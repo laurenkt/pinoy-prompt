@@ -3,7 +3,7 @@
 // fetched network-first so updates show up right away; other files are served
 // from cache and refreshed in the background.
 
-const CACHE = 'pinoy-prompt-v1';
+const CACHE = 'pinoy-prompt-v2';
 const SHELL = ['./manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png'];
 
 /** Fetch index.html and cache it along with the hashed JS/CSS it links to. */
@@ -14,6 +14,14 @@ async function cacheShell(cache) {
   const assets = [...html.matchAll(/(?:src|href)="(\.?\/?assets\/[^"]+)"/g)].map((m) => m[1]);
   await cache.put('./', response);
   await cache.addAll([...SHELL, ...assets]);
+  // Fonts are linked only from the CSS, so pull their URLs out of each cached stylesheet.
+  const fonts = [];
+  for (const css of assets.filter((a) => a.endsWith('.css'))) {
+    const base = new URL(css, self.location.href);
+    const text = await (await cache.match(css)).text();
+    for (const m of text.matchAll(/url\(["']?([^"')]+\.woff2)["']?\)/g)) fonts.push(new URL(m[1], base).href);
+  }
+  await cache.addAll([...new Set(fonts)]);
 }
 
 self.addEventListener('install', (event) => {

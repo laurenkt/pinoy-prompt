@@ -1,3 +1,4 @@
+import '@fontsource-variable/bricolage-grotesque';
 import './style.css';
 import type { App, Route, Tab } from './app';
 import { homeScreen } from './screens/home';
@@ -61,10 +62,10 @@ function render(route: Route): void {
 }
 
 function tabBar(active: Tab): HTMLElement {
-  const tabs: { id: Tab; label: string; icon: string; route: Route }[] = [
-    { id: 'home', label: 'Learn', icon: '🌱', route: { name: 'home' } },
-    { id: 'practice', label: 'Practice', icon: '🎯', route: { name: 'practice' } },
-    { id: 'words', label: 'Words', icon: '📖', route: { name: 'words' } },
+  const tabs: { id: Tab; label: string; route: Route }[] = [
+    { id: 'home', label: 'Learn', route: { name: 'home' } },
+    { id: 'practice', label: 'Practice', route: { name: 'practice' } },
+    { id: 'words', label: 'Words', route: { name: 'words' } },
   ];
   return h(
     'nav',
@@ -77,8 +78,7 @@ function tabBar(active: Tab): HTMLElement {
           'aria-current': t.id === active ? 'page' : undefined,
           onclick: () => app.navigate(t.route),
         },
-        h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, t.icon),
-        h('span', null, t.label),
+        t.label,
       ),
     ),
   );

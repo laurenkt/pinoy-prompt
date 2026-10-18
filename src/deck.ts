@@ -25,7 +25,6 @@ export interface Unit {
   title: string;
   /** Tagalog name for the unit. */
   tlTitle: string;
-  emoji: string;
   /** One or two sentences shown before the unit's first card. */
   intro: string;
   cards: Card[];
@@ -36,7 +35,6 @@ export const UNITS: Unit[] = [
     id: 'greetings',
     title: 'Greetings',
     tlTitle: 'Pagbati',
-    emoji: '👋',
     intro: 'Start with the words you will use every single day. Filipinos greet warmly, so these go a long way.',
     cards: [
       { id: 'kumusta', tl: 'Kumusta?', en: 'How are you? / Hello', kind: 'phrase', hint: 'koo-moos-TAH', note: 'The everyday "hello". It comes from the Spanish "¿cómo está?".' },
@@ -55,7 +53,6 @@ export const UNITS: Unit[] = [
     id: 'courtesy',
     title: 'Yes, no & politeness',
     tlTitle: 'Paggalang',
-    emoji: '🙏',
     intro: 'Respect is built into Tagalog. Adding "po" to a sentence makes it polite, especially with elders and strangers.',
     cards: [
       { id: 'oo', tl: 'Oo', en: 'Yes', kind: 'word', hint: 'OH-oh' },
@@ -72,7 +69,6 @@ export const UNITS: Unit[] = [
     id: 'meeting',
     title: 'Meeting people',
     tlTitle: 'Pagpapakilala',
-    emoji: '🤝',
     intro: 'Introduce yourself and get through your first conversation, even if you only understand a little.',
     cards: [
       { id: 'ano-pangalan', tl: 'Ano ang pangalan mo?', en: 'What is your name?', kind: 'phrase', hint: 'ah-NOH ahng pah-NGAH-lahn moh' },
@@ -91,7 +87,6 @@ export const UNITS: Unit[] = [
     id: 'numbers',
     title: 'Numbers 1–10',
     tlTitle: 'Mga Numero',
-    emoji: '🔢',
     intro: 'Count from one to ten. In shops and markets you will also hear Spanish numbers (uno, dos, tres) for prices and time.',
     cards: [
       { id: 'isa', tl: 'isa', en: 'one (1)', kind: 'word', hint: 'ee-SAH' },
@@ -110,7 +105,6 @@ export const UNITS: Unit[] = [
     id: 'questions',
     title: 'Question words',
     tlTitle: 'Mga Tanong',
-    emoji: '❓',
     intro: 'Six little words that unlock almost any question.',
     cards: [
       { id: 'ano', tl: 'Ano?', en: 'What?', kind: 'word', hint: 'ah-NOH' },
@@ -127,7 +121,6 @@ export const UNITS: Unit[] = [
     id: 'food',
     title: 'Food & eating',
     tlTitle: 'Pagkain',
-    emoji: '🍚',
     intro: 'Food is at the heart of Filipino life. Expect to be invited to eat, often!',
     cards: [
       { id: 'kain-tayo', tl: 'Kain tayo!', en: "Let's eat!", kind: 'phrase', hint: 'kah-EEN tah-YOH', note: 'A friendly invitation you will hear even from people already eating.' },
@@ -146,7 +139,6 @@ export const UNITS: Unit[] = [
     id: 'family',
     title: 'Family & friends',
     tlTitle: 'Pamilya',
-    emoji: '👨‍👩‍👧',
     intro: 'Family words are also used as friendly titles: you might call any older woman "Ate" or any older man "Kuya".',
     cards: [
       { id: 'nanay', tl: 'nanay', en: 'mother', kind: 'word', hint: 'NAH-nai' },
@@ -163,7 +155,6 @@ export const UNITS: Unit[] = [
     id: 'everyday',
     title: 'Everyday phrases',
     tlTitle: 'Pang-araw-araw',
-    emoji: '☀️',
     intro: 'Short phrases you will hear all the time, from the jeepney to the dinner table.',
     cards: [
       { id: 'tara-na', tl: 'Tara na!', en: "Let's go!", kind: 'phrase', hint: 'TAH-rah nah' },

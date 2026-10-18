@@ -11,7 +11,6 @@ export interface Settings {
 
 export interface Progress {
   cards: Record<string, CardState>;
-  streak: { count: number; lastDay: string | null };
   today: { day: string; newCount: number; reviewCount: number };
   settings: Settings;
 }
@@ -27,17 +26,9 @@ export function dayKey(time: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Yesterday's day key, safe across daylight-saving changes. */
-function previousDayKey(time: number): string {
-  const d = new Date(time);
-  d.setDate(d.getDate() - 1);
-  return dayKey(d.getTime());
-}
-
 export function emptyProgress(now: number): Progress {
   return {
     cards: {},
-    streak: { count: 0, lastDay: null },
     today: { day: dayKey(now), newCount: 0, reviewCount: 0 },
     settings: { ...DEFAULT_SETTINGS },
   };
@@ -49,6 +40,8 @@ export function load(now: number): Progress {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const saved = JSON.parse(raw) as Partial<Progress>;
+      // Older versions kept a day streak; drop it so it is not saved again.
+      delete (saved as Record<string, unknown>).streak;
       progress = {
         ...progress,
         ...saved,
@@ -88,21 +81,5 @@ export function recordAnswer(progress: Progress, cardId: string, rating: Rating,
   if (!existing) progress.today.newCount++;
   else progress.today.reviewCount++;
   progress.cards[cardId] = review(existing ?? newCardState(now), rating, now);
-  markStudied(progress, now);
   return progress;
-}
-
-function markStudied(progress: Progress, now: number): void {
-  const today = dayKey(now);
-  const { lastDay } = progress.streak;
-  if (lastDay === today) return;
-  const yesterday = previousDayKey(now);
-  progress.streak = { count: lastDay === yesterday ? progress.streak.count + 1 : 1, lastDay: today };
-}
-
-/** The streak as it stands now; it lapses if yesterday was missed. */
-export function currentStreak(progress: Progress, now: number): number {
-  const { lastDay, count } = progress.streak;
-  if (lastDay === dayKey(now) || lastDay === previousDayKey(now)) return count;
-  return 0;
 }

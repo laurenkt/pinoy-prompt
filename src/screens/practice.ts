@@ -3,7 +3,7 @@ import { ALL_CARDS, getCard, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { play, speechSupported } from '../speech';
-import { audioButton, h, progressBar } from '../ui';
+import { audioButton, h, icon, progressBar } from '../ui';
 
 type Mode = 'listen' | 'read' | 'recall';
 type MenuMode = Mode | 'mix';
@@ -11,11 +11,11 @@ type MenuMode = Mode | 'mix';
 const ROUND_SIZE = 10;
 const MIN_CARDS = 4;
 
-const MODES: { id: MenuMode; icon: string; title: string; desc: string }[] = [
-  { id: 'listen', icon: '🎧', title: 'Listen', desc: 'Hear Tagalog, pick the meaning' },
-  { id: 'read', icon: '👀', title: 'Read', desc: 'See Tagalog, pick the meaning' },
-  { id: 'recall', icon: '💬', title: 'Recall', desc: 'See English, pick the Tagalog' },
-  { id: 'mix', icon: '🎲', title: 'Mix it up', desc: 'A bit of everything' },
+const MODES: { id: MenuMode; title: string; desc: string }[] = [
+  { id: 'listen', title: 'Listen', desc: 'Hear Tagalog, pick the meaning' },
+  { id: 'read', title: 'Read', desc: 'See Tagalog, pick the meaning' },
+  { id: 'recall', title: 'Recall', desc: 'See English, pick the Tagalog' },
+  { id: 'mix', title: 'Mix it up', desc: 'A bit of everything' },
 ];
 
 interface Question {
@@ -106,7 +106,6 @@ export function practiceScreen(app: App): HTMLElement {
         h(
           'section',
           { class: 'card center' },
-          h('div', { class: 'big-emoji', 'aria-hidden': 'true' }, '🌱'),
           h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to play with them.`),
           h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'home' }) }, 'Go to lessons'),
         ),
@@ -124,8 +123,7 @@ export function practiceScreen(app: App): HTMLElement {
           const disabled = m.id === 'listen' && !canListen;
           return h(
             'button',
-            { class: 'mode', disabled, onclick: () => start(m.id) },
-            h('span', { class: 'mode-icon', 'aria-hidden': 'true' }, m.icon),
+            { class: `mode mode-${m.id}`, disabled, onclick: () => start(m.id) },
             h('span', { class: 'mode-title' }, m.title),
             h('span', { class: 'mode-desc' }, disabled ? 'No voice on this device' : m.desc),
           );
@@ -144,7 +142,7 @@ export function practiceScreen(app: App): HTMLElement {
     if (q.mode === 'listen') {
       prompt = h(
         'div',
-        { class: 'center' },
+        { class: 'prompt center' },
         h('p', { class: 'eyebrow' }, 'What did you hear?'),
         h('div', { class: 'audio-group big' }, audioButton(() => say(), 'Play again', 'huge'), audioButton(() => say(true), 'Play slowly', 'slow')),
         answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
@@ -152,12 +150,12 @@ export function practiceScreen(app: App): HTMLElement {
     } else if (q.mode === 'read') {
       prompt = h(
         'div',
-        null,
+        { class: 'prompt' },
         h('p', { class: 'eyebrow' }, 'What does this mean?'),
         h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
       );
     } else {
-      prompt = h('div', null, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
+      prompt = h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
     }
 
     return h(
@@ -166,9 +164,9 @@ export function practiceScreen(app: App): HTMLElement {
       h(
         'header',
         { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'End practice', onclick: () => app.navigate({ name: 'practice' }) }, '✕'),
+        h('button', { class: 'icon-btn', 'aria-label': 'End practice', onclick: () => app.navigate({ name: 'practice' }) }, icon('close')),
         progressBar(index, questions.length, 'Round progress'),
-        h('span', { class: 'session-title' }, `${score} ✓`),
+        h('span', { class: 'session-title' }, `${score} right`),
       ),
       h(
         'div',
@@ -210,9 +208,8 @@ export function practiceScreen(app: App): HTMLElement {
     return h(
       'div',
       { class: 'panel center' },
-      h('div', { class: 'big-emoji', 'aria-hidden': 'true' }, perfect ? '🏆' : score >= questions.length / 2 ? '⭐' : '💪'),
       h('h2', null, `${score} / ${questions.length}`),
-      h('p', null, perfect ? 'Perpekto! Perfect round.' : score >= questions.length / 2 ? 'Magaling! Nice work.' : 'Kaya mo yan! You can do it. Try another round.'),
+      h('p', null, perfect ? 'Perpekto! Perfect round.' : score >= questions.length / 2 ? 'Magaling! Nice work.' : 'Kaya mo yan! You can do it.'),
       h(
         'div',
         { class: 'row' },
