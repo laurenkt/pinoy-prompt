@@ -34,12 +34,32 @@ function append(el: Element, children: Child[]): void {
   }
 }
 
-/** A round speaker button that plays a card's audio. */
+const ICONS = {
+  speaker: '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  settings: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+};
+
+export type IconName = keyof typeof ICONS;
+
+/** A decorative stroke icon that takes the text color. */
+export function icon(name: IconName): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'icon');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = ICONS[name];
+  return svg;
+}
+
+/** A speaker button that plays a card's audio; the slow one is labelled 0.5×. */
 export function audioButton(onPlay: () => void, label = 'Play audio', extraClass = ''): HTMLButtonElement {
   return h(
     'button',
     { class: `audio-btn ${extraClass}`.trim(), 'aria-label': label, title: label, onclick: onPlay },
-    h('span', { 'aria-hidden': 'true' }, extraClass.includes('slow') ? '🐢' : '🔊'),
+    extraClass.includes('slow') ? h('span', { 'aria-hidden': 'true' }, '0.5×') : icon('speaker'),
   );
 }
 

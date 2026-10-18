@@ -3,7 +3,7 @@ import { UNITS } from '../deck';
 import { isIntroduced, isUnlocked } from '../session';
 import { isMature } from '../srs';
 import { play } from '../speech';
-import { audioButton, h } from '../ui';
+import { audioButton, h, icon } from '../ui';
 
 /** A phrasebook of every unit. Tap any card to hear it, learned or not. */
 export function wordsScreen(app: App, openUnitId?: string): HTMLElement {
@@ -12,7 +12,7 @@ export function wordsScreen(app: App, openUnitId?: string): HTMLElement {
     'div',
     { class: 'words' },
     h('h1', null, 'Words'),
-    h('p', { class: 'muted' }, 'Your phrasebook. Tap 🔊 to hear any word, even ones you have not learned yet.'),
+    h('p', { class: 'muted' }, 'Your phrasebook. Tap the speaker to hear any word, even ones you have not learned yet.'),
     UNITS.map((unit, i) => {
       const learned = unit.cards.filter((c) => isIntroduced(progress, c.id)).length;
       return h(
@@ -21,9 +21,9 @@ export function wordsScreen(app: App, openUnitId?: string): HTMLElement {
         h(
           'summary',
           null,
-          h('span', { class: 'unit-emoji', 'aria-hidden': 'true' }, unit.emoji),
+          h('span', { class: 'unit-num', 'aria-hidden': 'true' }, i + 1),
           h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, unit.title), h('span', { class: 'unit-tl' }, unit.tlTitle)),
-          h('span', { class: 'unit-count' }, isUnlocked(progress, i) ? `${learned}/${unit.cards.length}` : '🔒'),
+          h('span', { class: 'unit-count' }, isUnlocked(progress, i) ? `${learned}/${unit.cards.length}` : h('span', { 'aria-label': 'Locked' }, icon('lock'))),
         ),
         h(
           'ul',

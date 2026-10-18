@@ -1,11 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0038a8"/>
-  <path d="M0 256h512v144a112 112 0 0 1-112 112H112A112 112 0 0 1 0 400z" fill="#ce1126"/>
-  <path d="M0 112A112 112 0 0 1 112 0h0L300 256 112 512A112 112 0 0 1 0 400z" fill="#fffaf0"/>
-  <circle cx="110" cy="256" r="44" fill="#fcd116"/>
-  <g fill="#fcd116">
-    <circle cx="44" cy="120" r="14"/><circle cx="44" cy="392" r="14"/><circle cx="222" cy="256" r="14"/>
+  <rect width="512" height="512" rx="112" fill="#17123b"/>
+  <rect x="132" y="132" width="268" height="268" rx="56" fill="#0c0924"/>
+  <rect x="112" y="112" width="268" height="268" rx="56" fill="#2ec4b6" stroke="#0c0924" stroke-width="14"/>
+  <g transform="rotate(45 380 132)" fill="#ffb627" stroke="#0c0924" stroke-width="10">
+    <rect x="338" y="90" width="84" height="84" rx="14"/>
   </g>
-  <path d="M300 170h120a40 40 0 0 1 40 40v60a40 40 0 0 1-40 40h-50l-40 36v-36h-30a40 40 0 0 1-40-40v-60a40 40 0 0 1 40-40z" fill="#fff" stroke="#1d1d1f" stroke-width="0"/>
-  <text x="360" y="262" font-family="system-ui, sans-serif" font-size="64" font-weight="800" fill="#0038a8" text-anchor="middle">Po</text>
+  <rect x="352" y="104" width="12" height="56" fill="#e83f6f" transform="rotate(45 380 132)"/>
+  <rect x="396" y="104" width="12" height="56" fill="#e83f6f" transform="rotate(45 380 132)"/>
+  <text x="246" y="294" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="150" font-weight="800" fill="#17123b" text-anchor="middle" letter-spacing="-6">Po</text>
 </svg>

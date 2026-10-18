@@ -3,7 +3,7 @@
 // fetched network-first so updates show up right away; other files are served
 // from cache and refreshed in the background.
 
-const CACHE = 'pinoy-prompt-v1';
+const CACHE = 'pinoy-prompt-v2';
 const SHELL = ['./manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png'];
 
 /** Fetch index.html and cache it along with the hashed JS/CSS it links to. */

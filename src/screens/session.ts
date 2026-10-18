@@ -1,10 +1,10 @@
 import type { App } from '../app';
-import { getCard, unitOf, type Card } from '../deck';
+import { UNITS, getCard, unitOf, type Card } from '../deck';
 import { distractors, isIntroduced, requeue, shuffle, type Step } from '../session';
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { play } from '../speech';
 import { recordAnswer } from '../store';
-import { audioButton, h, progressBar } from '../ui';
+import { audioButton, h, icon, progressBar } from '../ui';
 
 type Phase = 'unit-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'done';
 
@@ -106,7 +106,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
       h(
         'header',
         { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Close session', onclick: () => app.navigate({ name: 'home' }) }, '✕'),
+        h('button', { class: 'icon-btn', 'aria-label': 'Close session', onclick: () => app.navigate({ name: 'home' }) }, icon('close')),
         progressBar(completed, completed + remaining, 'Session progress'),
         title ? h('span', { class: 'session-title' }, title) : null,
       ),
@@ -136,8 +136,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     return h(
       'div',
       { class: 'panel center' },
-      h('div', { class: 'big-emoji', 'aria-hidden': 'true' }, unit?.emoji),
-      h('p', { class: 'eyebrow' }, 'New unit'),
+      h('p', { class: 'eyebrow' }, unit ? `Unit ${UNITS.indexOf(unit) + 1} · New unit` : 'New unit'),
       h('h2', null, unit?.title),
       h('p', { class: 'tl-sub' }, unit?.tlTitle),
       h('p', null, unit?.intro),
@@ -161,11 +160,10 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     return h(
       'div',
       { class: 'panel' },
-      h('p', { class: 'eyebrow' }, c.kind === 'phrase' ? 'New phrase' : 'New word'),
-      tagalog(c),
+      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, c.kind === 'phrase' ? 'New phrase' : 'New word'), tagalog(c)),
       c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
       h('p', { class: 'meaning' }, c.en),
-      c.note && h('p', { class: 'note' }, '💡 ', c.note),
+      c.note && h('p', { class: 'note' }, c.note),
       h('p', { class: 'muted small' }, 'Listen, then say it out loud a couple of times.'),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: startQuiz }, 'Got it, quiz me'),
     );
@@ -177,8 +175,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     return h(
       'div',
       { class: 'panel' },
-      h('p', { class: 'eyebrow' }, 'What does this mean?'),
-      tagalog(c),
+      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'What does this mean?'), tagalog(c)),
       h(
         'div',
         { class: 'choices' },
@@ -212,8 +209,8 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     const state = app.progress.cards[c.id] ?? newCardState(app.now());
     const showBack = phase === 'back';
     const prompt = reverse
-      ? h('div', null, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, c.en))
-      : h('div', null, h('p', { class: 'eyebrow' }, 'Do you remember?'), tagalog(c));
+      ? h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, c.en))
+      : h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Do you remember?'), tagalog(c));
 
     return h(
       'div',
@@ -254,8 +251,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     return h(
       'div',
       { class: 'panel center' },
-      h('div', { class: 'big-emoji', 'aria-hidden': 'true' }, '🎉'),
-      h('h2', null, stats.answered ? 'Magaling! Great work.' : 'Nothing to study right now'),
+      h('h2', null, stats.answered ? 'Session finished' : 'Nothing to study right now'),
       stats.answered > 0 &&
         h(
           'div',
