@@ -50,20 +50,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    // ignoreVary: module scripts send an Origin header that a cached "Vary: Origin" entry would otherwise miss.
-    caches.match(request, { ignoreVary: true }).then((cached) => {
-      const fresh = fetch(request)
-        .then((response) => {
-          // 200 only: partial (206) responses, e.g. audio range requests, can't be cached.
-          if (response.status === 200) {
-            const copy = response.clone();
-            event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)));
-          }
-          return response;
-        })
-        .catch(() => cached || Response.error());
-      return cached || fresh;
-    }),
-  );
+  // ignoreVary: module scripts send an Origin header that a cached "Vary: Origin" entry would otherwise miss.
+  const cached = caches.match(request, { ignoreVary: true });
+  const fresh = fetch(request).then(async (response) => {
+    // 200 only: partial (206) responses, e.g. audio range requests, can't be cached.
+    if (response.status === 200) {
+      const cache = await caches.open(CACHE);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  });
+  event.respondWith(cached.then((hit) => hit || fresh).catch(() => Response.error()));
+  // Keep the worker alive until the background refresh has been cached.
+  event.waitUntil(fresh.catch(() => {}));
 });
