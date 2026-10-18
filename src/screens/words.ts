@@ -23,7 +23,7 @@ export function wordsScreen(app: App, openUnitId?: string): HTMLElement {
           null,
           h('span', { class: 'unit-num', 'aria-hidden': 'true' }, i + 1),
           h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, unit.title), h('span', { class: 'unit-tl' }, unit.tlTitle)),
-          h('span', { class: 'unit-count' }, isUnlocked(progress, i) ? `${learned}/${unit.cards.length}` : h('span', { 'aria-label': 'Locked' }, icon('lock'))),
+          h('span', { class: 'unit-count' }, isUnlocked(progress, i) ? `${learned}/${unit.cards.length}` : h('span', { role: 'img', 'aria-label': 'Locked' }, icon('lock'))),
         ),
         h(
           'ul',

@@ -15,13 +15,12 @@
   --pink: #ff6b92;
   --teal: #2ec4b6;
   --on-accent: #17123b;
-  --wrong-bg: #3a1640;
-  --right-bg: #12384a;
   --outline: 3px solid var(--ink);
   --shadow: 4px 4px 0 var(--ink);
   --shadow-big: 6px 6px 0 var(--ink);
   --radius: 20px;
   --tabbar-h: 64px;
+  --font-sans: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: dark;
 }
 
@@ -34,7 +33,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   font-size: 17px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
@@ -152,7 +151,6 @@ p {
 }
 
 .btn:active,
-.choice:active,
 .rate:active,
 .unit:active,
 .mode:active,
@@ -256,6 +254,10 @@ p {
     repeating-linear-gradient(0deg, var(--on-accent) 0 8px, transparent 8px 16px);
   opacity: 0.5;
   pointer-events: none;
+}
+
+.today > * {
+  position: relative;
 }
 
 .today h2 {
@@ -488,13 +490,17 @@ p {
   height: 48px;
   border-radius: 14px;
   border: var(--outline);
-  background: var(--on-accent);
+  background: var(--ink);
   color: var(--saffron);
   display: grid;
   place-items: center;
   font-size: 1.2rem;
   font-weight: 800;
   flex: none;
+}
+
+.audio-btn:not(.prompt .audio-btn) {
+  border-color: var(--line);
 }
 
 .audio-btn.slow {
@@ -518,7 +524,7 @@ p {
 }
 
 .hint .muted {
-  font-family: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .meaning {
@@ -751,6 +757,11 @@ p {
   padding: 14px;
   cursor: pointer;
   list-style: none;
+}
+
+.unit-list summary:focus-visible {
+  outline-offset: -6px;
+  outline-color: var(--on-accent);
 }
 
 .unit-list summary::-webkit-details-marker {
