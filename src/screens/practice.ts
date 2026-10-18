@@ -44,7 +44,7 @@ function pickRound(app: App, size: number): Card[] {
 
 export function practiceScreen(app: App): HTMLElement {
   const root = h('div', { class: 'practice' });
-  const learned = Object.keys(app.progress.cards).length;
+  const learned = Object.keys(app.progress.cards).filter((id) => getCard(id)).length;
   const canListen = speechSupported();
 
   let questions: Question[] = [];

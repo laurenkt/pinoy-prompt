@@ -1,5 +1,5 @@
 import type { App } from '../app';
-import { UNITS } from '../deck';
+import { UNITS, getCard } from '../deck';
 import {
   buildSession,
   buildUnitSession,
@@ -25,7 +25,8 @@ export function homeScreen(app: App): HTMLElement {
   const { progress } = app;
   const now = app.now();
   const hello = greeting(new Date(now).getHours());
-  const states = Object.values(progress.cards);
+  // Only cards still in the deck count; saved progress may outlive removed cards.
+  const states = Object.entries(progress.cards).filter(([id]) => getCard(id)).map(([, s]) => s);
   const learned = states.length;
   const known = states.filter(isMature).length;
   const streak = currentStreak(progress, now);
