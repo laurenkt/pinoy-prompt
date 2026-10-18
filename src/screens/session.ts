@@ -34,8 +34,10 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
   const autoplay = () => app.progress.settings.autoplay && say();
 
   function next(): void {
-    step = queue.shift();
-    card = step && getCard(step.cardId);
+    do {
+      step = queue.shift();
+      card = step && getCard(step.cardId);
+    } while (step && !card);
     picked = null;
     if (!step || !card) {
       phase = 'done';
@@ -186,6 +188,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
             {
               class: `choice ${answered && choice.id === c.id ? 'correct' : ''} ${answered && choice.id === picked && !right ? 'wrong' : ''}`,
               disabled: answered,
+              'data-autofocus': (!answered && i === 0) || undefined,
               onclick: () => pick(choice),
             },
             h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),

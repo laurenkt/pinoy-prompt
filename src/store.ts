@@ -27,6 +27,13 @@ export function dayKey(time: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Yesterday's day key, safe across daylight-saving changes. */
+function previousDayKey(time: number): string {
+  const d = new Date(time);
+  d.setDate(d.getDate() - 1);
+  return dayKey(d.getTime());
+}
+
 export function emptyProgress(now: number): Progress {
   return {
     cards: {},
@@ -89,13 +96,13 @@ function markStudied(progress: Progress, now: number): void {
   const today = dayKey(now);
   const { lastDay } = progress.streak;
   if (lastDay === today) return;
-  const yesterday = dayKey(now - 24 * 60 * 60 * 1000);
+  const yesterday = previousDayKey(now);
   progress.streak = { count: lastDay === yesterday ? progress.streak.count + 1 : 1, lastDay: today };
 }
 
 /** The streak as it stands now; it lapses if yesterday was missed. */
 export function currentStreak(progress: Progress, now: number): number {
   const { lastDay, count } = progress.streak;
-  if (lastDay === dayKey(now) || lastDay === dayKey(now - 24 * 60 * 60 * 1000)) return count;
+  if (lastDay === dayKey(now) || lastDay === previousDayKey(now)) return count;
   return 0;
 }

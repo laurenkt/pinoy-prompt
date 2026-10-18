@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { ALL_CARDS, getCard, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
-import { play, speechSupported, voiceQuality } from '../speech';
+import { play, speechSupported } from '../speech';
 import { audioButton, h, progressBar } from '../ui';
 
 type Mode = 'listen' | 'read' | 'recall';
@@ -45,7 +45,7 @@ function pickRound(app: App, size: number): Card[] {
 export function practiceScreen(app: App): HTMLElement {
   const root = h('div', { class: 'practice' });
   const learned = Object.keys(app.progress.cards).length;
-  const canListen = speechSupported() && voiceQuality() !== 'none';
+  const canListen = speechSupported();
 
   let questions: Question[] = [];
   let index = 0;
@@ -183,6 +183,7 @@ export function practiceScreen(app: App): HTMLElement {
               {
                 class: `choice ${answered && choice.id === q.card.id ? 'correct' : ''} ${answered && choice.id === picked && !right ? 'wrong' : ''}`,
                 disabled: answered,
+                'data-autofocus': (!answered && i === 0) || undefined,
                 lang: field === 'tl' ? 'fil' : undefined,
                 onclick: () => choose(choice),
               },

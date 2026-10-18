@@ -48,8 +48,8 @@ export function initVoices(): Promise<void> {
 }
 
 export function voiceQuality(): VoiceQuality {
-  if (!speechSupported() || !voice) return 'none';
-  const lang = voice.lang.toLowerCase();
+  if (!speechSupported()) return 'none';
+  const lang = voice?.lang.toLowerCase() ?? '';
   return lang.startsWith('fil') || lang.startsWith('tl') ? 'native' : 'approximate';
 }
 

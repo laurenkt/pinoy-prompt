@@ -1,7 +1,7 @@
 // Builds a study session and tracks it as the learner works through it.
 // Kept free of DOM code so it can be unit tested.
 
-import { ALL_CARDS, UNITS, type Card, type Unit } from './deck';
+import { ALL_CARDS, UNITS, getCard, type Card, type Unit } from './deck';
 import { isDue } from './srs';
 import type { Progress } from './store';
 
@@ -34,7 +34,8 @@ export function isUnlocked(progress: Progress, unitIndex: number): boolean {
 
 export function dueCards(progress: Progress, now: number): string[] {
   return Object.entries(progress.cards)
-    .filter(([, state]) => isDue(state, now))
+    // Skip progress for cards since removed from the deck.
+    .filter(([id, state]) => isDue(state, now) && getCard(id))
     .sort(([, a], [, b]) => a.due - b.due)
     .map(([id]) => id);
 }

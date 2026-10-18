@@ -17,6 +17,17 @@ describe('streaks', () => {
   });
 });
 
+describe('streaks across daylight saving', () => {
+  it('counts the day before a short (spring-forward) day as yesterday', () => {
+    const p = emptyProgress(NOW);
+    const before = new Date(2026, 2, 7, 23, 30).getTime();
+    const after = new Date(2026, 2, 8, 0, 30).getTime();
+    recordAnswer(p, 'isa', 'good', before);
+    recordAnswer(p, 'dalawa', 'good', after);
+    expect(p.streak.count).toBe(2);
+  });
+});
+
 describe('daily counters', () => {
   it('counts new cards and reviews, and resets on a new day', () => {
     let p = emptyProgress(NOW);

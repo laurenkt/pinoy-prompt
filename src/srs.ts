@@ -67,7 +67,7 @@ export function review(card: CardState, rating: Rating, now: number): CardState 
       break;
   }
   next.reps = card.reps + 1;
-  next.due = now + interval * DAY_MS;
+  next.due = startOfDayAfter(now, interval);
   return next;
 }
 
@@ -86,6 +86,17 @@ export function formatInterval(days: number): string {
   if (days < 30) return `${Math.round(days)}d`;
   if (days < 365) return `${Math.round(days / 30)}mo`;
   return `${round1(days / 365)}y`;
+}
+
+/**
+ * Local midnight of the day an interval lands on, so a card due "in 1 day" is
+ * ready first thing tomorrow rather than at this exact time tomorrow.
+ */
+export function startOfDayAfter(now: number, days: number): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + Math.round(days));
+  return d.getTime();
 }
 
 function round1(n: number): number {

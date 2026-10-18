@@ -84,6 +84,15 @@ function tabBar(active: Tab): HTMLElement {
   );
 }
 
+// A held Enter or Space would otherwise click through several screens at once.
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if (e.repeat && (e.key === 'Enter' || e.key === ' ')) e.preventDefault();
+  },
+  { capture: true },
+);
+
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   keyHandler?.(e);

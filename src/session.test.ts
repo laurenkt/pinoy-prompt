@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_CARDS, UNITS } from './deck';
-import { buildSession, buildUnitSession, distractors, isUnlocked, requeue, upcomingNewCards } from './session';
+import { buildSession, buildUnitSession, distractors, dueCards, isUnlocked, requeue, upcomingNewCards } from './session';
 import { DAY_MS } from './srs';
 import { emptyProgress, recordAnswer } from './store';
 
@@ -28,6 +28,15 @@ describe('buildSession', () => {
     const progress = emptyProgress(NOW);
     for (const card of UNITS[0].cards.slice(0, 8)) recordAnswer(progress, card.id, 'good', NOW);
     expect(buildSession(progress, NOW)).toEqual([]);
+  });
+});
+
+describe('dueCards', () => {
+  it('ignores saved progress for cards no longer in the deck', () => {
+    const progress = emptyProgress(NOW);
+    recordAnswer(progress, 'isa', 'good', NOW);
+    recordAnswer(progress, 'removed-card', 'good', NOW);
+    expect(dueCards(progress, NOW + 2 * DAY_MS)).toEqual(['isa']);
   });
 });
 
