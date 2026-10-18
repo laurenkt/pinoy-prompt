@@ -1,0 +1,235 @@
+import type { App } from '../app';
+import { ALL_CARDS, getCard, type Card } from '../deck';
+import { distractors, shuffle } from '../session';
+import type { CardState } from '../srs';
+import { play, speechSupported } from '../speech';
+import { audioButton, h, progressBar } from '../ui';
+
+type Mode = 'listen' | 'read' | 'recall';
+type MenuMode = Mode | 'mix';
+
+const ROUND_SIZE = 10;
+const MIN_CARDS = 4;
+
+const MODES: { id: MenuMode; icon: string; title: string; desc: string }[] = [
+  { id: 'listen', icon: '🎧', title: 'Listen', desc: 'Hear Tagalog, pick the meaning' },
+  { id: 'read', icon: '👀', title: 'Read', desc: 'See Tagalog, pick the meaning' },
+  { id: 'recall', icon: '💬', title: 'Recall', desc: 'See English, pick the Tagalog' },
+  { id: 'mix', icon: '🎲', title: 'Mix it up', desc: 'A bit of everything' },
+];
+
+interface Question {
+  card: Card;
+  mode: Mode;
+  choices: Card[];
+}
+
+/** Weaker cards (missed often, low ease, short interval) come up more. */
+function weight(state: CardState): number {
+  return 1 + state.lapses * 2 + Math.max(0, 3 - state.ease) * 2 + (state.interval < 3 ? 2 : 0);
+}
+
+function pickRound(app: App, size: number): Card[] {
+  const pool = Object.entries(app.progress.cards).map(([id, state]) => ({ card: getCard(id)!, w: weight(state) }))
+    .filter((p) => p.card);
+  const picked: Card[] = [];
+  while (picked.length < size && pool.length > 0) {
+    const total = pool.reduce((sum, p) => sum + p.w, 0);
+    let r = Math.random() * total;
+    const i = pool.findIndex((p) => (r -= p.w) <= 0);
+    picked.push(pool.splice(i === -1 ? pool.length - 1 : i, 1)[0].card);
+  }
+  return picked;
+}
+
+export function practiceScreen(app: App): HTMLElement {
+  const root = h('div', { class: 'practice' });
+  const learned = Object.keys(app.progress.cards).length;
+  const canListen = speechSupported();
+
+  let questions: Question[] = [];
+  let index = 0;
+  let picked: string | null = null;
+  let score = 0;
+  let lastMode: MenuMode = 'mix';
+
+  function start(menuMode: MenuMode): void {
+    lastMode = menuMode;
+    const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter(Boolean);
+    const distractorPool = known.length >= 6 ? known : ALL_CARDS;
+    const modes: Mode[] = canListen ? ['listen', 'read', 'recall'] : ['read', 'recall'];
+    questions = pickRound(app, ROUND_SIZE).map((card) => {
+      const mode = menuMode === 'mix' ? modes[Math.floor(Math.random() * modes.length)] : menuMode;
+      const field = mode === 'recall' ? 'tl' : 'en';
+      return { card, mode, choices: shuffle([card, ...distractors(card, field, 3, distractorPool)]) };
+    });
+    index = 0;
+    score = 0;
+    picked = null;
+    ask();
+  }
+
+  function ask(): void {
+    draw();
+    const q = questions[index];
+    if (q && q.mode !== 'recall' && (q.mode === 'listen' || app.progress.settings.autoplay)) void play(q.card);
+  }
+
+  function choose(choice: Card): void {
+    const q = questions[index];
+    if (!q || picked) return;
+    picked = choice.id;
+    if (choice.id === q.card.id) score++;
+    if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
+    draw();
+  }
+
+  function advance(): void {
+    index++;
+    picked = null;
+    ask();
+  }
+
+  function draw(): void {
+    if (questions.length === 0) root.replaceChildren(menu());
+    else if (index >= questions.length) root.replaceChildren(results());
+    else root.replaceChildren(questionView(questions[index]));
+    root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
+  }
+
+  function menu(): HTMLElement {
+    if (learned < MIN_CARDS) {
+      return h(
+        'div',
+        null,
+        h('h1', null, 'Practice'),
+        h(
+          'section',
+          { class: 'card center' },
+          h('div', { class: 'big-emoji', 'aria-hidden': 'true' }, '🌱'),
+          h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to play with them.`),
+          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'home' }) }, 'Go to lessons'),
+        ),
+      );
+    }
+    return h(
+      'div',
+      null,
+      h('h1', null, 'Practice'),
+      h('p', { class: 'muted' }, `Quick rounds of ${ROUND_SIZE} using the ${learned} words you know. Practice doesn't change your review schedule, so play as much as you like.`),
+      h(
+        'div',
+        { class: 'modes' },
+        MODES.map((m) => {
+          const disabled = m.id === 'listen' && !canListen;
+          return h(
+            'button',
+            { class: 'mode', disabled, onclick: () => start(m.id) },
+            h('span', { class: 'mode-icon', 'aria-hidden': 'true' }, m.icon),
+            h('span', { class: 'mode-title' }, m.title),
+            h('span', { class: 'mode-desc' }, disabled ? 'No voice on this device' : m.desc),
+          );
+        }),
+      ),
+    );
+  }
+
+  function questionView(q: Question): HTMLElement {
+    const answered = picked !== null;
+    const right = picked === q.card.id;
+    const field = q.mode === 'recall' ? 'tl' : 'en';
+    const say = (slow = false) => void play(q.card, slow);
+
+    let prompt: HTMLElement;
+    if (q.mode === 'listen') {
+      prompt = h(
+        'div',
+        { class: 'center' },
+        h('p', { class: 'eyebrow' }, 'What did you hear?'),
+        h('div', { class: 'audio-group big' }, audioButton(() => say(), 'Play again', 'huge'), audioButton(() => say(true), 'Play slowly', 'slow')),
+        answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
+      );
+    } else if (q.mode === 'read') {
+      prompt = h(
+        'div',
+        null,
+        h('p', { class: 'eyebrow' }, 'What does this mean?'),
+        h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
+      );
+    } else {
+      prompt = h('div', null, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
+    }
+
+    return h(
+      'div',
+      { class: 'session' },
+      h(
+        'header',
+        { class: 'session-header' },
+        h('button', { class: 'icon-btn', 'aria-label': 'End practice', onclick: () => app.navigate({ name: 'practice' }) }, '✕'),
+        progressBar(index, questions.length, 'Round progress'),
+        h('span', { class: 'session-title' }, `${score} ✓`),
+      ),
+      h(
+        'div',
+        { class: 'panel' },
+        prompt,
+        h(
+          'div',
+          { class: 'choices' },
+          q.choices.map((choice, i) =>
+            h(
+              'button',
+              {
+                class: `choice ${answered && choice.id === q.card.id ? 'correct' : ''} ${answered && choice.id === picked && !right ? 'wrong' : ''}`,
+                disabled: answered,
+                'data-autofocus': (!answered && i === 0) || undefined,
+                lang: field === 'tl' ? 'fil' : undefined,
+                onclick: () => choose(choice),
+              },
+              h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
+              choice[field],
+            ),
+          ),
+        ),
+        answered &&
+          h(
+            'div',
+            { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
+            h('strong', null, right ? 'Tama!' : 'Mali.'),
+            ' ',
+            `${q.card.tl} = ${q.card.en}`,
+          ),
+        answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: advance }, 'Next'),
+      ),
+    );
+  }
+
+  function results(): HTMLElement {
+    const perfect = score === questions.length;
+    return h(
+      'div',
+      { class: 'panel center' },
+      h('div', { class: 'big-emoji', 'aria-hidden': 'true' }, perfect ? '🏆' : score >= questions.length / 2 ? '⭐' : '💪'),
+      h('h2', null, `${score} / ${questions.length}`),
+      h('p', null, perfect ? 'Perpekto! Perfect round.' : score >= questions.length / 2 ? 'Magaling! Nice work.' : 'Kaya mo yan! You can do it. Try another round.'),
+      h(
+        'div',
+        { class: 'row' },
+        h('button', { class: 'btn secondary', onclick: () => { questions = []; draw(); } }, 'Change mode'),
+        h('button', { class: 'btn primary', 'data-autofocus': true, onclick: () => start(lastMode) }, 'Play again'),
+      ),
+    );
+  }
+
+  app.onKey((e) => {
+    const q = questions[index];
+    if (!q) return;
+    if (e.key === 'r' || e.key === 'R') return void play(q.card);
+    const n = Number(e.key);
+    if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
+  });
+
+  draw();
+  return root;
+}

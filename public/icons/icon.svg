@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0038a8"/>
+  <path d="M0 256h512v144a112 112 0 0 1-112 112H112A112 112 0 0 1 0 400z" fill="#ce1126"/>
+  <path d="M0 112A112 112 0 0 1 112 0h0L300 256 112 512A112 112 0 0 1 0 400z" fill="#fffaf0"/>
+  <circle cx="110" cy="256" r="44" fill="#fcd116"/>
+  <g fill="#fcd116">
+    <circle cx="44" cy="120" r="14"/><circle cx="44" cy="392" r="14"/><circle cx="222" cy="256" r="14"/>
+  </g>
+  <path d="M300 170h120a40 40 0 0 1 40 40v60a40 40 0 0 1-40 40h-50l-40 36v-36h-30a40 40 0 0 1-40-40v-60a40 40 0 0 1 40-40z" fill="#fff" stroke="#1d1d1f" stroke-width="0"/>
+  <text x="360" y="262" font-family="system-ui, sans-serif" font-size="64" font-weight="800" fill="#0038a8" text-anchor="middle">Po</text>
+</svg>

@@ -1,0 +1,19 @@
+{
+  "name": "pinoy-prompt",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A beginner-friendly PWA for learning Tagalog with spaced repetition.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}
