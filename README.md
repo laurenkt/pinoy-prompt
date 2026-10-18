@@ -2,6 +2,8 @@
 
 A small, phone-first web app for learning beginner Tagalog with spaced repetition. Install it to your home screen and it works offline.
 
+**Try it:** https://laurenkt.github.io/pinoy-prompt/ (open on your phone, then "Add to Home Screen").
+
 ## How it works
 
 - **Learn**: each day introduces a handful of new words and phrases (8 by default). Every new card shows the Tagalog, audio, a pronunciation guide, the meaning and a usage tip, followed by a quick multiple-choice check.
@@ -42,4 +44,4 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 
 ## Deploying
 
-`.github/workflows/deploy.yml` publishes to GitHub Pages on every push to `main`. Enable it once under **Settings › Pages › Source: GitHub Actions**. The build uses relative paths, so it also works from any static host.
+`.github/workflows/deploy.yml` publishes to GitHub Pages on every push to `main` (Pages is enabled with **Settings › Pages › Source: GitHub Actions**). The build uses relative paths, so it also works from any static host.
