@@ -37,7 +37,7 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 | `src/deck.ts` | All lesson content. Add units or cards here. |
 | `src/srs.ts` | The scheduler. |
 | `src/session.ts` | Building study sessions, unit unlocking, quiz distractors. |
-| `src/store.ts` | Saved progress, streaks and settings. |
+| `src/store.ts` | Saved progress, daily counters and settings. |
 | `src/speech.ts` | Audio playback and voice selection. |
 | `src/screens/` | One file per screen. |
 | `public/sw.js` | Service worker for offline use. |
