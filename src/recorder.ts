@@ -97,7 +97,8 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
       const name = err instanceof DOMException ? err.name : '';
       throw new RecordError(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic');
     }
-    if (context.state === 'suspended') await context.resume().catch(() => {});
+    // iOS can also leave it 'interrupted' as the microphone takes over the audio session.
+    if (context.state !== 'running') await context.resume().catch(() => {});
     const source = context.createMediaStreamSource(stream);
     // ScriptProcessor is deprecated but works everywhere, including iOS, without a separate worklet file.
     const processor = context.createScriptProcessor(4096, 1, 1);

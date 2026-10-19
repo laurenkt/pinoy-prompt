@@ -109,11 +109,16 @@ describe('compare', () => {
   it('counts added sounds against the attempt', () => {
     const c = compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ə', 'p', 'o']);
     expect(c.score).toBeLessThan(0.9);
+    // One stray sound on a short word is a slip, not a fail.
+    expect(compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'm', 'a', 'n', 't']).score).toBeGreaterThanOrEqual(0.9);
     expect(c.extra.filter((e) => e.counts).map((e) => e.ipa)).toEqual(['ə', 'p', 'o']);
   });
 
-  it('forgives a released final consonant and a glottal catch', () => {
+  it('forgives what speakers and recognisers naturally add', () => {
     expect(compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ə']).score).toBe(1);
+    expect(compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ɨ']).score).toBe(1);
+    expect(compare(toPhones('po'), ['p', 'o', 'h']).score).toBe(1);
+    expect(compare(toPhones('Kain tayo'), ['k', 'a', 'j', 'i', 'n', 't', 'a', 'j', 'o']).score).toBe(1);
     expect(compare(toPhones('Salamat po'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ʔ', 'p', 'o']).score).toBe(1);
   });
 

@@ -34,6 +34,8 @@ export interface PhoneModel {
 /** Whether the model is already on the device. */
 export async function modelDownloaded(): Promise<boolean> {
   try {
+    // caches.open would create the cache, which the service worker takes as a sign speaking is in use.
+    if (!(await caches.has(CACHE))) return false;
     return (await (await caches.open(CACHE)).match(MODEL_URL)) !== undefined;
   } catch {
     return false;
@@ -41,13 +43,17 @@ export async function modelDownloaded(): Promise<boolean> {
 }
 
 /** Read a download to the end, reporting progress; keeps the bytes only if asked. */
-async function readAll(body: ReadableStream<Uint8Array>, onProgress?: (fraction: number) => void, keep = false) {
+async function readAll(body: ReadableStream<Uint8Array>, onProgress?: (fraction: number) => void, keep = false, stop?: { now: boolean }) {
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let received = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
+    if (stop?.now) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
     if (keep) chunks.push(value);
     received += value.length;
     onProgress?.(Math.min(1, received / MODEL_BYTES));
@@ -70,9 +76,18 @@ async function fetchModel(onProgress?: (fraction: number) => void): Promise<Arra
   if (cache) {
     // Stream straight into the cache and read it back once, so the phone holds one copy in memory, not three.
     const [toCache, toCount] = response.body.tee();
+    const stop = { now: false };
+    const counting = readAll(toCount, onProgress, false, stop);
+    counting.catch(() => {});
     try {
-      const counting = readAll(toCount, onProgress);
       await cache.put(MODEL_URL, new Response(toCache, { headers: { 'content-type': 'application/octet-stream' } }));
+    } catch {
+      // Couldn't store it (e.g. the phone is out of space): download it again into memory for this session.
+      await cache.delete(MODEL_URL).catch(() => false);
+      stop.now = true;
+      return fetchIntoMemory(onProgress);
+    }
+    try {
       const { received } = await counting;
       // A download cut short must never be kept: it would fail on every launch.
       if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
@@ -84,8 +99,18 @@ async function fetchModel(onProgress?: (fraction: number) => void): Promise<Arra
     }
   }
 
-  // No cache to keep it in: hold it in memory for this session only.
-  const { chunks, received } = await readAll(response.body, onProgress, true);
+  return inMemory(response.body, onProgress);
+}
+
+/** Download the model without keeping it, for when it can't be stored. */
+async function fetchIntoMemory(onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
+  const response = await fetch(MODEL_URL);
+  if (!response.ok || !response.body) throw new Error(`Model download failed: ${response.status}`);
+  return inMemory(response.body, onProgress);
+}
+
+async function inMemory(body: ReadableStream<Uint8Array>, onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
+  const { chunks, received } = await readAll(body, onProgress, true);
   if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
   const bytes = new Uint8Array(received);
   let offset = 0;
@@ -108,9 +133,9 @@ export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise
     try {
       session = await ort.InferenceSession.create(await fetchModel(onProgress), { executionProviders: ['wasm'] });
     } catch (err) {
-      // A stored copy that won't load is damaged: drop it so the next try downloads afresh.
-      // Not when the runtime itself failed to load (e.g. offline), which says nothing about the model.
-      if (!/backend/i.test(String(err))) await caches.open(CACHE).then((cache) => cache.delete(MODEL_URL)).catch(() => false);
+      // A stored copy the runtime can't parse is damaged: drop it so the next try downloads afresh.
+      // Anything else (the runtime failing to load offline, running out of memory) says nothing about the model.
+      if (/protobuf|load model/i.test(String(err))) await caches.open(CACHE).then((cache) => cache.delete(MODEL_URL)).catch(() => false);
       throw err;
     }
     return { recognise: (samples) => recognise(session, samples) };

@@ -49,7 +49,7 @@ beforeEach(() => {
   vi.resetModules();
   create.mockReset().mockResolvedValue({ outputNames: ['log_probs'] });
   cache = new FakeCache();
-  vi.stubGlobal('caches', { open: async () => cache });
+  vi.stubGlobal('caches', { open: async () => cache, has: async () => cache.entries.size > 0 });
 });
 
 describe('loadPhoneModel', () => {
@@ -74,7 +74,7 @@ describe('loadPhoneModel', () => {
 
   it("drops a stored model the runtime can't load", async () => {
     vi.stubGlobal('fetch', serve(MODEL_BYTES));
-    create.mockRejectedValueOnce(new Error('protobuf parsing failed'));
+    create.mockRejectedValueOnce(new Error('Failed to load model because protobuf parsing failed.'));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
     await expect(loadPhoneModel()).rejects.toThrow();
     expect(await modelDownloaded()).toBe(false);
@@ -83,6 +83,27 @@ describe('loadPhoneModel', () => {
   it("keeps the stored model when it's the runtime that couldn't load (e.g. offline)", async () => {
     vi.stubGlobal('fetch', serve(MODEL_BYTES));
     create.mockRejectedValueOnce(new Error('no available backend found'));
+    const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
+    await expect(loadPhoneModel()).rejects.toThrow();
+    expect(await modelDownloaded()).toBe(true);
+  });
+});
+
+describe('when the model can\'t be stored', () => {
+  it('still loads it for this session', async () => {
+    vi.stubGlobal('fetch', serve(MODEL_BYTES));
+    cache.put = async () => {
+      throw new DOMException('full', 'QuotaExceededError');
+    };
+    const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
+    await expect(loadPhoneModel()).resolves.toBeTruthy();
+    expect(create).toHaveBeenCalledOnce();
+    expect(await modelDownloaded()).toBe(false);
+  });
+
+  it("keeps a good stored model when the phone runs out of memory loading it", async () => {
+    vi.stubGlobal('fetch', serve(MODEL_BYTES));
+    create.mockRejectedValueOnce(new RangeError('Out of memory'));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
     await expect(loadPhoneModel()).rejects.toThrow();
     expect(await modelDownloaded()).toBe(true);

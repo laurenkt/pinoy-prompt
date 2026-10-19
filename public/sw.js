@@ -35,7 +35,7 @@ const MODEL_CACHE = 'pinoy-prompt-models-v1';
  * the build's manifest does. Learners who never use speaking skip these 11 MB.
  */
 async function cacheSpeech(cache) {
-  if (!(await caches.has(MODEL_CACHE))) return;
+  if (!(await caches.has(MODEL_CACHE)) || (await (await caches.open(MODEL_CACHE)).keys()).length === 0) return;
   try {
     const manifest = await (await fetch('./asset-manifest.json', { cache: 'no-cache' })).json();
     const entry = manifest['src/phone-model.ts'];

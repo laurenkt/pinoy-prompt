@@ -276,6 +276,20 @@ export interface Comparison {
 const DELETE = 1;
 const INSERT = 0.7;
 const CLOSE = 0.4;
+const EXTRA_WEIGHT = 0.5;
+/** Sounds a speaker (or the recogniser) adds at the very end without it being a mistake: a breath, a released consonant. */
+const TRAILING = new Set(['h', 'ə', 'ɨ', 'ɐ', 'ʔ']);
+
+const isVowelSound = (ipa: string | undefined) => ipa !== undefined && FEATURES[baseSound(ipa)[0]]?.kind === 'vowel';
+
+/** Whether an added sound is a natural part of speech rather than a mistake. */
+function harmless(heard: string[], index: number): boolean {
+  const ipa = baseSound(heard[index]);
+  if (ipa === 'ʔ') return true;
+  if (index === heard.length - 1 && TRAILING.has(ipa)) return true;
+  // The y or w glide that joins two vowels, as in "kain" said "kayin".
+  return (ipa === 'j' || ipa === 'w') && isVowelSound(heard[index - 1]) && isVowelSound(heard[index + 1]);
+}
 
 /** Line up what was heard with what was expected (weighted edit distance) and judge each sound. */
 export function compare(expected: Phone[], heard: string[]): Comparison {
@@ -320,15 +334,14 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
       sounds.unshift({ phone: expected[i - 1], verdict: expected[i - 1].optional ? 'good' : 'missing' });
       i--;
     } else {
-      const ipa = heard[j - 1];
-      extra.unshift({ ipa, before: i, counts: !(baseSound(ipa) === 'ʔ' || (i === n && j === m && baseSound(ipa) === 'ə')) });
+      extra.unshift({ ipa: heard[j - 1], before: i, counts: !harmless(heard, j - 1) });
       j--;
     }
   }
 
   const counted = sounds.filter((s) => !s.phone.optional);
   const points = counted.reduce((sum, s) => sum + (s.verdict === 'good' ? 1 : s.verdict === 'close' ? 0.5 : 0), 0);
-  // Each added sound counts against the attempt as if it were one more sound to get right.
-  const added = extra.filter((e) => e.counts).length;
+  // Each added sound counts against the attempt as half a sound to get right: a slip, but recognisers add the odd stray one.
+  const added = extra.filter((e) => e.counts).length * EXTRA_WEIGHT;
   return { sounds, extra, score: counted.length ? points / (counted.length + added) : 0 };
 }
