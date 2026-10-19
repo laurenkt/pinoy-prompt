@@ -20,8 +20,11 @@ const GIVE_UP_MS = 30000;
  * (seen on phones) never report the end after stop().
  */
 export const STOP_GRACE_MS = 1500;
-/** If the recogniser shows no sign of life this long after starting, it isn't going to. */
-export const NO_START_MS = 5000;
+/**
+ * If the recogniser shows no sign of life this long after starting, it isn't
+ * going to. Long enough to read a speech-recognition permission prompt.
+ */
+export const NO_START_MS = 10000;
 
 // The Web Speech API isn't in TypeScript's DOM types; this is the part we use.
 interface RecognitionAlternative {
@@ -130,156 +133,59 @@ async function askForMicrophone(): Promise<void> {
     stream.getTracks().forEach((t) => t.stop());
   } catch (err) {
     const name = err instanceof DOMException ? err.name : '';
-    if (name === 'NotAllowedError' || name === 'SecurityError') throw new ListenError('denied');
-    if (name === 'NotFoundError' || name === 'OverconstrainedError') throw new ListenError('no-mic');
-    // Anything else: let the recogniser try anyway.
+    if (name === 'NotAllowedError') throw new ListenError('denied');
+    if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'NotReadableError') throw new ListenError('no-mic');
+    // Anything else (e.g. a permissions policy): let the recogniser try anyway.
+  }
+}
+
+/** Call a recogniser method that throws if it has already stopped. */
+function quietly(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    // Already stopped.
   }
 }
 
 /** Listen for one utterance. */
-export function listen({ onHearing, onPhase }: ListenCallbacks = {}): Listening {
+export function listen(callbacks: ListenCallbacks = {}): Listening {
   // Only one recogniser at a time: end the old one before starting another.
   active?.cancel();
   const Ctor = recognitionCtor();
-  let cancelled = false;
-  // Until the recogniser is running (e.g. while the permission prompt is up), stopping just cancels.
-  let cancel = () => {
-    cancelled = true;
-  };
-  let stop = () => cancel();
 
-  const result = (async () => {
-    if (!Ctor) throw new ListenError('unsupported');
-    await askForMicrophone();
-    if (cancelled) return [];
-    return recognise(Ctor);
+  let done = false;
+  let settleWith: (outcome: string[] | ListenError) => void = () => {};
+  const result = new Promise<string[]>((resolve, reject) => {
+    settleWith = (outcome) => {
+      if (done) return;
+      done = true;
+      if (outcome instanceof ListenError) reject(outcome);
+      else resolve(outcome);
+    };
+  });
+
+  let running: Controls | null = null;
+  const listening: Listening = {
+    result,
+    // Before the recogniser is running (e.g. while the permission prompt is up), stopping just ends it.
+    stop: () => (running ? running.stop() : settleWith([])),
+    cancel: () => {
+      running?.cancel();
+      settleWith([]);
+    },
+  };
+
+  void (async () => {
+    if (!Ctor) return settleWith(new ListenError('unsupported'));
+    try {
+      await askForMicrophone();
+    } catch (err) {
+      return settleWith(err instanceof ListenError ? err : new ListenError('failed'));
+    }
+    if (!done) running = recognise(Ctor, callbacks, settleWith);
   })();
 
-  function recognise(Ctor: RecognitionCtor): Promise<string[]> {
-    return new Promise<string[]>((resolve, reject) => {
-      const r = new Ctor();
-      r.lang = LANG;
-      r.interimResults = true;
-      r.maxAlternatives = 5;
-      r.continuous = false;
-
-      let alternatives: string[] = [];
-      let failure: ListenError | null = null;
-      let settled = false;
-      let alive = false;
-      let phase: ListenPhase = 'starting';
-      const timers: ReturnType<typeof setTimeout>[] = [];
-      const later = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms));
-      const setPhase = (next: ListenPhase) => {
-        if (settled || phase === next || phase === 'finishing') return;
-        phase = next;
-        onPhase?.(next);
-      };
-      const settle = () => {
-        if (settled) return;
-        settled = true;
-        timers.forEach(clearTimeout);
-        if (failure) reject(failure);
-        else resolve(cancelled ? [] : alternatives);
-      };
-      // Judge what was heard so far, whether or not the recogniser ever reports the end.
-      const finish = () => {
-        if (settled) return;
-        setPhase('finishing');
-        try {
-          r.stop();
-        } catch {
-          // Already stopped.
-        }
-        later(STOP_GRACE_MS, () => {
-          try {
-            r.abort();
-          } catch {
-            // Already stopped.
-          }
-          settle();
-        });
-      };
-      stop = finish;
-      cancel = () => {
-        cancelled = true;
-        try {
-          r.abort();
-        } catch {
-          // Already stopped.
-        }
-        settle();
-      };
-
-      const showsLife = () => {
-        alive = true;
-      };
-      r.onstart = showsLife;
-      r.onaudiostart = () => {
-        showsLife();
-        setPhase('mic-on');
-        // The listening limit starts when the microphone opens, not while the permission prompt is up.
-        later(MAX_LISTEN_MS, finish);
-      };
-      r.onsoundstart = () => setPhase('sound');
-      r.onspeechstart = () => setPhase('sound');
-      r.onsoundend = () => {
-        if (phase === 'sound') setPhase('mic-on');
-      };
-      later(GIVE_UP_MS, finish);
-      later(NO_START_MS, () => {
-        if (alive || settled) return;
-        failure = new ListenError('no-start');
-        try {
-          r.abort();
-        } catch {
-          // Already stopped.
-        }
-        settle();
-      });
-
-      r.onresult = (e) => {
-        // Each result is one stretch of speech; join them, alternative by alternative.
-        const results = Array.from({ length: e.results.length }, (_, i) => e.results[i]);
-        if (results.length === 0) return;
-        const count = Math.max(...results.map((res) => res.length));
-        alternatives = Array.from({ length: count }, (_, a) =>
-          results
-            .map((res) => (res[a] ?? res[0]).transcript.trim())
-            .join(' ')
-            .trim(),
-        ).filter(Boolean);
-        // A transcript means it is hearing speech, even on recognisers that skip the sound events.
-        showsLife();
-        setPhase('sound');
-        if (alternatives[0]) onHearing?.(alternatives[0]);
-      };
-      r.onerror = (e) => {
-        showsLife();
-        if (e.error === 'language-not-supported') {
-          languageUnsupported = true;
-          failure = new ListenError('unsupported');
-        } else if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-          failure = new ListenError('denied');
-        } else if (e.error === 'audio-capture') {
-          failure = new ListenError('no-mic');
-        } else if (e.error === 'network') {
-          failure = new ListenError('offline');
-        } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
-          failure = new ListenError('failed');
-        }
-      };
-      r.onend = settle;
-      try {
-        r.start();
-      } catch {
-        failure = new ListenError('failed');
-        settle();
-      }
-    });
-  }
-
-  const listening: Listening = { result, stop: () => stop(), cancel: () => cancel() };
   active = listening;
   void result
     .catch(() => {})
@@ -287,6 +193,126 @@ export function listen({ onHearing, onPhase }: ListenCallbacks = {}): Listening 
       if (active === listening) active = null;
     });
   return listening;
+}
+
+interface Controls {
+  stop(): void;
+  cancel(): void;
+}
+
+function recognise(
+  Ctor: RecognitionCtor,
+  { onHearing, onPhase }: ListenCallbacks,
+  done: (outcome: string[] | ListenError) => void,
+): Controls {
+  const r = new Ctor();
+  r.lang = LANG;
+  r.interimResults = true;
+  r.maxAlternatives = 5;
+  r.continuous = false;
+
+  let alternatives: string[] = [];
+  let failure: ListenError | null = null;
+  let settled = false;
+  let cancelled = false;
+  let alive = false;
+  let soundEvents = false;
+  let phase: ListenPhase = 'starting';
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const later = (ms: number, fn: () => void) => {
+    if (!settled) timers.push(setTimeout(fn, ms));
+  };
+  const setPhase = (next: ListenPhase) => {
+    if (settled || phase === next || phase === 'finishing') return;
+    phase = next;
+    onPhase?.(next);
+  };
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    timers.forEach(clearTimeout);
+    done(failure ?? (cancelled ? [] : alternatives));
+  };
+  // Judge what was heard so far, whether or not the recogniser ever reports the end.
+  const finish = () => {
+    if (settled) return;
+    setPhase('finishing');
+    later(STOP_GRACE_MS, () => {
+      quietly(() => r.abort());
+      settle();
+    });
+    quietly(() => r.stop());
+  };
+  const cancel = () => {
+    cancelled = true;
+    quietly(() => r.abort());
+    settle();
+  };
+
+  const showsLife = () => {
+    alive = true;
+  };
+  r.onstart = showsLife;
+  r.onaudiostart = () => {
+    showsLife();
+    setPhase('mic-on');
+    // The listening limit starts when the microphone opens, not while a permission prompt is up.
+    later(MAX_LISTEN_MS, finish);
+  };
+  r.onsoundstart = r.onspeechstart = () => {
+    soundEvents = true;
+    setPhase('sound');
+  };
+  r.onsoundend = () => {
+    if (phase === 'sound') setPhase('mic-on');
+  };
+  later(GIVE_UP_MS, finish);
+  later(NO_START_MS, () => {
+    if (alive || settled) return;
+    failure = new ListenError('no-start');
+    quietly(() => r.abort());
+    settle();
+  });
+
+  r.onresult = (e) => {
+    // Each result is one stretch of speech; join them, alternative by alternative.
+    const results = Array.from({ length: e.results.length }, (_, i) => e.results[i]);
+    if (results.length === 0) return;
+    const count = Math.max(...results.map((res) => res.length));
+    alternatives = Array.from({ length: count }, (_, a) =>
+      results
+        .map((res) => (res[a] ?? res[0]).transcript.trim())
+        .join(' ')
+        .trim(),
+    ).filter(Boolean);
+    showsLife();
+    // A transcript means it is hearing speech, on recognisers that don't send sound events.
+    if (!soundEvents) setPhase('sound');
+    if (alternatives[0]) onHearing?.(alternatives[0]);
+  };
+  r.onerror = (e) => {
+    showsLife();
+    if (e.error === 'language-not-supported') {
+      languageUnsupported = true;
+      failure = new ListenError('unsupported');
+    } else if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      failure = new ListenError('denied');
+    } else if (e.error === 'audio-capture') {
+      failure = new ListenError('no-mic');
+    } else if (e.error === 'network') {
+      failure = new ListenError('offline');
+    } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
+      failure = new ListenError('failed');
+    }
+  };
+  r.onend = settle;
+  try {
+    r.start();
+  } catch {
+    failure = new ListenError('failed');
+    settle();
+  }
+  return { stop: finish, cancel };
 }
 
 let active: Listening | null = null;

@@ -48,10 +48,14 @@ let uninstall: () => void;
 let getUserMedia: ReturnType<typeof vi.fn>;
 let micTrackStop: ReturnType<typeof vi.fn>;
 
-/** Stand in for the browser's microphone permission: granted, or refused with a DOMException name. */
+/**
+ * Stand in for the browser's microphone permission: granted, refused with a
+ * DOMException name, or 'pending' for a prompt the learner never answers.
+ */
 function fakeMicrophone(refuse?: string): void {
   micTrackStop = vi.fn();
   getUserMedia = vi.fn(async () => {
+    if (refuse === 'pending') return new Promise(() => {});
     if (refuse) throw new DOMException('refused', refuse);
     return { getTracks: () => [{ stop: micTrackStop }] };
   });
@@ -177,6 +181,19 @@ describe('Speak mode when the microphone is refused', () => {
   it("explains it and doesn't start the recogniser", async () => {
     await startSpeaking();
     expect(text('.feedback')).toContain('microphone is blocked');
+    expect(FakeRecognition.instances).toHaveLength(0);
+  });
+});
+
+describe('Speak mode while the microphone prompt is unanswered', () => {
+  beforeEach(() => setUp({}, 'pending'));
+
+  it("lets the learner stop with I'm done", async () => {
+    await startSpeaking();
+    expect(text('.listen-status')).toBe('Waiting for the microphone…');
+    button("I'm done").click();
+    await flush();
+    expect(text('.feedback strong')).toBe("Didn't catch that.");
     expect(FakeRecognition.instances).toHaveLength(0);
   });
 });

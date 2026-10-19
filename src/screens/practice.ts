@@ -25,8 +25,8 @@ const PROBLEMS: Record<ListenProblem, string> = {
   unsupported: "This browser can't recognise Filipino speech, so speaking questions are off. Chrome on Android usually can.",
   'home-screen': "Apps opened from an iPhone's home screen can't use speech recognition, so speaking questions are off here.",
   denied: 'The microphone is blocked. Allow it for this site in your browser settings, then try again.',
-  'no-mic': "Couldn't find a microphone on this device.",
-  'no-start': "The speech recogniser didn't start. This browser may not support it properly.",
+  'no-mic': "Couldn't use the microphone. Check that the device has one and no other app is using it.",
+  'no-start': "The speech recogniser didn't start. If your browser asked for permission, allow it and try again. Otherwise this browser may not support it.",
   offline: "Couldn't reach the speech service. Speaking questions need a connection on this device.",
   failed: 'Something went wrong while listening. Try again.',
 };
@@ -37,6 +37,11 @@ const PHASES: Record<ListenPhase, string> = {
   sound: 'Hearing you…',
   finishing: 'Checking what we heard…',
 };
+
+/** What the Speak menu button says when it can't be used. */
+function speakUnavailable(problem: ListenProblem): string {
+  return problem === 'home-screen' ? 'Not available in iPhone home-screen apps' : "Speech checking isn't available in this browser";
+}
 
 /** Where a speaking question is up to. */
 type Speak =
@@ -200,6 +205,7 @@ export function practiceScreen(app: App): HTMLElement {
         ),
       );
     }
+    const speakBlocker = recognitionBlocker();
     return h(
       'div',
       null,
@@ -209,13 +215,14 @@ export function practiceScreen(app: App): HTMLElement {
         'div',
         { class: 'modes' },
         MODES.map((m) => {
-          const noVoice = m.id === 'listen' && !canListen;
-          const noRecogniser = m.id === 'speak' && !recognitionSupported();
+          let unavailable: string | null = null;
+          if (m.id === 'listen' && !canListen) unavailable = 'No voice on this device';
+          if (m.id === 'speak' && speakBlocker) unavailable = speakUnavailable(speakBlocker);
           return h(
             'button',
-            { class: `mode mode-${m.id}`, disabled: noVoice || noRecogniser, onclick: () => start(m.id) },
+            { class: `mode mode-${m.id}`, disabled: unavailable !== null, onclick: () => start(m.id) },
             h('span', { class: 'mode-title' }, m.title),
-            h('span', { class: 'mode-desc' }, noVoice ? 'No voice on this device' : noRecogniser ? (recognitionBlocker() === 'home-screen' ? "Not available in iPhone home-screen apps" : "Speech checking isn't available in this browser") : m.desc),
+            h('span', { class: 'mode-desc' }, unavailable ?? m.desc),
           );
         }),
       ),
@@ -331,7 +338,7 @@ export function practiceScreen(app: App): HTMLElement {
           // Five bars that sit still while the mic is open and dance while it picks up sound.
           h('div', { class: 'meter', 'aria-hidden': 'true' }, [1, 2, 3, 4, 5].map(() => h('span', null))),
           h('p', { class: 'listen-status center', role: 'status' }, PHASES[speak.phase]),
-          h('p', { class: 'hearing center', lang: 'fil' }, speak.hearing),
+          h('p', { class: 'hearing center', 'aria-live': 'polite', lang: 'fil' }, speak.hearing),
           h(
             'button',
             { class: 'btn mic big done', 'data-autofocus': true, disabled: speak.phase === 'finishing', onclick: () => listening?.stop() },
