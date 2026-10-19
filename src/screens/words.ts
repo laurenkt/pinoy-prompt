@@ -1,36 +1,35 @@
 import type { App } from '../app';
 import { UNITS } from '../deck';
-import { isIntroduced, isUnlocked } from '../session';
-import { isMature } from '../srs';
+import { STRENGTHS, strengthOf } from '../memory';
 import { play } from '../speech';
-import { audioButton, h, icon } from '../ui';
+import { audioButton, h } from '../ui';
 
-/** A phrasebook of every unit. Tap any card to hear it, learned or not. */
-export function wordsScreen(app: App, openUnitId?: string): HTMLElement {
+const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
+
+/** A phrasebook by topic. Tap any card to hear it, learned or not. */
+export function wordsScreen(app: App): HTMLElement {
   const { progress } = app;
-  const el = h(
+  return h(
     'div',
     { class: 'words' },
     h('h1', null, 'Words'),
-    h('p', { class: 'muted' }, 'Your phrasebook. Tap the speaker to hear any word, even ones you have not learned yet.'),
-    UNITS.map((unit, i) => {
-      const learned = unit.cards.filter((c) => isIntroduced(progress, c.id)).length;
-      return h(
+    h('p', { class: 'muted' }, 'Your phrasebook. Tap the speaker to hear any word, even ones you have not met yet. Each word you know shows how firmly it is stored.'),
+    UNITS.map((unit) =>
+      h(
         'details',
-        { class: 'card unit-list', id: `unit-${unit.id}`, open: unit.id === openUnitId || undefined },
+        { class: 'card unit-list' },
         h(
           'summary',
           null,
-          h('span', { class: 'unit-num', 'aria-hidden': 'true' }, i + 1),
           h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, unit.title), h('span', { class: 'unit-tl' }, unit.tlTitle)),
-          h('span', { class: 'unit-count' }, isUnlocked(progress, i) ? `${learned}/${unit.cards.length}` : h('span', { role: 'img', 'aria-label': 'Locked' }, icon('lock'))),
         ),
         h(
           'ul',
           { class: 'word-list' },
           unit.cards.map((card) => {
             const state = progress.cards[card.id];
-            const badge = !state ? null : isMature(state) ? h('span', { class: 'badge known' }, 'known') : h('span', { class: 'badge' }, 'learning');
+            const strength = state && strengthOf(state);
+            const badge = strength && h('span', { class: `badge s-${strength}` }, STRENGTH_LABEL.get(strength));
             return h(
               'li',
               { class: `word ${state ? '' : 'unseen'}` },
@@ -45,9 +44,7 @@ export function wordsScreen(app: App, openUnitId?: string): HTMLElement {
             );
           }),
         ),
-      );
-    }),
+      ),
+    ),
   );
-  if (openUnitId) requestAnimationFrame(() => document.getElementById(`unit-${openUnitId}`)?.scrollIntoView({ block: 'start' }));
-  return el;
 }

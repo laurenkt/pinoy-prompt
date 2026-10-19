@@ -41,6 +41,8 @@ describe('saved progress from every schema version', () => {
       const raw = JSON.parse(text);
       expect(progress.settings).toEqual((raw.progress ?? raw).settings);
       expect(progress.today).toEqual((raw.progress ?? raw).today);
+      // Review results were first kept in schema 3; earlier copies start with none.
+      expect(progress.history).toEqual((raw.progress ?? raw).history ?? {});
       expect('streak' in progress).toBe(false);
     });
 
@@ -111,6 +113,12 @@ describe('damaged saved progress', () => {
     expect(Object.getPrototypeOf(progress.cards)).toBe(Object.prototype);
   });
 
+  it('drops only the damaged days of review history', () => {
+    const history = { '2026-10-17': { reviews: 4, missed: 9 }, '2026-10-18': { reviews: 'x', missed: 0 }, yesterday: { reviews: 1, missed: 0 }, '2026-10-19': { reviews: 2, missed: 0 } };
+    const { progress } = decodeOk(JSON.stringify({ schema: 3, progress: { ...emptyProgress(NOW), history } }));
+    expect(progress.history).toEqual({ '2026-10-17': { reviews: 4, missed: 4 }, '2026-10-19': { reviews: 2, missed: 0 } });
+  });
+
   it('falls back to defaults for out-of-range settings', () => {
     const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 0, autoplay: 'yes' } }));
     expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true });
@@ -121,7 +129,7 @@ describe('damaged saved progress', () => {
     let seed = 1;
     const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const pick = <T>(xs: T[]) => xs[Math.floor(random() * xs.length)];
-    const base = JSON.parse(fixtures['./test/fixtures/progress-schema-2.json']);
+    const base = JSON.parse(fixtures[`./test/fixtures/progress-schema-${SCHEMA}.json`]);
 
     for (let i = 0; i < 2000; i++) {
       const copy = structuredClone(base);
@@ -153,6 +161,11 @@ function expectValid(p: Progress): void {
     expect(card.ease).toBeGreaterThanOrEqual(1.3);
   }
   expect(p.today.day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  for (const [day, tally] of Object.entries(p.history)) {
+    expect(day).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(Number.isInteger(tally.reviews) && tally.reviews >= 0).toBe(true);
+    expect(Number.isInteger(tally.missed) && tally.missed >= 0 && tally.missed <= tally.reviews).toBe(true);
+  }
   expect(Number.isInteger(p.settings.dailyNew)).toBe(true);
   expect(typeof p.settings.autoplay).toBe('boolean');
 }
@@ -169,6 +182,28 @@ describe('merging two copies', () => {
     expect(mergeInto(a, b)).toBe(2);
     expect(Object.keys(a.cards).sort()).toEqual(['dalawa', 'isa', 'tatlo']);
     expect(a.cards.dalawa.reviewed).toBe(NOW + 2000);
+  });
+
+  it('keeps the fuller review tally for each day from either copy, whole', () => {
+    const a = emptyProgress(NOW);
+    const b = emptyProgress(NOW);
+    a.history = { '2026-10-17': { reviews: 5, missed: 1 }, '2026-10-18': { reviews: 10, missed: 0 } };
+    b.history = { '2026-10-18': { reviews: 3, missed: 3 }, '2026-10-19': { reviews: 1, missed: 1 } };
+    mergeInto(a, b);
+    expect(a.history).toEqual({
+      '2026-10-17': { reviews: 5, missed: 1 },
+      // Not { reviews: 10, missed: 3 }, which neither copy recorded.
+      '2026-10-18': { reviews: 10, missed: 0 },
+      '2026-10-19': { reviews: 1, missed: 1 },
+    });
+  });
+
+  it('does not bring back review history from before a reset', () => {
+    const reset = emptyProgress(NOW);
+    const old = emptyProgress(NOW);
+    old.history = { '2026-10-18': { reviews: 9, missed: 2 }, '2026-10-20': { reviews: 2, missed: 0 } };
+    mergeInto(reset, old, { since: new Date(2026, 9, 19, 9).getTime() });
+    expect(reset.history).toEqual({ '2026-10-20': { reviews: 2, missed: 0 } });
   });
 
   it('keeps the newer day counters', () => {

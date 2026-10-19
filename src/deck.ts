@@ -1,5 +1,5 @@
-// The starter deck. Units are learned in order; each unlocks once every card in
-// the previous unit has been introduced.
+// The starter deck, grouped by topic. New cards are introduced in this order,
+// a few a day; a topic's intro is shown before its first card.
 //
 // Pronunciation hints use CAPS for the stressed syllable. To add a recorded
 // clip for a card, drop the file in public/audio/ and set `audio` to its name;

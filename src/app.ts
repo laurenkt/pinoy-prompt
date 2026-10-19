@@ -5,7 +5,7 @@ export type Route =
   | { name: 'home' }
   | { name: 'session'; steps: Step[]; title?: string }
   | { name: 'practice' }
-  | { name: 'words'; unitId?: string }
+  | { name: 'words' }
   | { name: 'settings' };
 
 export type Tab = 'home' | 'practice' | 'words';

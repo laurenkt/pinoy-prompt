@@ -54,7 +54,7 @@ function render(route: Route): void {
       tab = 'practice';
       break;
     case 'words':
-      screen = wordsScreen(app, route.unitId);
+      screen = wordsScreen(app);
       tab = 'words';
       break;
     case 'session':
