@@ -191,11 +191,14 @@ function changedAt(card: CardState): number {
 /**
  * Fold another copy of progress into `target`, so no card in either is lost.
  * Where both have a card, the more recently reviewed one wins. Settings stay
- * as they are in `target`. Returns how many cards were added or updated.
+ * as they are in `target`. With `since`, only cards from `other` reviewed after
+ * that time are taken (used to keep answers given after a reset). Returns how
+ * many cards were added or updated.
  */
-export function mergeInto(target: Progress, other: Progress): number {
+export function mergeInto(target: Progress, other: Progress, { since = -Infinity } = {}): number {
   let changed = 0;
   for (const [id, card] of Object.entries(other.cards)) {
+    if (changedAt(card) <= since) continue;
     const mine = target.cards[id];
     if (!mine || changedAt(card) > changedAt(mine)) {
       target.cards[id] = card;

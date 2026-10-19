@@ -78,9 +78,9 @@ async function flush(): Promise<void> {
   try {
     await drain();
   } finally {
-    // Cleared in the same tick the queue is found empty, so a write that
-    // arrives just after starts a new flush instead of waiting on this one.
     writing = null;
+    // A write that arrived after the queue was found empty but before now.
+    if (pending !== null) writing = flush();
   }
 }
 

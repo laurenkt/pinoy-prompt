@@ -82,8 +82,9 @@ export function load(now: number): Progress {
  * wins and localStorage is brought back up to date.
  */
 export async function loadDurable(now: number): Promise<Progress> {
-  const progress = load(now);
   const text = await readMirror();
+  // Read localStorage after the mirror, so a tab that saved meanwhile isn't missed.
+  const progress = load(now);
   if (text === null) return progress;
   const mirrored = decode(text, now);
   if (mirrored.kind !== 'ok') return progress;
@@ -95,9 +96,9 @@ export async function loadDurable(now: number): Promise<Progress> {
     if (mergeInto(progress, m.progress) > 0) save(progress);
     return progress;
   }
-  const sameReset = m.resetAt === resetAt;
   const restored = adopt(m);
-  if (sameReset) mergeInto(restored, progress);
+  // Across a reset, only answers given after it carry over.
+  mergeInto(restored, progress, { since: m.resetAt });
   save(restored);
   return rollDay(restored, now);
 }
@@ -123,8 +124,12 @@ export function save(progress: Progress, { replace = false } = {}): boolean {
     if (replace) {
       // Writing a reset; the stored copy is what is being replaced.
     } else if (s.resetAt > resetAt) {
-      // Progress was reset elsewhere after this page loaded; honour it.
+      // Progress was reset after this page last read it (in another tab, or
+      // before a start-up that couldn't read storage). Honour the reset, but
+      // keep anything answered here since.
+      const mine = { ...progress, cards: { ...progress.cards } };
       replaceContents(progress, s.progress);
+      mergeInto(progress, mine, { since: s.resetAt });
       resetAt = s.resetAt;
     } else if (s.resetAt === resetAt) {
       // Safe even when nothing changed elsewhere: it only adds cards or newer reviews.
@@ -132,11 +137,12 @@ export function save(progress: Progress, { replace = false } = {}): boolean {
     }
   }
 
+  // If storage couldn't even be read, writing blind could overwrite progress
+  // we never saw, in either copy.
+  if (stored === null) return false;
   rev = Math.max(rev, storedRev) + 1;
   const text = encode({ schema, rev, savedAt: now, resetAt, progress });
   writeMirror(text);
-  // If storage couldn't even be read, writing blind could overwrite progress we never saw.
-  if (stored === null) return false;
   try {
     localStorage.setItem(STORAGE_KEY, text);
     return true;

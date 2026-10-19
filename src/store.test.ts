@@ -38,9 +38,12 @@ beforeEach(() => {
   vi.stubGlobal('indexedDB', new IDBFactory());
   resetMirrorForTests();
   resetStoreForTests();
+  // Resets are stamped with the clock, so keep it in step with NOW.
+  vi.useFakeTimers({ toFake: ['Date'], now: NOW });
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -359,6 +362,20 @@ describe('resetting', () => {
     b.save(pb);
     expect(Object.keys(stored().progress.cards)).not.toContain('isa');
     expect(Object.keys(pb.cards)).not.toContain('isa');
+  });
+
+  it('keeps answers given after an earlier reset by a page that could not read storage', () => {
+    save(learn('isa'));
+    reset(NOW);
+    save(learn('dalawa'));
+    restart();
+
+    storage.failReads = true;
+    const p = load(NOW + 1000);
+    storage.failReads = false;
+    recordAnswer(p, 'tatlo', 'good', NOW + 1000);
+    expect(save(p)).toBe(true);
+    expect(Object.keys(stored().progress.cards).sort()).toEqual(['dalawa', 'tatlo']);
   });
 });
 
