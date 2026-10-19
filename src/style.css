@@ -844,39 +844,63 @@ p {
   margin: 0;
 }
 
-.hearing {
-  min-height: 1.5em;
-  margin-top: 12px;
-  font-weight: 700;
+.heard {
+  margin: 4px 0 0;
+}
+
+.heard summary {
+  cursor: pointer;
   color: var(--muted);
 }
 
-.marks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 10px 0 6px;
+.ipa {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  margin: 4px 0 0;
 }
 
-.mark {
-  font-size: 1.15rem;
+/* The card's text, each letter coloured by how its sound came out. */
+.letters {
+  font-size: 2rem;
   font-weight: 800;
-  border: 2px solid var(--ink);
-  border-radius: 10px;
-  padding: 2px 10px;
+  letter-spacing: 0.02em;
+  margin: 10px 0 8px;
+}
+
+.letters span {
+  border-radius: 6px;
+}
+
+.sound-good {
+  color: var(--teal);
+}
+
+.sound-close {
   color: var(--on-accent);
+  background: var(--saffron);
 }
 
-.mark.ok {
-  background: var(--teal);
-}
-
-.mark.miss {
+.sound-off,
+.sound-missing {
+  color: var(--on-accent);
   background: var(--pink);
 }
 
-.heard {
-  margin: 0;
+.tips {
+  margin: 8px 0 0;
+  padding-left: 1.2rem;
+}
+
+.tips li {
+  margin-bottom: 6px;
+}
+
+.download-bar {
+  margin: 16px 0 10px;
+}
+
+.skip-link {
+  width: 100%;
+  margin-top: 10px;
 }
 
 .speak .row {

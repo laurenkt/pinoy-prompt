@@ -3,7 +3,9 @@
 // fetched network-first so updates show up right away; other files are served
 // from cache and refreshed in the background.
 
-const CACHE = 'pinoy-prompt-v2';
+const CACHE = 'pinoy-prompt-v3';
+// Other caches the app keeps (like the pronunciation model) aren't ours to clear.
+const isShellCache = (key) => /^pinoy-prompt-v\d+$/.test(key);
 const SHELL = ['./manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png'];
 
 /** Fetch index.html and cache it along with the hashed JS/CSS it links to. */
@@ -33,7 +35,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => isShellCache(k) && k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -60,15 +62,20 @@ self.addEventListener('fetch', (event) => {
 
   // ignoreVary: module scripts send an Origin header that a cached "Vary: Origin" entry would otherwise miss.
   const cached = caches.match(request, { ignoreVary: true });
-  const fresh = fetch(request).then(async (response) => {
-    // 200 only: partial (206) responses, e.g. audio range requests, can't be cached.
-    if (response.status === 200) {
-      const cache = await caches.open(CACHE);
-      await cache.put(request, response.clone());
-    }
-    return response;
-  });
-  event.respondWith(cached.then((hit) => hit || fresh).catch(() => Response.error()));
+  const refresh = () =>
+    fetch(request).then(async (response) => {
+      // 200 only: partial (206) responses, e.g. audio range requests, can't be cached.
+      if (response.status === 200) {
+        const cache = await caches.open(CACHE);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    });
+  // Built assets have content hashes in their names, so a cached copy never goes stale.
+  // Skipping the refresh matters for large ones like the speech model runtime.
+  const hashed = new URL(request.url).pathname.includes('/assets/');
+  const result = cached.then((hit) => (hit && hashed ? { hit } : { hit, fresh: refresh() }));
+  event.respondWith(result.then(({ hit, fresh }) => hit || fresh).catch(() => Response.error()));
   // Keep the worker alive until the background refresh has been cached.
-  event.waitUntil(fresh.catch(() => {}));
+  event.waitUntil(result.then(({ fresh }) => fresh).catch(() => {}));
 });

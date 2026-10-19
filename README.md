@@ -13,7 +13,7 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 
 Units unlock in order: Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases.
 
-Progress is stored on the device. Nothing is sent to our server (there isn't one). The one exception is speaking questions: the browser's speech recogniser may send your voice to its own speech service, as Chrome does.
+Progress is stored on the device. Nothing is sent to our server (there isn't one), and that includes your voice: speaking questions are checked on the device.
 
 ## Saved progress
 
@@ -29,17 +29,23 @@ A learner's progress is the one thing the app can't afford to lose, so it is kep
 
 ## Speaking questions
 
-The **Speak** practice mode shows a word or phrase, listens while the learner says it, and passes if it heard the right thing.
+The **Speak** practice mode shows a word or phrase, records the learner saying it, and coaches them on each sound: the letters they said well, the ones that were nearly there, the ones that were off, and a short tip for the most important fix (for example "ng is one sound, like the end of *sing*" or "Filipino r is a quick tap, like the tt in American *butter*").
 
-It uses the browser's [Web Speech API](https://developer.mozilla.org/docs/Web/API/SpeechRecognition) in Filipino (`fil-PH`), asking for up to five guesses. `src/pronounce.ts` then compares those guesses with the card. Both sides are folded to a rough phonetic spelling first, because recognisers and Tagalog spelling both vary: o/u and e/i are merged, `siya`/`sya` and `c`/`k` are treated alike, digits become Tagalog numbers, and spaces are ignored. An attempt passes at 80% similarity, and each word of the card is marked as said or missed so the learner sees what to fix. Add other accepted spellings to a card with `accept: [...]`.
+How it works:
 
-Why this approach: it works today on the phones most learners have (Chrome on Android handles Filipino), adds nothing to the download, and a recogniser that understands the word is a fair test of whether a listener would. Comparing the learner's audio with reference audio (MFCC features with dynamic time warping) needs recorded clips, and the app's audio is the device's speech voice, which a web page can't capture. On-device models like Whisper or wav2vec2 would work offline but cost tens to hundreds of megabytes, and small Whisper models are weak at Tagalog.
+1. **Recording** (`src/recorder.ts`): the microphone is read at its native rate, shown live on a level meter, downsampled to 16 kHz, and stopped automatically after a short silence (or by tapping "I'm done").
+2. **Recognising sounds** (`src/fbank.ts`, `src/phone-model.ts`): the audio becomes 80-band log mel features, computed exactly as in training (checked against lhotse in `src/fbank.test.ts`), and goes through [ZIPA](https://github.com/lingjzhu/zipa) (Zhu et al., ACL 2025), a multilingual phone recogniser that outputs IPA sounds rather than words. We use the 64M-parameter `zipa-small-crctc` model, int8-quantised, run with onnxruntime-web in WebAssembly. Model © its authors, [CC BY 4.0](https://huggingface.co/anyspeech/zipa-small-crctc-500k).
+3. **Expected sounds** (`src/phonetics.ts`): Tagalog spelling is close to phonemic, so a rule set turns each card into IPA (ng → ŋ, r → ɾ, mga → maŋa, ts → tʃ, siy+vowel → ʃ, borrowed letters, optional glottal stops).
+4. **Comparing** (`src/phonetics.ts`): the two sound sequences are aligned with an edit distance weighted by phonetic features, so a near miss (aspirated p, o said as ou) costs less than a different sound. Tagalog allophones (o/ɔ, e/ɛ, r/ɾ) count as right.
+5. **Coaching** (`src/coach.ts`): common English-speaker patterns get a specific tip; anything else gets "sounded like X". Under "Sounds we heard" the learner can see the raw IPA.
 
-While listening, the screen shows whether the microphone is open and whether it is picking up sound, based on the recogniser's own events. The app asks for the microphone itself before starting the recogniser, because some recognisers fail silently instead of prompting. Tapping "I'm done" always finishes within a second and a half, even on recognisers that never report that they stopped.
+The model is a one-time download of about 71 MB, fetched from Hugging Face only after the learner agrees, then kept in the browser's Cache Storage so it works offline. Mixed rounds include speaking only once it's on the device.
 
-Limits: a recogniser checks that the words were understood, not fine details like stress. Browsers without a Filipino recogniser (Firefox, and possibly Safari) show the mode as unavailable, and it is left out of mixed rounds there. Apps opened from an iPhone's home screen can't use speech recognition at all ([WebKit bug 225298](https://bugs.webkit.org/show_bug.cgi?id=225298)), so the mode says so there.
+Why this approach: the browser's speech recogniser can only say whether it understood the word, which isn't coaching, and it isn't available at all in apps opened from an iPhone's home screen ([WebKit bug 225298](https://bugs.webkit.org/show_bug.cgi?id=225298)). Comparing against reference audio would need recorded clips for every card. A phone recogniser hears what was actually said, works on any modern browser including iOS, and keeps the voice on the device.
 
-`src/screens/practice.speak.test.ts` plays the mode through in a simulated DOM with a scripted recogniser (`src/test/fake-recognition.ts`). It covers the microphone prompt, the listening feedback, finishing on "I'm done" with recognisers that do and don't report the end, a recogniser that never starts, refused microphones, and the iPhone home-screen case. Practice is unscored, so a misheard attempt never touches the review schedule.
+Limits: it doesn't judge stress or intonation yet, and a phone recogniser can mishear, so tips are guidance rather than a verdict. Practice is unscored, so attempts never touch the review schedule.
+
+Tests: `src/screens/speak.test.ts` and `src/screens/practice.speak.test.ts` play the mode through in a simulated DOM with a scripted microphone and model, covering the download offer, recording feedback, "I'm done", results and tips, and microphone problems. `src/phonetics.test.ts` covers spelling to sounds, comparison and tips.
 
 ## Audio
 
@@ -67,8 +73,9 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 | `src/progress-schema.ts` | The saved progress format, its migrations and repair. |
 | `src/progress-mirror.ts` | The IndexedDB copy of saved progress. |
 | `src/speech.ts` | Audio playback and voice selection. |
-| `src/listen.ts` | Speech recognition for speaking questions. |
-| `src/pronounce.ts` | Judging what the recogniser heard against the card. |
+| `src/recorder.ts` | Microphone recording for speaking questions. |
+| `src/fbank.ts`, `src/phone-model.ts` | Audio features and the on-device phone recogniser. |
+| `src/phonetics.ts`, `src/coach.ts` | Expected sounds, comparison and pronunciation tips. |
 | `src/screens/` | One file per screen. |
 | `public/sw.js` | Service worker for offline use. |
 

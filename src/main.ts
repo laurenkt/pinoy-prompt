@@ -6,7 +6,7 @@ import { practiceScreen } from './screens/practice';
 import { sessionScreen } from './screens/session';
 import { settingsScreen } from './screens/settings';
 import { wordsScreen } from './screens/words';
-import { cancelListening } from './listen';
+import { cancelRecording } from './recorder';
 import { initVoices, stop } from './speech';
 import { replaceContents } from './progress-schema';
 import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
@@ -30,7 +30,7 @@ const app: App = {
   },
   navigate(route: Route) {
     stop();
-    cancelListening();
+    cancelRecording();
     keyHandler = null;
     app.progress = rollDay(app.progress, Date.now());
     render(route);
