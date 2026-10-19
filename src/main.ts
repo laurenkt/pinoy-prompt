@@ -6,6 +6,7 @@ import { practiceScreen } from './screens/practice';
 import { sessionScreen } from './screens/session';
 import { settingsScreen } from './screens/settings';
 import { wordsScreen } from './screens/words';
+import { cancelListening } from './listen';
 import { initVoices, stop } from './speech';
 import { load, rollDay, save, type Progress } from './store';
 import { h } from './ui';
@@ -25,6 +26,7 @@ const app: App = {
   },
   navigate(route: Route) {
     stop();
+    cancelListening();
     keyHandler = null;
     app.progress = rollDay(app.progress, Date.now());
     render(route);
