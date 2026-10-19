@@ -9,6 +9,7 @@ import type { Take } from '../recorder';
 import { emptyProgress, recordAnswer } from '../store';
 import { practiceScreen } from './practice';
 import type { SpeakDeps } from './speak';
+import { FakePlayer, fakeRecognition } from '../test/fake-speech';
 
 const KNOWN = ['salamat', 'kumusta', 'tatlo', 'paalam', 'oo', 'kape'];
 
@@ -35,9 +36,10 @@ function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
     loadPhoneModel: async () => ({
       recognise: async () => {
         const id = KNOWN.find((k) => getCard(k)!.tl === card)!;
-        return { sounds: toPhones(getCard(id)!.tl).filter((p) => !p.optional).map((p) => p.ipa) };
+        return fakeRecognition(toPhones(getCard(id)!.tl).filter((p) => !p.optional).map((p) => p.ipa));
       },
     }),
+    player: () => new FakePlayer(),
     ...overrides,
   };
 }

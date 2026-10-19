@@ -188,28 +188,48 @@ const AFFRICATES: Record<string, string> = { 'tʃ': 'tʃ', 'dʒ': 'dʒ' };
 /** English-style glides the recogniser writes as two vowels, joined so they can be coached: "go" (oʊ), "day" (eɪ). */
 const GLIDES = new Set(['oʊ', 'ɔʊ', 'eɪ', 'ɛɪ']);
 
+/** A recogniser token with when it was heard, in seconds. */
+export interface TimedToken {
+  token: string;
+  start: number;
+  end: number;
+}
+
+/** A sound heard, with when: seconds from the start of the recording. */
+export interface TimedSound {
+  sound: string;
+  start: number;
+  end: number;
+}
+
 /**
  * Turn the recogniser's tokens (one symbol each) into sounds: modifiers like
  * ʰ and ː join the sound before them, t+ʃ and d+ʒ join into one, o+ʊ and e+ɪ
  * within a word join into a gliding vowel, word breaks and special tokens are
- * dropped, and ASCII g becomes IPA ɡ.
+ * dropped, and ASCII g becomes IPA ɡ. Joined sounds span all their tokens.
  */
-export function groupTokens(tokens: string[]): string[] {
-  const sounds: string[] = [];
+export function groupTimed(tokens: TimedToken[]): TimedSound[] {
+  const sounds: TimedSound[] = [];
   // Index of the first sound in the current word, so glides don't join across a word break.
   let wordStart = 0;
-  for (const raw of tokens) {
+  for (const { token: raw, start, end } of tokens) {
     if (raw === '▁') wordStart = sounds.length;
     if (!raw || raw === '▁' || raw.startsWith('<')) continue;
     const token = raw === 'g' ? 'ɡ' : raw;
     const last = sounds[sounds.length - 1];
     const inWord = sounds.length > wordStart;
-    if (MODIFIERS.has(token) && last !== undefined) sounds[sounds.length - 1] = last + token;
-    else if (last !== undefined && AFFRICATES[last + token]) sounds[sounds.length - 1] = AFFRICATES[last + token];
-    else if (inWord && GLIDES.has(last + token)) sounds[sounds.length - 1] = last + token;
-    else sounds.push(token);
+    const join = (sound: string) => (sounds[sounds.length - 1] = { sound, start: last.start, end: Math.max(last.end, end) });
+    if (last && MODIFIERS.has(token)) join(last.sound + token);
+    else if (last && AFFRICATES[last.sound + token]) join(AFFRICATES[last.sound + token]);
+    else if (last && inWord && GLIDES.has(last.sound + token)) join(last.sound + token);
+    else sounds.push({ sound: token, start, end });
   }
   return sounds;
+}
+
+/** groupTimed for tokens without timing. */
+export function groupTokens(tokens: string[]): string[] {
+  return groupTimed(tokens.map((token) => ({ token, start: 0, end: 0 }))).map((s) => s.sound);
 }
 
 // --- Comparing sounds ---------------------------------------------------------
@@ -326,6 +346,10 @@ export interface SoundResult {
   verdict: SoundVerdict;
   /** What was heard in its place, if anything. */
   heard?: string;
+  /** Index of the heard sound lined up with this one, if any (whatever the verdict). */
+  heardAt?: number;
+  /** 0–1: how close what was heard is to this sound (1 is spot on, 0 is missing or unrelated). */
+  closeness: number;
 }
 
 export interface Comparison {
@@ -334,7 +358,7 @@ export interface Comparison {
    * Sounds heard that the card doesn't have, with the index of the expected sound they came before.
    * `counts` is false for harmless ones: a glottal catch, or a short "uh" as a final consonant is released.
    */
-  extra: { ipa: string; before: number; counts: boolean }[];
+  extra: { ipa: string; before: number; counts: boolean; at: number }[];
   /** 0–1: share of the card's sounds that were said well (close counts half). */
   score: number;
 }
@@ -393,7 +417,6 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   const dropped = new Set<Phone>();
   /** Heard positions lined up with an expected sound, and those of added sounds. */
   const matchedAt = new Set<number>();
-  const extraAt: number[] = [];
   const extra: Comparison['extra'] = [];
   let i = n;
   let j = m;
@@ -404,16 +427,18 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
       if (d < soundDistance(expected[i - 1].ipa, heard[j - 1])) viaAlso.add(expected[i - 1]);
       matchedAt.add(j - 1);
       const verdict: SoundVerdict = d === 0 ? 'good' : d <= CLOSE ? 'close' : 'off';
-      sounds.unshift(verdict === 'good' ? { phone: expected[i - 1], verdict } : { phone: expected[i - 1], verdict, heard: heard[j - 1] });
+      const result: SoundResult = { phone: expected[i - 1], verdict, heardAt: j - 1, closeness: Math.max(0, 1 - d) };
+      if (verdict !== 'good') result.heard = heard[j - 1];
+      sounds.unshift(result);
       i--;
       j--;
     } else if (s === 'del' && i > 0) {
       dropped.add(expected[i - 1]);
-      sounds.unshift({ phone: expected[i - 1], verdict: mayDrop(expected[i - 1]) ? 'good' : 'missing' });
+      const fine = mayDrop(expected[i - 1]);
+      sounds.unshift({ phone: expected[i - 1], verdict: fine ? 'good' : 'missing', closeness: fine ? 1 : 0 });
       i--;
     } else {
-      extra.unshift({ ipa: heard[j - 1], before: i, counts: !harmless(heard, j - 1) });
-      extraAt.unshift(j - 1);
+      extra.unshift({ ipa: heard[j - 1], before: i, counts: !harmless(heard, j - 1), at: j - 1 });
       j--;
     }
   }
@@ -422,7 +447,7 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   // repeat per vowel said is fine, but a vowel dragged on or stuttered still counts.
   const lengthened = new Set<number>();
   extra.forEach((e, k) => {
-    const at = extraAt[k];
+    const at = e.at;
     const ipa = baseSound(e.ipa);
     if (!e.counts || !isVowelSound(ipa)) return;
     const twin = [at - 1, at + 1].find((n) => matchedAt.has(n) && !lengthened.has(n) && baseSound(heard[n]) === ipa);
@@ -434,7 +459,7 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   // "ay" may lose its y only when said "e": said "a", the y still has to be there.
   sounds.forEach((r, k) => {
     if (r.phone.dropsAfterAlso && dropped.has(r.phone) && k > 0 && !viaAlso.has(sounds[k - 1].phone)) {
-      sounds[k] = { phone: r.phone, verdict: 'missing' };
+      sounds[k] = { phone: r.phone, verdict: 'missing', closeness: 0 };
     }
   });
 

@@ -1,0 +1,117 @@
+{
+  "a": {
+    "file": "a.mp3",
+    "syllable": "a",
+    "word": "para"
+  },
+  "b": {
+    "file": "b.mp3",
+    "syllable": "ba",
+    "word": "hakbangin"
+  },
+  "d": {
+    "file": "d.mp3",
+    "syllable": "da",
+    "word": "daang"
+  },
+  "dʒ": {
+    "file": "j.mp3",
+    "syllable": "idʒo",
+    "word": "jong"
+  },
+  "h": {
+    "file": "h.mp3",
+    "syllable": "ha",
+    "word": "haharap"
+  },
+  "i": {
+    "file": "i.mp3",
+    "syllable": "i",
+    "word": "aktibong"
+  },
+  "j": {
+    "file": "y.mp3",
+    "syllable": "ja",
+    "word": "pagbiyahe"
+  },
+  "k": {
+    "file": "k.mp3",
+    "syllable": "ka",
+    "word": "ikaapat"
+  },
+  "l": {
+    "file": "l.mp3",
+    "syllable": "la",
+    "word": "partikular"
+  },
+  "m": {
+    "file": "m.mp3",
+    "syllable": "ma",
+    "word": "pagmamaneho"
+  },
+  "n": {
+    "file": "n.mp3",
+    "syllable": "na",
+    "word": "sinaunang"
+  },
+  "o": {
+    "file": "o.mp3",
+    "syllable": "o",
+    "word": "tungkol"
+  },
+  "p": {
+    "file": "p.mp3",
+    "syllable": "pa",
+    "word": "pangunahing"
+  },
+  "s": {
+    "file": "s.mp3",
+    "syllable": "sa",
+    "word": "sakit"
+  },
+  "t": {
+    "file": "t.mp3",
+    "syllable": "ta",
+    "word": "tinatawag"
+  },
+  "tʃ": {
+    "file": "ch.mp3",
+    "syllable": "etʃe",
+    "word": "cherry"
+  },
+  "u": {
+    "file": "u.mp3",
+    "syllable": "u",
+    "word": "lutong"
+  },
+  "w": {
+    "file": "w.mp3",
+    "syllable": "wa",
+    "word": "dalawa"
+  },
+  "ŋ": {
+    "file": "ng.mp3",
+    "syllable": "ŋa",
+    "word": "mga"
+  },
+  "ɛ": {
+    "file": "e.mp3",
+    "syllable": "ɛ",
+    "word": "tibeten"
+  },
+  "ɡ": {
+    "file": "g.mp3",
+    "syllable": "ɡa",
+    "word": "napakahalagang"
+  },
+  "ɾ": {
+    "file": "r.mp3",
+    "syllable": "aɾa",
+    "word": "paraang"
+  },
+  "ʃ": {
+    "file": "sh.mp3",
+    "syllable": "ʃa",
+    "word": "pamamasyal"
+  }
+}

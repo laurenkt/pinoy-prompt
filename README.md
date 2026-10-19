@@ -39,6 +39,14 @@ How it works:
 4. **Comparing** (`src/phonetics.ts`): the two sound sequences are aligned with an edit distance weighted by phonetic features, so a near miss (aspirated p, o said as ou) costs less than a different sound. Tagalog allophones (o/ɔ, e/ɛ, r/ɾ) count as right, and added sounds count against the attempt (except a glottal catch or a released final consonant). A card can list other standard pronunciations with `accept: [...]` (Kumusta accepts Kamusta); the attempt is judged against the closest one.
 5. **Coaching** (`src/coach.ts`): common English-speaker patterns get a specific tip; anything else gets "sounded like X". Under "Sounds we heard" the learner can see the raw IPA.
 
+**The results screen** breaks the attempt down sound by sound (`src/screens/speak-result.ts`):
+
+- The recording is drawn as a ribbon (`src/spectrogram.ts`, WebGL with a 2D canvas fallback): it swells with loudness, holds the pitch spectrum inside, and is outlined in each sound's verdict colour. A glowing playhead follows whatever is playing.
+- Every expected sound sits above what was heard, grouped by word. Tap the top tile to hear a native speaker say that sound, or the bottom one to hear that slice of your own recording. The link between them gets longer and breaks up the further off it was.
+- The selected sound gets a closeness bar and a map of where it's made in the mouth (`src/sound-map.ts`): the vowel chart for vowels, a where × how grid for consonants. Your mark and the target sit on it with a path between them, and "Yours, then the target" plays both while your mark travels to the target.
+
+The recogniser's output gives each sound a time (from the CTC frames), which is how a tap finds its slice of the recording. The native reference clips in `public/sounds/` are short syllables (like "ŋa" and "aɾa") cut from the [FLEURS](https://huggingface.co/datasets/google/fleurs) Filipino recordings (CC BY 4.0), each checked by running the recogniser on the cut clip; `src/reference-sounds.json` lists the word each came from.
+
 The model is a one-time download of about 71 MB, fetched from Hugging Face only after the learner agrees, then kept in the browser's Cache Storage so it works offline. A download that's cut short is never kept. Once the model is on the device, the service worker also keeps the model's runtime (about 11 MB, listed in the build's `asset-manifest.json`) across app updates; learners who never use speaking don't download it. Mixed rounds include speaking only once it's on the device.
 
 Why this approach: the browser's speech recogniser can only say whether it understood the word, which isn't coaching, and it isn't available at all in apps opened from an iPhone's home screen ([WebKit bug 225298](https://bugs.webkit.org/show_bug.cgi?id=225298)). Comparing against reference audio would need recorded clips for every card. A phone recogniser hears what was actually said, works on any modern browser including iOS, and keeps the voice on the device.
@@ -78,6 +86,7 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 | `src/recorder.ts` | Microphone recording for speaking questions. |
 | `src/fbank.ts`, `src/phone-model.ts` | Audio features and the on-device phone recogniser. |
 | `src/phonetics.ts`, `src/coach.ts` | Expected sounds, comparison and pronunciation tips. |
+| `src/screens/speak-result.ts`, `src/spectrogram.ts`, `src/sound-map.ts`, `src/player.ts` | The sound-by-sound results screen. |
 | `src/screens/` | One file per screen. |
 | `public/sw.js` | Service worker for offline use. |
 

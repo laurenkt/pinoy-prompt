@@ -6,6 +6,7 @@ import { getCard } from '../deck';
 import type { PhoneModel } from '../phone-model';
 import { RecordError, type RecorderEvents, type Take } from '../recorder';
 import { speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { FakePlayer, fakeRecognition } from '../test/fake-speech';
 
 /** A scriptable microphone: the test decides what it hears and when it stops. */
 class FakeMic {
@@ -39,12 +40,13 @@ let heard: string[];
 let downloaded: boolean;
 let loadModel: ReturnType<typeof vi.fn<SpeakDeps['loadPhoneModel']>>;
 let panel: SpeakPanel;
+let player: FakePlayer;
 const onAttempt = vi.fn();
 const onNext = vi.fn();
 const say = vi.fn();
 
 function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
-  const model: PhoneModel = { recognise: async () => ({ sounds: heard }) };
+  const model: PhoneModel = { recognise: async () => fakeRecognition(heard) };
   loadModel = vi.fn<SpeakDeps['loadPhoneModel']>(async (onProgress) => {
     onProgress?.(0.5);
     onProgress?.(1);
@@ -55,6 +57,7 @@ function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
     record: mic.record as unknown as SpeakDeps['record'],
     modelDownloaded: async () => downloaded,
     loadPhoneModel: loadModel,
+    player: () => player,
     ...overrides,
   };
 }
@@ -75,6 +78,7 @@ async function open(cardId: string, overrides?: Partial<SpeakDeps>): Promise<voi
 
 beforeEach(() => {
   mic = new FakeMic();
+  player = new FakePlayer();
   heard = [];
   downloaded = true;
   vi.clearAllMocks();
@@ -160,7 +164,10 @@ describe('an attempt', () => {
     expect(onAttempt).toHaveBeenCalledWith(false);
     expect(panel.el.querySelector('.sound-off')?.textContent).toBe('ng');
     expect(text('.tips')).toContain('sing');
-    expect(text('.heard')).toContain('/i n a t/');
+    // The breakdown pairs the ng with the n that was heard, and starts on it.
+    expect(text('.pair-off .tile-target .tile-ipa')).toBe('ŋ');
+    expect(text('.pair-off .tile-heard')).toBe('n');
+    expect(text('.sound-detail .detail-letters')).toBe('“ng”');
     // Another go, or move on.
     expect(button('Try again')).toBeTruthy();
     button('Next word').click();

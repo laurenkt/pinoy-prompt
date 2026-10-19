@@ -3,10 +3,12 @@
 
 import { coach, type Tip } from '../coach';
 import type { Card } from '../deck';
-import type { PhoneModel } from '../phone-model';
+import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonetics';
 import { record, RecordError, recordingSupported, type RecordProblem, type Recording } from '../recorder';
 import { h, icon } from '../ui';
+import { webAudioPlayer, type Player } from '../player';
+import { resultView as soundResults, type ResultView } from './speak-result';
 
 /** Download size shown to the learner before they agree to it. */
 const MODEL_MB = 71;
@@ -20,6 +22,8 @@ export interface SpeakDeps {
   record: typeof record;
   modelDownloaded(): Promise<boolean>;
   loadPhoneModel(onProgress?: (fraction: number) => void): Promise<PhoneModel>;
+  /** Plays back pieces of the recording and reference sounds. */
+  player(): Player;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -28,7 +32,9 @@ export const defaultDeps: SpeakDeps = {
   // Loaded on demand so the model runtime isn't part of the app's first download.
   modelDownloaded: async () => (await import('../phone-model')).modelDownloaded(),
   loadPhoneModel: async (onProgress) => (await import('../phone-model')).loadPhoneModel(onProgress),
+  player: () => (sharedPlayer ??= webAudioPlayer()),
 };
+let sharedPlayer: Player | null = null;
 
 type Problem = RecordProblem | 'download' | 'failed';
 
@@ -47,7 +53,7 @@ type State =
   | { name: 'ready' }
   | { name: 'recording'; speech: boolean }
   | { name: 'analysing' }
-  | { name: 'result'; text: string; comparison: Comparison; tips: Tip[]; heard: string[] }
+  | { name: 'result'; text: string; comparison: Comparison; tips: Tip[]; heard: string[]; recognition?: Recognition; samples?: Float32Array }
   | { name: 'problem'; problem: Problem };
 
 export interface SpeakOptions {
@@ -171,11 +177,12 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         return set({ name: 'result', text: card.tl, comparison: compare(variants[0].phones, []), tips: [], heard: [] });
       }
       set({ name: 'analysing' });
-      const { sounds } = await model.recognise(take.samples);
+      const recognition = await model.recognise(take.samples);
       if (stale()) return;
+      const { sounds } = recognition;
       const { text, comparison } = judge(sounds);
       options.onAttempt(isRight(comparison));
-      set({ name: 'result', text, comparison, tips: coach(text, comparison), heard: sounds });
+      set({ name: 'result', text, comparison, tips: coach(text, comparison), heard: sounds, recognition, samples: take.samples });
     } catch (err) {
       if (stale()) return;
       recording = null;
@@ -256,12 +263,17 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           ),
         ];
       case 'result':
-        return resultView(state.text, state.comparison, state.tips, state.heard);
+        return resultView(state);
     }
   }
 
-  function resultView(text: string, comparison: Comparison, tips: Tip[], heard: string[]): HTMLElement[] {
+  /** The sound-by-sound breakdown currently on screen, so it can stop its audio when replaced. */
+  let breakdown: ResultView | null = null;
+
+  function resultView(result: Extract<State, { name: 'result' }>): HTMLElement[] {
+    const { text, comparison, tips, heard, recognition, samples } = result;
     const right = isRight(comparison);
+    const pct = Math.round(comparison.score * 100);
     const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
     const detail =
       heard.length === 0
@@ -269,33 +281,67 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         : right
           ? 'Every sound came through clearly.'
           : 'Letters in pink need work; yellow ones were nearly there.';
+    breakdown =
+      heard.length > 0 && recognition && samples
+        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: deps.player(), say: options.say })
+        : null;
     return [
       h(
         'div',
         { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
-        h('strong', null, title),
-        ' ',
-        detail,
+        h(
+          'div',
+          { class: 'feedback-head' },
+          h('div', null, h('strong', null, title), ' ', detail),
+          heard.length > 0 && dial(comparison.score, `${pct}% of the way there`),
+        ),
         heard.length > 0 &&
           h(
             'p',
             { class: 'letters', lang: 'fil' },
             markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)),
           ),
-        tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
-        heard.length > 0 && h('details', { class: 'heard small' }, h('summary', null, 'Sounds we heard'), h('p', { class: 'ipa' }, `/${heard.join(' ')}/`)),
+        tips.length > 0 &&
+          h(
+            'ul',
+            { class: 'tips' },
+            tips.map((t) =>
+              h(
+                'li',
+                null,
+                // With the breakdown below, a tip's letters open that sound in it.
+                breakdown
+                  ? h('button', { class: 'tip-link', lang: 'fil', onclick: () => breakdown?.focusLetters(t.letters) }, t.letters)
+                  : h('strong', { lang: 'fil' }, t.letters),
+                ': ',
+                t.text,
+              ),
+            ),
+          ),
       ),
+      breakdown?.el,
       h(
         'div',
         { class: 'row' },
-        h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly'),
+        !breakdown && h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly'),
         right ? h('button', { class: 'btn primary', 'data-autofocus': true, onclick: options.onNext }, 'Next') : micButton('Try again', 'btn mic'),
       ),
       !right && h('button', { class: 'btn secondary skip-link', onclick: options.onNext }, 'Next word'),
     ].filter(Boolean) as HTMLElement[];
   }
 
+  /** A ring that fills with how close the attempt was. */
+  function dial(score: number, label: string): HTMLElement {
+    const r = 26;
+    const c = 2 * Math.PI * r;
+    const el = h('div', { class: 'dial', role: 'img', 'aria-label': label });
+    el.innerHTML = `<svg viewBox="0 0 64 64" aria-hidden="true"><circle class="dial-track" cx="32" cy="32" r="${r}"/><circle class="dial-fill" cx="32" cy="32" r="${r}" stroke-dasharray="${c * score} ${c}" transform="rotate(-90 32 32)"/></svg><span>${Math.round(score * 100)}<small>%</small></span>`;
+    return el;
+  }
+
   function draw(): void {
+    breakdown?.dispose();
+    breakdown = null;
     const phase = state.name === 'recording' ? (state.speech ? 'phase-sound' : 'phase-mic-on') : '';
     el.className = `speak ${state.name} ${phase}`.trim();
     el.replaceChildren(...view());
@@ -311,6 +357,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     dispose: () => {
       disposed = true;
       recording?.cancel();
+      breakdown?.dispose();
     },
   };
 }
