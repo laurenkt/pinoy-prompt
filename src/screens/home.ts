@@ -1,16 +1,7 @@
 import type { App } from '../app';
-import { UNITS, getCard } from '../deck';
-import {
-  buildSession,
-  buildUnitSession,
-  dueCards,
-  isUnlocked,
-  newCardsLeftToday,
-  unitProgress,
-  upcomingNewCards,
-} from '../session';
-import { isMature } from '../srs';
-import { h, icon, progressBar } from '../ui';
+import { MIN_MEASURED_REVIEWS, RECALL_WINDOW_DAYS, STRENGTHS, memorySummary, type MemorySummary } from '../memory';
+import { buildExtraSession, buildSession, dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
+import { h, icon } from '../ui';
 
 /** A Tagalog greeting for the time of day. */
 function greeting(hour: number): { tl: string; en: string } {
@@ -24,15 +15,8 @@ export function homeScreen(app: App): HTMLElement {
   const { progress } = app;
   const now = app.now();
   const hello = greeting(new Date(now).getHours());
-  // Only cards still in the deck count; saved progress may outlive removed cards.
-  const states = Object.entries(progress.cards).filter(([id]) => getCard(id)).map(([, s]) => s);
-  const learned = states.length;
-  const known = states.filter(isMature).length;
-  const isFirstRun = learned === 0;
-
-  const steps = buildSession(progress, now);
-  const reviewCount = dueCards(progress, now).length;
-  const newCount = Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length);
+  const memory = memorySummary(progress, now);
+  const isFirstRun = memory.total === 0;
 
   // The last word of the greeting gets the accent color.
   const split = hello.tl.lastIndexOf(' ');
@@ -53,51 +37,8 @@ export function homeScreen(app: App): HTMLElement {
     ),
 
     isFirstRun ? welcomeCard() : null,
-
-    todayCard(app, steps.length, reviewCount, newCount, isFirstRun, isFirstRun ? null : `${learned} learned · ${known} well known`),
-
-    h('h2', { class: 'section-title' }, 'Your path'),
-    h(
-      'ol',
-      { class: 'path' },
-      UNITS.map((unit, i) => {
-        const unlocked = isUnlocked(progress, i);
-        const { introduced, total } = unitProgress(progress, unit);
-        const complete = introduced === total;
-        const state = !unlocked ? 'locked' : complete ? 'complete' : introduced > 0 ? 'started' : 'open';
-        const onclick = !unlocked
-          ? undefined
-          : complete
-            ? () => app.navigate({ name: 'words', unitId: unit.id })
-            : () => app.navigate({ name: 'session', steps: buildUnitSession(progress, unit.id), title: unit.title });
-        return h(
-          'li',
-          null,
-          h(
-            'button',
-            {
-              class: `unit ${state}`,
-              disabled: !unlocked,
-              onclick,
-              'aria-label': `Unit ${i + 1}: ${unit.title}${unlocked ? `, ${introduced} of ${total} learned` : ' (locked)'}`,
-            },
-            h(
-              'span',
-              { class: 'unit-top', 'aria-hidden': 'true' },
-              h('span', null, `Unit ${i + 1}`),
-              !unlocked ? icon('lock') : complete ? icon('check') : h('span', null, `${introduced}/${total}`),
-            ),
-            h(
-              'span',
-              { class: 'unit-body', 'aria-hidden': 'true' },
-              h('span', { class: 'unit-title' }, unit.title),
-              h('span', { class: 'unit-tl', lang: 'fil' }, unit.tlTitle),
-              unlocked && progressBar(introduced, total),
-            ),
-          ),
-        );
-      }),
-    ),
+    todayCard(app, isFirstRun),
+    isFirstRun ? null : memorySection(memory),
   );
 }
 
@@ -117,27 +58,43 @@ function welcomeCard(): HTMLElement {
   );
 }
 
-function todayCard(app: App, total: number, reviews: number, fresh: number, isFirstRun: boolean, summary: string | null): HTMLElement {
-  const meta = summary && h('p', { class: 'today-meta' }, summary);
-  if (total === 0) {
-    const nextUnit = UNITS.find((u, i) => isUnlocked(app.progress, i) && unitProgress(app.progress, u).introduced < u.cards.length);
+function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+function todayCard(app: App, isFirstRun: boolean): HTMLElement {
+  const { progress } = app;
+  const now = app.now();
+  const steps = buildSession(progress, now);
+  const reviews = dueCards(progress, now).length;
+  const unmet = upcomingNewCards(progress, Infinity).length;
+  const fresh = Math.min(newCardsLeftToday(progress), unmet);
+  const rate = progress.settings.dailyNew;
+
+  const rateLine = h(
+    'p',
+    { class: 'today-meta' },
+    unmet === 0 ? "You've met every word in the deck." : `${plural(rate, 'new word')} a day`,
+    unmet > 0 && h('button', { class: 'link-btn', onclick: () => app.navigate({ name: 'settings' }) }, 'Change'),
+  );
+
+  if (steps.length === 0) {
     return h(
       'section',
       { class: 'card today done' },
-      meta,
-      h('h2', { lang: 'fil' }, 'Tapos na!'),
-      h('p', null, 'All done for today. Come back tomorrow, or keep going:'),
+      rateLine,
+      h('h2', null, 'Nothing due'),
+      h('p', null, "Your reviews are done for now. Words come back as they're about to fade."),
       h(
         'div',
         { class: 'row' },
         h('button', { class: 'btn secondary', onclick: () => app.navigate({ name: 'practice' }) }, 'Practice'),
-        nextUnit &&
+        unmet > 0 &&
           h(
             'button',
             {
               class: 'btn primary',
-              onclick: () =>
-                app.navigate({ name: 'session', steps: buildUnitSession(app.progress, nextUnit.id), title: nextUnit.title }),
+              onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(progress), title: 'New words' }),
             },
             'Learn 5 more',
           ),
@@ -153,8 +110,8 @@ function todayCard(app: App, total: number, reviews: number, fresh: number, isFi
   return h(
     'section',
     { class: 'card today' },
-    meta,
-    h('h2', null, isFirstRun ? 'Your first lesson' : "Today's session"),
+    rateLine,
+    h('h2', null, isFirstRun ? 'Your first words' : 'Today'),
     h('p', null, `${parts.join(' · ')} · about ${minutes} min`),
     h(
       'button',
@@ -163,6 +120,78 @@ function todayCard(app: App, total: number, reviews: number, fresh: number, isFi
         onclick: () => app.navigate({ name: 'session', steps: buildSession(app.progress, app.now()) }),
       },
       isFirstRun ? 'Start learning' : 'Start',
+    ),
+  );
+}
+
+function memorySection(memory: MemorySummary): HTMLElement {
+  const { total, strengths, recent, due } = memory;
+  const measured = recent.reviews >= MIN_MEASURED_REVIEWS;
+  const recall = measured ? 1 - recent.missed / recent.reviews : (memory.estimatedRecall ?? 0);
+  const pct = `${Math.round(recall * 100)}%`;
+
+  const coming: string[] = [];
+  if (due.tomorrow > 0) coming.push(`${due.tomorrow} by tomorrow`);
+  if (due.week > due.tomorrow) coming.push(`${due.week} this week`);
+
+  return h(
+    'section',
+    { class: 'memory', 'aria-labelledby': 'memory-title' },
+    h('h2', { class: 'section-title', id: 'memory-title' }, 'Your memory'),
+    h(
+      'div',
+      { class: 'tiles' },
+      h(
+        'div',
+        { class: 'tile words-tile' },
+        h('span', { class: 'tile-value' }, total),
+        h('span', { class: 'tile-label' }, total === 1 ? 'word or phrase' : 'words & phrases'),
+      ),
+      h(
+        'div',
+        { class: 'tile recall-tile' },
+        h('span', { class: 'tile-value' }, measured ? pct : `≈${pct}`),
+        h('span', { class: 'tile-label' }, measured ? `recalled, last ${RECALL_WINDOW_DAYS} days` : 'recall, estimated'),
+      ),
+    ),
+    h(
+      'p',
+      { class: 'memory-note muted small' },
+      measured
+        ? `Right on ${recent.reviews - recent.missed} of ${plural(recent.reviews, 'review')} of words you'd learned.`
+        : `Estimated from your review schedule. Once you've done ${MIN_MEASURED_REVIEWS} reviews, this shows how often you actually remember.`,
+    ),
+
+    h(
+      'div',
+      { class: 'card strength-card' },
+      h('h3', null, "How firmly they're stored"),
+      strengthBar(memory),
+      h(
+        'ul',
+        { class: 'strength-legend' },
+        STRENGTHS.map((s) =>
+          h(
+            'li',
+            null,
+            h('span', { class: `swatch s-${s.id}`, 'aria-hidden': 'true' }),
+            h('span', { class: 'legend-label' }, h('strong', null, s.label), ' ', h('span', { class: 'muted' }, s.desc)),
+            h('span', { class: 'legend-count' }, strengths[s.id]),
+          ),
+        ),
+      ),
+      coming.length > 0 && h('p', { class: 'coming muted small' }, `Coming up for review: ${coming.join(' · ')}`),
+    ),
+  );
+}
+
+function strengthBar({ total, strengths }: MemorySummary): HTMLElement {
+  const label = STRENGTHS.map((s) => `${strengths[s.id]} ${s.label.toLowerCase()}`).join(', ');
+  return h(
+    'div',
+    { class: 'strength-bar', role: 'img', 'aria-label': label },
+    STRENGTHS.filter((s) => strengths[s.id] > 0).map((s) =>
+      h('span', { class: `seg s-${s.id}`, style: { flexGrow: String(strengths[s.id] / total) } }),
     ),
   );
 }

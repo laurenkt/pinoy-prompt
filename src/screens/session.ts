@@ -1,12 +1,12 @@
 import type { App } from '../app';
-import { UNITS, getCard, unitOf, type Card } from '../deck';
+import { getCard, unitOf, type Card } from '../deck';
 import { distractors, isIntroduced, requeue, shuffle, type Step } from '../session';
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { play } from '../speech';
 import { recordAnswer } from '../store';
 import { audioButton, h, icon, progressBar } from '../ui';
 
-type Phase = 'unit-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'done';
+type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'done';
 
 const RATINGS: { rating: Rating; label: string }[] = [
   { rating: 'again', label: 'Again' },
@@ -27,7 +27,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
   let picked: string | null = null;
   let reverse = false;
   let completed = 0;
-  const unitsIntroduced = new Set<string>();
+  const topicsIntroduced = new Set<string>();
   const stats = { learned: 0, reviewed: 0, correct: 0, answered: 0 };
 
   const say = (slow = false) => card && void play(card, slow);
@@ -44,9 +44,9 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     } else if (step.kind === 'new' && !isIntroduced(app.progress, card.id)) {
       const unit = unitOf(card.id);
       const unitIsFresh = unit && !unit.cards.some((c) => isIntroduced(app.progress, c.id));
-      if (unit && unitIsFresh && !unitsIntroduced.has(unit.id)) {
-        unitsIntroduced.add(unit.id);
-        phase = 'unit-intro';
+      if (unit && unitIsFresh && !topicsIntroduced.has(unit.id)) {
+        topicsIntroduced.add(unit.id);
+        phase = 'topic-intro';
       } else {
         phase = 'intro';
         autoplay();
@@ -118,8 +118,8 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
   function body(): HTMLElement {
     if (phase === 'done' || !card) return doneView();
     switch (phase) {
-      case 'unit-intro':
-        return unitIntroView();
+      case 'topic-intro':
+        return topicIntroView();
       case 'intro':
         return introView(card);
       case 'quiz':
@@ -131,12 +131,12 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     }
   }
 
-  function unitIntroView(): HTMLElement {
+  function topicIntroView(): HTMLElement {
     const unit = card && unitOf(card.id);
     return h(
       'div',
       { class: 'panel center' },
-      h('p', { class: 'eyebrow' }, unit ? `Unit ${UNITS.indexOf(unit) + 1} · New unit` : 'New unit'),
+      h('p', { class: 'eyebrow' }, 'New topic'),
       h('h2', null, unit?.title),
       h('p', { class: 'tl-sub' }, unit?.tlTitle),
       h('p', null, unit?.intro),

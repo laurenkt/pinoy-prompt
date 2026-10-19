@@ -23,9 +23,19 @@ export interface Settings {
   autoplay: boolean;
 }
 
+/** How a day's reviews of already-learned cards went. */
+export interface DayTally {
+  /** Reviews of cards that had been learned (interval of a day or more). */
+  reviews: number;
+  /** How many of those were forgotten ("Again"). */
+  missed: number;
+}
+
 export interface Progress {
   cards: Record<string, CardState>;
   today: { day: string; newCount: number; reviewCount: number };
+  /** Review results by local day (YYYY-MM-DD), for measuring recall. */
+  history: Record<string, DayTally>;
   settings: Settings;
 }
 
@@ -43,7 +53,7 @@ export interface Envelope {
 }
 
 /** The schema this build writes. */
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 
 type Data = Record<string, unknown>;
 
@@ -52,6 +62,8 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   // 1 → 2: progress moved into a versioned envelope (handled by decode) and
   // the day streak, kept by the first builds, was removed.
   1: ({ streak: _streak, ...rest }) => rest,
+  // 2 → 3: review results are tallied by day. Nothing earlier was recorded, so it starts empty.
+  2: (data) => ({ history: {}, ...data }),
 };
 
 export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true };
@@ -67,6 +79,7 @@ export function emptyProgress(now: number): Progress {
   return {
     cards: {},
     today: { day: dayKey(now), newCount: 0, reviewCount: 0 },
+    history: {},
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -145,9 +158,17 @@ export function sanitize(data: Data, now: number): Progress {
   const fresh = emptyProgress(now);
   const t = data.today;
   const today =
-    isObject(t) && typeof t.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.day) && isCount(t.newCount) && isCount(t.reviewCount)
+    isObject(t) && typeof t.day === 'string' && DAY.test(t.day) && isCount(t.newCount) && isCount(t.reviewCount)
       ? { day: t.day, newCount: t.newCount, reviewCount: t.reviewCount }
       : fresh.today;
+
+  const history: Record<string, DayTally> = {};
+  if (isObject(data.history)) {
+    for (const [day, value] of Object.entries(data.history)) {
+      if (!DAY.test(day) || !isObject(value) || !isCount(value.reviews) || !isCount(value.missed)) continue;
+      history[day] = { reviews: value.reviews, missed: Math.min(value.missed, value.reviews) };
+    }
+  }
 
   const s = isObject(data.settings) ? data.settings : {};
   const settings: Settings = {
@@ -156,7 +177,7 @@ export function sanitize(data: Data, now: number): Progress {
     autoplay: typeof s.autoplay === 'boolean' ? s.autoplay : DEFAULT_SETTINGS.autoplay,
   };
 
-  return { ...data, cards, today, settings };
+  return { ...data, cards, today, history, settings };
 }
 
 /**
@@ -211,6 +232,13 @@ export function mergeInto(target: Progress, other: Progress, { since = -Infinity
   } else if (other.today.day > target.today.day) {
     target.today = { ...other.today };
   }
+  // Like today's counters: each copy only ever counts up, so the larger count is the fuller one.
+  for (const [day, theirs] of Object.entries(other.history)) {
+    const mine = target.history[day];
+    target.history[day] = mine
+      ? { reviews: Math.max(mine.reviews, theirs.reviews), missed: Math.max(mine.missed, theirs.missed) }
+      : { ...theirs };
+  }
   const extra = target as unknown as Data;
   for (const [key, value] of Object.entries(other)) {
     if (!(key in extra) && key !== '__proto__') extra[key] = value;
@@ -223,6 +251,8 @@ export function replaceContents(target: Progress, source: Progress): void {
   for (const key of Object.keys(target)) delete (target as unknown as Data)[key];
   Object.assign(target, source);
 }
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 function isObject(v: unknown): v is Data {
   return typeof v === 'object' && v !== null && !Array.isArray(v);

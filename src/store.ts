@@ -26,7 +26,7 @@ import {
 } from './progress-schema';
 import { newCardState, review, type Rating } from './srs';
 
-export { DEFAULT_SETTINGS, dayKey, emptyProgress, type Progress, type Settings } from './progress-schema';
+export { DEFAULT_SETTINGS, dayKey, emptyProgress, type DayTally, type Progress, type Settings } from './progress-schema';
 
 export const STORAGE_KEY = 'pinoy-prompt:progress';
 /** Where schema 1 kept progress. Read once to upgrade, then left alone. */
@@ -223,6 +223,12 @@ export function recordAnswer(progress: Progress, cardId: string, rating: Rating,
   const existing = progress.cards[cardId];
   if (!existing) progress.today.newCount++;
   else progress.today.reviewCount++;
+  // Only a card that had been learned tests memory. A retry minutes after a miss doesn't.
+  if (existing && existing.interval >= 1) {
+    const day = dayKey(now);
+    const tally = progress.history[day] ?? { reviews: 0, missed: 0 };
+    progress.history[day] = { reviews: tally.reviews + 1, missed: tally.missed + (rating === 'again' ? 1 : 0) };
+  }
   progress.cards[cardId] = review(existing ?? newCardState(now), rating, now);
   return progress;
 }

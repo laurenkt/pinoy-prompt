@@ -29,6 +29,7 @@ import { FakeStorage } from './test/fake-storage';
 
 const NOW = new Date(2026, 9, 19, 12).getTime();
 const LEGACY_V1 = (await import('./test/fixtures/progress-schema-1-streak.json?raw')).default;
+const SCHEMA_2 = (await import('./test/fixtures/progress-schema-2.json?raw')).default;
 
 let storage: FakeStorage;
 
@@ -73,6 +74,38 @@ describe('daily counters', () => {
     expect(p.today).toEqual({ day: dayKey(NOW), newCount: 1, reviewCount: 1 });
     p = rollDay(p, NOW + DAY_MS);
     expect(p.today.newCount).toBe(0);
+  });
+});
+
+describe('review history', () => {
+  it('tallies reviews of learned cards by day, and the ones forgotten', () => {
+    const p = learn('isa', 'dalawa', 'tatlo');
+    // Answering a card for the first time is learning it, not recalling it.
+    expect(p.history).toEqual({});
+    const later = NOW + 2 * DAY_MS;
+    recordAnswer(p, 'isa', 'good', later);
+    recordAnswer(p, 'dalawa', 'hard', later);
+    recordAnswer(p, 'tatlo', 'again', later);
+    // The retry minutes after a miss is relearning, so it isn't counted again.
+    recordAnswer(p, 'tatlo', 'good', later + 60_000);
+    expect(p.history).toEqual({ [dayKey(later)]: { reviews: 3, missed: 1 } });
+  });
+
+  it('starts empty when upgrading saved schema 2 progress, keeping everything else', () => {
+    storage.setItem(STORAGE_KEY, SCHEMA_2);
+    const before = JSON.parse(SCHEMA_2).progress;
+    const p = load(NOW);
+    expect(p.cards).toEqual(before.cards);
+    expect(p.settings).toEqual(before.settings);
+    expect(p.history).toEqual({});
+
+    recordAnswer(p, 'kumusta', 'good', NOW);
+    save(p);
+    const after = stored();
+    expect(after.schema).toBe(SCHEMA);
+    expect(after.rev).toBe(42);
+    expect(Object.keys(after.progress.cards).sort()).toEqual(['isa', 'kumusta']);
+    expect(after.progress.history).toEqual({ [dayKey(NOW)]: { reviews: 1, missed: 0 } });
   });
 });
 

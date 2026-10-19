@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ALL_CARDS, UNITS } from './deck';
-import { buildSession, buildUnitSession, distractors, dueCards, isUnlocked, requeue, upcomingNewCards } from './session';
+import { buildExtraSession, buildSession, distractors, dueCards, requeue, upcomingNewCards } from './session';
 import { DAY_MS } from './srs';
 import { emptyProgress, recordAnswer } from './store';
 
 const NOW = Date.UTC(2026, 0, 1, 12);
 
 describe('buildSession', () => {
-  it('starts a new learner on the first unit, up to the daily limit', () => {
+  it('starts a new learner at the top of the deck, up to the daily limit', () => {
     const steps = buildSession(emptyProgress(NOW), NOW);
     expect(steps).toHaveLength(8);
     expect(steps.every((s) => s.kind === 'new')).toBe(true);
@@ -40,23 +40,22 @@ describe('dueCards', () => {
   });
 });
 
-describe('unlocking', () => {
-  it('unlocks the next unit only when the previous one is fully introduced', () => {
+describe('new cards', () => {
+  it('come in deck order across topics, with nothing locked', () => {
     const progress = emptyProgress(NOW);
-    expect(isUnlocked(progress, 1)).toBe(false);
-    for (const card of UNITS[0].cards) recordAnswer(progress, card.id, 'good', NOW);
-    expect(isUnlocked(progress, 1)).toBe(true);
-    expect(isUnlocked(progress, 2)).toBe(false);
+    expect(upcomingNewCards(progress, Infinity)).toEqual(ALL_CARDS.map((c) => c.id));
+    // Someone who stopped part way through a topic carries straight on from there.
+    for (const card of UNITS[0].cards.slice(0, 3)) recordAnswer(progress, card.id, 'good', NOW);
+    expect(upcomingNewCards(progress, 2)).toEqual(UNITS[0].cards.slice(3, 5).map((c) => c.id));
   });
 
-  it('does not offer new cards from locked units', () => {
-    const ids = upcomingNewCards(emptyProgress(NOW), 100);
-    expect(ids).toEqual(UNITS[0].cards.map((c) => c.id));
-  });
-
-  it('builds a unit session from that unit only', () => {
-    const steps = buildUnitSession(emptyProgress(NOW), UNITS[0].id, 5);
-    expect(steps.map((s) => s.cardId)).toEqual(UNITS[0].cards.slice(0, 5).map((c) => c.id));
+  it('can go beyond the daily rate when asked for', () => {
+    const progress = emptyProgress(NOW);
+    for (const card of ALL_CARDS.slice(0, 8)) recordAnswer(progress, card.id, 'good', NOW);
+    expect(buildSession(progress, NOW)).toEqual([]);
+    const steps = buildExtraSession(progress, 5);
+    expect(steps.map((s) => s.cardId)).toEqual(ALL_CARDS.slice(8, 13).map((c) => c.id));
+    expect(steps.every((s) => s.kind === 'new')).toBe(true);
   });
 });
 

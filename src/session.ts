@@ -1,7 +1,7 @@
 // Builds a study session and tracks it as the learner works through it.
 // Kept free of DOM code so it can be unit tested.
 
-import { ALL_CARDS, UNITS, getCard, type Card, type Unit } from './deck';
+import { ALL_CARDS, getCard, type Card } from './deck';
 import { isDue } from './srs';
 import type { Progress } from './store';
 
@@ -20,18 +20,6 @@ export function isIntroduced(progress: Progress, cardId: string): boolean {
   return cardId in progress.cards;
 }
 
-export function unitProgress(progress: Progress, unit: Unit): { introduced: number; total: number } {
-  const introduced = unit.cards.filter((c) => isIntroduced(progress, c.id)).length;
-  return { introduced, total: unit.cards.length };
-}
-
-/** A unit unlocks once every card in the unit before it has been introduced. */
-export function isUnlocked(progress: Progress, unitIndex: number): boolean {
-  if (unitIndex <= 0) return true;
-  const prev = UNITS[unitIndex - 1];
-  return prev.cards.every((c) => isIntroduced(progress, c.id));
-}
-
 export function dueCards(progress: Progress, now: number): string[] {
   return Object.entries(progress.cards)
     // Skip progress for cards since removed from the deck.
@@ -44,17 +32,12 @@ export function newCardsLeftToday(progress: Progress): number {
   return Math.max(0, progress.settings.dailyNew - progress.today.newCount);
 }
 
-/** The next cards to introduce, in deck order, from unlocked units only. */
-export function upcomingNewCards(progress: Progress, limit: number, unitId?: string): string[] {
+/** The next cards to introduce, in deck order. */
+export function upcomingNewCards(progress: Progress, limit: number): string[] {
   const result: string[] = [];
-  for (let i = 0; i < UNITS.length && result.length < limit; i++) {
-    const unit = UNITS[i];
-    if (unitId && unit.id !== unitId) continue;
-    if (!isUnlocked(progress, i)) break;
-    for (const card of unit.cards) {
-      if (result.length >= limit) break;
-      if (!isIntroduced(progress, card.id)) result.push(card.id);
-    }
+  for (const card of ALL_CARDS) {
+    if (result.length >= limit) break;
+    if (!isIntroduced(progress, card.id)) result.push(card.id);
   }
   return result;
 }
@@ -76,9 +59,9 @@ export function buildSession(progress: Progress, now: number): Step[] {
   return steps;
 }
 
-/** A session focused on one unit's new cards, ignoring the daily limit. */
-export function buildUnitSession(progress: Progress, unitId: string, size = 5): Step[] {
-  return upcomingNewCards(progress, size, unitId).map((cardId) => ({ cardId, kind: 'new' }));
+/** A few more new cards beyond the daily rate, for when the learner wants them. */
+export function buildExtraSession(progress: Progress, size = 5): Step[] {
+  return upcomingNewCards(progress, size).map((cardId) => ({ cardId, kind: 'new' }));
 }
 
 /** Put a missed card back a few steps later so it comes round again this session. */

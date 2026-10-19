@@ -9,9 +9,10 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 - **Learn**: each day introduces a handful of new words and phrases (8 by default). Every new card shows the Tagalog, audio, a pronunciation guide, the meaning and a usage tip, followed by a quick multiple-choice check.
 - **Review**: cards come back on an SM-2 style schedule (1 day, 3 days, then growing by each card's ease). You rate each recall as Again, Hard, Good or Easy; missed cards come round again in the same session.
 - **Practice**: unscored rounds of 10 (listen, read, recall, speak, or mixed) using the words you know, weighted toward the ones you find hardest. Practice never changes the review schedule.
-- **Words**: a phrasebook of every unit, tappable for audio.
+- **Home**: today's reviews and new words, then a picture of your memory: how many words you know, how well you recall them (measured from your reviews over the last 30 days, or estimated from the schedule until there are enough), and how firmly each is stored (just met, days, weeks, long-term, read from its review interval). There are no lessons to complete or streaks to keep.
+- **Words**: a phrasebook by topic, tappable for audio, showing how firmly each word you know is stored.
 
-Units unlock in order: Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases.
+New words come in deck order, topic by topic (Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases), at the daily rate set in Settings. "Learn 5 more" adds extra when you want them.
 
 Progress is stored on the device. Nothing is sent to our server (there isn't one), and that includes your voice: speaking questions are checked on the device.
 
@@ -76,9 +77,10 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 
 | Path | What's there |
 | --- | --- |
-| `src/deck.ts` | All lesson content. Add units or cards here. |
+| `src/deck.ts` | All word content, grouped by topic. Add topics or cards here. |
 | `src/srs.ts` | The scheduler. |
-| `src/session.ts` | Building study sessions, unit unlocking, quiz distractors. |
+| `src/session.ts` | Building study sessions, new-word order, quiz distractors. |
+| `src/memory.ts` | Memory stats for Home: strength bands, estimated and measured recall. |
 | `src/store.ts` | Saving and loading progress, daily counters and backups. |
 | `src/progress-schema.ts` | The saved progress format, its migrations and repair. |
 | `src/progress-mirror.ts` | The IndexedDB copy of saved progress. |
