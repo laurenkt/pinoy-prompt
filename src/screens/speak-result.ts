@@ -130,7 +130,10 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   }
   const playhead = (t: number | null) => ribbon?.setPlayhead(t);
 
+  // Counts playbacks started (and dispose), so a sequence can tell it was interrupted.
+  let plays = 0;
   const playMine = (range: { start: number; end: number }) => {
+    plays++;
     const playback = player.playSlice(attempt.samples, SAMPLE_RATE, range.start, range.end, playhead);
     void playback.done.then(() => playhead(null));
     return playback;
@@ -171,6 +174,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const ipa = target(list[index]);
     const ref = ipa ? referenceFor(ipa) : null;
     if (!ref) return Promise.resolve();
+    plays++;
     return player.playUrl(ref.url).done;
   };
 
@@ -271,8 +275,12 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
           onclick: async () => {
             drawn.reset();
             drawn.heard?.classList.add('speaking');
-            await playMine(yoursFor(index)).done;
+            const mine = playMine(yoursFor(index));
+            const turn = plays;
+            await mine.done;
             drawn.heard?.classList.remove('speaking');
+            // Something else was played, or the screen closed: don't carry on.
+            if (plays !== turn) return;
             const goal = ipa ? chartPoint(placeOf(ipa)) : null;
             if (goal) drawn.moveTo(goal, 700);
             await playTarget(index);
@@ -347,6 +355,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       detail.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     },
     dispose: () => {
+      plays++;
       player.stop();
       ribbon?.dispose();
     },

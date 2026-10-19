@@ -37,7 +37,7 @@ How it works:
 2. **Recognising sounds** (`src/fbank.ts`, `src/phone-model.ts`): the audio becomes 80-band log mel features, computed exactly as in training (checked against lhotse in `src/fbank.test.ts`), and goes through [ZIPA](https://github.com/lingjzhu/zipa) (Zhu et al., ACL 2025), a multilingual phone recogniser that outputs IPA sounds rather than words. We use the 64M-parameter `zipa-small-crctc` model, int8-quantised, run with onnxruntime-web in WebAssembly. Model © its authors, [CC BY 4.0](https://huggingface.co/anyspeech/zipa-small-crctc-500k).
 3. **Expected sounds** (`src/phonetics.ts`): Tagalog spelling is close to phonemic, so a rule set turns each card into IPA (ng → ŋ, r → ɾ, mga → maŋa, ts → tʃ, siy+vowel → ʃ, borrowed letters, optional glottal stops).
 4. **Comparing** (`src/phonetics.ts`): the two sound sequences are aligned with an edit distance weighted by phonetic features, so a near miss (aspirated p, o said as ou) costs less than a different sound. Tagalog allophones (o/ɔ, e/ɛ, r/ɾ) count as right, and added sounds count against the attempt (except a glottal catch or a released final consonant). A card can list other standard pronunciations with `accept: [...]` (Kumusta accepts Kamusta); the attempt is judged against the closest one.
-5. **Coaching** (`src/coach.ts`): common English-speaker patterns get a specific tip; anything else gets "sounded like X". Under "Sounds we heard" the learner can see the raw IPA.
+5. **Coaching** (`src/coach.ts`): common English-speaker patterns get a specific tip; anything else gets "sounded like X".
 
 **The results screen** breaks the attempt down sound by sound (`src/screens/speak-result.ts`):
 

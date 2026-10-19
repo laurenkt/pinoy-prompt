@@ -289,6 +289,8 @@ export function createSpectrogram(
     dispose() {
       disposed = true;
       cancelAnimationFrame(frame);
+      // Browsers cap live WebGL contexts, and each result screen makes one.
+      webgl?.getExtension('WEBGL_lose_context')?.loseContext();
     },
   };
 }

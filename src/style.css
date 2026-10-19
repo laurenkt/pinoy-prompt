@@ -844,20 +844,6 @@ p {
   margin: 0;
 }
 
-.heard {
-  margin: 4px 0 0;
-}
-
-.heard summary {
-  cursor: pointer;
-  color: var(--muted);
-}
-
-.ipa {
-  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  margin: 4px 0 0;
-}
-
 /* The card's text, each letter coloured by how its sound came out. */
 .letters {
   font-size: 2rem;

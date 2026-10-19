@@ -74,6 +74,16 @@ describe('the breakdown', () => {
     expect(q('.chart-heard').classList).toContain('arrived');
   });
 
+  it('stops the sequence when something else is played during it', async () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    const both = all('.detail-actions button').find((b) => b.textContent === '▶ Yours, then the target')!;
+    both.click();
+    q<HTMLButtonElement>('.pair-off .tile-heard').click();
+    await flush();
+    await flush();
+    expect(player.calls.map((c) => c.kind)).toEqual(['slice', 'slice']);
+  });
+
   it('draws vowels on the vowel map and consonants on the consonant map', () => {
     show(attempt('po', ['p', 'u']));
     q<HTMLButtonElement>('.pair-close .tile-heard').click();
