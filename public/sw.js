@@ -26,8 +26,30 @@ async function cacheShell(cache) {
   await cache.addAll([...new Set(fonts)]);
 }
 
+/** Must match CACHE in src/phone-model.ts. */
+const MODEL_CACHE = 'pinoy-prompt-models-v1';
+
+/**
+ * Once the learner has downloaded the pronunciation model, keep the code that
+ * runs it offline too. It's loaded on demand, so index.html doesn't list it;
+ * the build's manifest does. Learners who never use speaking skip these 11 MB.
+ */
+async function cacheSpeech(cache) {
+  if (!(await caches.has(MODEL_CACHE))) return;
+  try {
+    const manifest = await (await fetch('./asset-manifest.json', { cache: 'no-cache' })).json();
+    const entry = manifest['src/phone-model.ts'];
+    if (entry) await cache.addAll([entry.file, ...(entry.assets ?? [])].map((f) => `./${f}`));
+  } catch {
+    // Speaking will fetch them when it's next used online.
+  }
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then(cacheShell));
+  event.waitUntil(caches.open(CACHE).then(async (cache) => {
+    await cacheShell(cache);
+    await cacheSpeech(cache);
+  }));
   self.skipWaiting();
 });
 

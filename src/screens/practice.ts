@@ -51,7 +51,12 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   const canSpeak = deps.recordingSupported();
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
   let speakReady = false;
-  if (canSpeak) void deps.modelDownloaded().then((ready) => (speakReady = ready));
+  if (canSpeak) {
+    deps.modelDownloaded().then(
+      (ready) => (speakReady ||= ready),
+      () => {},
+    );
+  }
 
   let questions: Question[] = [];
   let index = 0;
@@ -97,6 +102,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
           if (title) title.textContent = `${score} right`;
         },
         onNext: advance,
+        onReady: () => (speakReady = true),
         deps,
       });
     }

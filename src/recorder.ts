@@ -45,17 +45,34 @@ export function recordingSupported(): boolean {
   return typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof AudioContext !== 'undefined';
 }
 
-/** Average blocks of samples down to 16 kHz. Speech has little above 8 kHz, so this is enough. */
+/**
+ * Resample to 16 kHz with windowed-sinc interpolation. Going down, it first
+ * filters out everything above the new Nyquist frequency, so high hiss (and
+ * the top of "s") can't fold back into the band the recogniser listens to.
+ */
 export function resample(input: Float32Array, fromRate: number): Float32Array {
   if (fromRate === SAMPLE_RATE) return input;
   const ratio = fromRate / SAMPLE_RATE;
+  // Cutoff as a fraction of the input's Nyquist frequency, a little under the lower of the two rates.
+  const cutoff = Math.min(1, 1 / ratio) * 0.95;
+  const half = Math.ceil(8 / cutoff);
   const out = new Float32Array(Math.floor(input.length / ratio));
   for (let i = 0; i < out.length; i++) {
-    const start = Math.floor(i * ratio);
-    const end = Math.min(input.length, Math.floor((i + 1) * ratio));
+    const t = i * ratio;
+    const centre = Math.floor(t);
     let sum = 0;
-    for (let j = start; j < end; j++) sum += input[j];
-    out[i] = end > start ? sum / (end - start) : 0;
+    let weights = 0;
+    for (let k = centre - half + 1; k <= centre + half; k++) {
+      if (k < 0 || k >= input.length) continue;
+      const d = t - k;
+      const x = Math.PI * cutoff * d;
+      const sinc = x === 0 ? 1 : Math.sin(x) / x;
+      const window = 0.5 + 0.5 * Math.cos((Math.PI * d) / half);
+      const w = sinc * window;
+      sum += input[k] * w;
+      weights += w;
+    }
+    out[i] = weights > 0 ? sum / weights : 0;
   }
   return out;
 }
@@ -66,16 +83,21 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
   let cancelled = false;
   // stop() can come before the microphone is open (e.g. during the permission prompt).
   let stopped = false;
+  // Made (and resumed) right away, while still inside the learner's tap: iOS keeps an audio
+  // context created later, after the permission prompt, suspended, and then nothing records.
+  const context = recordingSupported() ? new AudioContext() : null;
+  void context?.resume().catch(() => {});
   const audio = (async () => {
-    if (!recordingSupported()) throw new RecordError('unsupported');
+    if (!context) throw new RecordError('unsupported');
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
     } catch (err) {
+      void context.close().catch(() => {});
       const name = err instanceof DOMException ? err.name : '';
       throw new RecordError(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic');
     }
-    const context = new AudioContext();
+    if (context.state === 'suspended') await context.resume().catch(() => {});
     const source = context.createMediaStreamSource(stream);
     // ScriptProcessor is deprecated but works everywhere, including iOS, without a separate worklet file.
     const processor = context.createScriptProcessor(4096, 1, 1);
@@ -86,13 +108,16 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
 
     return new Promise<Take>((resolve) => {
       let done = false;
+      // The time limit runs on a timer too, in case the audio never starts flowing.
+      const limit = setTimeout(() => finish(), MAX_RECORDING_MS + 500);
       finish = () => {
         if (done) return;
         done = true;
+        clearTimeout(limit);
         processor.disconnect();
         source.disconnect();
         stream.getTracks().forEach((t) => t.stop());
-        void context.close();
+        void context.close().catch(() => {});
         const total = chunks.reduce((n, c) => n + c.length, 0);
         const all = new Float32Array(total);
         let offset = 0;

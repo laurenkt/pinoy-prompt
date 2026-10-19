@@ -47,7 +47,7 @@ type State =
   | { name: 'ready' }
   | { name: 'recording'; speech: boolean }
   | { name: 'analysing' }
-  | { name: 'result'; comparison: Comparison; tips: Tip[]; heard: string[] }
+  | { name: 'result'; text: string; comparison: Comparison; tips: Tip[]; heard: string[] }
   | { name: 'problem'; problem: Problem };
 
 export interface SpeakOptions {
@@ -58,6 +58,8 @@ export interface SpeakOptions {
   /** Called after each judged attempt; `right` is true for a good one. */
   onAttempt(right: boolean): void;
   onNext(): void;
+  /** Called once the model is loaded and the learner can speak. */
+  onReady?(): void;
   deps?: SpeakDeps;
 }
 
@@ -104,7 +106,13 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let disposed = false;
   /** Bumped for each attempt, so a stale attempt's result is ignored. */
   let attempt = 0;
-  const expected = toPhones(card.tl);
+  // The card's spelling and any other accepted pronunciations (e.g. Kamusta for Kumusta).
+  const variants = [card.tl, ...(card.accept ?? [])].map((text) => ({ text, phones: toPhones(text) }));
+  /** Judge what was heard against the closest accepted pronunciation. */
+  const judge = (heard: string[]) =>
+    variants
+      .map((v) => ({ text: v.text, comparison: compare(v.phones, heard) }))
+      .reduce((best, next) => (next.comparison.score > best.comparison.score ? next : best));
 
   const set = (next: State) => {
     if (disposed) return;
@@ -114,7 +122,13 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   async function prepare(): Promise<void> {
     if (!deps.recordingSupported()) return set({ name: 'problem', problem: 'unsupported' });
-    if (await deps.modelDownloaded()) return load();
+    let downloaded = false;
+    try {
+      downloaded = await deps.modelDownloaded();
+    } catch {
+      // The model code itself couldn't load (offline, or an old page after an update): offer the download, which retries it.
+    }
+    if (downloaded) return load();
     set({ name: 'offer' });
   }
 
@@ -127,6 +141,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         updateProgress();
       });
       set({ name: 'ready' });
+      options.onReady?.();
     } catch {
       set({ name: 'problem', problem: 'download' });
     }
@@ -153,14 +168,14 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       if (stale()) return;
       recording = null;
       if (!take.speech) {
-        return set({ name: 'result', comparison: compare(expected, []), tips: [], heard: [] });
+        return set({ name: 'result', text: card.tl, comparison: compare(variants[0].phones, []), tips: [], heard: [] });
       }
       set({ name: 'analysing' });
       const { sounds } = await model.recognise(take.samples);
       if (stale()) return;
-      const comparison = compare(expected, sounds);
+      const { text, comparison } = judge(sounds);
       options.onAttempt(isRight(comparison));
-      set({ name: 'result', comparison, tips: coach(card.tl, comparison), heard: sounds });
+      set({ name: 'result', text, comparison, tips: coach(text, comparison), heard: sounds });
     } catch (err) {
       if (stale()) return;
       recording = null;
@@ -241,11 +256,11 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           ),
         ];
       case 'result':
-        return resultView(state.comparison, state.tips, state.heard);
+        return resultView(state.text, state.comparison, state.tips, state.heard);
     }
   }
 
-  function resultView(comparison: Comparison, tips: Tip[], heard: string[]): HTMLElement[] {
+  function resultView(text: string, comparison: Comparison, tips: Tip[], heard: string[]): HTMLElement[] {
     const right = isRight(comparison);
     const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
     const detail =
@@ -265,7 +280,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           h(
             'p',
             { class: 'letters', lang: 'fil' },
-            markLetters(card.tl, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)),
+            markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)),
           ),
         tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
         heard.length > 0 && h('details', { class: 'heard small' }, h('summary', null, 'Sounds we heard'), h('p', { class: 'ipa' }, `/${heard.join(' ')}/`)),

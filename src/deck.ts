@@ -18,6 +18,8 @@ export interface Card {
   note?: string;
   /** Optional recorded clip in public/audio/. */
   audio?: string;
+  /** Other accepted pronunciations, as spelled, for when the learner says the card out loud. */
+  accept?: string[];
 }
 
 export interface Unit {
@@ -37,7 +39,7 @@ export const UNITS: Unit[] = [
     tlTitle: 'Pagbati',
     intro: 'Start with the words you will use every single day. Filipinos greet warmly, so these go a long way.',
     cards: [
-      { id: 'kumusta', tl: 'Kumusta?', en: 'How are you? / Hello', kind: 'phrase', hint: 'koo-moos-TAH', note: 'The everyday "hello". It comes from the Spanish "¿cómo está?".' },
+      { id: 'kumusta', tl: 'Kumusta?', accept: ['Kamusta?'], en: 'How are you? / Hello', kind: 'phrase', hint: 'koo-moos-TAH', note: 'The everyday "hello". It comes from the Spanish "¿cómo está?".' },
       { id: 'mabuti', tl: 'Mabuti naman.', en: "I'm fine.", kind: 'phrase', hint: 'mah-BOO-tee nah-MAHN', note: 'The usual answer to "Kumusta?". "Naman" softens it, like "fine, thanks".' },
       { id: 'salamat', tl: 'Salamat', en: 'Thank you', kind: 'word', hint: 'sah-LAH-maht' },
       { id: 'maraming-salamat', tl: 'Maraming salamat', en: 'Thank you very much', kind: 'phrase', hint: 'mah-RAH-ming sah-LAH-maht', note: '"Marami" means "many", so literally "many thanks".' },

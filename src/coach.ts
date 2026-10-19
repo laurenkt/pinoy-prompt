@@ -89,5 +89,15 @@ export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
     if (tip && !tips.some((t) => t.text === tip)) tips.push({ letters, text: tip });
     if (tips.length >= max) break;
   }
+  const added = comparison.extra.find((e) => e.counts);
+  if (added && tips.length < max) {
+    // Point at the written sound the extra one came after (or before, at the start).
+    const written = comparison.sounds.map((r) => r.phone).filter((p) => p.to > p.from);
+    const after = written.filter((p) => comparison.sounds.findIndex((r) => r.phone === p) < added.before).pop();
+    const anchor = after ?? written[0];
+    const letters = anchor ? text.slice(anchor.from, anchor.to) : '';
+    const where = after ? 'after' : 'before';
+    tips.push({ letters, text: `There was an extra ${describeSound(added.ipa)} sound ${where} "${letters}". Leave it out.` });
+  }
   return tips;
 }

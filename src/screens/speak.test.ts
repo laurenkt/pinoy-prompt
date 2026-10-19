@@ -107,6 +107,18 @@ describe('first use', () => {
     expect(button('Try again')).toBeTruthy();
   });
 
+  it("offers the download when it can't tell whether the model is there", async () => {
+    await open('salamat', { modelDownloaded: async () => Promise.reject(new Error('chunk failed to load')) });
+    expect(button('Download')).toBeTruthy();
+  });
+
+  it('tells the practice screen once speaking is ready', async () => {
+    const onReady = vi.fn();
+    panel = speakPanel(getCard('salamat')!, { say, silence: () => {}, onAttempt, onNext, onReady, deps: deps() });
+    await flush();
+    expect(onReady).toHaveBeenCalledOnce();
+  });
+
   it('says so when the browser has no microphone access at all', async () => {
     await open('salamat', { recordingSupported: () => false });
     expect(text('.feedback')).toContain("can't record");
@@ -153,6 +165,16 @@ describe('an attempt', () => {
     expect(button('Try again')).toBeTruthy();
     button('Next word').click();
     expect(onNext).toHaveBeenCalled();
+  });
+
+  it('accepts another standard pronunciation of the card', async () => {
+    heard = ['k', 'a', 'm', 'u', 's', 't', 'a'];
+    await open('kumusta');
+    button('Tap and speak').click();
+    button("I'm done").click();
+    await flush();
+    expect(text('.feedback strong')).toBe('Tama!');
+    expect(text('.letters')).toBe('Kamusta?');
   });
 
   it("says it didn't catch anything when there was no speech", async () => {

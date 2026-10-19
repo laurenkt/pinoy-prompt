@@ -19,6 +19,7 @@ import TOKENS from './phone-tokens.json';
 export const MODEL_URL =
   'https://huggingface.co/anyspeech/zipa-small-crctc-500k/resolve/dfe87c97662606fa6db90ad06f627d4363314744/model.int8.onnx';
 const MODEL_BYTES = 70677672;
+// public/sw.js checks for this cache by name to keep the model's runtime offline too.
 const CACHE = 'pinoy-prompt-models-v1';
 
 export interface Recognition {
@@ -39,38 +40,58 @@ export async function modelDownloaded(): Promise<boolean> {
   }
 }
 
-async function fetchModel(onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
-  let cache: Cache | null = null;
-  try {
-    cache = await caches.open(CACHE);
-    const hit = await cache.match(MODEL_URL);
-    if (hit) return hit.arrayBuffer();
-  } catch {
-    // No Cache API (e.g. private mode): download every time.
-  }
-  const response = await fetch(MODEL_URL);
-  if (!response.ok || !response.body) throw new Error(`Model download failed: ${response.status}`);
-  const total = Number(response.headers.get('content-length')) || MODEL_BYTES;
-  const reader = response.body.getReader();
+/** Read a download to the end, reporting progress; keeps the bytes only if asked. */
+async function readAll(body: ReadableStream<Uint8Array>, onProgress?: (fraction: number) => void, keep = false) {
+  const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let received = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    chunks.push(value);
+    if (keep) chunks.push(value);
     received += value.length;
-    onProgress?.(Math.min(1, received / total));
+    onProgress?.(Math.min(1, received / MODEL_BYTES));
   }
+  return { chunks, received };
+}
+
+async function fetchModel(onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
+  let cache: Cache | null = null;
+  try {
+    cache = await caches.open(CACHE);
+    const hit = await cache.match(MODEL_URL);
+    if (hit) return await hit.arrayBuffer();
+  } catch {
+    // No Cache API (e.g. private mode), or an unreadable copy: download it.
+  }
+  const response = await fetch(MODEL_URL);
+  if (!response.ok || !response.body) throw new Error(`Model download failed: ${response.status}`);
+
+  if (cache) {
+    // Stream straight into the cache and read it back once, so the phone holds one copy in memory, not three.
+    const [toCache, toCount] = response.body.tee();
+    try {
+      const counting = readAll(toCount, onProgress);
+      await cache.put(MODEL_URL, new Response(toCache, { headers: { 'content-type': 'application/octet-stream' } }));
+      const { received } = await counting;
+      // A download cut short must never be kept: it would fail on every launch.
+      if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
+      const stored = await cache.match(MODEL_URL);
+      if (stored) return await stored.arrayBuffer();
+    } catch (err) {
+      await cache.delete(MODEL_URL).catch(() => false);
+      throw err;
+    }
+  }
+
+  // No cache to keep it in: hold it in memory for this session only.
+  const { chunks, received } = await readAll(response.body, onProgress, true);
+  if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
   const bytes = new Uint8Array(received);
   let offset = 0;
   for (const chunk of chunks) {
     bytes.set(chunk, offset);
     offset += chunk.length;
-  }
-  try {
-    await cache?.put(MODEL_URL, new Response(bytes, { headers: { 'content-type': 'application/octet-stream' } }));
-  } catch {
-    // Out of storage: it still works this time.
   }
   return bytes.buffer;
 }
@@ -83,7 +104,15 @@ export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise
     // Single-threaded: threads need cross-origin isolation, which GitHub Pages can't turn on.
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.wasmPaths = { mjs: mjsUrl, wasm: wasmUrl };
-    const session = await ort.InferenceSession.create(await fetchModel(onProgress), { executionProviders: ['wasm'] });
+    let session: ort.InferenceSession;
+    try {
+      session = await ort.InferenceSession.create(await fetchModel(onProgress), { executionProviders: ['wasm'] });
+    } catch (err) {
+      // A stored copy that won't load is damaged: drop it so the next try downloads afresh.
+      // Not when the runtime itself failed to load (e.g. offline), which says nothing about the model.
+      if (!/backend/i.test(String(err))) await caches.open(CACHE).then((cache) => cache.delete(MODEL_URL)).catch(() => false);
+      throw err;
+    }
     return { recognise: (samples) => recognise(session, samples) };
   })();
   // Let a failed load be retried.

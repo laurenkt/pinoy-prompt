@@ -134,19 +134,28 @@ export function toPhones(text: string): Phone[] {
 const MODIFIERS = new Set(['ʰ', 'ʲ', 'ʷ', 'ː', 'ˠ', 'ˤ', '˞', 'ʼ', '\u0303', '\u031a', '\u0325', '\u0329', '\u032a', '\u0334', '\u033a']);
 const AFFRICATES: Record<string, string> = { 'tʃ': 'tʃ', 'dʒ': 'dʒ' };
 
+/** English-style glides the recogniser writes as two vowels, joined so they can be coached: "go" (oʊ), "day" (eɪ). */
+const GLIDES = new Set(['oʊ', 'ɔʊ', 'eɪ', 'ɛɪ']);
+
 /**
  * Turn the recogniser's tokens (one symbol each) into sounds: modifiers like
- * ʰ and ː join the sound before them, t+ʃ and d+ʒ join into one, word breaks
- * and special tokens are dropped, and ASCII g becomes IPA ɡ.
+ * ʰ and ː join the sound before them, t+ʃ and d+ʒ join into one, o+ʊ and e+ɪ
+ * within a word join into a gliding vowel, word breaks and special tokens are
+ * dropped, and ASCII g becomes IPA ɡ.
  */
 export function groupTokens(tokens: string[]): string[] {
   const sounds: string[] = [];
+  // Index of the first sound in the current word, so glides don't join across a word break.
+  let wordStart = 0;
   for (const raw of tokens) {
+    if (raw === '▁') wordStart = sounds.length;
     if (!raw || raw === '▁' || raw.startsWith('<')) continue;
     const token = raw === 'g' ? 'ɡ' : raw;
     const last = sounds[sounds.length - 1];
+    const inWord = sounds.length > wordStart;
     if (MODIFIERS.has(token) && last !== undefined) sounds[sounds.length - 1] = last + token;
     else if (last !== undefined && AFFRICATES[last + token]) sounds[sounds.length - 1] = AFFRICATES[last + token];
+    else if (inWord && GLIDES.has(last + token)) sounds[sounds.length - 1] = last + token;
     else sounds.push(token);
   }
   return sounds;
@@ -255,8 +264,11 @@ export interface SoundResult {
 
 export interface Comparison {
   sounds: SoundResult[];
-  /** Sounds heard that the card doesn't have, with the index of the expected sound they came before. */
-  extra: { ipa: string; before: number }[];
+  /**
+   * Sounds heard that the card doesn't have, with the index of the expected sound they came before.
+   * `counts` is false for harmless ones: a glottal catch, or a short "uh" as a final consonant is released.
+   */
+  extra: { ipa: string; before: number; counts: boolean }[];
   /** 0–1: share of the card's sounds that were said well (close counts half). */
   score: number;
 }
@@ -293,7 +305,7 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   }
 
   const sounds: SoundResult[] = [];
-  const extra: { ipa: string; before: number }[] = [];
+  const extra: Comparison['extra'] = [];
   let i = n;
   let j = m;
   while (i > 0 || j > 0) {
@@ -308,12 +320,15 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
       sounds.unshift({ phone: expected[i - 1], verdict: expected[i - 1].optional ? 'good' : 'missing' });
       i--;
     } else {
-      extra.unshift({ ipa: heard[j - 1], before: i });
+      const ipa = heard[j - 1];
+      extra.unshift({ ipa, before: i, counts: !(baseSound(ipa) === 'ʔ' || (i === n && j === m && baseSound(ipa) === 'ə')) });
       j--;
     }
   }
 
   const counted = sounds.filter((s) => !s.phone.optional);
   const points = counted.reduce((sum, s) => sum + (s.verdict === 'good' ? 1 : s.verdict === 'close' ? 0.5 : 0), 0);
-  return { sounds, extra, score: counted.length ? points / counted.length : 0 };
+  // Each added sound counts against the attempt as if it were one more sound to get right.
+  const added = extra.filter((e) => e.counts).length;
+  return { sounds, extra, score: counted.length ? points / (counted.length + added) : 0 };
 }

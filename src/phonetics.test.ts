@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coach } from './coach';
 import { ALL_CARDS } from './deck';
-import { compare, soundDistance, toPhones } from './phonetics';
+import { compare, groupTokens, soundDistance, toPhones } from './phonetics';
 
 /** The required sounds, joined, for compact assertions. */
 const sounds = (text: string) =>
@@ -52,6 +52,19 @@ describe('toPhones', () => {
   });
 });
 
+describe('groupTokens', () => {
+  it('joins modifiers, affricates and English glides from single-symbol tokens', () => {
+    expect(groupTokens(['p', 'ʰ', 'o', 'ʊ'])).toEqual(['pʰ', 'oʊ']);
+    expect(groupTokens(['t', 'ʃ', 'a'])).toEqual(['tʃ', 'a']);
+    expect(groupTokens(['d', 'e', 'ɪ'])).toEqual(['d', 'eɪ']);
+    expect(groupTokens(['g', 'a', 'ː'])).toEqual(['ɡ', 'aː']);
+  });
+
+  it("doesn't join a glide across a word break", () => {
+    expect(groupTokens(['p', 'o', '▁', 'ʊ', 'n'])).toEqual(['p', 'o', 'ʊ', 'n']);
+  });
+});
+
 describe('soundDistance', () => {
   it('treats free variants as the same and o/u as a small slip', () => {
     expect(soundDistance('ɾ', 'r')).toBe(0);
@@ -93,6 +106,17 @@ describe('compare', () => {
     expect(c.extra.map((e) => e.ipa)).toEqual(['w']);
   });
 
+  it('counts added sounds against the attempt', () => {
+    const c = compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ə', 'p', 'o']);
+    expect(c.score).toBeLessThan(0.9);
+    expect(c.extra.filter((e) => e.counts).map((e) => e.ipa)).toEqual(['ə', 'p', 'o']);
+  });
+
+  it('forgives a released final consonant and a glottal catch', () => {
+    expect(compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ə']).score).toBe(1);
+    expect(compare(toPhones('Salamat po'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ʔ', 'p', 'o']).score).toBe(1);
+  });
+
   it("doesn't penalise leaving out an optional catch", () => {
     expect(compare(toPhones('Oo'), ['o', 'o']).score).toBe(1);
   });
@@ -116,7 +140,15 @@ describe('coach', () => {
   it('explains aspirated stops and gliding vowels', () => {
     const text = 'po';
     expect(coach(text, compare(toPhones(text), ['pʰ', 'o']))[0].text).toContain('puff of air');
-    expect(coach(text, compare(toPhones(text), ['p', 'oʊ']))[0].text).toContain('pure');
+    // As the recogniser writes "po" said like English "go": one symbol per token.
+    expect(coach(text, compare(toPhones(text), groupTokens(['p', 'o', 'ʊ'])))[0].text).toContain('pure');
+  });
+
+  it('points out an added sound', () => {
+    const text = 'Salamat';
+    const [tip] = coach(text, compare(toPhones(text), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ə', 's']));
+    expect(tip.text).toContain('extra');
+    expect(tip.letters).toBe('t');
   });
 
   it('gives one tip per kind of mistake, at most two', () => {
