@@ -39,6 +39,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Installed, it should feel like an app: no double-tap or pinch zoom. In a browser tab, zoom still works. */
+.standalone,
+.standalone body {
+  touch-action: pan-x pan-y;
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -1004,13 +1010,14 @@ p {
 .sound-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px 18px;
+  gap: 22px 18px;
   padding: 4px 0 12px;
 }
 
 .word-group {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px 6px;
 }
 
 .pair {
@@ -1018,7 +1025,6 @@ p {
   display: flex;
   flex-direction: column;
   align-items: center;
-  scroll-snap-align: start;
 }
 
 .pair-close {
