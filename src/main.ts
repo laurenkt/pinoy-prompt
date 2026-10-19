@@ -8,21 +8,25 @@ import { settingsScreen } from './screens/settings';
 import { wordsScreen } from './screens/words';
 import { cancelListening } from './listen';
 import { initVoices, stop } from './speech';
-import { load, rollDay, save, type Progress } from './store';
+import { replaceContents } from './progress-schema';
+import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
 import { h } from './ui';
 
 const root = document.getElementById('app')!;
 let keyHandler: ((e: KeyboardEvent) => void) | null = null;
 
+let warnedSaveFailed = false;
+
 const app: App = {
-  progress: load(Date.now()),
+  // Replaced by the saved progress before the first screen is drawn.
+  progress: emptyProgress(Date.now()),
   now: () => Date.now(),
   commit() {
-    save(app.progress);
+    saved(save(app.progress));
   },
   replaceProgress(progress: Progress) {
     app.progress = progress;
-    save(progress);
+    saved(save(progress));
   },
   navigate(route: Route) {
     stop();
@@ -100,8 +104,46 @@ document.addEventListener('keydown', (e) => {
   keyHandler?.(e);
 });
 
+/** Tell the learner, once, if progress stops saving, so they can back it up. */
+function saved(ok: boolean): void {
+  if (ok) {
+    askToPersist();
+    return;
+  }
+  if (warnedSaveFailed) return;
+  warnedSaveFailed = true;
+  const banner = h(
+    'div',
+    { class: 'save-warning', role: 'alert' },
+    h('p', null, "Progress couldn't be saved on this device. It may be full, or in private browsing. Back up your progress from Settings to keep it."),
+    h('button', { class: 'btn secondary', onclick: () => banner.remove() }, 'OK'),
+  );
+  document.body.append(banner);
+}
+
+async function start(): Promise<void> {
+  // Another tab saved: pick up its progress in place, so screens holding it see the change.
+  onExternalChange((progress) => replaceContents(app.progress, progress));
+  try {
+    replaceContents(app.progress, await loadDurable(Date.now()));
+  } catch {
+    replaceContents(app.progress, load(Date.now()));
+  }
+  app.navigate({ name: 'home' });
+  askToPersist();
+}
+
+let askedToPersist = false;
+
+/** Once there is progress worth keeping, ask the browser not to evict it. */
+function askToPersist(): void {
+  if (askedToPersist || Object.keys(app.progress.cards).length === 0) return;
+  askedToPersist = true;
+  void requestPersistence();
+}
+
 void initVoices();
-app.navigate({ name: 'home' });
+void start();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {

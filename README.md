@@ -13,7 +13,19 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 
 Units unlock in order: Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases.
 
-Progress is stored in `localStorage` on the device. Nothing is sent to our server (there isn't one). The one exception is speaking questions: the browser's speech recogniser may send your voice to its own speech service, as Chrome does.
+Progress is stored on the device. Nothing is sent to our server (there isn't one). The one exception is speaking questions: the browser's speech recogniser may send your voice to its own speech service, as Chrome does.
+
+## Saved progress
+
+A learner's progress is the one thing the app can't afford to lose, so it is kept with some care:
+
+- **Versioned.** Progress is saved in `localStorage` as `{ schema, rev, savedAt, progress }`. `src/progress-schema.ts` upgrades older copies one schema at a time, repairs damaged cards field by field instead of dropping them, and keeps fields it doesn't recognise, so an older build never strips data a newer one added. To change the schema, bump `SCHEMA`, add a migration and add a fixture under `src/test/fixtures/`; the tests fail until all three exist.
+- **Two copies.** Every save is mirrored to IndexedDB. On start-up the newer copy wins, so a cleared or unreadable `localStorage`, or a write iOS lost by killing the app, is recovered from the mirror.
+- **Saves never remove cards.** Each save re-reads what is stored and merges it in, keeping the more recently reviewed version of each card. Two open tabs can't overwrite each other, and a start-up that failed to read storage can't save an empty copy over real progress. Only Reset replaces progress, and it keeps the old copy under `pinoy-prompt:before-reset`. A copy that can't be read at all is set aside under `pinoy-prompt:unreadable`.
+- **Kept from eviction.** Once there is progress, the app asks the browser for persistent storage (`navigator.storage.persist()`).
+- **Backups.** Settings can save a backup file (through the share sheet on iPhone) and restore one. Restoring merges, so it never removes anything. On iPhone the Home Screen app and Safari keep separate storage, so a backup is how to move progress between them.
+
+`src/store.test.ts` plays out the ways progress could be lost: unreadable or full storage, a wiped `localStorage`, a lost write, a hung IndexedDB, two tabs saving at once, upgrades from the first storage format, and resets. `src/progress-schema.test.ts` loads a fixture from every schema version and throws thousands of randomly damaged copies at the loader.
 
 ## Speaking questions
 
@@ -40,7 +52,7 @@ To use a recorded clip instead, put the file in `public/audio/` and set `audio: 
 ```sh
 npm install
 npm run dev      # local dev server
-npm test         # unit tests (scheduler, session building, deck checks)
+npm test         # unit tests (scheduler, sessions, saved progress, deck checks)
 npm run build    # type-check and build to dist/
 ```
 
@@ -51,7 +63,9 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 | `src/deck.ts` | All lesson content. Add units or cards here. |
 | `src/srs.ts` | The scheduler. |
 | `src/session.ts` | Building study sessions, unit unlocking, quiz distractors. |
-| `src/store.ts` | Saved progress, daily counters and settings. |
+| `src/store.ts` | Saving and loading progress, daily counters and backups. |
+| `src/progress-schema.ts` | The saved progress format, its migrations and repair. |
+| `src/progress-mirror.ts` | The IndexedDB copy of saved progress. |
 | `src/speech.ts` | Audio playback and voice selection. |
 | `src/listen.ts` | Speech recognition for speaking questions. |
 | `src/pronounce.ts` | Judging what the recogniser heard against the card. |
