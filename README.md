@@ -23,7 +23,11 @@ It uses the browser's [Web Speech API](https://developer.mozilla.org/docs/Web/AP
 
 Why this approach: it works today on the phones most learners have (Chrome on Android handles Filipino), adds nothing to the download, and a recogniser that understands the word is a fair test of whether a listener would. Comparing the learner's audio with reference audio (MFCC features with dynamic time warping) needs recorded clips, and the app's audio is the device's speech voice, which a web page can't capture. On-device models like Whisper or wav2vec2 would work offline but cost tens to hundreds of megabytes, and small Whisper models are weak at Tagalog.
 
-Limits: a recogniser checks that the words were understood, not fine details like stress. Browsers without a Filipino recogniser (Firefox, and possibly Safari) show the mode as unavailable, and it is left out of mixed rounds there. Practice is unscored, so a misheard attempt never touches the review schedule.
+While listening, the screen shows whether the microphone is open and whether it is picking up sound, based on the recogniser's own events. The app asks for the microphone itself before starting the recogniser, because some recognisers fail silently instead of prompting. Tapping "I'm done" always finishes within a second and a half, even on recognisers that never report that they stopped.
+
+Limits: a recogniser checks that the words were understood, not fine details like stress. Browsers without a Filipino recogniser (Firefox, and possibly Safari) show the mode as unavailable, and it is left out of mixed rounds there. Apps opened from an iPhone's home screen can't use speech recognition at all ([WebKit bug 225298](https://bugs.webkit.org/show_bug.cgi?id=225298)), so the mode says so there.
+
+`src/screens/practice.speak.test.ts` plays the mode through in a simulated DOM with a scripted recogniser (`src/test/fake-recognition.ts`). It covers the microphone prompt, the listening feedback, finishing on "I'm done" with recognisers that do and don't report the end, a recogniser that never starts, refused microphones, and the iPhone home-screen case. Practice is unscored, so a misheard attempt never touches the review schedule.
 
 ## Audio
 

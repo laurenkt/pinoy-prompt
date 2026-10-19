@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { ALL_CARDS, getCard, type Card } from '../deck';
-import { listen, ListenError, recognitionSupported, type Listening, type ListenProblem } from '../listen';
+import { listen, ListenError, recognitionBlocker, recognitionSupported, type Listening, type ListenPhase, type ListenProblem } from '../listen';
 import { judge, type Verdict } from '../pronounce';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
@@ -23,15 +23,30 @@ const MODES: { id: MenuMode; title: string; desc: string }[] = [
 
 const PROBLEMS: Record<ListenProblem, string> = {
   unsupported: "This browser can't recognise Filipino speech, so speaking questions are off. Chrome on Android usually can.",
+  'home-screen': "Apps opened from an iPhone's home screen can't use speech recognition, so speaking questions are off here.",
   denied: 'The microphone is blocked. Allow it for this site in your browser settings, then try again.',
+  'no-mic': "Couldn't use the microphone. Check that the device has one and no other app is using it.",
+  'no-start': "The speech recogniser didn't start. If your browser asked for permission, allow it and try again. Otherwise this browser may not support it.",
   offline: "Couldn't reach the speech service. Speaking questions need a connection on this device.",
   failed: 'Something went wrong while listening. Try again.',
 };
 
+const PHASES: Record<ListenPhase, string> = {
+  starting: 'Waiting for the microphone…',
+  'mic-on': 'Mic on. Say it now.',
+  sound: 'Hearing you…',
+  finishing: 'Checking what we heard…',
+};
+
+/** What the Speak menu button says when it can't be used. */
+function speakUnavailable(problem: ListenProblem): string {
+  return problem === 'home-screen' ? 'Not available in iPhone home-screen apps' : "Speech checking isn't available in this browser";
+}
+
 /** Where a speaking question is up to. */
 type Speak =
   | { state: 'ready' }
-  | { state: 'listening'; hearing: string }
+  | { state: 'listening'; phase: ListenPhase; hearing: string }
   | { state: 'heard'; verdict: Verdict }
   | { state: 'problem'; problem: ListenProblem };
 
@@ -93,7 +108,8 @@ export function practiceScreen(app: App): HTMLElement {
 
   function ask(): void {
     // Once the recogniser has said it can't do Filipino, say so rather than offer the microphone.
-    speak = recognitionSupported() ? { state: 'ready' } : { state: 'problem', problem: 'unsupported' };
+    const blocked = recognitionBlocker();
+    speak = blocked ? { state: 'problem', problem: blocked } : { state: 'ready' };
     draw();
     const q = questions[index];
     if (q && q.mode !== 'recall' && (q.mode === 'listen' || app.progress.settings.autoplay)) void play(q.card);
@@ -126,13 +142,19 @@ export function practiceScreen(app: App): HTMLElement {
     if (!q || speak.state === 'listening') return;
     // Don't let the reference audio leak into the microphone.
     stop();
-    speak = { state: 'listening', hearing: '' };
+    speak = { state: 'listening', phase: 'starting', hearing: '' };
     draw();
-    const current = listen((text) => {
-      if (listening !== current || speak.state !== 'listening') return;
-      speak = { state: 'listening', hearing: text };
-      const live = root.querySelector('.hearing');
-      if (live) live.textContent = text;
+    const current: Listening = listen({
+      onPhase: (phase) => {
+        if (listening !== current || speak.state !== 'listening') return;
+        speak = { ...speak, phase };
+        showListening();
+      },
+      onHearing: (hearing) => {
+        if (listening !== current || speak.state !== 'listening') return;
+        speak = { ...speak, hearing };
+        showListening();
+      },
     });
     listening = current;
     try {
@@ -148,6 +170,18 @@ export function practiceScreen(app: App): HTMLElement {
       if (listening === current) listening = null;
     }
     draw();
+  }
+
+  /** Update the listening view in place, so it doesn't re-animate or lose focus on every event. */
+  function showListening(): void {
+    if (speak.state !== 'listening') return;
+    const view = root.querySelector('.speak');
+    if (!view) return;
+    view.className = `speak listening phase-${speak.phase}`;
+    view.querySelector('.listen-status')!.textContent = PHASES[speak.phase];
+    view.querySelector('.hearing')!.textContent = speak.hearing;
+    const done = view.querySelector<HTMLButtonElement>('.done')!;
+    done.disabled = speak.phase === 'finishing';
   }
 
   function draw(): void {
@@ -171,6 +205,7 @@ export function practiceScreen(app: App): HTMLElement {
         ),
       );
     }
+    const speakBlocker = recognitionBlocker();
     return h(
       'div',
       null,
@@ -180,13 +215,14 @@ export function practiceScreen(app: App): HTMLElement {
         'div',
         { class: 'modes' },
         MODES.map((m) => {
-          const noVoice = m.id === 'listen' && !canListen;
-          const noRecogniser = m.id === 'speak' && !recognitionSupported();
+          let unavailable: string | null = null;
+          if (m.id === 'listen' && !canListen) unavailable = 'No voice on this device';
+          if (m.id === 'speak' && speakBlocker) unavailable = speakUnavailable(speakBlocker);
           return h(
             'button',
-            { class: `mode mode-${m.id}`, disabled: noVoice || noRecogniser, onclick: () => start(m.id) },
+            { class: `mode mode-${m.id}`, disabled: unavailable !== null, onclick: () => start(m.id) },
             h('span', { class: 'mode-title' }, m.title),
-            h('span', { class: 'mode-desc' }, noVoice ? 'No voice on this device' : noRecogniser ? "Speech checking isn't available in this browser" : m.desc),
+            h('span', { class: 'mode-desc' }, unavailable ?? m.desc),
           );
         }),
       ),
@@ -297,15 +333,17 @@ export function practiceScreen(app: App): HTMLElement {
       case 'listening':
         return h(
           'div',
-          { class: 'speak' },
+          { class: `speak listening phase-${speak.phase}` },
           hint,
+          // Five bars that sit still while the mic is open and dance while it picks up sound.
+          h('div', { class: 'meter', 'aria-hidden': 'true' }, [1, 2, 3, 4, 5].map(() => h('span', null))),
+          h('p', { class: 'listen-status center', role: 'status' }, PHASES[speak.phase]),
+          h('p', { class: 'hearing center', 'aria-live': 'polite', lang: 'fil' }, speak.hearing),
           h(
             'button',
-            { class: 'btn mic big listening', 'data-autofocus': true, onclick: () => listening?.stop() },
-            h('span', { class: 'pulse', 'aria-hidden': 'true' }),
-            ' Listening… tap when done',
+            { class: 'btn mic big done', 'data-autofocus': true, disabled: speak.phase === 'finishing', onclick: () => listening?.stop() },
+            "I'm done",
           ),
-          h('p', { class: 'hearing center', 'aria-live': 'polite', lang: 'fil' }, speak.hearing),
         );
       case 'problem':
         return h(
@@ -315,7 +353,7 @@ export function practiceScreen(app: App): HTMLElement {
           h(
             'div',
             { class: 'row' },
-            speak.problem !== 'unsupported' && h('button', { class: 'btn secondary', onclick: () => void startListening() }, 'Try again'),
+            speak.problem !== 'unsupported' && speak.problem !== 'home-screen' && h('button', { class: 'btn secondary', onclick: () => void startListening() }, 'Try again'),
             h('button', { class: 'btn primary', 'data-autofocus': true, onclick: advance }, 'Skip'),
           ),
         );

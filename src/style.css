@@ -770,29 +770,78 @@ p {
   gap: 4px;
 }
 
-.btn.mic.listening {
+.btn.mic.done {
   background: var(--cream);
 }
 
-.pulse {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--magenta);
-  border: 2px solid var(--ink);
-  animation: pulse 1s ease-in-out infinite alternate;
+.btn.mic.done:disabled {
+  opacity: 0.6;
 }
 
-@keyframes pulse {
+/* Listening: bars show the microphone state, from flat (waiting) to dancing (hearing sound). */
+.meter {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  height: 64px;
+  margin: 8px 0 4px;
+}
+
+.meter span {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--line);
+  border: 2px solid var(--ink);
+  transition: height 0.2s ease, background 0.2s ease;
+}
+
+.phase-mic-on .meter span {
+  background: var(--teal);
+  height: 20px;
+}
+
+.phase-sound .meter span {
+  background: var(--saffron);
+  animation: level 0.6s ease-in-out infinite alternate;
+}
+
+.phase-sound .meter span:nth-child(2) {
+  animation-delay: -0.2s;
+}
+
+.phase-sound .meter span:nth-child(3) {
+  animation-delay: -0.45s;
+}
+
+.phase-sound .meter span:nth-child(4) {
+  animation-delay: -0.1s;
+}
+
+.phase-sound .meter span:nth-child(5) {
+  animation-delay: -0.35s;
+}
+
+@keyframes level {
+  from {
+    height: 16px;
+  }
   to {
-    transform: scale(1.35);
+    height: 56px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse {
+  .phase-sound .meter span {
     animation: none;
+    height: 44px;
   }
+}
+
+.listen-status {
+  font-weight: 800;
+  margin: 0;
 }
 
 .hearing {
