@@ -1085,3 +1085,33 @@ p {
   border-color: var(--ink);
   font-weight: 800;
 }
+
+.save-warning {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: max(12px, env(safe-area-inset-top));
+  z-index: 20;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--magenta);
+  color: var(--cream);
+  border: var(--outline);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.save-warning p {
+  margin: 0;
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.backup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}

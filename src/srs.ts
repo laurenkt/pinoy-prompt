@@ -18,11 +18,13 @@ export interface CardState {
   due: number;
   /** When the card was first introduced, as epoch milliseconds. */
   introduced: number;
+  /** When the card was last reviewed. Missing on cards saved before it was tracked. */
+  reviewed?: number;
 }
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
-const MIN_EASE = 1.3;
-const START_EASE = 2.5;
+export const MIN_EASE = 1.3;
+export const START_EASE = 2.5;
 const RELEARN_DELAY_MS = 60 * 1000;
 
 export function newCardState(now: number): CardState {
@@ -48,7 +50,7 @@ export function nextInterval(card: CardState, rating: Rating): number {
 
 export function review(card: CardState, rating: Rating, now: number): CardState {
   const interval = nextInterval(card, rating);
-  const next: CardState = { ...card, interval };
+  const next: CardState = { ...card, interval, reviewed: now };
 
   switch (rating) {
     case 'again':

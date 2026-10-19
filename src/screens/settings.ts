@@ -1,13 +1,27 @@
 import type { App } from '../app';
 import { getCard } from '../deck';
 import { play, voiceQuality } from '../speech';
-import { reset } from '../store';
+import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon } from '../ui';
 
 const DAILY_OPTIONS = [5, 8, 12, 15];
 
 export function settingsScreen(app: App): HTMLElement {
   const root = h('div', { class: 'settings' });
+  const restoreInput = h('input', { type: 'file', accept: 'application/json,.json', hidden: true });
+  restoreInput.addEventListener('change', async () => {
+    const file = restoreInput.files?.[0];
+    restoreInput.value = '';
+    if (!file) return;
+    const changed = importBackup(app.progress, await file.text(), app.now());
+    if (changed === null) {
+      alert("That file isn't a Pinoy Prompt backup.");
+      return;
+    }
+    app.commit();
+    alert(changed === 1 ? 'Restored 1 word.' : `Restored ${changed} words.`);
+    draw();
+  });
 
   function draw(): void {
     const { settings } = app.progress;
@@ -76,7 +90,18 @@ export function settingsScreen(app: App): HTMLElement {
         'section',
         { class: 'card' },
         h('h2', null, 'Progress'),
-        h('p', { class: 'muted small' }, 'Your progress is saved on this device only.'),
+        h(
+          'p',
+          { class: 'muted small' },
+          'Your progress is saved on this device only. On iPhone, the Home Screen app and Safari keep separate progress. Back it up to move it or keep it safe; restoring adds to what is here and never removes anything.',
+        ),
+        h(
+          'div',
+          { class: 'backup-actions' },
+          h('button', { class: 'btn secondary', onclick: () => void backUp(app) }, 'Back up progress'),
+          h('button', { class: 'btn secondary', onclick: () => restoreInput.click() }, 'Restore from backup'),
+          restoreInput,
+        ),
         h(
           'button',
           {
@@ -96,4 +121,21 @@ export function settingsScreen(app: App): HTMLElement {
 
   draw();
   return root;
+}
+
+/** Save a backup file: through the share sheet where there is one (iPhone), else as a download. */
+async function backUp(app: App): Promise<void> {
+  const name = backupFileName(app.now());
+  const file = new File([exportBackup(app.progress)], name, { type: 'application/json' });
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Pinoy Prompt backup' });
+      return;
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+    }
+  }
+  const url = URL.createObjectURL(file);
+  h('a', { href: url, download: name }).click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
