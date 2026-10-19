@@ -38,8 +38,18 @@ describe('toPhones', () => {
     expect(compare(toPhones('ngayon'), ['n', 'a', 'j', 'o', 'n']).score).toBeLessThan(1);
   });
 
-  it('accepts "ay" said "e"', () => {
+  it('accepts "ay" said "e", but not said "a"', () => {
     expect(compare(toPhones('Ito ay'), ['i', 't', 'o', 'e']).score).toBe(1);
+    expect(compare(toPhones('Ito ay'), ['i', 't', 'o', 'a', 'j']).score).toBe(1);
+    expect(compare(toPhones('Ito ay'), ['i', 't', 'o', 'a']).score).toBeLessThan(1);
+  });
+
+  it('keeps "ng" as ng before the g of a loanword like "Ingles"', () => {
+    expect(compare(toPhones('Ingles'), ['i', 'n', 'ɡ', 'l', 'ɛ', 's']).score).toBeLessThan(1);
+  });
+
+  it("doesn't read the contraction 'ng as the particle", () => {
+    expect(sounds("Ano'ng oras")).toBe('a n o ŋ o ɾ a s');
   });
 
   it('keeps one g in "ngg" and "ngk"', () => {
@@ -90,6 +100,9 @@ describe('groupTokens', () => {
 describe('soundDistance', () => {
   it("accepts the recogniser's q for a back k, and long vowels written twice", () => {
     expect(soundDistance('k', 'q')).toBe(0);
+    expect(soundDistance('k', 'qʰ')).toBeGreaterThan(0);
+    // One repeat is length; more is a dragged or stuttered vowel.
+    expect(compare(toPhones('po'), ['p', 'o', 'o', 'o', 'o']).score).toBeLessThan(1);
     expect(compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'a', 'm', 'a', 't']).score).toBe(1);
   });
 
@@ -174,6 +187,12 @@ describe('coach', () => {
     expect(coach(text, compare(toPhones(text), ['pʰ', 'o']))[0].text).toContain('puff of air');
     // As the recogniser writes "po" said like English "go": one symbol per token.
     expect(coach(text, compare(toPhones(text), groupTokens(['p', 'o', 'ʊ'])))[0].text).toContain('pure');
+  });
+
+  it('explains "ng" that blends into the next sound', () => {
+    const text = 'Anong balita?';
+    const [tip] = coach(text, compare(toPhones(text), ['a', 'n', 'o', 'n', 'b', 'a', 'l', 'i', 't', 'a']));
+    expect(tip.text).toContain('"m"');
   });
 
   it('points out an added sound', () => {

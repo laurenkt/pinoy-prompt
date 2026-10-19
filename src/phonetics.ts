@@ -21,6 +21,8 @@ export interface Phone {
    * next sound and disappear ("ang mga" said "amga").
    */
   also?: string[];
+  /** Only fine to leave out when the sound before it was said one of its `also` ways ("ay" said "e", not "a"). */
+  dropsAfterAlso?: boolean;
 }
 
 const VOWELS = 'aeiou';
@@ -58,7 +60,6 @@ const LETTERS: Record<string, string> = {
   z: 's',
 };
 
-/** Expected sounds for a card's Tagalog text, mapped back to its letters. */
 /**
  * In running speech "ng" takes the place of the consonant after it, within a
  * word or across a space: m before p, b and m; n before t, d, s, l and n. Before
@@ -75,6 +76,7 @@ function assimilated(lower: string, at: number): string[] | undefined {
   return undefined;
 }
 
+/** Expected sounds for a card's Tagalog text, mapped back to its letters. */
 export function toPhones(text: string): Phone[] {
   const lower = text.toLowerCase().normalize('NFC');
   const phones: Phone[] = [];
@@ -95,17 +97,17 @@ export function toPhones(text: string): Phone[] {
     if (wordStart && lower.startsWith('mga', i) && !isLetter(lower[i + 3])) {
       push('m', i, i + 1);
       // Not spelled, and often swallowed in quick speech ("mŋa").
-      push('a', i, i + 1, true);
+      push('a', i + 1, i + 1, true);
       push('ŋ', i + 1, i + 3);
       push('a', i + 2, i + 3);
       i += 3;
       continue;
     }
     // The particle "ng" is said "nang".
-    if (wordStart && lower.startsWith('ng', i) && !isLetter(lower[i + 2])) {
+    if (wordStart && lower.startsWith('ng', i) && !isLetter(lower[i + 2]) && lower[i - 1] !== "'" && lower[i - 1] !== '’') {
       push('n', i, i + 1);
       // Not spelled, and often swallowed in quick speech.
-      push('a', i, i + 2, true);
+      push('a', i + 1, i + 1, true);
       push('ŋ', i + 1, i + 2);
       const also = assimilated(lower, i + 2);
       if (also) phones[phones.length - 1].also = also;
@@ -119,6 +121,7 @@ export function toPhones(text: string): Phone[] {
       phones[phones.length - 1].also = ['e', 'æ'];
       push('j', i + 1, i + 2);
       phones[phones.length - 1].also = [''];
+      phones[phones.length - 1].dropsAfterAlso = true;
       i += 2;
       continue;
     }
@@ -133,11 +136,13 @@ export function toPhones(text: string): Phone[] {
     }
     if (ch === 'n' && next === 'g') {
       push('ŋ', i, i + 2);
-      const also = assimilated(lower, i + 2);
-      if (also) phones[phones.length - 1].also = also;
-      // In loanwords like "Ingles", l or r after "ng" keeps the g.
+      // In loanwords like "Ingles", l or r after "ng" keeps the g (and the ng stays ng before it).
       const after = lower[i + 2];
       if (after === 'l' || after === 'r') push('ɡ', i + 1, i + 2);
+      else {
+        const also = assimilated(lower, i + 2);
+        if (also) phones[phones.length - 1].also = also;
+      }
       i += 2;
       continue;
     }
@@ -298,7 +303,7 @@ export function soundDistance(expected: string, heard: string): number {
   if (a === b) return isAspirated(heard) ? 0.3 : 0;
   // A vowel that glides into another, like English "go" (oʊ) or "day" (eɪ): close, but worth a tip.
   if (isGlidingVowel(b) && FEATURES[a]?.kind === 'vowel') return Math.min(1, soundDistance(a, b[0]) + 0.3);
-  if (SAME.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return 0;
+  if (SAME.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return isAspirated(heard) ? 0.3 : 0;
   // In Tagalog o/u and e/i swap freely in many words, so those are only a small slip.
   if (SLIPS.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return 0.35;
   // A glide and its vowel (y and i, w and u) are hard to tell apart.
@@ -348,7 +353,14 @@ function harmless(heard: string[], index: number): boolean {
   const ipa = baseSound(heard[index]);
   if (ipa === 'ʔ') return true;
   // A long vowel written twice ("kagubaatan"): Tagalog marks stress with length.
-  if (isVowelSound(ipa) && (baseSound(heard[index - 1] ?? '') === ipa || baseSound(heard[index + 1] ?? '') === ipa)) return true;
+  // Only one repeat, though: a vowel dragged on or stuttered still counts.
+  if (isVowelSound(ipa)) {
+    let start = index;
+    let end = index;
+    while (start > 0 && baseSound(heard[start - 1]) === ipa) start--;
+    while (end < heard.length - 1 && baseSound(heard[end + 1]) === ipa) end++;
+    if (end - start === 1) return true;
+  }
   if (index === heard.length - 1 && TRAILING.has(ipa)) return true;
   // The y or w glide that joins two vowels, as in "kain" said "kayin".
   return (ipa === 'j' || ipa === 'w') && isVowelSound(heard[index - 1]) && isVowelSound(heard[index + 1]);
@@ -385,6 +397,9 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   }
 
   const sounds: SoundResult[] = [];
+  /** Expected sounds that were said one of their `also` ways. */
+  const viaAlso = new Set<Phone>();
+  const dropped = new Set<Phone>();
   const extra: Comparison['extra'] = [];
   let i = n;
   let j = m;
@@ -392,11 +407,13 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
     const s = step[i][j];
     if (s === 'sub' && i > 0 && j > 0) {
       const d = distance(expected[i - 1], heard[j - 1]);
+      if (d < soundDistance(expected[i - 1].ipa, heard[j - 1])) viaAlso.add(expected[i - 1]);
       const verdict: SoundVerdict = d === 0 ? 'good' : d <= CLOSE ? 'close' : 'off';
       sounds.unshift(verdict === 'good' ? { phone: expected[i - 1], verdict } : { phone: expected[i - 1], verdict, heard: heard[j - 1] });
       i--;
       j--;
     } else if (s === 'del' && i > 0) {
+      dropped.add(expected[i - 1]);
       sounds.unshift({ phone: expected[i - 1], verdict: mayDrop(expected[i - 1]) ? 'good' : 'missing' });
       i--;
     } else {
@@ -404,6 +421,13 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
       j--;
     }
   }
+
+  // "ay" may lose its y only when said "e": said "a", the y still has to be there.
+  sounds.forEach((r, k) => {
+    if (r.phone.dropsAfterAlso && dropped.has(r.phone) && k > 0 && !viaAlso.has(sounds[k - 1].phone)) {
+      sounds[k] = { phone: r.phone, verdict: 'missing' };
+    }
+  });
 
   const counted = sounds.filter((s) => !s.phone.optional);
   const points = counted.reduce((sum, s) => sum + (s.verdict === 'good' ? 1 : s.verdict === 'close' ? 0.5 : 0), 0);
