@@ -75,7 +75,7 @@ function tipFor(r: SoundResult, letters: string): string | null {
     return 'Make the "u" a full "oo", as in "food".';
   }
   if (r.verdict === 'missing') return `We didn't hear the ${describeSound(want)} sound for "${letters}".`;
-  if (r.heard) return `"${letters}" sounded like ${describeSound(r.heard)}. Aim for ${[want, ...alternatives].map(describeSound).join(' or ')}.`;
+  if (r.heard) return `"${letters}" sounded like ${describeSound(r.heard)}. Aim for ${[...new Set([want, ...alternatives.filter((a) => a !== 'æ')].map(describeSound))].join(' or ')}.`;
   return null;
 }
 

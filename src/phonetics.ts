@@ -352,15 +352,6 @@ const isVowelSound = (ipa: string | undefined) => ipa !== undefined && FEATURES[
 function harmless(heard: string[], index: number): boolean {
   const ipa = baseSound(heard[index]);
   if (ipa === 'ʔ') return true;
-  // A long vowel written twice ("kagubaatan"): Tagalog marks stress with length.
-  // Only one repeat, though: a vowel dragged on or stuttered still counts.
-  if (isVowelSound(ipa)) {
-    let start = index;
-    let end = index;
-    while (start > 0 && baseSound(heard[start - 1]) === ipa) start--;
-    while (end < heard.length - 1 && baseSound(heard[end + 1]) === ipa) end++;
-    if (end - start === 1) return true;
-  }
   if (index === heard.length - 1 && TRAILING.has(ipa)) return true;
   // The y or w glide that joins two vowels, as in "kain" said "kayin".
   return (ipa === 'j' || ipa === 'w') && isVowelSound(heard[index - 1]) && isVowelSound(heard[index + 1]);
@@ -400,6 +391,9 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   /** Expected sounds that were said one of their `also` ways. */
   const viaAlso = new Set<Phone>();
   const dropped = new Set<Phone>();
+  /** Heard positions lined up with an expected sound, and those of added sounds. */
+  const matchedAt = new Set<number>();
+  const extraAt: number[] = [];
   const extra: Comparison['extra'] = [];
   let i = n;
   let j = m;
@@ -408,6 +402,7 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
     if (s === 'sub' && i > 0 && j > 0) {
       const d = distance(expected[i - 1], heard[j - 1]);
       if (d < soundDistance(expected[i - 1].ipa, heard[j - 1])) viaAlso.add(expected[i - 1]);
+      matchedAt.add(j - 1);
       const verdict: SoundVerdict = d === 0 ? 'good' : d <= CLOSE ? 'close' : 'off';
       sounds.unshift(verdict === 'good' ? { phone: expected[i - 1], verdict } : { phone: expected[i - 1], verdict, heard: heard[j - 1] });
       i--;
@@ -418,9 +413,23 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
       i--;
     } else {
       extra.unshift({ ipa: heard[j - 1], before: i, counts: !harmless(heard, j - 1) });
+      extraAt.unshift(j - 1);
       j--;
     }
   }
+
+  // A vowel written twice is a long vowel (Tagalog marks stress with length): one
+  // repeat per vowel said is fine, but a vowel dragged on or stuttered still counts.
+  const lengthened = new Set<number>();
+  extra.forEach((e, k) => {
+    const at = extraAt[k];
+    const ipa = baseSound(e.ipa);
+    if (!e.counts || !isVowelSound(ipa)) return;
+    const twin = [at - 1, at + 1].find((n) => matchedAt.has(n) && !lengthened.has(n) && baseSound(heard[n]) === ipa);
+    if (twin === undefined) return;
+    lengthened.add(twin);
+    extra[k] = { ...e, counts: false };
+  });
 
   // "ay" may lose its y only when said "e": said "a", the y still has to be there.
   sounds.forEach((r, k) => {

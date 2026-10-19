@@ -103,6 +103,8 @@ describe('soundDistance', () => {
     expect(soundDistance('k', 'qʰ')).toBeGreaterThan(0);
     // One repeat is length; more is a dragged or stuttered vowel.
     expect(compare(toPhones('po'), ['p', 'o', 'o', 'o', 'o']).score).toBeLessThan(1);
+    // Spelled double vowels can be lengthened too.
+    expect(compare(toPhones('Nasaan'), ['n', 'a', 's', 'a', 'a', 'a', 'n']).score).toBe(1);
     expect(compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'a', 'm', 'a', 't']).score).toBe(1);
   });
 
