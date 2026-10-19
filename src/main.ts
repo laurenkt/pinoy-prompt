@@ -99,8 +99,13 @@ document.addEventListener(
   { capture: true },
 );
 
-// iOS Safari ignores user-scalable=no, so stop its pinch gesture directly.
-document.addEventListener('gesturestart', (e) => e.preventDefault());
+// Installed, it should feel like an app, so turn off zoom. In a browser tab, zoom still works.
+if (matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone) {
+  document.documentElement.classList.add('standalone');
+  document.querySelector('meta[name="viewport"]')?.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+  // iOS ignores user-scalable=no, so cancel its pinch gesture directly.
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(type, (e) => e.preventDefault());
+}
 
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;

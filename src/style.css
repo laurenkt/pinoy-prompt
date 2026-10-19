@@ -37,7 +37,11 @@ body {
   font-size: 17px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
-  /* Feel like an app: no double-tap zoom, and no pinch zoom on browsers that honour it. */
+}
+
+/* Installed, it should feel like an app: no double-tap or pinch zoom. In a browser tab, zoom still works. */
+.standalone,
+.standalone body {
   touch-action: pan-x pan-y;
 }
 
@@ -1012,7 +1016,8 @@ p {
 
 .word-group {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 10px 6px;
 }
 
 .pair {
