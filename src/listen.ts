@@ -10,8 +10,10 @@
 // headless Chromium during testing.
 
 const LANG = 'fil-PH';
-/** Stop listening after this long even if the recogniser hasn't. */
+/** Stop listening this long after the microphone opens, even if the recogniser hasn't. */
 const MAX_LISTEN_MS = 8000;
+/** Give up on a recogniser that never reports back (this includes time on the permission prompt). */
+const GIVE_UP_MS = 30000;
 
 // The Web Speech API isn't in TypeScript's DOM types; this is the part we use.
 interface RecognitionAlternative {
@@ -38,6 +40,7 @@ interface Recognition extends EventTarget {
   abort(): void;
   onresult: ((e: RecognitionEvent) => void) | null;
   onerror: ((e: RecognitionErrorEvent) => void) | null;
+  onaudiostart: (() => void) | null;
   onend: (() => void) | null;
 }
 interface RecognitionCtor {
@@ -76,6 +79,8 @@ export interface Listening {
 
 /** Listen for one utterance. `onHearing` gets the live transcript as the learner speaks. */
 export function listen(onHearing?: (text: string) => void): Listening {
+  // Only one recogniser at a time: end the old one before starting another.
+  active?.cancel();
   const Ctor = recognitionCtor();
   let recognition: Recognition | null = null;
   let cancelled = false;
@@ -90,7 +95,24 @@ export function listen(onHearing?: (text: string) => void): Listening {
 
     let alternatives: string[] = [];
     let failure: ListenError | null = null;
-    const timer = setTimeout(() => r.stop(), MAX_LISTEN_MS);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      clearTimeout(giveUp);
+      if (failure) reject(failure);
+      else resolve(cancelled ? [] : alternatives);
+    };
+    // The listening limit starts when the microphone opens, not while the permission prompt is up.
+    r.onaudiostart = () => {
+      timer = setTimeout(() => r.stop(), MAX_LISTEN_MS);
+    };
+    const giveUp = setTimeout(() => {
+      r.abort();
+      settle();
+    }, GIVE_UP_MS);
 
     r.onresult = (e) => {
       // Each result is one stretch of speech; join them, alternative by alternative.
@@ -113,16 +135,12 @@ export function listen(onHearing?: (text: string) => void): Listening {
         failure = new ListenError('failed');
       }
     };
-    r.onend = () => {
-      clearTimeout(timer);
-      if (failure) reject(failure);
-      else resolve(cancelled ? [] : alternatives);
-    };
+    r.onend = settle;
     try {
       r.start();
     } catch {
-      clearTimeout(timer);
-      reject(new ListenError('failed'));
+      failure = new ListenError('failed');
+      settle();
     }
   });
   const listening: Listening = {
@@ -133,7 +151,6 @@ export function listen(onHearing?: (text: string) => void): Listening {
       recognition?.abort();
     },
   };
-  active?.cancel();
   active = listening;
   void result.catch(() => {}).finally(() => {
     if (active === listening) active = null;

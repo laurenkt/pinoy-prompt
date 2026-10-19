@@ -13,7 +13,7 @@ export const CLOSE = 0.6;
 /** Score at or above which a single word counts as said. */
 const WORD_OK = 0.75;
 
-const NUMBERS: Record<string, string> = {
+const NUMBERS = new Map(Object.entries({
   '1': 'isa',
   '2': 'dalawa',
   '3': 'tatlo',
@@ -24,7 +24,7 @@ const NUMBERS: Record<string, string> = {
   '8': 'walo',
   '9': 'siyam',
   '10': 'sampu',
-};
+}));
 
 /** Lowercase words with accents and punctuation removed. Hyphens split words. */
 export function words(text: string): string[] {
@@ -34,7 +34,7 @@ export function words(text: string): string[] {
     .replace(/[̀-ͯ]/g, '')
     .split(/[^a-z0-9]+/)
     .filter(Boolean)
-    .map((w) => NUMBERS[w] ?? w);
+    .map((w) => NUMBERS.get(w) ?? w);
 }
 
 /** A rough phonetic spelling of one word, so spelling variants compare equal. */
@@ -89,8 +89,13 @@ export interface Verdict {
   marks: WordMark[];
 }
 
+/** The target as written, split into the words shown to the learner. */
+function shownWords(target: string): string[] {
+  return target.split(/\s+/).filter((w) => words(w).length > 0);
+}
+
 function scoreAgainst(target: string, heard: string): { score: number; marks: WordMark[] } {
-  const targetWords = target.split(/\s+/).filter((w) => words(w).length > 0);
+  const targetWords = shownWords(target);
   const heardFolded = words(heard).map(fold);
   const heardJoined = heardFolded.join('');
   // Compare without spaces: recognisers split and join words unpredictably.
@@ -123,10 +128,16 @@ export function judge(targets: string[], heard: string[]): Verdict {
   if (best) {
     // Always show the card's own wording, even when another accepted spelling matched.
     if (bestTarget !== targets[0]) {
-      best.marks = scoreAgainst(targets[0], best.heard).marks.map((m) => (best!.pass ? { ...m, ok: true } : m));
+      const matched = best.marks;
+      const shown = shownWords(targets[0]);
+      // Carry the marks over word for word when the spellings line up; otherwise re-mark against the card.
+      best.marks =
+        shown.length === matched.length
+          ? shown.map((text, i) => ({ text, ok: matched[i].ok }))
+          : scoreAgainst(targets[0], best.heard).marks;
     }
     return best;
   }
-  const marks = targets[0]?.split(/\s+/).filter((w) => words(w).length > 0).map((text) => ({ text, ok: false })) ?? [];
+  const marks = shownWords(targets[0] ?? '').map((text) => ({ text, ok: false }));
   return { score: 0, pass: false, close: false, heard: '', marks };
 }

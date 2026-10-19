@@ -79,6 +79,16 @@ describe('judge', () => {
     expect(judge(['Oo'], ['o']).pass).toBe(false);
   });
 
+  it('copes with words that are also object property names', () => {
+    expect(() => judge(['Salamat'], ['constructor valueOf toString'])).not.toThrow();
+  });
+
+  it('keeps the marks in step with an alternative spelling that nearly matched', () => {
+    const v = judge(['Kumusta?', 'Kamusta?'], ['kamostah']);
+    expect(v.marks.map((m) => m.text)).toEqual(['Kumusta?']);
+    expect(v.marks[0].ok).toBe(v.close);
+  });
+
   it('reports nothing heard', () => {
     const v = judge(['Salamat'], []);
     expect(v).toMatchObject({ pass: false, close: false, heard: '', score: 0 });

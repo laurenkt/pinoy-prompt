@@ -71,7 +71,6 @@ export function practiceScreen(app: App): HTMLElement {
   let lastMode: MenuMode = 'mix';
   let speak: Speak = { state: 'ready' };
   let listening: Listening | null = null;
-  let passed = false;
 
   function start(menuMode: MenuMode): void {
     lastMode = menuMode;
@@ -95,10 +94,15 @@ export function practiceScreen(app: App): HTMLElement {
   function ask(): void {
     // Once the recogniser has said it can't do Filipino, say so rather than offer the microphone.
     speak = recognitionSupported() ? { state: 'ready' } : { state: 'problem', problem: 'unsupported' };
-    passed = false;
     draw();
     const q = questions[index];
     if (q && q.mode !== 'recall' && (q.mode === 'listen' || app.progress.settings.autoplay)) void play(q.card);
+  }
+
+  /** Play a card, except while the microphone is open: the recogniser would hear the voice, not the learner. */
+  function sayCard(card: Card, slow = false): void {
+    if (speak.state === 'listening') return;
+    void play(card, slow);
   }
 
   function choose(choice: Card): void {
@@ -135,10 +139,7 @@ export function practiceScreen(app: App): HTMLElement {
       const heard = await current.result;
       if (listening !== current || questions[index] !== q) return;
       const verdict = judge([q.card.tl, ...(q.card.accept ?? [])], heard);
-      if (verdict.pass && !passed) {
-        passed = true;
-        score++;
-      }
+      if (verdict.pass) score++;
       speak = { state: 'heard', verdict };
     } catch (err) {
       if (listening !== current || questions[index] !== q) return;
@@ -196,7 +197,7 @@ export function practiceScreen(app: App): HTMLElement {
     const answered = picked !== null;
     const right = picked === q.card.id;
     const field = q.mode === 'recall' ? 'tl' : 'en';
-    const say = (slow = false) => void play(q.card, slow);
+    const say = (slow = false) => sayCard(q.card, slow);
 
     let prompt: HTMLElement;
     if (q.mode === 'speak') {
@@ -275,10 +276,10 @@ export function practiceScreen(app: App): HTMLElement {
   function speakView(q: Question): HTMLElement {
     const c = q.card;
     const hint = c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint);
-    const mic = (label: string, autofocus = true) =>
+    const mic = (label: string, className = 'btn mic big') =>
       h(
         'button',
-        { class: 'btn mic big', 'data-autofocus': autofocus || undefined, onclick: () => void startListening() },
+        { class: className, 'data-autofocus': true, onclick: () => void startListening() },
         icon('mic'),
         ' ',
         label,
@@ -345,7 +346,7 @@ export function practiceScreen(app: App): HTMLElement {
                 'div',
                 { class: 'row' },
                 h('button', { class: 'btn secondary', onclick: advance }, 'Skip'),
-                h('button', { class: 'btn mic', 'data-autofocus': true, onclick: () => void startListening() }, icon('mic'), ' Try again'),
+                mic('Try again', 'btn mic'),
               ),
         );
       }
@@ -371,7 +372,7 @@ export function practiceScreen(app: App): HTMLElement {
   app.onKey((e) => {
     const q = questions[index];
     if (!q) return;
-    if (e.key === 'r' || e.key === 'R') return void play(q.card);
+    if (e.key === 'r' || e.key === 'R') return sayCard(q.card);
     if (q.mode === 'speak') return;
     const n = Number(e.key);
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
