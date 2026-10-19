@@ -13,7 +13,17 @@
 //   losing either one alone loses nothing.
 
 import { readMirror, writeMirror } from './progress-mirror';
-import { SCHEMA, dayKey, decode, emptyProgress, encode, mergeInto, type Envelope, type Progress } from './progress-schema';
+import {
+  SCHEMA,
+  dayKey,
+  decode,
+  emptyProgress,
+  encode,
+  mergeInto,
+  replaceContents,
+  type Envelope,
+  type Progress,
+} from './progress-schema';
 import { newCardState, review, type Rating } from './srs';
 
 export { DEFAULT_SETTINGS, dayKey, emptyProgress, type Progress, type Settings } from './progress-schema';
@@ -30,6 +40,8 @@ export const BEFORE_RESET_KEY = 'pinoy-prompt:before-reset';
 let rev = 0;
 /** The schema to write: this build's, or a newer one whose data was loaded. */
 let schema = SCHEMA;
+/** When the progress this page holds was last reset. */
+let resetAt = 0;
 
 type Stored = { kind: 'missing' } | { kind: 'ok'; envelope: Envelope };
 
@@ -40,20 +52,14 @@ function readStored(now: number): Stored {
   if (text === null) return { kind: 'missing' };
   const decoded = decode(text, now);
   if (decoded.kind === 'ok') return decoded;
-  setAside(text);
+  // If it can't be set aside, treat storage as unreadable so nothing overwrites it.
+  if (localStorage.getItem(UNREADABLE_KEY) !== text) localStorage.setItem(UNREADABLE_KEY, text);
   return { kind: 'missing' };
-}
-
-function setAside(text: string): void {
-  try {
-    if (localStorage.getItem(UNREADABLE_KEY) !== text) localStorage.setItem(UNREADABLE_KEY, text);
-  } catch {
-    // Nowhere to put it; the copy stays where it is until the next save.
-  }
 }
 
 function adopt(envelope: Envelope): Progress {
   rev = envelope.rev;
+  resetAt = envelope.resetAt;
   schema = Math.max(schema, envelope.schema);
   return envelope.progress;
 }
@@ -80,21 +86,26 @@ export async function loadDurable(now: number): Promise<Progress> {
   const text = await readMirror();
   if (text === null) return progress;
   const mirrored = decode(text, now);
-  if (mirrored.kind !== 'ok' || mirrored.envelope.rev < rev) return progress;
-  if (mirrored.envelope.rev === rev) {
+  if (mirrored.kind !== 'ok') return progress;
+  const m = mirrored.envelope;
+  // A copy from before the other's reset is out of date, whatever its revision.
+  if (m.resetAt < resetAt || (m.resetAt === resetAt && m.rev < rev)) return progress;
+  if (m.resetAt === resetAt && m.rev === rev) {
     // Same revision, but a save that only reached the mirror may share it.
-    if (mergeInto(progress, mirrored.envelope.progress) > 0) save(progress);
+    if (mergeInto(progress, m.progress) > 0) save(progress);
     return progress;
   }
-  const restored = adopt(mirrored.envelope);
-  mergeInto(restored, progress);
+  const sameReset = m.resetAt === resetAt;
+  const restored = adopt(m);
+  if (sameReset) mergeInto(restored, progress);
   save(restored);
   return rollDay(restored, now);
 }
 
 /**
  * Save progress. Anything newer in storage is folded into `progress` first,
- * so it may gain cards. Returns false if the main copy couldn't be written.
+ * so it may gain cards; if another tab reset progress since, `progress` takes
+ * on the reset copy instead. Returns false if the main copy couldn't be written.
  */
 export function save(progress: Progress, { replace = false } = {}): boolean {
   const now = Date.now();
@@ -106,14 +117,23 @@ export function save(progress: Progress, { replace = false } = {}): boolean {
   }
   let storedRev = 0;
   if (stored?.kind === 'ok') {
-    storedRev = stored.envelope.rev;
-    schema = Math.max(schema, stored.envelope.schema);
-    // Merging is safe even when nothing changed elsewhere: it only adds cards or newer reviews.
-    if (!replace) mergeInto(progress, stored.envelope.progress);
+    const s = stored.envelope;
+    storedRev = s.rev;
+    schema = Math.max(schema, s.schema);
+    if (replace) {
+      // Writing a reset; the stored copy is what is being replaced.
+    } else if (s.resetAt > resetAt) {
+      // Progress was reset elsewhere after this page loaded; honour it.
+      replaceContents(progress, s.progress);
+      resetAt = s.resetAt;
+    } else if (s.resetAt === resetAt) {
+      // Safe even when nothing changed elsewhere: it only adds cards or newer reviews.
+      mergeInto(progress, s.progress);
+    }
   }
 
   rev = Math.max(rev, storedRev) + 1;
-  const text = encode({ schema, rev, savedAt: now, progress });
+  const text = encode({ schema, rev, savedAt: now, resetAt, progress });
   writeMirror(text);
   // If storage couldn't even be read, writing blind could overwrite progress we never saw.
   if (stored === null) return false;
@@ -136,6 +156,7 @@ export function reset(now: number): Progress {
     // Carry on; the reset itself matters more than the safety copy.
   }
   const fresh = emptyProgress(now);
+  resetAt = Math.max(Date.now(), resetAt + 1);
   save(fresh, { replace: true });
   return fresh;
 }
@@ -146,8 +167,10 @@ export function onExternalChange(listener: (progress: Progress) => void): void {
     if (e.key !== STORAGE_KEY || e.newValue === null) return;
     const now = Date.now();
     const decoded = decode(e.newValue, now);
-    if (decoded.kind !== 'ok' || decoded.envelope.rev <= rev) return;
-    listener(rollDay(adopt(decoded.envelope), now));
+    if (decoded.kind !== 'ok') return;
+    const next = decoded.envelope;
+    if (next.resetAt < resetAt || (next.resetAt === resetAt && next.rev <= rev)) return;
+    listener(rollDay(adopt(next), now));
   });
 }
 
@@ -164,7 +187,7 @@ export async function requestPersistence(): Promise<boolean> {
 
 /** A backup file's contents: the same envelope that is stored. */
 export function exportBackup(progress: Progress): string {
-  return encode({ schema, rev, savedAt: Date.now(), progress });
+  return encode({ schema, rev, savedAt: Date.now(), resetAt, progress });
 }
 
 export function backupFileName(now: number): string {
@@ -200,5 +223,6 @@ export function recordAnswer(progress: Progress, cardId: string, rating: Rating,
 /** Forget what this page has read, as on a fresh start. For tests. */
 export function resetStoreForTests(): void {
   rev = 0;
+  resetAt = 0;
   schema = SCHEMA;
 }

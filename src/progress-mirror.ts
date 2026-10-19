@@ -39,7 +39,12 @@ function open(): Promise<IDBDatabase> {
 }
 
 function available(): boolean {
-  return typeof indexedDB !== 'undefined';
+  try {
+    return typeof indexedDB !== 'undefined' && indexedDB !== null;
+  } catch {
+    // Reading indexedDB throws where storage is blocked.
+    return false;
+  }
 }
 
 /** The mirrored copy, or null if there is none or it can't be read in time. */
@@ -66,12 +71,20 @@ export async function readMirror(timeoutMs = 1500): Promise<string | null> {
 export function writeMirror(text: string): void {
   if (!available()) return;
   pending = text;
-  writing ??= flush().finally(() => {
-    writing = null;
-  });
+  writing ??= flush();
 }
 
 async function flush(): Promise<void> {
+  try {
+    await drain();
+  } finally {
+    // Cleared in the same tick the queue is found empty, so a write that
+    // arrives just after starts a new flush instead of waiting on this one.
+    writing = null;
+  }
+}
+
+async function drain(): Promise<void> {
   while (pending !== null) {
     const text = pending;
     pending = null;

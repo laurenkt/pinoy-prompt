@@ -8,7 +8,8 @@ import { settingsScreen } from './screens/settings';
 import { wordsScreen } from './screens/words';
 import { cancelListening } from './listen';
 import { initVoices, stop } from './speech';
-import { emptyProgress, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
+import { replaceContents } from './progress-schema';
+import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
 import { h } from './ui';
 
 const root = document.getElementById('app')!;
@@ -121,11 +122,13 @@ function saved(ok: boolean): void {
 }
 
 async function start(): Promise<void> {
-  app.progress = await loadDurable(Date.now());
-  // Another tab saved: pick up its progress so this one doesn't fall behind.
-  onExternalChange((progress) => {
-    app.progress = progress;
-  });
+  // Another tab saved: pick up its progress in place, so screens holding it see the change.
+  onExternalChange((progress) => replaceContents(app.progress, progress));
+  try {
+    replaceContents(app.progress, await loadDurable(Date.now()));
+  } catch {
+    replaceContents(app.progress, load(Date.now()));
+  }
   app.navigate({ name: 'home' });
   askToPersist();
 }

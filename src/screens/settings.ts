@@ -13,7 +13,8 @@ export function settingsScreen(app: App): HTMLElement {
     const file = restoreInput.files?.[0];
     restoreInput.value = '';
     if (!file) return;
-    const changed = importBackup(app.progress, await file.text(), app.now());
+    const text = await file.text();
+    const changed = importBackup(app.progress, text, app.now());
     if (changed === null) {
       alert("That file isn't a Pinoy Prompt backup.");
       return;

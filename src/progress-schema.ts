@@ -37,6 +37,8 @@ export interface Envelope {
   rev: number;
   /** When the copy was written, as epoch milliseconds. */
   savedAt: number;
+  /** When progress was last reset (0 if never). Cards from before it must not be merged back in. */
+  resetAt: number;
   progress: Progress;
 }
 
@@ -91,6 +93,7 @@ export function decodeValue(value: unknown, now: number): Decoded {
   let schema: number;
   let rev = 0;
   let savedAt = 0;
+  let resetAt = 0;
   let data: Data;
   if ('schema' in value) {
     if (!isWhole(value.schema) || value.schema < 1 || !isObject(value.progress)) {
@@ -99,6 +102,7 @@ export function decodeValue(value: unknown, now: number): Decoded {
     schema = value.schema;
     rev = isWhole(value.rev) && value.rev >= 0 ? value.rev : 0;
     savedAt = isNumber(value.savedAt) ? value.savedAt : 0;
+    resetAt = isNumber(value.resetAt) && value.resetAt >= 0 ? value.resetAt : 0;
     data = value.progress;
   } else if ('cards' in value || 'today' in value || 'settings' in value) {
     schema = 1;
@@ -119,7 +123,7 @@ export function decodeValue(value: unknown, now: number): Decoded {
 
   return {
     kind: 'ok',
-    envelope: { schema: Math.max(schema, SCHEMA), rev, savedAt, progress: sanitize(data, now) },
+    envelope: { schema: Math.max(schema, SCHEMA), rev, savedAt, resetAt, progress: sanitize(data, now) },
   };
 }
 
@@ -209,6 +213,12 @@ export function mergeInto(target: Progress, other: Progress): number {
     if (!(key in extra) && key !== '__proto__') extra[key] = value;
   }
   return changed;
+}
+
+/** Make `target` hold exactly what `source` does, so anything holding `target` sees the change. */
+export function replaceContents(target: Progress, source: Progress): void {
+  for (const key of Object.keys(target)) delete (target as unknown as Data)[key];
+  Object.assign(target, source);
 }
 
 function isObject(v: unknown): v is Data {

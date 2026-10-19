@@ -71,7 +71,7 @@ describe('a copy from a newer version of the app', () => {
     };
     const { schema, progress } = decodeOk(JSON.stringify(future));
     expect(schema).toBe(SCHEMA + 3);
-    const saved = JSON.parse(encode({ schema, rev: 8, savedAt: NOW, progress }));
+    const saved = JSON.parse(encode({ schema, rev: 8, savedAt: NOW, resetAt: 0, progress }));
     expect(saved.progress.goals).toEqual(['travel']);
     expect(saved.progress.settings.theme).toBe('night');
     expect(saved.progress.cards.isa.audioScore).toBe(0.9);

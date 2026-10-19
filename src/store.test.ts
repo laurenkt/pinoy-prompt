@@ -140,6 +140,22 @@ describe('storage that misbehaves', () => {
     expect(storage.items.get(UNREADABLE_KEY)).toBe('{"cards": {"isa": trunc');
   });
 
+  it('leaves an unreadable copy in place if it cannot be set aside', () => {
+    storage.setItem(STORAGE_KEY, '{"cards": trunc');
+    storage.failWrites = true;
+    const p = load(NOW);
+    storage.failWrites = false;
+    // Only the set-aside write fails from here on.
+    const setItem = storage.setItem.bind(storage);
+    storage.setItem = (k, v) => {
+      if (k === UNREADABLE_KEY) throw new DOMException('full', 'QuotaExceededError');
+      setItem(k, v);
+    };
+    recordAnswer(p, 'isa', 'good', NOW);
+    expect(save(p)).toBe(false);
+    expect(storage.items.get(STORAGE_KEY)).toBe('{"cards": trunc');
+  });
+
   it('does not overwrite saved progress it failed to read at start-up', () => {
     save(learn('isa', 'dalawa', 'tatlo'));
     restart();
@@ -209,7 +225,7 @@ describe('storage that misbehaves', () => {
     await mirrorSettled();
     vi.stubGlobal('indexedDB', new IDBFactory());
     resetMirrorForTests();
-    writeMirror(encode({ schema: SCHEMA, rev: 0, savedAt: 0, progress: learn('stale') }));
+    writeMirror(encode({ schema: SCHEMA, rev: 0, savedAt: 0, resetAt: 0, progress: learn('stale') }));
     await mirrorSettled();
     restart();
     expect(Object.keys((await loadDurable(NOW)).cards)).toEqual(['isa']);
@@ -224,6 +240,22 @@ describe('storage that misbehaves', () => {
     await vi.advanceTimersByTimeAsync(2000);
     vi.useRealTimers();
     expect(Object.keys((await loading).cards)).toEqual(['isa']);
+  });
+
+  it('works where even looking at IndexedDB throws', async () => {
+    save(learn('isa'));
+    restart();
+    Object.defineProperty(globalThis, 'indexedDB', {
+      configurable: true,
+      get() {
+        throw new DOMException('blocked', 'SecurityError');
+      },
+    });
+    try {
+      expect(Object.keys((await loadDurable(NOW)).cards)).toEqual(['isa']);
+    } finally {
+      Object.defineProperty(globalThis, 'indexedDB', { configurable: true, writable: true, value: new IDBFactory() });
+    }
   });
 
   it('works with no IndexedDB at all', async () => {
@@ -279,7 +311,7 @@ describe('two copies of the app open at once', () => {
     const p = load(NOW);
     let latest = p;
     onExternalChange((next) => (latest = next));
-    const other = encode({ schema: SCHEMA, rev: 9, savedAt: NOW, progress: learn('isa') });
+    const other = encode({ schema: SCHEMA, rev: 9, savedAt: NOW, resetAt: 0, progress: learn('isa') });
     storage.items.set(STORAGE_KEY, other);
     window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: other }));
     expect(Object.keys(latest.cards)).toEqual(['isa']);
@@ -300,6 +332,33 @@ describe('resetting', () => {
 
     restart();
     expect((await loadDurable(NOW)).cards).toEqual({});
+  });
+
+  it('stays erased when only the mirror got the reset', async () => {
+    save(learn('isa', 'dalawa'));
+    await mirrorSettled();
+    storage.failWrites = true;
+    reset(NOW);
+    await mirrorSettled();
+    storage.failWrites = false;
+    restart();
+    expect((await loadDurable(NOW)).cards).toEqual({});
+  });
+
+  it('is honoured by another tab that still holds the old progress', async () => {
+    save(learn('isa', 'dalawa'));
+    vi.resetModules();
+    const a = await import('./store');
+    vi.resetModules();
+    const b = await import('./store');
+    a.load(NOW);
+    const pb = b.load(NOW);
+
+    a.reset(NOW);
+    b.recordAnswer(pb, 'tatlo', 'good', NOW);
+    b.save(pb);
+    expect(Object.keys(stored().progress.cards)).not.toContain('isa');
+    expect(Object.keys(pb.cards)).not.toContain('isa');
   });
 });
 
