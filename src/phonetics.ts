@@ -15,6 +15,12 @@ export interface Phone {
   to: number;
   /** Fine to leave out, e.g. the glottal catch before a word-initial vowel. */
   optional?: boolean;
+  /**
+   * Other ways of saying it that are just as right, from the sound next to it:
+   * "ng" before p or b is said m. An empty string means it can merge into the
+   * next sound and disappear ("ang mga" said "amga").
+   */
+  also?: string[];
 }
 
 const VOWELS = 'aeiou';
@@ -53,6 +59,22 @@ const LETTERS: Record<string, string> = {
 };
 
 /** Expected sounds for a card's Tagalog text, mapped back to its letters. */
+/**
+ * In running speech "ng" takes the place of the consonant after it, within a
+ * word or across a space: m before p, b and m; n before t, d, s, l and n. Before
+ * the same nasal it can merge away completely.
+ */
+function assimilated(lower: string, at: number): string[] | undefined {
+  let k = at;
+  while (k < lower.length && (lower[k] === ' ' || lower[k] === '-')) k++;
+  const following = lower[k];
+  if (following === 'p' || following === 'b') return ['m'];
+  if (following === 'm') return ['m', ''];
+  if (following && 'tdsl'.includes(following)) return ['n'];
+  if (following === 'n' && lower[k + 1] !== 'g') return ['n', ''];
+  return undefined;
+}
+
 export function toPhones(text: string): Phone[] {
   const lower = text.toLowerCase().normalize('NFC');
   const phones: Phone[] = [];
@@ -72,10 +94,32 @@ export function toPhones(text: string): Phone[] {
     // "mga" (plural marker) is said "maŋa".
     if (wordStart && lower.startsWith('mga', i) && !isLetter(lower[i + 3])) {
       push('m', i, i + 1);
-      push('a', i, i + 1);
+      // Not spelled, and often swallowed in quick speech ("mŋa").
+      push('a', i, i + 1, true);
       push('ŋ', i + 1, i + 3);
       push('a', i + 2, i + 3);
       i += 3;
+      continue;
+    }
+    // The particle "ng" is said "nang".
+    if (wordStart && lower.startsWith('ng', i) && !isLetter(lower[i + 2])) {
+      push('n', i, i + 1);
+      // Not spelled, and often swallowed in quick speech.
+      push('a', i, i + 2, true);
+      push('ŋ', i + 1, i + 2);
+      const also = assimilated(lower, i + 2);
+      if (also) phones[phones.length - 1].also = also;
+      i += 2;
+      continue;
+    }
+    // "ay" and "may" are often said "e" and "me" in everyday speech.
+    if (ch === 'a' && next === 'y' && !isLetter(lower[i + 2]) && (wordStart || (lower[i - 1] === 'm' && (i === 1 || !isLetter(lower[i - 2]))))) {
+      if (wordStart) push('ʔ', i, i + 1, true);
+      push('a', i, i + 1);
+      phones[phones.length - 1].also = ['e', 'æ'];
+      push('j', i + 1, i + 2);
+      phones[phones.length - 1].also = [''];
+      i += 2;
       continue;
     }
     // A vowel starting a word, or following another vowel, begins with a catch in the throat.
@@ -89,9 +133,11 @@ export function toPhones(text: string): Phone[] {
     }
     if (ch === 'n' && next === 'g') {
       push('ŋ', i, i + 2);
-      // In loanwords like "Ingles", a consonant after "ng" keeps the g.
+      const also = assimilated(lower, i + 2);
+      if (also) phones[phones.length - 1].also = also;
+      // In loanwords like "Ingles", l or r after "ng" keeps the g.
       const after = lower[i + 2];
-      if (isLetter(after) && !isVowel(after)) push('ɡ', i + 1, i + 2);
+      if (after === 'l' || after === 'r') push('ɡ', i + 1, i + 2);
       i += 2;
       continue;
     }
@@ -218,6 +264,19 @@ const SAME: [string, string][] = [
   ['a', 'ɑ'],
   ['ɾ', 'r'],
   ['ɲ', 'nj'],
+  // The recogniser often writes a Tagalog k said far back in the mouth as q.
+  ['k', 'q'],
+];
+
+/** In Tagalog o/u and e/i swap freely in many words, so those are only a small slip. */
+const SLIPS: [string, string][] = [
+  ['o', 'u'],
+  ['ɛ', 'i'],
+  ['e', 'i'],
+];
+const GLIDE_VOWELS: [string, string][] = [
+  ['j', 'i'],
+  ['w', 'u'],
 ];
 
 /** Strip length marks, ties and diacritics other than aspiration, so model output compares cleanly. */
@@ -241,7 +300,9 @@ export function soundDistance(expected: string, heard: string): number {
   if (isGlidingVowel(b) && FEATURES[a]?.kind === 'vowel') return Math.min(1, soundDistance(a, b[0]) + 0.3);
   if (SAME.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return 0;
   // In Tagalog o/u and e/i swap freely in many words, so those are only a small slip.
-  if ((a === 'o' && b === 'u') || (a === 'u' && b === 'o') || (a === 'ɛ' && b === 'i') || (a === 'i' && b === 'ɛ')) return 0.35;
+  if (SLIPS.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return 0.35;
+  // A glide and its vowel (y and i, w and u) are hard to tell apart.
+  if (GLIDE_VOWELS.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return 0.3;
   const fa = FEATURES[a];
   const fb = FEATURES[b];
   if (!fa || !fb) return 1;
@@ -286,6 +347,8 @@ const isVowelSound = (ipa: string | undefined) => ipa !== undefined && FEATURES[
 function harmless(heard: string[], index: number): boolean {
   const ipa = baseSound(heard[index]);
   if (ipa === 'ʔ') return true;
+  // A long vowel written twice ("kagubaatan"): Tagalog marks stress with length.
+  if (isVowelSound(ipa) && (baseSound(heard[index - 1] ?? '') === ipa || baseSound(heard[index + 1] ?? '') === ipa)) return true;
   if (index === heard.length - 1 && TRAILING.has(ipa)) return true;
   // The y or w glide that joins two vowels, as in "kain" said "kayin".
   return (ipa === 'j' || ipa === 'w') && isVowelSound(heard[index - 1]) && isVowelSound(heard[index + 1]);
@@ -295,7 +358,10 @@ function harmless(heard: string[], index: number): boolean {
 export function compare(expected: Phone[], heard: string[]): Comparison {
   const n = expected.length;
   const m = heard.length;
-  const deleteCost = (p: Phone) => (p.optional ? 0 : DELETE);
+  const mayDrop = (p: Phone) => p.optional || p.also?.includes('') === true;
+  const deleteCost = (p: Phone) => (mayDrop(p) ? 0 : DELETE);
+  const distance = (p: Phone, h: string) =>
+    Math.min(soundDistance(p.ipa, h), ...(p.also ?? []).filter(Boolean).map((alt) => soundDistance(alt, h)));
   // cost[i][j]: best cost of matching expected[0..i) with heard[0..j).
   const cost: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   const step: ('sub' | 'del' | 'ins')[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill('sub'));
@@ -309,7 +375,7 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   }
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
-      const sub = cost[i - 1][j - 1] + soundDistance(expected[i - 1].ipa, heard[j - 1]);
+      const sub = cost[i - 1][j - 1] + distance(expected[i - 1], heard[j - 1]);
       const del = cost[i - 1][j] + deleteCost(expected[i - 1]);
       const ins = cost[i][j - 1] + INSERT;
       const best = Math.min(sub, del, ins);
@@ -325,13 +391,13 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   while (i > 0 || j > 0) {
     const s = step[i][j];
     if (s === 'sub' && i > 0 && j > 0) {
-      const d = soundDistance(expected[i - 1].ipa, heard[j - 1]);
+      const d = distance(expected[i - 1], heard[j - 1]);
       const verdict: SoundVerdict = d === 0 ? 'good' : d <= CLOSE ? 'close' : 'off';
       sounds.unshift(verdict === 'good' ? { phone: expected[i - 1], verdict } : { phone: expected[i - 1], verdict, heard: heard[j - 1] });
       i--;
       j--;
     } else if (s === 'del' && i > 0) {
-      sounds.unshift({ phone: expected[i - 1], verdict: expected[i - 1].optional ? 'good' : 'missing' });
+      sounds.unshift({ phone: expected[i - 1], verdict: mayDrop(expected[i - 1]) ? 'good' : 'missing' });
       i--;
     } else {
       extra.unshift({ ipa: heard[j - 1], before: i, counts: !harmless(heard, j - 1) });
