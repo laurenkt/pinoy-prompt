@@ -54,9 +54,12 @@ export function voiceQuality(): VoiceQuality {
 }
 
 let currentClip: HTMLAudioElement | null = null;
+/** Bumped by stop(), so a play() still loading a clip or voices doesn't start afterwards. */
+let generation = 0;
 
 export async function play(card: Card, slow = false): Promise<void> {
   stop();
+  const mine = generation;
   if (card.audio) {
     currentClip = new Audio(`${import.meta.env.BASE_URL}audio/${card.audio}`);
     currentClip.playbackRate = slow ? 0.75 : 1;
@@ -67,8 +70,9 @@ export async function play(card: Card, slow = false): Promise<void> {
       // Fall through to speech if the clip can't play.
     }
   }
-  if (!speechSupported()) return;
+  if (!speechSupported() || mine !== generation) return;
   await initVoices();
+  if (mine !== generation) return;
   const utterance = new SpeechSynthesisUtterance(card.tl);
   if (voice) {
     utterance.voice = voice;
@@ -81,6 +85,7 @@ export async function play(card: Card, slow = false): Promise<void> {
 }
 
 export function stop(): void {
+  generation++;
   currentClip?.pause();
   currentClip = null;
   if (speechSupported()) speechSynthesis.cancel();

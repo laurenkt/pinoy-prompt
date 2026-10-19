@@ -722,8 +722,15 @@ p {
   background: var(--magenta);
 }
 
+/* Five modes: Mix it up takes the whole last row. */
+.mode-speak {
+  background: var(--pink);
+}
+
 .mode-mix {
   background: var(--cream);
+  grid-column: 1 / -1;
+  min-height: 96px;
 }
 
 .mode:disabled {
@@ -741,6 +748,90 @@ p {
 .mode-desc {
   font-size: 0.85rem;
   font-weight: 500;
+}
+
+/* Speaking questions */
+
+.prompt-meaning {
+  font-weight: 700;
+  margin: 10px 0 0;
+}
+
+.speak .hint {
+  text-align: center;
+}
+
+.btn.mic {
+  background: var(--magenta);
+  color: var(--on-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.btn.mic.listening {
+  background: var(--cream);
+}
+
+.pulse {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--magenta);
+  border: 2px solid var(--ink);
+  animation: pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  to {
+    transform: scale(1.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+}
+
+.hearing {
+  min-height: 1.5em;
+  margin-top: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+
+.mark {
+  font-size: 1.15rem;
+  font-weight: 800;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  padding: 2px 10px;
+  color: var(--on-accent);
+}
+
+.mark.ok {
+  background: var(--teal);
+}
+
+.mark.miss {
+  background: var(--pink);
+}
+
+.heard {
+  margin: 0;
+}
+
+.speak .row {
+  margin-top: 12px;
 }
 
 /* Words */
