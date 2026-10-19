@@ -46,6 +46,10 @@ const STOPS = 'ptk';
 function tipFor(r: SoundResult, letters: string): string | null {
   const want = r.phone.ipa;
   const heard = r.heard ? baseSound(r.heard) : '';
+  const alternatives = (r.phone.also ?? []).filter(Boolean);
+  if (want === 'ŋ' && alternatives.length > 0) {
+    return `"ng" blends into the next sound here, so say it as "ng" or "${alternatives.join('" or "')}"${heard ? `, not ${describeSound(heard)}` : ''}.`;
+  }
   if (want === 'ŋ') {
     return `"ng" is a single sound, like the end of "sing". Hold the back of your tongue up and hum it${r.phone.from === 0 ? ', even at the start of a word' : ''}.`;
   }
@@ -71,7 +75,7 @@ function tipFor(r: SoundResult, letters: string): string | null {
     return 'Make the "u" a full "oo", as in "food".';
   }
   if (r.verdict === 'missing') return `We didn't hear the ${describeSound(want)} sound for "${letters}".`;
-  if (r.heard) return `"${letters}" sounded like ${describeSound(r.heard)}. Aim for ${describeSound(want)}.`;
+  if (r.heard) return `"${letters}" sounded like ${describeSound(r.heard)}. Aim for ${[...new Set([want, ...alternatives.filter((a) => a !== 'æ')].map(describeSound))].join(' or ')}.`;
   return null;
 }
 

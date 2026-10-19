@@ -43,6 +43,8 @@ The model is a one-time download of about 71 MB, fetched from Hugging Face only 
 
 Why this approach: the browser's speech recogniser can only say whether it understood the word, which isn't coaching, and it isn't available at all in apps opened from an iPhone's home screen ([WebKit bug 225298](https://bugs.webkit.org/show_bug.cgi?id=225298)). Comparing against reference audio would need recorded clips for every card. A phone recogniser hears what was actually said, works on any modern browser including iOS, and keeps the voice on the device.
 
+Tuning: the scoring was checked against 73 sentences read by native speakers ([FLEURS](https://huggingface.co/datasets/google/fleurs) Filipino dev set), so that natural Tagalog isn't marked wrong: "ng" taking the sound after it (m before p/b, n before t/d/s/l), the particle "ng" said "nang", "ay" said "e", long vowels, and the recogniser writing k as q. In that fast, connected speech about 80% of words come through with nothing flagged; careful single words do better.
+
 Limits: it doesn't judge stress or intonation yet, and a phone recogniser can mishear, so tips are guidance rather than a verdict. Practice is unscored, so attempts never touch the review schedule.
 
 Tests: `src/screens/speak.test.ts` and `src/screens/practice.speak.test.ts` play the mode through in a simulated DOM with a scripted microphone and model, covering the download offer, recording feedback, "I'm done", results and tips, and microphone problems. `src/phonetics.test.ts` covers spelling to sounds, comparison and tips.
