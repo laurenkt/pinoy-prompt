@@ -99,6 +99,9 @@ document.addEventListener(
   { capture: true },
 );
 
+// iOS Safari ignores user-scalable=no, so stop its pinch gesture directly.
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   keyHandler?.(e);

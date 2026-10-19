@@ -37,6 +37,8 @@ body {
   font-size: 17px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
+  /* Feel like an app: no double-tap zoom, and no pinch zoom on browsers that honour it. */
+  touch-action: pan-x pan-y;
 }
 
 button {
