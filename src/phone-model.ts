@@ -1,0 +1,170 @@
+// The phone recogniser: ZIPA (small, CTC), a multilingual model that turns
+// speech into IPA sounds. It runs on the device with onnxruntime-web, so audio
+// never leaves the phone. The model (about 71 MB) downloads on first use and is
+// kept in the Cache API for offline use after that.
+//
+// Model: Zhu et al., "ZIPA: A family of efficient models for multilingual phone
+// recognition" (ACL 2025), https://github.com/lingjzhu/zipa, CC BY 4.0.
+
+import * as ort from 'onnxruntime-web/wasm';
+// The package doesn't export its runtime files, so they're referenced by path for Vite to copy into the build.
+// Both are needed: once wasmPaths is set, onnxruntime-web loads its JS glue from there too.
+import mjsUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs?url';
+import wasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
+import { fbank, NUM_MEL_BINS } from './fbank';
+import { groupTokens } from './phonetics';
+import TOKENS from './phone-tokens.json';
+
+/** Pinned to a revision so the model can't change under the app. */
+export const MODEL_URL =
+  'https://huggingface.co/anyspeech/zipa-small-crctc-500k/resolve/dfe87c97662606fa6db90ad06f627d4363314744/model.int8.onnx';
+const MODEL_BYTES = 70677672;
+// public/sw.js checks for this cache by name to keep the model's runtime offline too.
+const CACHE = 'pinoy-prompt-models-v1';
+
+export interface Recognition {
+  /** The sounds heard, in IPA. */
+  sounds: string[];
+}
+
+export interface PhoneModel {
+  recognise(samples: Float32Array): Promise<Recognition>;
+}
+
+/** Whether the model is already on the device. */
+export async function modelDownloaded(): Promise<boolean> {
+  try {
+    // caches.open would create the cache, which the service worker takes as a sign speaking is in use.
+    if (!(await caches.has(CACHE))) return false;
+    return (await (await caches.open(CACHE)).match(MODEL_URL)) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/** Read a download to the end, reporting progress; keeps the bytes only if asked. */
+async function readAll(body: ReadableStream<Uint8Array>, onProgress?: (fraction: number) => void, keep = false, stop?: { now: boolean }) {
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (stop?.now) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+    if (keep) chunks.push(value);
+    received += value.length;
+    onProgress?.(Math.min(1, received / MODEL_BYTES));
+  }
+  return { chunks, received };
+}
+
+async function fetchModel(onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
+  let cache: Cache | null = null;
+  try {
+    cache = await caches.open(CACHE);
+    const hit = await cache.match(MODEL_URL);
+    if (hit) return await hit.arrayBuffer();
+  } catch {
+    // No Cache API (e.g. private mode), or an unreadable copy: download it.
+  }
+  const response = await fetch(MODEL_URL);
+  if (!response.ok || !response.body) throw new Error(`Model download failed: ${response.status}`);
+
+  if (cache) {
+    // Stream straight into the cache and read it back once, so the phone holds one copy in memory, not three.
+    const [toCache, toCount] = response.body.tee();
+    const stop = { now: false };
+    const counting = readAll(toCount, onProgress, false, stop);
+    counting.catch(() => {});
+    try {
+      await cache.put(MODEL_URL, new Response(toCache, { headers: { 'content-type': 'application/octet-stream' } }));
+    } catch {
+      // Couldn't store it (e.g. the phone is out of space): download it again into memory for this session.
+      await cache.delete(MODEL_URL).catch(() => false);
+      stop.now = true;
+      return fetchIntoMemory(onProgress);
+    }
+    try {
+      const { received } = await counting;
+      // A download cut short must never be kept: it would fail on every launch.
+      if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
+      const stored = await cache.match(MODEL_URL);
+      if (stored) return await stored.arrayBuffer();
+    } catch (err) {
+      await cache.delete(MODEL_URL).catch(() => false);
+      throw err;
+    }
+  }
+
+  return inMemory(response.body, onProgress);
+}
+
+/** Download the model without keeping it, for when it can't be stored. */
+async function fetchIntoMemory(onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
+  const response = await fetch(MODEL_URL);
+  if (!response.ok || !response.body) throw new Error(`Model download failed: ${response.status}`);
+  return inMemory(response.body, onProgress);
+}
+
+async function inMemory(body: ReadableStream<Uint8Array>, onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
+  const { chunks, received } = await readAll(body, onProgress, true);
+  if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return bytes.buffer;
+}
+
+let loading: Promise<PhoneModel> | null = null;
+
+/** Load the recogniser, downloading it the first time. */
+export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise<PhoneModel> {
+  loading ??= (async () => {
+    // Single-threaded: threads need cross-origin isolation, which GitHub Pages can't turn on.
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.wasmPaths = { mjs: mjsUrl, wasm: wasmUrl };
+    let session: ort.InferenceSession;
+    try {
+      session = await ort.InferenceSession.create(await fetchModel(onProgress), { executionProviders: ['wasm'] });
+    } catch (err) {
+      // A stored copy the runtime can't parse is damaged: drop it so the next try downloads afresh.
+      // Anything else (the runtime failing to load offline, running out of memory) says nothing about the model.
+      if (/protobuf|load model/i.test(String(err))) await caches.open(CACHE).then((cache) => cache.delete(MODEL_URL)).catch(() => false);
+      throw err;
+    }
+    return { recognise: (samples) => recognise(session, samples) };
+  })();
+  // Let a failed load be retried.
+  loading.catch(() => {
+    loading = null;
+  });
+  return loading;
+}
+
+async function recognise(session: ort.InferenceSession, samples: Float32Array): Promise<Recognition> {
+  const { data, frames } = fbank(samples);
+  if (frames === 0) return { sounds: [] };
+  const outputs = await session.run({
+    x: new ort.Tensor('float32', data, [1, frames, NUM_MEL_BINS]),
+    x_lens: new ort.Tensor('int64', BigInt64Array.from([BigInt(frames)]), [1]),
+  });
+  const logProbs = outputs[session.outputNames[0]];
+  const [, steps, vocab] = logProbs.dims as number[];
+  const values = logProbs.data as Float32Array;
+  // Greedy CTC decoding: best token per step, dropping blanks and repeats.
+  const tokens: string[] = [];
+  let previous = -1;
+  for (let t = 0; t < steps; t++) {
+    let best = 0;
+    for (let v = 1; v < vocab; v++) if (values[t * vocab + v] > values[t * vocab + best]) best = v;
+    if (best !== 0 && best !== previous) tokens.push(TOKENS[best]);
+    previous = best;
+  }
+  return { sounds: groupTokens(tokens) };
+}

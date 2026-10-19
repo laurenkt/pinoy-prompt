@@ -18,7 +18,7 @@ export interface Card {
   note?: string;
   /** Optional recorded clip in public/audio/. */
   audio?: string;
-  /** Other spellings to accept when the learner says the card out loud. */
+  /** Other accepted pronunciations, as spelled, for when the learner says the card out loud. */
   accept?: string[];
 }
 
