@@ -17,7 +17,7 @@ export function wordsScreen(app: App): HTMLElement {
     UNITS.map((unit) =>
       h(
         'details',
-        { class: 'card unit-list', id: `unit-${unit.id}` },
+        { class: 'card unit-list' },
         h(
           'summary',
           null,

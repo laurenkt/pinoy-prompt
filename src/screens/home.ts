@@ -94,7 +94,7 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
             'button',
             {
               class: 'btn primary',
-              onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(progress), title: 'New words' }),
+              onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'New words' }),
             },
             'Learn 5 more',
           ),
@@ -132,7 +132,7 @@ function memorySection(memory: MemorySummary): HTMLElement {
 
   const coming: string[] = [];
   if (due.tomorrow > 0) coming.push(`${due.tomorrow} by tomorrow`);
-  if (due.week > due.tomorrow) coming.push(`${due.week} this week`);
+  if (due.week > 0) coming.push(`${due.week} ${due.tomorrow > 0 ? 'more ' : ''}this week`);
 
   return h(
     'section',
@@ -158,7 +158,7 @@ function memorySection(memory: MemorySummary): HTMLElement {
       'p',
       { class: 'memory-note muted small' },
       measured
-        ? `Right on ${recent.reviews - recent.missed} of ${plural(recent.reviews, 'review')} of words you'd learned.`
+        ? `Right on ${recent.reviews - recent.missed} of ${plural(recent.reviews, 'review')}.`
         : `Estimated from your review schedule. Once you've done ${MIN_MEASURED_REVIEWS} reviews, this shows how often you actually remember.`,
     ),
 

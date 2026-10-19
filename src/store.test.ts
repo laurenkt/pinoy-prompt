@@ -78,6 +78,13 @@ describe('daily counters', () => {
 });
 
 describe('review history', () => {
+  it('counts the next day\'s review of a word missed on its first showing', () => {
+    const p = emptyProgress(NOW);
+    recordAnswer(p, 'isa', 'again', NOW);
+    recordAnswer(p, 'isa', 'again', NOW + DAY_MS);
+    expect(p.history).toEqual({ [dayKey(NOW + DAY_MS)]: { reviews: 1, missed: 1 } });
+  });
+
   it('tallies reviews of learned cards by day, and the ones forgotten', () => {
     const p = learn('isa', 'dalawa', 'tatlo');
     // Answering a card for the first time is learning it, not recalling it.

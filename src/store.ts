@@ -218,13 +218,16 @@ export function rollDay(progress: Progress, now: number): Progress {
   return { ...progress, today: { day, newCount: 0, reviewCount: 0 } };
 }
 
+/** Answers this soon after the last one are in-session retries, not tests of memory. */
+const RETRY_WINDOW_MS = 60 * 60 * 1000;
+
 /** Record a rating for a card, introducing it if it is new. Mutates and returns progress. */
 export function recordAnswer(progress: Progress, cardId: string, rating: Rating, now: number): Progress {
   const existing = progress.cards[cardId];
   if (!existing) progress.today.newCount++;
   else progress.today.reviewCount++;
-  // Only a card that had been learned tests memory. A retry minutes after a miss doesn't.
-  if (existing && existing.interval >= 1) {
+  // A review after a gap tests memory; a retry minutes after a miss doesn't.
+  if (existing && (existing.reviewed === undefined || now - existing.reviewed >= RETRY_WINDOW_MS)) {
     const day = dayKey(now);
     const tally = progress.history[day] ?? { reviews: 0, missed: 0 };
     progress.history[day] = { reviews: tally.reviews + 1, missed: tally.missed + (rating === 'again' ? 1 : 0) };

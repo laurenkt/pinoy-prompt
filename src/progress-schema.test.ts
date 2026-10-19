@@ -184,17 +184,26 @@ describe('merging two copies', () => {
     expect(a.cards.dalawa.reviewed).toBe(NOW + 2000);
   });
 
-  it('keeps the fuller review tally for each day from either copy', () => {
+  it('keeps the fuller review tally for each day from either copy, whole', () => {
     const a = emptyProgress(NOW);
     const b = emptyProgress(NOW);
-    a.history = { '2026-10-17': { reviews: 5, missed: 1 }, '2026-10-18': { reviews: 2, missed: 0 } };
-    b.history = { '2026-10-18': { reviews: 4, missed: 1 }, '2026-10-19': { reviews: 1, missed: 1 } };
+    a.history = { '2026-10-17': { reviews: 5, missed: 1 }, '2026-10-18': { reviews: 10, missed: 0 } };
+    b.history = { '2026-10-18': { reviews: 3, missed: 3 }, '2026-10-19': { reviews: 1, missed: 1 } };
     mergeInto(a, b);
     expect(a.history).toEqual({
       '2026-10-17': { reviews: 5, missed: 1 },
-      '2026-10-18': { reviews: 4, missed: 1 },
+      // Not { reviews: 10, missed: 3 }, which neither copy recorded.
+      '2026-10-18': { reviews: 10, missed: 0 },
       '2026-10-19': { reviews: 1, missed: 1 },
     });
+  });
+
+  it('does not bring back review history from before a reset', () => {
+    const reset = emptyProgress(NOW);
+    const old = emptyProgress(NOW);
+    old.history = { '2026-10-18': { reviews: 9, missed: 2 }, '2026-10-20': { reviews: 2, missed: 0 } };
+    mergeInto(reset, old, { since: new Date(2026, 9, 19, 9).getTime() });
+    expect(reset.history).toEqual({ '2026-10-20': { reviews: 2, missed: 0 } });
   });
 
   it('keeps the newer day counters', () => {

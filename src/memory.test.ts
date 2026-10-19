@@ -7,7 +7,9 @@ const NOW = new Date(2026, 9, 19, 12).getTime();
 
 function card(interval: number, reviewedDaysAgo: number, extra: Partial<CardState> = {}): CardState {
   const reviewed = NOW - reviewedDaysAgo * DAY_MS;
-  return { ...newCardState(reviewed), interval, reps: interval > 0 ? 2 : 0, reviewed, due: reviewed + interval * DAY_MS, ...extra };
+  // Scheduled as review() does: local midnight a whole number of days on.
+  const due = interval > 0 ? startOfDayAfter(reviewed, interval) : reviewed + 60_000;
+  return { ...newCardState(reviewed), interval, reps: interval > 0 ? 2 : 0, reviewed, due, ...extra };
 }
 
 describe('strengthOf', () => {
@@ -32,13 +34,22 @@ describe('recallChance', () => {
   });
 
   it('works out the last review for cards saved before it was recorded', () => {
-    const old = card(4, 4);
+    // Reviewed late in the evening; the guess is midday that day, so within half a day.
+    const reviewed = new Date(2026, 9, 15, 22).getTime();
+    const old = review({ ...newCardState(reviewed - 3 * DAY_MS), reps: 2, interval: 2 }, 'good', reviewed);
+    const exact = recallChance(old, NOW);
     delete old.reviewed;
-    expect(recallChance(old, NOW)).toBeCloseTo(0.9, 5);
+    const guessed = recallChance(old, NOW);
+    expect(Math.abs(guessed - exact)).toBeLessThan(0.02);
+  });
+
+  it('treats a word still being learned, or just forgotten, as half likely at best', () => {
+    expect(recallChance(card(0, 0), NOW)).toBeCloseTo(0.5);
+    expect(recallChance(card(0, 1), NOW)).toBeLessThan(0.5);
   });
 
   it('never goes above 1 for a review stamped in the future', () => {
-    expect(recallChance(card(3, -2), NOW)).toBe(1);
+    expect(recallChance({ ...card(3, 0), reviewed: NOW + 2 * DAY_MS }, NOW)).toBe(1);
   });
 });
 
@@ -58,7 +69,7 @@ describe('memorySummary', () => {
     const m = memorySummary(p, NOW);
     expect(m.total).toBe(4);
     expect(m.strengths).toEqual({ new: 1, days: 1, weeks: 1, long: 1 });
-    expect(m.due).toEqual({ now: 1, tomorrow: 2, week: 3 });
+    expect(m.due).toEqual({ tomorrow: 2, week: 1 });
     expect(m.estimatedRecall).toBeGreaterThan(0);
     expect(m.estimatedRecall).toBeLessThanOrEqual(1);
   });
@@ -69,12 +80,13 @@ describe('memorySummary', () => {
 });
 
 describe('recentReviews', () => {
-  it('adds up the last 30 days of reviews, today included', () => {
+  it('adds up the last 30 days of reviews, today included and nothing after it', () => {
     const p = emptyProgress(NOW);
     p.history = {
       [dayKey(NOW)]: { reviews: 4, missed: 1 },
       [dayKey(NOW - 29 * DAY_MS)]: { reviews: 6, missed: 0 },
       [dayKey(NOW - 30 * DAY_MS)]: { reviews: 100, missed: 50 },
+      [dayKey(NOW + DAY_MS)]: { reviews: 100, missed: 50 },
     };
     expect(recentReviews(p, NOW)).toEqual({ reviews: 10, missed: 1 });
   });

@@ -25,7 +25,7 @@ export interface Settings {
 
 /** How a day's reviews of already-learned cards went. */
 export interface DayTally {
-  /** Reviews of cards that had been learned (interval of a day or more). */
+  /** Reviews of cards answered before, not counting retries within the hour. */
   reviews: number;
   /** How many of those were forgotten ("Again"). */
   missed: number;
@@ -232,12 +232,13 @@ export function mergeInto(target: Progress, other: Progress, { since = -Infinity
   } else if (other.today.day > target.today.day) {
     target.today = { ...other.today };
   }
-  // Like today's counters: each copy only ever counts up, so the larger count is the fuller one.
+  // Days before a reset stay erased. Where both copies have a day, keep the
+  // fuller tally whole, so its reviews and misses still belong together.
+  const sinceDay = since === -Infinity ? '' : dayKey(since);
   for (const [day, theirs] of Object.entries(other.history)) {
+    if (day <= sinceDay) continue;
     const mine = target.history[day];
-    target.history[day] = mine
-      ? { reviews: Math.max(mine.reviews, theirs.reviews), missed: Math.max(mine.missed, theirs.missed) }
-      : { ...theirs };
+    if (!mine || theirs.reviews > mine.reviews) target.history[day] = { ...theirs };
   }
   const extra = target as unknown as Data;
   for (const [key, value] of Object.entries(other)) {

@@ -32,9 +32,15 @@ export function strengthOf(card: CardState): Strength {
   return 'long';
 }
 
-/** When the card was last answered. Older saves don't record it, so it is worked back from the schedule. */
+/**
+ * When the card was last answered. Older saves don't record it, so it is
+ * worked back from the schedule: due is local midnight a whole number of days
+ * after the review, so the review was on that day; midday is the best guess.
+ */
 function lastSeen(card: CardState, now: number): number {
-  const seen = card.reviewed ?? (card.interval >= 1 ? card.due - card.interval * DAY_MS : card.introduced);
+  const seen =
+    card.reviewed ??
+    (card.interval >= 1 ? startOfDayAfter(card.due, -Math.round(card.interval)) + DAY_MS / 2 : card.introduced);
   return Math.min(seen, now);
 }
 
@@ -44,10 +50,14 @@ function lastSeen(card: CardState, now: number): number {
  * is what the schedule aims for.
  */
 export function recallChance(card: CardState, now: number): number {
-  // A word still being learned fades within hours.
-  const stability = Math.max(card.interval, 0.25);
+  // A word not yet learned, or just forgotten, is a coin toss at best, even
+  // straight after seeing the answer, and fades within hours.
+  if (card.interval < 1) {
+    const days = (now - lastSeen(card, now)) / DAY_MS;
+    return 0.5 * Math.pow(1 + ((19 / 81) * days) / 0.25, -0.5);
+  }
   const days = (now - lastSeen(card, now)) / DAY_MS;
-  return Math.pow(1 + ((19 / 81) * days) / stability, -0.5);
+  return Math.pow(1 + ((19 / 81) * days) / card.interval, -0.5);
 }
 
 export interface MemorySummary {
@@ -58,8 +68,8 @@ export interface MemorySummary {
   estimatedRecall: number | null;
   /** Reviews of learned words in the last RECALL_WINDOW_DAYS days. */
   recent: { reviews: number; missed: number };
-  /** Reviews waiting now, and how many more fall due by the end of tomorrow and within a week. */
-  due: { now: number; tomorrow: number; week: number };
+  /** Reviews falling due later today or tomorrow, and in the rest of the coming week. */
+  due: { tomorrow: number; week: number };
 }
 
 export function memorySummary(progress: Progress, now: number): MemorySummary {
@@ -68,16 +78,16 @@ export function memorySummary(progress: Progress, now: number): MemorySummary {
     .filter(([id]) => getCard(id))
     .map(([, card]) => card);
   const strengths: Record<Strength, number> = { new: 0, days: 0, weeks: 0, long: 0 };
-  const due = { now: 0, tomorrow: 0, week: 0 };
+  const due = { tomorrow: 0, week: 0 };
   const endOfTomorrow = startOfDayAfter(now, 2);
   const endOfWeek = startOfDayAfter(now, 8);
   let recall = 0;
   for (const card of cards) {
     strengths[strengthOf(card)]++;
     recall += recallChance(card, now);
-    if (card.due <= now) due.now++;
-    else if (card.due < endOfTomorrow) due.tomorrow++;
-    if (card.due > now && card.due < endOfWeek) due.week++;
+    if (card.due <= now) continue;
+    if (card.due < endOfTomorrow) due.tomorrow++;
+    else if (card.due < endOfWeek) due.week++;
   }
   return {
     total: cards.length,
@@ -91,10 +101,12 @@ export function memorySummary(progress: Progress, now: number): MemorySummary {
 /** Totals of the day tallies within the recall window, today included. */
 export function recentReviews(progress: Progress, now: number, days = RECALL_WINDOW_DAYS): { reviews: number; missed: number } {
   const from = dayKey(startOfDayAfter(now, 1 - days));
+  const today = dayKey(now);
   let reviews = 0;
   let missed = 0;
   for (const [day, tally] of Object.entries(progress.history)) {
-    if (day < from) continue;
+    // A day after today came from a device with its clock set ahead.
+    if (day < from || day > today) continue;
     reviews += tally.reviews;
     missed += tally.missed;
   }
