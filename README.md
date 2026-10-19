@@ -37,7 +37,15 @@ How it works:
 2. **Recognising sounds** (`src/fbank.ts`, `src/phone-model.ts`): the audio becomes 80-band log mel features, computed exactly as in training (checked against lhotse in `src/fbank.test.ts`), and goes through [ZIPA](https://github.com/lingjzhu/zipa) (Zhu et al., ACL 2025), a multilingual phone recogniser that outputs IPA sounds rather than words. We use the 64M-parameter `zipa-small-crctc` model, int8-quantised, run with onnxruntime-web in WebAssembly. Model © its authors, [CC BY 4.0](https://huggingface.co/anyspeech/zipa-small-crctc-500k).
 3. **Expected sounds** (`src/phonetics.ts`): Tagalog spelling is close to phonemic, so a rule set turns each card into IPA (ng → ŋ, r → ɾ, mga → maŋa, ts → tʃ, siy+vowel → ʃ, borrowed letters, optional glottal stops).
 4. **Comparing** (`src/phonetics.ts`): the two sound sequences are aligned with an edit distance weighted by phonetic features, so a near miss (aspirated p, o said as ou) costs less than a different sound. Tagalog allophones (o/ɔ, e/ɛ, r/ɾ) count as right, and added sounds count against the attempt (except a glottal catch or a released final consonant). A card can list other standard pronunciations with `accept: [...]` (Kumusta accepts Kamusta); the attempt is judged against the closest one.
-5. **Coaching** (`src/coach.ts`): common English-speaker patterns get a specific tip; anything else gets "sounded like X". Under "Sounds we heard" the learner can see the raw IPA.
+5. **Coaching** (`src/coach.ts`): common English-speaker patterns get a specific tip; anything else gets "sounded like X".
+
+**The results screen** breaks the attempt down sound by sound (`src/screens/speak-result.ts`):
+
+- The recording is drawn as a ribbon (`src/spectrogram.ts`, WebGL with a 2D canvas fallback): it swells with loudness, holds the pitch spectrum inside, and is outlined in each sound's verdict colour. A glowing playhead follows whatever is playing.
+- Every expected sound sits above what was heard, grouped by word. Tap the top tile to hear a native speaker say that sound, or the bottom one to hear that slice of your own recording. The link between them gets longer and breaks up the further off it was.
+- The selected sound gets a closeness bar and a map of where it's made in the mouth (`src/sound-map.ts`): the vowel chart for vowels, a where × how grid for consonants. Your mark and the target sit on it with a path between them, and "Yours, then the target" plays both while your mark travels to the target.
+
+The recogniser's output gives each sound a time (from the CTC frames), which is how a tap finds its slice of the recording. The native reference clips in `public/sounds/` are short syllables (like "ŋa" and "aɾa") cut from the [FLEURS](https://huggingface.co/datasets/google/fleurs) Filipino recordings (CC BY 4.0), each checked by running the recogniser on the cut clip; `src/reference-sounds.json` lists the word each came from.
 
 The model is a one-time download of about 71 MB, fetched from Hugging Face only after the learner agrees, then kept in the browser's Cache Storage so it works offline. A download that's cut short is never kept. Once the model is on the device, the service worker also keeps the model's runtime (about 11 MB, listed in the build's `asset-manifest.json`) across app updates; learners who never use speaking don't download it. Mixed rounds include speaking only once it's on the device.
 
@@ -78,6 +86,7 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 | `src/recorder.ts` | Microphone recording for speaking questions. |
 | `src/fbank.ts`, `src/phone-model.ts` | Audio features and the on-device phone recogniser. |
 | `src/phonetics.ts`, `src/coach.ts` | Expected sounds, comparison and pronunciation tips. |
+| `src/screens/speak-result.ts`, `src/spectrogram.ts`, `src/sound-map.ts`, `src/player.ts` | The sound-by-sound results screen. |
 | `src/screens/` | One file per screen. |
 | `public/sw.js` | Service worker for offline use. |
 

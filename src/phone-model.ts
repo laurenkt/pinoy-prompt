@@ -12,7 +12,7 @@ import * as ort from 'onnxruntime-web/wasm';
 import mjsUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs?url';
 import wasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
 import { fbank, NUM_MEL_BINS } from './fbank';
-import { groupTokens } from './phonetics';
+import { groupTimed, type TimedToken } from './phonetics';
 import TOKENS from './phone-tokens.json';
 
 /** Pinned to a revision so the model can't change under the app. */
@@ -25,6 +25,10 @@ const CACHE = 'pinoy-prompt-models-v1';
 export interface Recognition {
   /** The sounds heard, in IPA. */
   sounds: string[];
+  /** When each sound was heard, in seconds from the start of the recording. */
+  timing: { start: number; end: number }[];
+  /** The log mel features the model heard: NUM_MEL_BINS values per 10 ms frame, for drawing. */
+  features: { data: Float32Array; frames: number };
 }
 
 export interface PhoneModel {
@@ -148,8 +152,9 @@ export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise
 }
 
 async function recognise(session: ort.InferenceSession, samples: Float32Array): Promise<Recognition> {
-  const { data, frames } = fbank(samples);
-  if (frames === 0) return { sounds: [] };
+  const features = fbank(samples);
+  const { data, frames } = features;
+  if (frames === 0) return { sounds: [], timing: [], features };
   const outputs = await session.run({
     x: new ort.Tensor('float32', data, [1, frames, NUM_MEL_BINS]),
     x_lens: new ort.Tensor('int64', BigInt64Array.from([BigInt(frames)]), [1]),
@@ -157,14 +162,18 @@ async function recognise(session: ort.InferenceSession, samples: Float32Array): 
   const logProbs = outputs[session.outputNames[0]];
   const [, steps, vocab] = logProbs.dims as number[];
   const values = logProbs.data as Float32Array;
+  // Seconds per output step (the model subsamples the 10 ms frames).
+  const stepSeconds = (frames / steps) * 0.01;
   // Greedy CTC decoding: best token per step, dropping blanks and repeats.
-  const tokens: string[] = [];
+  const tokens: TimedToken[] = [];
   let previous = -1;
   for (let t = 0; t < steps; t++) {
     let best = 0;
     for (let v = 1; v < vocab; v++) if (values[t * vocab + v] > values[t * vocab + best]) best = v;
-    if (best !== 0 && best !== previous) tokens.push(TOKENS[best]);
+    if (best !== 0 && best !== previous) tokens.push({ token: TOKENS[best], start: t * stepSeconds, end: (t + 1) * stepSeconds });
+    else if (best !== 0) tokens[tokens.length - 1].end = (t + 1) * stepSeconds;
     previous = best;
   }
-  return { sounds: groupTokens(tokens) };
+  const sounds = groupTimed(tokens);
+  return { sounds: sounds.map((s) => s.sound), timing: sounds.map(({ start, end }) => ({ start, end })), features };
 }
