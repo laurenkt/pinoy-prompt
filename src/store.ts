@@ -96,9 +96,10 @@ export async function loadDurable(now: number): Promise<Progress> {
     if (mergeInto(progress, m.progress) > 0) save(progress);
     return progress;
   }
+  const crossesReset = m.resetAt > resetAt;
   const restored = adopt(m);
   // Across a reset, only answers given after it carry over.
-  mergeInto(restored, progress, { since: m.resetAt });
+  mergeInto(restored, progress, { since: crossesReset ? m.resetAt : -Infinity });
   save(restored);
   return rollDay(restored, now);
 }
