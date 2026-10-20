@@ -1716,7 +1716,7 @@ p {
   box-shadow: 2px 2px 0 var(--ink);
 }
 
-/* A call fills the screen: the transcript scrolls between the visual and the controls, which stay put. */
+/* A call fills the screen: the transcript scrolls between the header and the controls, which stay put. */
 .talk-chat {
   display: flex;
   flex-direction: column;
@@ -1732,21 +1732,26 @@ p {
   margin-bottom: 12px;
 }
 
-.talk-chat > .talk-visual {
-  flex: 0 1 auto;
+.talk-backdrop {
+  /* The whole screen behind the call, beneath the transcript and controls. */
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
 }
 
-.talk-visual {
-  display: block;
-  width: 100%;
-  height: 96px;
-  /* Gives way to the transcript on short screens, such as a phone on its side. */
-  min-height: 40px;
-  margin-bottom: 14px;
-  background: var(--surface);
-  border: var(--outline);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+.talk-chat > :not(.talk-backdrop) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Text sitting straight on the backdrop gets a shadow to stand out from it. */
+.talk-chat .session-header,
+.talk-chat .talk-status,
+.talk-chat .talk-help {
+  text-shadow: 0 1px 3px var(--ink), 0 0 12px var(--ink);
 }
 
 .talk-chat > .talk-log {
