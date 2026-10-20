@@ -282,6 +282,14 @@ p {
   color: var(--saffron);
 }
 
+/* The secondary way in: less prominent than Study, but always there. */
+.today .learn-more {
+  display: block;
+  margin: 14px auto 0;
+  padding: 4px 0;
+  color: inherit;
+}
+
 .section-title {
   margin-top: 26px;
   margin-bottom: 12px;
@@ -449,6 +457,18 @@ p {
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
+}
+
+.session-count {
+  flex: 1;
+  font-weight: 800;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .session-title {

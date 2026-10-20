@@ -2,17 +2,20 @@
 // Kept free of DOM code so it can be unit tested.
 
 import { ALL_CARDS, getCard, type Card } from './deck';
-import { isDue } from './srs';
+import { recallChance } from './memory';
+import { isDue, type CardState } from './srs';
 import type { Progress } from './store';
 
-export type StepKind = 'new' | 'review';
+/** Extra steps are practice beyond the schedule: they never change it. */
+export type StepKind = 'new' | 'review' | 'extra';
 
 export interface Step {
   cardId: string;
   kind: StepKind;
+  /** How to ask it; the session picks one when it's left out. */
+  format?: Format;
 }
 
-const MAX_REVIEWS = 50;
 /** How far back in the queue a missed card is re-inserted. */
 const REQUEUE_GAP = 3;
 
@@ -42,21 +45,101 @@ export function upcomingNewCards(progress: Progress, limit: number): string[] {
   return result;
 }
 
+/** How a card is asked. One memory per word: these are different ways of testing it, not separate things to learn. */
+export type Format =
+  /** See the Tagalog, pick the meaning. */
+  | 'read'
+  /** Hear the Tagalog, pick the meaning. */
+  | 'listen'
+  /** See the English, pick the Tagalog. */
+  | 'recall'
+  /** See the Tagalog, remember the meaning, rate yourself. */
+  | 'remember'
+  /** See the English, come up with the Tagalog, rate yourself. */
+  | 'produce'
+  /** Say it out loud and get coached. Pronunciation only, so it never changes the schedule. */
+  | 'speak';
+
+/** What this device can do, which decides the formats on offer. */
+export interface Abilities {
+  listen: boolean;
+  speak: boolean;
+}
+
 /**
- * The day's session: due reviews with new cards mixed in, one new card after
- * every few reviews so a long review backlog never hides new material.
+ * Weaker words get the easier formats; as a word holds for longer it is asked
+ * in harder ways, ending with producing the Tagalog from the English.
  */
-export function buildSession(progress: Progress, now: number): Step[] {
-  const reviews = dueCards(progress, now).slice(0, MAX_REVIEWS);
-  const fresh = upcomingNewCards(progress, newCardsLeftToday(progress));
-  const steps: Step[] = [];
-  let r = 0;
-  let n = 0;
-  while (r < reviews.length || n < fresh.length) {
-    for (let i = 0; i < 3 && r < reviews.length; i++) steps.push({ cardId: reviews[r++], kind: 'review' });
-    if (n < fresh.length) steps.push({ cardId: fresh[n++], kind: 'new' });
+export function pickFormat(state: CardState, can: Abilities, random: () => number = Math.random): Format {
+  if (state.interval < 1) return 'read';
+  const formats: Format[] = state.interval < 7 ? ['read', 'remember'] : ['remember', 'produce', 'recall'];
+  if (can.listen) formats.push('listen');
+  return formats[Math.floor(random() * formats.length)];
+}
+
+/** New words wait while this many words are still being learned (just met, or just forgotten). */
+export const MAX_LEARNING = 3;
+/** A card shown in the last few steps isn't shown again yet, so a miss gets a short gap. */
+const RECENT_GAP = 3;
+/** Roughly one in this many practice steps is a speaking one, when the device can do it. */
+const SPEAK_EVERY = 4;
+
+export function learningCount(progress: Progress): number {
+  return Object.entries(progress.cards).filter(([id, state]) => state.interval < 1 && getCard(id)).length;
+}
+
+/**
+ * Words that need attention now, weakest first: everything due, plus words
+ * still being learned (they are due again within a minute anyway).
+ */
+export function studyQueue(progress: Progress, now: number): string[] {
+  return Object.entries(progress.cards)
+    .filter(([id, state]) => (isDue(state, now) || state.interval < 1) && getCard(id))
+    .map(([id, state]) => ({ id, recall: recallChance(state, now) }))
+    .sort((a, b) => a.recall - b.recall)
+    .map(({ id }) => id);
+}
+
+/**
+ * The next step of open-ended study. In order:
+ * 1. Due reviews, weakest first.
+ * 2. A new word, but only once nothing is due, few words are still being
+ *    learned, and the daily new-word rate allows it.
+ * 3. Extra practice on the weakest words, which doesn't change the schedule.
+ * `recent` is the cards shown this session, latest last. `misses` counts
+ * extra-practice misses this session, so those words come round again.
+ */
+export function nextStudyStep(
+  progress: Progress,
+  now: number,
+  recent: string[],
+  can: Abilities,
+  misses: ReadonlyMap<string, number> = new Map(),
+  random: () => number = Math.random,
+): Step | null {
+  const shownRecently = new Set(recent.slice(-RECENT_GAP));
+  const last = recent[recent.length - 1];
+  // A full gap when there's enough to fill it; otherwise just not the same card twice running.
+  const queue = studyQueue(progress, now);
+  const review = queue.find((id) => !shownRecently.has(id)) ?? queue.find((id) => id !== last);
+  if (review) return { cardId: review, kind: 'review', format: pickFormat(progress.cards[review], can, random) };
+
+  if (newCardsLeftToday(progress) > 0 && learningCount(progress) < MAX_LEARNING) {
+    const [fresh] = upcomingNewCards(progress, 1);
+    if (fresh) return { cardId: fresh, kind: 'new', format: 'read' };
   }
-  return steps;
+
+  const known = Object.entries(progress.cards).filter(([id]) => getCard(id));
+  if (known.length === 0) return null;
+  const weakness = ([id, state]: [string, CardState]) => recallChance(state, now) - (misses.get(id) ?? 0);
+  const ranked = known.sort((a, b) => weakness(a) - weakness(b));
+  // Small decks can't keep a full gap, but never ask the same card twice in a row unless it's the only one.
+  const [cardId] =
+    ranked.find(([id]) => !shownRecently.has(id)) ?? ranked.find(([id]) => id !== last) ?? ranked[0];
+  const formats: Format[] = ['read', 'recall'];
+  if (can.listen) formats.push('listen');
+  const format = can.speak && random() < 1 / SPEAK_EVERY ? 'speak' : formats[Math.floor(random() * formats.length)];
+  return { cardId, kind: 'extra', format };
 }
 
 /** A few more new cards beyond the daily rate, for when the learner wants them. */

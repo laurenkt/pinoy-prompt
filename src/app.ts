@@ -3,6 +3,7 @@ import type { Progress } from './store';
 
 export type Route =
   | { name: 'home' }
+  | { name: 'study' }
   | { name: 'session'; steps: Step[]; title?: string }
   | { name: 'practice' }
   | { name: 'words' }
