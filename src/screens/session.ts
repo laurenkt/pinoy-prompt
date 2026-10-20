@@ -4,7 +4,7 @@ import { distractors, isIntroduced, requeue, shuffle, type Step } from '../sessi
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { play } from '../speech';
 import { recordAnswer } from '../store';
-import { audioButton, h, icon, progressBar } from '../ui';
+import { audioButton, h, hookView, icon, progressBar } from '../ui';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'done';
 
@@ -114,7 +114,8 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
   }
 
   function draw(): void {
-    const remaining = queue.length + (phase === 'done' ? 0 : 1);
+    // On the missed screen the card is already back in the queue.
+    const remaining = queue.length + (phase === 'done' || phase === 'missed' ? 0 : 1);
     root.replaceChildren(
       h(
         'header',
@@ -272,6 +273,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
       { class: 'panel' },
       h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Coming back shortly'), tagalog(c)),
       h('p', { class: 'meaning' }, c.en),
+      c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
       hookView(c),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
     );
@@ -294,10 +296,6 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
       h('p', { class: 'muted' }, 'Words you just learned will come back for review when you are about to forget them.'),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: () => app.navigate({ name: 'home' }) }, 'Done'),
     );
-  }
-
-  function hookView(c: Card): HTMLElement {
-    return h('div', { class: 'hook' }, h('p', { class: 'hook-label' }, 'Remember it by'), h('p', null, c.hook));
   }
 
   function tagalog(c: Card): HTMLElement {
