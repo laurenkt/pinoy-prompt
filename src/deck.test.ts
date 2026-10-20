@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, UNITS, getCard } from './deck';
+import { ALL_CARDS, LEARN_ORDER, UNITS, getCard } from './deck';
 import { upcomingNewCards } from './session';
 import { emptyProgress, recordAnswer } from './store';
 
@@ -28,6 +28,10 @@ describe('deck', () => {
 
   it('gives every unit enough cards for a four-option quiz', () => {
     for (const unit of UNITS) expect(unit.cards.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('puts every card in the learning order exactly once', () => {
+    expect([...LEARN_ORDER].sort()).toEqual(ALL_CARDS.map((c) => c.id).sort());
   });
 
   it('gives every card a memory hook', () => {

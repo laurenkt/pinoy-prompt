@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, UNITS } from './deck';
+import { ALL_CARDS, LEARN_ORDER, UNITS } from './deck';
 import {
   MAX_LEARNING,
   buildExtraSession,
@@ -31,7 +31,7 @@ function learn(progress: ReturnType<typeof emptyProgress>, ids: string[], days =
 describe('nextStudyStep', () => {
   it('starts a new learner at the top of the deck', () => {
     const step = nextStudyStep(emptyProgress(NOW), NOW, [], CAN);
-    expect(step).toEqual({ cardId: UNITS[0].cards[0].id, kind: 'new', format: 'read' });
+    expect(step).toEqual({ cardId: LEARN_ORDER[0], kind: 'new', format: 'read' });
   });
 
   it('serves due reviews before any new word, weakest first', () => {
@@ -146,20 +146,29 @@ describe('dueCards', () => {
 });
 
 describe('new cards', () => {
-  it('come in deck order across topics, with nothing locked', () => {
+  it('come most useful first across topics, with nothing locked', () => {
     const progress = emptyProgress(NOW);
-    expect(upcomingNewCards(progress, Infinity)).toEqual(ALL_CARDS.map((c) => c.id));
-    // Someone who stopped part way through a topic carries straight on from there.
-    for (const card of UNITS[0].cards.slice(0, 3)) recordAnswer(progress, card.id, 'good', NOW);
-    expect(upcomingNewCards(progress, 2)).toEqual(UNITS[0].cards.slice(3, 5).map((c) => c.id));
+    expect(upcomingNewCards(progress, Infinity)).toEqual(LEARN_ORDER);
+    for (const id of LEARN_ORDER.slice(0, 3)) recordAnswer(progress, id, 'good', NOW);
+    expect(upcomingNewCards(progress, 2)).toEqual(LEARN_ORDER.slice(3, 5));
+  });
+
+  it('skip cards met in an earlier order, however they were met', () => {
+    const progress = emptyProgress(NOW);
+    // Older builds introduced whole topics in turn.
+    const met = UNITS[0].cards.map((c) => c.id);
+    for (const id of met) recordAnswer(progress, id, 'good', NOW);
+    const next = upcomingNewCards(progress, Infinity);
+    expect(next).toEqual(LEARN_ORDER.filter((id) => !met.includes(id)));
+    expect(next.length).toBe(ALL_CARDS.length - met.length);
   });
 
   it('can go beyond the daily rate when asked for', () => {
     const progress = emptyProgress(NOW);
-    for (const card of ALL_CARDS.slice(0, 8)) recordAnswer(progress, card.id, 'good', NOW);
+    for (const id of LEARN_ORDER.slice(0, 8)) recordAnswer(progress, id, 'good', NOW);
     expect(newCardsLeftToday(progress)).toBe(0);
     const steps = buildExtraSession(progress, 5);
-    expect(steps.map((s) => s.cardId)).toEqual(ALL_CARDS.slice(8, 13).map((c) => c.id));
+    expect(steps.map((s) => s.cardId)).toEqual(LEARN_ORDER.slice(8, 13));
     expect(steps.every((s) => s.kind === 'new')).toBe(true);
   });
 });

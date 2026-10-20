@@ -1,5 +1,6 @@
-// The starter deck, grouped by topic. New cards are introduced in this order,
-// a few a day; a topic's intro is shown before its first card.
+// The starter deck, grouped by topic. New cards are introduced a few a day in
+// LEARN_ORDER, most useful first, whatever their topic; a topic's intro is
+// shown before the first of its cards a learner meets.
 //
 // Pronunciation hints use CAPS for the stressed syllable. To add a recorded
 // clip for a card, drop the file in public/audio/ and set `audio` to its name;
@@ -129,7 +130,7 @@ export const UNITS: Unit[] = [
     id: 'asking',
     title: 'Asking more',
     tlTitle: 'Pagtatanong',
-    intro: 'Questions for getting around: where someone is, how many, which one, how long. Put "ba" in a sentence and it becomes a yes/no question.',
+    intro: 'More questions for getting around: where someone is, where they are going, how many, which one, how long.',
     cards: [
       { id: 'nasaan-ka', tl: 'Nasaan ka?', en: 'Where are you?', kind: 'phrase', hint: 'nah-sah-AHN kah', note: '"Nasaan" asks where someone or something is right now.', hook: '"Na" (at) + "saan" (where, from "Taga-saan ka?"): where-at you? Put any thing or place after it: "Nasaan ang ...?"' },
       { id: 'saan-ka-pupunta', tl: 'Saan ka pupunta?', en: 'Where are you going?', kind: 'phrase', hint: 'sah-AHN kah poo-POON-tah', note: 'Also a friendly greeting in passing. "Diyan lang" ("just over there") is a fine vague answer.', hook: '"Punta" (go to) is from Spanish "punta", a point: the point you are heading for. Doubling the first syllable, pu-punta, makes it "will go".' },
@@ -162,6 +163,7 @@ export const UNITS: Unit[] = [
       { id: 'wala', tl: 'Wala.', en: "There's none. / Nothing.", kind: 'word', hint: 'wah-LAH', hook: 'The "wala" in "walang anuman" (it\'s nothing). "Meron" and "wala" are the yes and no of having.' },
       { id: 'kailangan-ko', tl: 'Kailangan ko ito.', en: 'I need this.', kind: 'phrase', hint: 'kah-ee-LAH-ngahn koh ee-TOH', hook: '"Kailangan" (need) + "ko" (I) + "ito" (this). Swap "kailangan" for "gusto" (want) and you get "I want this".' },
       { id: 'puwede-ba', tl: 'Puwede ba?', en: 'Can I? / Is it allowed?', kind: 'phrase', hint: 'PWEH-deh bah', hook: 'From Spanish "puede", can, plus the question-maker "ba". Point at an empty chair and ask. Texts spell it "pwede".' },
+      { id: 'dito', tl: 'dito', en: 'here', kind: 'word', hint: 'DEE-toh', hook: 'Three steps of distance: "dito" by me, "diyan" by you, "doon" away from us both.' },
       { id: 'at', tl: 'at', en: 'and', kind: 'word', hint: 'aht', hook: 'Looks like English "at" but means "and": "kape at tinapay", coffee and bread.' },
       { id: 'pero', tl: 'pero', en: 'but', kind: 'word', hint: 'PEH-roh', hook: 'The same as Spanish "pero". "Oo, pero..." is "yes, but...", the start of every polite refusal.' },
       { id: 'kasi', tl: 'kasi', en: 'because', kind: 'word', hint: 'kah-SEE', hook: 'Sounds like "\'cause, see": because, see? It often comes at the end of an excuse: "Trapik kasi."' },
@@ -172,7 +174,7 @@ export const UNITS: Unit[] = [
     id: 'time',
     title: 'Telling time',
     tlTitle: 'Oras',
-    intro: 'Clock times use Spanish numbers. One o\'clock is "ala-una", and every other hour is "alas-" plus the number: alas-dos, alas-tres.',
+    intro: 'Ask the time and tell it. Clock times use Spanish numbers: one o\'clock is "ala-una", and every other hour is "alas-" plus the number, alas-dos, alas-tres.',
     cards: [
       { id: 'anong-oras-na', tl: 'Anong oras na?', en: 'What time is it?', kind: 'phrase', hint: 'ah-NONG OH-rahs nah', hook: '"Oras" is from Spanish "horas", hours, and "na" means already: "what hour already?"' },
       { id: 'ala-una', tl: 'Ala-una', en: "one o'clock", kind: 'word', hint: 'AH-lah OO-nah', hook: 'Spanish "a la una", at one. One is singular, so it is "ala", not "alas".' },
@@ -273,7 +275,6 @@ export const UNITS: Unit[] = [
       { id: 'diretso', tl: 'diretso', en: 'straight ahead', kind: 'word', hint: 'dee-RET-choh', hook: 'Spanish "derecho", straight, with the ch written "ts". "Diretso lang" is "just keep going".' },
       { id: 'kumaliwa-ka', tl: 'Kumaliwa ka.', en: 'Turn left.', kind: 'phrase', hint: 'koo-mah-lee-WAH kah', hook: 'The "-um-" trick from "sumakay": slot it into "kaliwa" and left becomes a verb, go left.' },
       { id: 'kumanan-ka', tl: 'Kumanan ka.', en: 'Turn right.', kind: 'phrase', hint: 'koo-MAH-nahn kah', hook: 'The same trick on "kanan": k-um-anan, go right.' },
-      { id: 'dito', tl: 'dito', en: 'here', kind: 'word', hint: 'DEE-toh', hook: 'Three steps of distance: "dito" by me, "diyan" by you, "doon" away from us both.' },
       { id: 'diyan', tl: 'diyan', accept: ['dyan'], en: 'there (near you)', kind: 'word', hint: 'dyahn', hook: 'The middle of the three: dito (by me), diyan (by you), doon (over there).' },
       { id: 'doon', tl: 'doon', en: 'over there', kind: 'word', hint: 'doh-ON', hook: 'The farthest of the three. Stretch out the "do-on" as if pointing far away.' },
       { id: 'malapit', tl: 'malapit', en: 'near', kind: 'word', hint: 'mah-LAH-pit', hook: '"Lapit" is closeness. Ma- turns it into a describing word, like ma-ganda and ma-buti.' },
@@ -335,7 +336,7 @@ export const UNITS: Unit[] = [
       { id: 'ulam', tl: 'ulam', en: 'dish eaten with rice', kind: 'word', hint: 'OO-lahm', hook: 'Anything you eat with rice is "ulam". "Anong ulam?" (what\'s for dinner?) is asked in every Filipino home.' },
       { id: 'kutsara', tl: 'kutsara', en: 'spoon', kind: 'word', hint: 'koot-CHAH-rah', note: 'Filipinos eat with a spoon in the right hand and a fork in the left.', hook: 'Spanish "cuchara", with the ch written "ts".' },
       { id: 'tinidor', tl: 'tinidor', en: 'fork', kind: 'word', hint: 'tee-nee-DOR', hook: 'Spanish "tenedor". Here the fork just pushes food onto the spoon.' },
-      { id: 'baso', tl: 'baso', en: 'glass (for drinking)', kind: 'word', hint: 'BAH-soh', hook: 'Spanish "vaso", with v turned to b, as in "Biyernes".' },
+      { id: 'baso', tl: 'baso', en: 'glass (for drinking)', kind: 'word', hint: 'BAH-soh', hook: 'Spanish "vaso", with the v turned to b. Tagalog swaps Spanish v for b all the time.' },
       { id: 'bill-po', tl: 'Bill po.', en: 'The bill, please.', kind: 'phrase', hint: 'bil poh', note: 'You will also hear "Bill out po", or see people draw a rectangle in the air.', hook: 'English "bill" with "po" for politeness. Taglish at its most practical.' },
     ],
   },
@@ -472,6 +473,67 @@ export const UNITS: Unit[] = [
 ];
 
 export const ALL_CARDS: Card[] = UNITS.flatMap((u) => u.cards);
+
+/**
+ * The order new cards are introduced in, most useful first, across topics. Topics
+ * only group cards for display. Each tier is roughly what a learner needs next to
+ * get by in conversation; within a tier, cards a hook builds on come first. Every
+ * card appears exactly once (deck.test.ts checks).
+ */
+export const LEARN_ORDER: readonly string[] = [
+  // Hello, thanks, yes, no, and getting through a conversation you barely follow.
+  'kumusta', 'mabuti', 'salamat', 'oo', 'hindi', 'po', 'opo', 'salamat-po', 'walang-anuman', 'ano', 'sige',
+  'ano-pangalan', 'ako-si', 'taga-saan', 'taga-ako', 'paalam', 'ingat', 'pasensya-na', 'hindi-ko-alam',
+  'hindi-maintindihan', 'pakiulit', 'paano-sabihin', 'ano-ibig-sabihin', 'dahan-dahan', 'ingles',
+  'kaunti-lang',
+  // Asking for things: where, what, how much, I want, I need, can I.
+  'saan', 'nasaan-banyo', 'ano-ito', 'magkano', 'gusto-ko-ito', 'ayoko', 'ako', 'ikaw', 'may-kape-ba', 'wala',
+  'meron', 'puwede-ba', 'kailangan-ko', 'dito', 'isa', 'dalawa', 'tatlo', 'apat', 'lima', 'anim', 'pito',
+  'walo', 'siyam', 'sampu', 'tara-na', 'sandali-lang',
+  // Where you are and when: on my way, here, almost there, now, later, tomorrow.
+  'nasaan-ka', 'saan-ka-pupunta', 'papunta-na-ako', 'nandito-na-ako', 'malapit-na-ako', 'kailan', 'ngayon',
+  'mamaya', 'kanina', 'mamaya-na-lang', 'bukas', 'anong-oras-na', 'sino', 'bakit', 'paano',
+  // Thanks and greetings, eating together, and the small replies that keep a chat going.
+  'maraming-salamat', 'magandang-umaga', 'magandang-hapon', 'magandang-gabi', 'kain-tayo', 'tubig', 'masarap',
+  'busog-na-ako', 'gutom-na-ako', 'tayo', 'okay-lang-ba', 'okay-lang-ako', 'ayos-lang', 'talaga', 'oo-nga',
+  'ako-rin', 'tama',
+  // Directions and getting a ride, and running late.
+  'kaliwa', 'kanan', 'diretso', 'diyan', 'doon', 'malapit', 'malayo', 'paano-pumunta', 'ate', 'kuya',
+  'para-po', 'bayad-po', 'aalis-na-ako', 'pauwi-na-ako', 'nasaan-ka-na', 'mahuhuli-ako', 'hintayin-mo-ako',
+  'teka',
+  // More people words and joiners, ordering a drink, and buying things.
+  'siya', 'kami', 'sila', 'at', 'pero', 'kasi', 'naku', 'grabe', 'siguro', 'kape', 'kanin', 'pahingi-tubig',
+  'bill-po', 'isa-pa', 'ito-na-lang', 'iyan', 'iyon', 'mahal', 'mura', 'magkano-lahat', 'ilan', 'pabili-po',
+  'meron-ba-kayong', 'tinapay',
+  // Clock times, and the parts of the day.
+  'ala-una', 'alas-dos', 'alas-tres', 'kalahati', 'alas-singko', 'alas-sais', 'alas-siyete', 'alas-otso',
+  'alas-diyes', 'alas-dose', 'kahapon', 'alas-siyete-umaga', 'alas-otso-gabi',
+  // Making plans, and hedging.
+  'libre-ka-ba', 'ano-ang-plano', 'saan-tayo-magkikita', 'anong-oras-magkikita', 'kita-tayo-bukas',
+  'puwede-ako', 'hindi-ako-puwede', 'baka', 'ewan-ko', 'hindi-naman', 'ano-ulit', 'ganoon-ba',
+  // How you feel, getting help, home and family.
+  'pagod-na-ako', 'mainit', 'masakit', 'may-sakit-ako', 'tulong', 'pakitulungan', 'naliligaw-ako', 'bahay',
+  'nasa-bahay-ako', 'kaibigan', 'nanay', 'tatay', 'anak', 'mahal-kita', 'anong-balita', 'ikinagagalak',
+  // More questions and reactions.
+  'alin', 'gaano-katagal', 'gaano-kalayo', 'anong-ginagawa-mo', 'trapik', 'sayang', 'tama-na', 'makikiraan-po',
+  // Days and weeks, riding, and where things are.
+  'araw', 'linggo', 'tanghali', 'susunod-na-linggo', 'noong-isang-linggo', 'lagi', 'minsan', 'kaagad',
+  'sumakay', 'bumaba', 'dyip', 'sa-tabi-lang', 'kumaliwa-ka', 'kumanan-ka', 'katabi', 'sa-harap', 'sa-likod',
+  'kanto', 'kalye',
+  // Places in town, and eating out.
+  'palengke', 'tindahan', 'paaralan', 'kainan', 'ospital', 'botika', 'nasaan-ospital', 'kailangan-doktor',
+  'gamot', 'ano-masarap-dito', 'maanghang', 'huwag-maanghang', 'ulam', 'manok', 'isda', 'baso', 'kutsara',
+  'tinidor', 'isa-pong-adobo',
+  // Money and shopping.
+  'pera', 'piso', 'sukli', 'barya', 'dalawampu', 'limampu', 'isang-daan', 'limang-daan', 'isang-libo',
+  'tumawad', 'tumitingin-lang', 'wala-na', 'malaki', 'maliit',
+  // Less everyday feelings, plans and family.
+  'nauuhaw-ako', 'inaantok-ako', 'malamig', 'masaya', 'malungkot', 'gusto-ko-umuwi', 'sasama-ako',
+  'tuloy-ba-tayo', 'mga', 'para-saan', 'kanino', 'lola', 'lolo',
+  // Rarer places, dates and emergencies.
+  'simbahan', 'opisina', 'bangko', 'paliparan', 'buwan', 'taon', 'lunes', 'biyernes', 'sabado', 'hatinggabi',
+  'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',
+];
 
 const byId = new Map(ALL_CARDS.map((c) => [c.id, c]));
 

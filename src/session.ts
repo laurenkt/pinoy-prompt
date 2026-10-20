@@ -1,7 +1,7 @@
 // Builds a study session and tracks it as the learner works through it.
 // Kept free of DOM code so it can be unit tested.
 
-import { ALL_CARDS, getCard, type Card } from './deck';
+import { ALL_CARDS, LEARN_ORDER, getCard, type Card } from './deck';
 import { recallChance } from './memory';
 import { isDue, type CardState } from './srs';
 import type { Progress } from './store';
@@ -35,12 +35,12 @@ export function newCardsLeftToday(progress: Progress): number {
   return Math.max(0, progress.settings.dailyNew - progress.today.newCount);
 }
 
-/** The next cards to introduce, in deck order. */
+/** The next cards to introduce, most useful first (see LEARN_ORDER). */
 export function upcomingNewCards(progress: Progress, limit: number): string[] {
   const result: string[] = [];
-  for (const card of ALL_CARDS) {
+  for (const id of LEARN_ORDER) {
     if (result.length >= limit) break;
-    if (!isIntroduced(progress, card.id)) result.push(card.id);
+    if (!isIntroduced(progress, id)) result.push(id);
   }
   return result;
 }
