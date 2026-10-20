@@ -4,7 +4,7 @@
 // The app spots those words in the transcript of what the AI says, so the
 // learner can tap one to hear it and see its meaning.
 
-import { ALL_CARDS, getCard, UNITS, type Card, type Unit } from './deck';
+import { getCard, isVocab, LEARN_ORDER, UNITS, type Card, type Unit } from './deck';
 import { STRENGTHS, strengthOf, type Strength } from './memory';
 import type { Progress } from './progress-schema';
 
@@ -34,10 +34,13 @@ export function talkPlan(progress: Progress, topicId: string | null): TalkPlan {
   const topic = UNITS.find((u) => u.id === topicId) ?? null;
   const known = Object.entries(progress.cards)
     .map(([id, state]) => ({ card: getCard(id), strength: strengthOf(state) }))
-    .filter((k): k is KnownWord => k.card !== undefined)
+    // Guides (patterns, sounds, know-how) aren't words to drop into a sentence.
+    .filter((k): k is KnownWord => k.card !== undefined && isVocab(k.card))
     .sort((a, b) => ORDER.indexOf(a.strength) - ORDER.indexOf(b.strength));
   const unseen = (c: Card) => !progress.cards[c.id];
-  const newWord = topic?.cards.find(unseen) ?? ALL_CARDS.find(unseen) ?? null;
+  // The most useful word not met yet, from the topic if there is one.
+  const next = LEARN_ORDER.map(getCard).filter((c): c is Card => c !== undefined && isVocab(c) && unseen(c));
+  const newWord = next.find((c) => topic?.cards.includes(c)) ?? next[0] ?? null;
   return { topic, known, newWord };
 }
 

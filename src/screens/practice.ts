@@ -1,5 +1,5 @@
 import type { App } from '../app';
-import { ALL_CARDS, getCard, type Card } from '../deck';
+import { VOCAB, getCard, isVocab, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { play, speechSupported, stop } from '../speech';
@@ -32,8 +32,9 @@ function weight(state: CardState): number {
 }
 
 function pickRound(app: App, size: number): Card[] {
+  // Drills are for words and phrases; guides are practised in Study.
   const pool = Object.entries(app.progress.cards).map(([id, state]) => ({ card: getCard(id)!, w: weight(state) }))
-    .filter((p) => p.card);
+    .filter((p) => p.card && isVocab(p.card));
   const picked: Card[] = [];
   while (picked.length < size && pool.length > 0) {
     const total = pool.reduce((sum, p) => sum + p.w, 0);
@@ -46,7 +47,7 @@ function pickRound(app: App, size: number): Card[] {
 
 export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLElement {
   const root = h('div', { class: 'practice' });
-  const learned = Object.keys(app.progress.cards).filter((id) => getCard(id)).length;
+  const learned = Object.keys(app.progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length;
   const canListen = speechSupported();
   const canSpeak = deps.recordingSupported();
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
@@ -68,8 +69,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   function start(menuMode: MenuMode): void {
     lastMode = menuMode;
-    const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter(Boolean);
-    const distractorPool = known.length >= 6 ? known : ALL_CARDS;
+    const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
+    const distractorPool = known.length >= 6 ? known : VOCAB;
     const modes: Mode[] = ['read', 'recall'];
     if (canListen) modes.push('listen');
     if (canSpeak && speakReady) modes.push('speak');

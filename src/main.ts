@@ -72,14 +72,15 @@ function render(route: Route): void {
       screen = settingsScreen(app);
       break;
   }
-  root.replaceChildren(h('main', { class: 'screen' }, screen), ...(tab ? [tabBar(tab)] : []));
+  // The tab bar sits at the top of the page and scrolls away with it, so it never covers content.
+  root.replaceChildren(h('main', { class: 'screen' }, ...(tab ? [tabBar(tab)] : []), screen));
 }
 
 function tabBar(active: Tab): HTMLElement {
   const tabs: { id: Tab; label: string; route: Route }[] = [
     { id: 'home', label: 'Study', route: { name: 'home' } },
     { id: 'practice', label: 'Drills', route: { name: 'practice' } },
-    { id: 'words', label: 'Words', route: { name: 'words' } },
+    { id: 'words', label: 'Library', route: { name: 'words' } },
   ];
   return h(
     'nav',

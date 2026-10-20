@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UNITS } from './deck';
+import { getCard, isVocab, LEARN_ORDER, UNITS } from './deck';
 import { emptyProgress, recordAnswer } from './store';
 import { addPiece, findWords, talkInstructions, talkPlan, talkTopics, TURN_GAP_MS, type Segment, type SpokenTurn } from './talk';
 
@@ -30,11 +30,18 @@ describe('talkPlan', () => {
     ]);
   });
 
-  it('brings in the first unmet word of the topic, or of the deck', () => {
+  it('brings in the most useful unmet word, from the topic if one is chosen', () => {
     const progress = progressWith(['kumusta']);
-    expect(talkPlan(progress, null).newWord?.id).toBe(UNITS[0].cards[1].id);
+    const next = (ids: readonly string[]) => ids.find((id) => !progress.cards[id] && isVocab(getCard(id)!));
+    expect(talkPlan(progress, null).newWord?.id).toBe(next(LEARN_ORDER));
     const food = UNITS.find((u) => u.id === 'food')!;
-    expect(talkPlan(progress, 'food').newWord?.id).toBe(food.cards[0].id);
+    const foodIds = new Set(food.cards.map((c) => c.id));
+    expect(talkPlan(progress, 'food').newWord?.id).toBe(next(LEARN_ORDER.filter((id) => foodIds.has(id))));
+  });
+
+  it('leaves guides out of the words to use', () => {
+    const progress = progressWith(['kumusta', 'p-po']);
+    expect(talkPlan(progress, null).known.map((k) => k.card.id)).toEqual(['kumusta']);
   });
 
   it('offers only topics with a word met', () => {

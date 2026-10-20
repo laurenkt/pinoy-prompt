@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, UNITS } from './deck';
+import { ALL_CARDS, LEARN_ORDER, UNITS, VOCAB, getCard, isVocab } from './deck';
 import {
   MAX_LEARNING,
+  PATTERN_START,
+  GUIDE_START,
   buildExtraSession,
+  buildTiles,
+  canBuild,
+  unmetCount,
+  drillSentence,
+  pickDrill,
   distractors,
   dueCards,
   learningCount,
@@ -20,6 +27,9 @@ const NOW = Date.UTC(2026, 0, 1, 12);
 
 const CAN = { listen: true, speak: false };
 
+const isVocabId = (id: string) => isVocab(getCard(id)!);
+const VOCAB_ORDER = LEARN_ORDER.filter(isVocabId);
+
 /** Introduce cards and give them each a schedule `days` long, last seen at NOW. */
 function learn(progress: ReturnType<typeof emptyProgress>, ids: string[], days = 3): void {
   for (const id of ids) {
@@ -31,7 +41,7 @@ function learn(progress: ReturnType<typeof emptyProgress>, ids: string[], days =
 describe('nextStudyStep', () => {
   it('starts a new learner at the top of the deck', () => {
     const step = nextStudyStep(emptyProgress(NOW), NOW, [], CAN);
-    expect(step).toEqual({ cardId: UNITS[0].cards[0].id, kind: 'new', format: 'read' });
+    expect(step).toEqual({ cardId: LEARN_ORDER[0], kind: 'new', format: 'read' });
   });
 
   it('serves due reviews before any new word, weakest first', () => {
@@ -146,20 +156,108 @@ describe('dueCards', () => {
 });
 
 describe('new cards', () => {
-  it('come in deck order across topics, with nothing locked', () => {
+  it('come most useful first across topics, with no vocabulary locked', () => {
     const progress = emptyProgress(NOW);
-    expect(upcomingNewCards(progress, Infinity)).toEqual(ALL_CARDS.map((c) => c.id));
-    // Someone who stopped part way through a topic carries straight on from there.
-    for (const card of UNITS[0].cards.slice(0, 3)) recordAnswer(progress, card.id, 'good', NOW);
-    expect(upcomingNewCards(progress, 2)).toEqual(UNITS[0].cards.slice(3, 5).map((c) => c.id));
+    expect(upcomingNewCards(progress, Infinity).filter(isVocabId)).toEqual(VOCAB_ORDER);
+    for (const id of VOCAB_ORDER.slice(0, 3)) recordAnswer(progress, id, 'good', NOW);
+    expect(upcomingNewCards(progress, 2)).toEqual(VOCAB_ORDER.slice(3, 5));
+  });
+
+  it('skip cards met in an earlier order, however they were met', () => {
+    const progress = emptyProgress(NOW);
+    // Older builds introduced whole topics in turn.
+    const met = UNITS[0].cards.map((c) => c.id);
+    for (const id of met) recordAnswer(progress, id, 'good', NOW);
+    const next = upcomingNewCards(progress, Infinity);
+    expect(next.filter(isVocabId)).toEqual(VOCAB_ORDER.filter((id) => !met.includes(id)));
+    expect(next.filter(isVocabId).length).toBe(VOCAB.length - met.length);
+  });
+
+  it('hold guides back until enough cards are met and the ones they build on have settled', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, GUIDE_START - 1));
+    // One more card first: the earliest a guide can come.
+    const soon = upcomingNewCards(progress, Infinity);
+    expect(isVocabId(soon[0])).toBe(true);
+    // Guides that build on cards not yet met wait for them to settle.
+    const met = VOCAB_ORDER.slice(0, GUIDE_START - 1);
+    const guides = soon.filter((id) => !isVocabId(id));
+    expect(guides).toContain('k-psst');
+    for (const id of guides) for (const need of getCard(id)!.needs ?? []) expect(met).toContain(need);
+
+    // Everything met so far has lasted a few days, so guides that build on it can come.
+    learn(progress, VOCAB_ORDER.slice(GUIDE_START - 1, PATTERN_START + 10));
+    const next = upcomingNewCards(progress, Infinity);
+    const [first] = next.filter((id) => !isVocab(getCard(id)!));
+    expect(first).toBe('k-psst');
+    // And it comes at the first chance, ahead of the vocabulary it was placed after.
+    expect(next[0]).toBe('k-psst');
+  });
+
+  it('keep patterns out of the first cards, however settled', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, PATTERN_START - 3));
+    const soon = upcomingNewCards(progress, Infinity);
+    // Three more cards before the first pattern, at the earliest.
+    expect(soon.findIndex((id) => getCard(id)!.kind === 'pattern')).toBeGreaterThanOrEqual(3);
+  });
+
+  it('wait for a card a guide needs to be remembered after a day, not just met', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 40));
+    // Just met: one good answer, not yet seen again.
+    progress.cards['po'] = { ...progress.cards['po'], reps: 1 };
+    expect(upcomingNewCards(progress, Infinity)).not.toContain('p-po');
+    progress.cards['po'] = { ...progress.cards['po'], reps: 2 };
+    expect(upcomingNewCards(progress, Infinity)).toContain('p-po');
+  });
+
+  it('space guides out among new words', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 40));
+    const next = upcomingNewCards(progress, 30);
+    const guideAt = next.flatMap((id, i) => (isVocab(getCard(id)!) ? [] : [i]));
+    expect(guideAt.length).toBeGreaterThan(1);
+    for (let i = 1; i < guideAt.length; i++) expect(guideAt[i] - guideAt[i - 1]).toBeGreaterThanOrEqual(6);
+  });
+
+  it('keep bringing in guides once every word is met', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER);
+    const guides = upcomingNewCards(progress, Infinity);
+    expect(guides.length).toBeGreaterThan(1);
+    learn(progress, guides.slice(0, 1));
+    expect(upcomingNewCards(progress, Infinity).length).toBeGreaterThan(0);
+  });
+
+  it('still count a card forgotten and relearned as one a guide can build on', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 40));
+    // Missed once after weeks, then remembered again: reps start over, but it was known.
+    progress.cards['po'] = { ...progress.cards['po'], reps: 1, lapses: 1, interval: 1 };
+    expect(upcomingNewCards(progress, Infinity)).toContain('p-po');
+  });
+
+  it('count guides that are still waiting as unmet', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER);
+    expect(unmetCount(progress)).toBe(LEARN_ORDER.length - VOCAB_ORDER.length);
+  });
+
+  it('count guides met earlier when spacing the next one', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 80));
+    learn(progress, ['k-psst']);
+    const next = upcomingNewCards(progress, 30);
+    expect(next.slice(0, 5).every((id) => isVocab(getCard(id)!))).toBe(true);
   });
 
   it('can go beyond the daily rate when asked for', () => {
     const progress = emptyProgress(NOW);
-    for (const card of ALL_CARDS.slice(0, 8)) recordAnswer(progress, card.id, 'good', NOW);
+    for (const id of LEARN_ORDER.slice(0, 8)) recordAnswer(progress, id, 'good', NOW);
     expect(newCardsLeftToday(progress)).toBe(0);
     const steps = buildExtraSession(progress, 5);
-    expect(steps.map((s) => s.cardId)).toEqual(ALL_CARDS.slice(8, 13).map((c) => c.id));
+    expect(steps.map((s) => s.cardId)).toEqual(LEARN_ORDER.slice(8, 13));
     expect(steps.every((s) => s.kind === 'new')).toBe(true);
   });
 });
@@ -186,6 +284,54 @@ describe('distractors', () => {
       expect(picks.map((p) => p.id)).not.toContain(card.id);
       expect(new Set(picks.map((p) => p.en)).size).toBe(3);
       expect(picks.every((p) => p.kind === 'word')).toBe(true);
+    }
+  });
+});
+
+describe('guides', () => {
+  it('are checked with a gap while being learned, then built or recalled', () => {
+    const learning = newCardState(NOW);
+    const learned = { ...learning, interval: 10, reps: 3 };
+    expect(pickFormat(learning, CAN, () => 0.1, 'pattern')).toBe('gap');
+    expect(pickFormat(learned, CAN, () => 0.1, 'pattern')).toBe('build');
+    expect(pickFormat(learned, CAN, () => 0.9, 'pattern')).toBe('think');
+    expect(pickFormat(learning, CAN, () => 0.1, 'sound')).toBe('gap');
+    expect(pickFormat(learned, CAN, () => 0.1, 'knowhow')).toBe('think');
+  });
+
+  it('are never offered for speaking in extra practice', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, ['p-po', 's-ng'], 30);
+    progress.today.newCount = progress.settings.dailyNew;
+    for (let i = 0; i < 20; i++) {
+      const step = nextStudyStep(progress, NOW, [], { listen: true, speak: true }, new Map(), () => i / 20);
+      expect(['gap', 'build']).toContain(step?.format);
+    }
+  });
+
+  it('pick drills made of cards already met, and not the same one twice running', () => {
+    const progress = emptyProgress(NOW);
+    const card = getCard('p-gusto')!;
+    learn(progress, ['gusto-ko-ito', 'kape']);
+    const known = card.drills!.filter((d) => !d.uses);
+    for (let i = 0; i < 10; i++) expect(known).toContain(pickDrill(card, progress, 'gap', undefined, () => i / 10));
+    learn(progress, ['tubig', 'kanin', 'tinapay']);
+    const first = pickDrill(card, progress, 'gap', undefined, () => 0)!;
+    expect(pickDrill(card, progress, 'gap', first, () => 0)).not.toBe(first);
+  });
+
+  it('only build sentences long enough to be worth ordering', () => {
+    const progress = emptyProgress(NOW);
+    const card = getCard('p-hindi')!;
+    for (let i = 0; i < 10; i++) expect(canBuild(pickDrill(card, progress, 'build', undefined, () => i / 10)!)).toBe(true);
+    expect(drillSentence({ q: 'I want coffee.', tl: 'Gusto ko ___ kape.', answer: 'ng', wrong: [] })).toBe('Gusto ko ng kape.');
+    // Capitals and punctuation would give the order away.
+    expect(buildTiles({ q: 'Who is Ana?', tl: 'Sino ___ Ana?', answer: 'si', wrong: ['ng', 'ba'] })).toEqual({ words: ['sino', 'si', 'ana'], decoy: 'ng' });
+  });
+
+  it('are never used as wrong answers for words', () => {
+    for (let i = 0; i < 20; i++) {
+      for (const c of distractors(getCard('kape')!, 'en', 3, ALL_CARDS)) expect(isVocab(c)).toBe(true);
     }
   });
 });
