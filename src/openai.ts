@@ -124,6 +124,8 @@ export interface CallEvents {
   onUsage(seconds: number): void;
   /** The call ended, from either side; error is set if it broke. */
   onEnded(error?: AiError): void;
+  /** Audio to show as it plays: the learner's microphone once the call is set up, and the AI's voice once it arrives. */
+  onAudio?(who: ChatTurn['who'], stream: MediaStream): void;
 }
 
 export interface Call {
@@ -204,8 +206,10 @@ export async function startCall(
     peer = deps.createPeer();
     const pc = peer;
     pc.ontrack = (e) => {
-      speaker.srcObject = e.streams[0] ?? new MediaStream([e.track]);
+      const voice = e.streams[0] ?? new MediaStream([e.track]);
+      speaker.srcObject = voice;
       void speaker.play().catch(() => {});
+      if (!ended) events.onAudio?.('ai', voice);
     };
     for (const track of mic.getAudioTracks()) pc.addTrack(track, mic);
     // Listeners go on before the offer, so no early event is missed.
@@ -235,6 +239,7 @@ export async function startCall(
     const body = (await response.json()) as { transport?: { sdp?: string } };
     if (!body.transport?.sdp) throw new AiError('other', 'OpenAI started the call without an answer.');
     await pc.setRemoteDescription({ type: 'answer', sdp: body.transport.sdp });
+    if (!ended) events.onAudio?.('you', mic);
   } catch (e) {
     ended = true;
     release();

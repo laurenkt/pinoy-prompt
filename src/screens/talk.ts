@@ -3,18 +3,21 @@ import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey,
 import { play } from '../speech';
 import { addPiece, findWords, talkGreeting, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
 import { h, icon } from '../ui';
+import { createVisualizer, type Visualizer } from '../visualizer';
 import { keyForm } from './settings';
 
 export interface TalkDeps {
   call: CallDeps;
   callSupported(): boolean;
+  visualizer(canvas: HTMLCanvasElement): Visualizer;
 }
 
-export const defaultTalkDeps: TalkDeps = { call: browserCallDeps, callSupported };
+export const defaultTalkDeps: TalkDeps = { call: browserCallDeps, callSupported, visualizer: createVisualizer };
 
 const MIN_WORDS = 4;
 
 let activeCall: Call | null = null;
+let activeVisual: Visualizer | null = null;
 /** Bumped whenever a call is started or abandoned, so a call still connecting can tell it's no longer wanted. */
 let generation = 0;
 
@@ -23,6 +26,8 @@ export function hangUpTalk(): void {
   generation++;
   activeCall?.hangUp();
   activeCall = null;
+  activeVisual?.stop();
+  activeVisual = null;
 }
 
 type State = { name: 'menu' } | { name: 'connecting' } | { name: 'call'; muted: boolean } | { name: 'ended' };
@@ -39,6 +44,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   let revealed = new Set<string>();
   /** The transcript's bubbles, one per turn, updated in place as pieces arrive. */
   let log: HTMLElement | null = null;
+  /** Kept across redraws, so the visual keeps running when the screen changes around it. */
+  const canvas = h('canvas', { class: 'talk-visual', 'aria-hidden': 'true' }) as HTMLCanvasElement;
 
   async function begin(): Promise<void> {
     const key = getApiKey();
@@ -52,6 +59,9 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     seconds = 0;
     revealed = new Set();
     state = { name: 'connecting' };
+    // Made in the tap, before anything is awaited, so the browser lets its audio run.
+    const visual = deps.visualizer(canvas);
+    activeVisual = visual;
     draw();
     try {
       const call = await startCall(key, { instructions: talkInstructions(plan), greeting: talkGreeting(plan) }, {
@@ -74,9 +84,14 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
           const meter = root.querySelector('.talk-meter');
           if (meter) meter.textContent = meterText();
         },
+        onAudio: (who, stream) => {
+          if (current()) visual.listen(who, stream);
+        },
         onEnded: (e) => {
           if (!current()) return;
           activeCall = null;
+          visual.stop();
+          activeVisual = null;
           if (e) error = errorText(e);
           state = { name: 'ended' };
           draw();
@@ -87,6 +102,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
       else call.hangUp();
     } catch (e) {
       if (!current()) return;
+      visual.stop();
+      activeVisual = null;
       error = errorText(e);
       state = { name: 'ended' };
       draw();
@@ -112,23 +129,33 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   }
 
   function draw(): void {
+    // The transcript scrolls by itself: keep the learner's place, or keep following the newest words.
+    const before = log as HTMLElement | null;
+    const follow = !before || atEnd(before);
+    const top = before?.scrollTop ?? 0;
     log = null;
     if (!getApiKey()) root.replaceChildren(setup());
     else if (state.name === 'menu') root.replaceChildren(menu());
     else {
       root.replaceChildren(conversation());
-      (log as HTMLElement | null)?.lastElementChild?.scrollIntoView?.({ block: 'end' });
+      const now = log as HTMLElement | null;
+      if (now) now.scrollTop = follow ? now.scrollHeight : top;
     }
+  }
+
+  /** Whether the transcript is scrolled to its newest words, give or take a line. */
+  function atEnd(el: HTMLElement): boolean {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 48;
   }
 
   /** Show a turn that changed, without redrawing the rest of the screen under the learner's finger. */
   function showTurn(index: number, added: boolean): void {
     if (!log) return;
-    const near = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 80;
+    const follow = atEnd(log);
     const el = bubble(turns[index]);
     if (added) log.insertBefore(el, log.children[index] ?? null);
     else log.children[index]?.replaceWith(el);
-    if (near && index === turns.length - 1) el.scrollIntoView?.({ block: 'end' });
+    if (follow) log.scrollTop = log.scrollHeight;
   }
 
   function header(title: string, extra?: HTMLElement): HTMLElement {
@@ -210,6 +237,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
       'div',
       { class: 'talk-chat' },
       header('Talking', h('span', { class: 'session-title talk-meter' }, meterText())),
+      live && canvas,
       log,
       status && h('p', { class: 'talk-status' }, status),
       error && h('div', { class: 'feedback bad', role: 'alert' }, error),
@@ -228,6 +256,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
                 if (state.name !== 'call') return;
                 state = { name: 'call', muted: !state.muted };
                 activeCall?.setMuted(state.muted);
+                activeVisual?.setMuted(state.muted);
                 draw();
               },
             },

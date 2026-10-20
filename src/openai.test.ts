@@ -152,6 +152,16 @@ describe('startCall', () => {
     expect(f.events.onEnded).toHaveBeenCalledOnce();
   });
 
+  it('hands over the microphone and the AI voice to show', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    const onAudio = vi.fn();
+    await startCall(KEY, PROMPT, { ...f.events, onAudio }, f.deps);
+    const voice = {} as MediaStream;
+    f.peer.ontrack!({ streams: [voice], track: {} });
+    expect(onAudio.mock.calls.map(([who]) => who)).toEqual(['you', 'ai']);
+    expect(onAudio.mock.calls[1][1]).toBe(voice);
+  });
+
   it('asks for the greeting once, and still starts if that fails', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
     await startCall(KEY, PROMPT, f.events, f.deps);
