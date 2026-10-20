@@ -251,6 +251,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
             ' ',
             `${q.card.tl} = ${q.card.en}`,
           ),
+        q.mode !== 'speak' && answered && !right &&
+          h('div', { class: 'hook' }, h('p', { class: 'hook-label' }, 'Remember it by'), h('p', null, q.card.hook)),
         q.mode !== 'speak' && answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: advance }, 'Next'),
       ),
     );

@@ -15,4 +15,8 @@ describe('deck', () => {
   it('gives every unit enough cards for a four-option quiz', () => {
     for (const unit of UNITS) expect(unit.cards.length).toBeGreaterThanOrEqual(4);
   });
+
+  it('gives every card a memory hook', () => {
+    for (const card of ALL_CARDS) expect(card.hook.trim(), card.id).not.toBe('');
+  });
 });
