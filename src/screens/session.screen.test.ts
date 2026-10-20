@@ -113,4 +113,14 @@ describe('open-ended study', () => {
     root.querySelector<HTMLButtonElement>('[aria-label="Stop studying"]')!.click();
     expect(root.textContent).toContain('Session finished');
   });
+
+  it("starts the new day's counts when study runs past midnight", () => {
+    const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
+    app.progress.settings.dailyNew = 4;
+    // Today's new words are used up, but by yesterday's count.
+    app.progress.today = { ...app.progress.today, day: '2000-01-01' };
+    const root = sessionScreen(app, null, undefined, noMic);
+    expect(root.textContent).not.toContain("You're caught up");
+    expect(app.progress.today.newCount).toBe(0);
+  });
 });

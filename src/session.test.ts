@@ -10,6 +10,7 @@ import {
   nextStudyStep,
   pickFormat,
   requeue,
+  studyQueue,
   upcomingNewCards,
 } from './session';
 import { DAY_MS, newCardState } from './srs';
@@ -45,6 +46,14 @@ describe('nextStudyStep', () => {
     expect(nextStudyStep(progress, later, [a.id], CAN)).toMatchObject({ cardId: b.id, kind: 'review' });
     // Short of cards to space out, the gap shrinks rather than skipping a due word.
     expect(nextStudyStep(progress, later, [a.id, b.id], CAN)).toMatchObject({ cardId: a.id, kind: 'review' });
+  });
+
+  it('serves due words before learning ones that are not quite due', () => {
+    const progress = emptyProgress(NOW);
+    const [a, b] = UNITS[0].cards.map((card) => card.id);
+    learn(progress, [a], 1);
+    recordAnswer(progress, b, 'again', NOW + 2 * DAY_MS);
+    expect(studyQueue(progress, NOW + 2 * DAY_MS)).toEqual([a, b]);
   });
 
   it('holds back new words while several are still being learned', () => {
@@ -117,13 +126,13 @@ describe('pickFormat', () => {
     expect(all(0)).toEqual(new Set(['read']));
   });
 
-  it('asks in harder ways as a word holds for longer', () => {
-    expect(all(3)).toEqual(new Set(['read', 'remember', 'listen']));
-    expect(all(14)).toEqual(new Set(['remember', 'produce', 'recall', 'listen']));
+  it('self-rates learned words, in harder ways as they hold for longer', () => {
+    expect(all(3)).toEqual(new Set(['remember', 'hear']));
+    expect(all(14)).toEqual(new Set(['remember', 'produce', 'hear']));
   });
 
   it('leaves out listening without a voice', () => {
-    expect(all(14, { listen: false, speak: false })).not.toContain('listen');
+    expect(all(14, { listen: false, speak: false })).not.toContain('hear');
   });
 });
 

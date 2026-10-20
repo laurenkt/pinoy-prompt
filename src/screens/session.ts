@@ -14,7 +14,7 @@ import {
 } from '../session';
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { play, speechSupported, stop } from '../speech';
-import { recordAnswer } from '../store';
+import { recordAnswer, rollDay } from '../store';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
@@ -70,6 +70,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
 
   function take(): Step | undefined {
     if (!open) return queue.shift();
+    // Study can run past midnight without leaving the screen, so start the new day's counts here.
+    app.progress = rollDay(app.progress, app.now());
     return nextStudyStep(app.progress, app.now(), recent, { listen: canListen, speak: speakReady }, misses) ?? undefined;
   }
 
@@ -127,9 +129,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         onReady: () => (speakReady = true),
         deps,
       });
-    } else if (format === 'remember' || format === 'produce') {
+    } else if (format === 'remember' || format === 'hear' || format === 'produce') {
       phase = 'front';
-      if (format === 'remember') autoplay();
+      if (format === 'hear') say();
+      else if (format === 'remember') autoplay();
     } else {
       startQuiz();
       return;
@@ -152,8 +155,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (rating !== 'again') stats.correct++;
     if (wasNew) stats.learned++;
     else stats.reviewed++;
+    if (open) return;
     // Open-ended study brings a missed card back by itself: it's still being learned.
-    if (rating === 'again' && !open) queue = requeue(queue, step);
+    if (rating === 'again') queue = requeue(queue, step);
     else completed++;
   }
 
@@ -184,7 +188,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function rate(rating: Rating): void {
     finish(rating);
     // A miss is the moment a hook helps most, so give it a beat before moving on.
-    if (rating === 'again' && !hookShown && step?.kind !== 'extra') {
+    if (rating === 'again' && !hookShown) {
       phase = 'missed';
       draw();
     } else {
@@ -272,11 +276,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       h(
         'p',
         null,
-        unmet && app.progress.today.newCount < app.progress.settings.dailyNew
-          ? 'No reviews are due. New words come in once the ones you are still learning have settled.'
-          : unmet
-            ? "No reviews are due, and today's new words are in."
-            : 'No reviews are due.',
+        unmet ? "No reviews are due, and today's new words are in." : "No reviews are due, and you've met every word.",
         ' You can keep going with practice on your weakest words. It won\'t change when they come back.',
       ),
       h(
@@ -408,7 +408,15 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     const reverse = format === 'produce';
     const prompt = reverse
       ? h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, c.en))
-      : h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Do you remember?'), tagalog(c));
+      : format === 'hear'
+        ? h(
+            'div',
+            { class: 'prompt center' },
+            h('p', { class: 'eyebrow' }, 'Do you know what you heard?'),
+            h('div', { class: 'audio-group big' }, audioButton(() => say(), 'Play again', 'huge'), audioButton(() => say(true), 'Play slowly', 'slow')),
+            showBack && h('p', { class: 'tl', lang: 'fil' }, c.tl),
+          )
+        : h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Do you remember?'), tagalog(c));
 
     return h(
       'div',

@@ -55,6 +55,8 @@ export type Format =
   | 'recall'
   /** See the Tagalog, remember the meaning, rate yourself. */
   | 'remember'
+  /** Hear the Tagalog, remember the meaning, rate yourself. */
+  | 'hear'
   /** See the English, come up with the Tagalog, rate yourself. */
   | 'produce'
   /** Say it out loud and get coached. Pronunciation only, so it never changes the schedule. */
@@ -67,13 +69,14 @@ export interface Abilities {
 }
 
 /**
- * Weaker words get the easier formats; as a word holds for longer it is asked
- * in harder ways, ending with producing the Tagalog from the English.
+ * Words still being learned get a multiple-choice check. Learned words are
+ * self-rated, because a lucky guess would push a word weeks out; they move from
+ * reading and hearing to producing the Tagalog from the English as they hold.
  */
 export function pickFormat(state: CardState, can: Abilities, random: () => number = Math.random): Format {
   if (state.interval < 1) return 'read';
-  const formats: Format[] = state.interval < 7 ? ['read', 'remember'] : ['remember', 'produce', 'recall'];
-  if (can.listen) formats.push('listen');
+  const formats: Format[] = state.interval < 7 ? ['remember'] : ['remember', 'produce', 'produce'];
+  if (can.listen) formats.push('hear');
   return formats[Math.floor(random() * formats.length)];
 }
 
@@ -89,14 +92,14 @@ export function learningCount(progress: Progress): number {
 }
 
 /**
- * Words that need attention now, weakest first: everything due, plus words
- * still being learned (they are due again within a minute anyway).
+ * Words to study now: everything due, weakest first, then words still being
+ * learned that aren't quite due (they're due again within a minute anyway).
  */
 export function studyQueue(progress: Progress, now: number): string[] {
   return Object.entries(progress.cards)
     .filter(([id, state]) => (isDue(state, now) || state.interval < 1) && getCard(id))
-    .map(([id, state]) => ({ id, recall: recallChance(state, now) }))
-    .sort((a, b) => a.recall - b.recall)
+    .map(([id, state]) => ({ id, early: !isDue(state, now), recall: recallChance(state, now) }))
+    .sort((a, b) => Number(a.early) - Number(b.early) || a.recall - b.recall)
     .map(({ id }) => id);
 }
 
@@ -131,11 +134,12 @@ export function nextStudyStep(
 
   const known = Object.entries(progress.cards).filter(([id]) => getCard(id));
   if (known.length === 0) return null;
-  const weakness = ([id, state]: [string, CardState]) => recallChance(state, now) - (misses.get(id) ?? 0);
-  const ranked = known.sort((a, b) => weakness(a) - weakness(b));
+  const ranked = known
+    .map(([id, state]) => ({ id, weakness: recallChance(state, now) - (misses.get(id) ?? 0) }))
+    .sort((a, b) => a.weakness - b.weakness)
+    .map(({ id }) => id);
   // Small decks can't keep a full gap, but never ask the same card twice in a row unless it's the only one.
-  const [cardId] =
-    ranked.find(([id]) => !shownRecently.has(id)) ?? ranked.find(([id]) => id !== last) ?? ranked[0];
+  const cardId = ranked.find((id) => !shownRecently.has(id)) ?? ranked.find((id) => id !== last) ?? ranked[0];
   const formats: Format[] = ['read', 'recall'];
   if (can.listen) formats.push('listen');
   const format = can.speak && random() < 1 / SPEAK_EVERY ? 'speak' : formats[Math.floor(random() * formats.length)];

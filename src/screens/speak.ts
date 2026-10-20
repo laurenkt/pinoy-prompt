@@ -30,7 +30,7 @@ export const defaultDeps: SpeakDeps = {
   recordingSupported,
   record,
   // Loaded on demand so the model runtime isn't part of the app's first download.
-  modelDownloaded: async () => (await import('../phone-model')).modelDownloaded(),
+  modelDownloaded: async () => (await import('../model-cache')).modelDownloaded(),
   loadPhoneModel: async (onProgress) => (await import('../phone-model')).loadPhoneModel(onProgress),
   player: () => (sharedPlayer ??= webAudioPlayer()),
 };

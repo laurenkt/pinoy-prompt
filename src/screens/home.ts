@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { MIN_MEASURED_REVIEWS, RECALL_WINDOW_DAYS, STRENGTHS, memorySummary, type MemorySummary } from '../memory';
-import { buildExtraSession, newCardsLeftToday, studyQueue, upcomingNewCards } from '../session';
+import { buildExtraSession, dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
 import { h, icon } from '../ui';
 
 /** A Tagalog greeting for the time of day. */
@@ -65,7 +65,7 @@ function plural(n: number, one: string, many = `${one}s`): string {
 function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
   const now = app.now();
-  const reviews = studyQueue(progress, now).length;
+  const reviews = dueCards(progress, now).length;
   const unmet = upcomingNewCards(progress, Infinity).length;
   const fresh = Math.min(newCardsLeftToday(progress), unmet);
   const rate = progress.settings.dailyNew;
