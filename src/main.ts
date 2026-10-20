@@ -5,6 +5,7 @@ import { homeScreen } from './screens/home';
 import { practiceScreen } from './screens/practice';
 import { sessionScreen } from './screens/session';
 import { settingsScreen } from './screens/settings';
+import { hangUpTalk, talkScreen } from './screens/talk';
 import { wordsScreen } from './screens/words';
 import { cancelRecording } from './recorder';
 import { initVoices, stop } from './speech';
@@ -31,6 +32,7 @@ const app: App = {
   navigate(route: Route) {
     stop();
     cancelRecording();
+    hangUpTalk();
     keyHandler = null;
     app.progress = rollDay(app.progress, Date.now());
     render(route);
@@ -62,6 +64,9 @@ function render(route: Route): void {
       break;
     case 'session':
       screen = sessionScreen(app, route.steps, route.title);
+      break;
+    case 'talk':
+      screen = talkScreen(app);
       break;
     case 'settings':
       screen = settingsScreen(app);

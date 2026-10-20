@@ -971,6 +971,12 @@ p {
   min-height: 96px;
 }
 
+.mode-talk {
+  background: var(--saffron);
+  grid-column: 1 / -1;
+  min-height: 96px;
+}
+
 .mode:disabled {
   background: var(--surface);
   color: var(--faint);
@@ -1679,6 +1685,127 @@ p {
 
 .badge.s-long {
   background: var(--teal);
+}
+
+/* Talk */
+
+.talk-label {
+  font-size: 1rem;
+  margin-top: 18px;
+}
+
+.talk-topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.chip {
+  border: var(--outline);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 6px 14px;
+  min-height: 40px;
+  font-weight: 700;
+}
+
+.chip.selected {
+  background: var(--teal);
+  color: var(--on-accent);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.talk-log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.bubble {
+  margin: 0;
+  max-width: 88%;
+  padding: 10px 14px;
+  border: var(--outline);
+  border-radius: 18px;
+  overflow-wrap: break-word;
+}
+
+.bubble.ai {
+  align-self: flex-start;
+  background: var(--cream);
+  color: var(--on-accent);
+  border-bottom-left-radius: 6px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.bubble.you {
+  align-self: flex-end;
+  background: var(--surface);
+  border-bottom-right-radius: 6px;
+}
+
+.tl-word button {
+  border: none;
+  border-bottom: 3px solid var(--ink);
+  background: none;
+  padding: 0;
+  font-weight: 800;
+  color: inherit;
+}
+
+/* Underlined in the colour of the word's strength on Home; dashed until it's learned. */
+.tl-word.w-long button {
+  border-bottom-color: var(--teal);
+}
+
+.tl-word.w-weeks button {
+  border-bottom-color: var(--saffron);
+}
+
+.tl-word.w-days button {
+  border-bottom-color: var(--pink);
+}
+
+.tl-word.w-new button,
+.tl-word.w-unseen button {
+  border-bottom-style: dashed;
+}
+
+.gloss {
+  font-style: italic;
+  font-weight: 500;
+}
+
+.talk-status {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.talk-help {
+  margin-bottom: 12px;
+}
+
+.key-input {
+  font: inherit;
+  color: var(--on-accent);
+  background: var(--cream);
+  border: var(--outline);
+  border-radius: 14px;
+  padding: 10px 12px;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.key-form a {
+  color: var(--saffron);
+}
+
+.key-problem {
+  color: var(--pink);
+  font-weight: 700;
 }
 
 /* Settings */

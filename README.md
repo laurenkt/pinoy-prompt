@@ -14,10 +14,22 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 - **Drills**: unscored rounds of 10 in one skill (listen, read, recall, speak, or mixed), weighted toward the words you find hardest. Drills never change the review schedule.
 - **Home**: what Study will do next, then a picture of your memory: how many words you know, how well you recall them (measured from your reviews over the last 30 days, or estimated from the schedule until there are enough), and how firmly each is stored (just met, days, weeks, long-term, read from its review interval). There are no lessons to complete or streaks to keep.
 - **Library**: everything there is to learn, filterable by kind: words and phrases by topic (tappable for audio), then patterns, sounds, how to say things and know-how. Each card you know shows how firmly it is stored.
+- **Talk** (in Drills): a spoken conversation with an AI in English, with the learner's Tagalog mixed in. See below.
 
 New words come most useful first, whatever their topic, at the daily rate set in Settings: `LEARN_ORDER` in `src/deck.ts` ranks every card by how soon it helps in conversation (hello, thanks, yes/no and "I don't understand" first; "I'm on my way" and "now / later" early; "Traffic!" and the weekdays much later). Topics only group words on the Words screen, and a topic's intro shows before the first of its words a learner meets. The deck is weighted towards getting by quickly: greetings and politeness, meeting people, numbers, questions, the building blocks (I, you, there is, I need, can I), telling time, when things happen, travelling, places and directions, making plans, food and eating out, money and shopping, family, everyday phrases, chat reactions, how you feel, and help in an emergency. Progress is kept by card id, so a card's id must never change once released (`src/deck.test.ts` checks this).
 
-Progress is stored on the device. Nothing is sent to our server (there isn't one), and that includes your voice: speaking questions are checked on the device.
+Progress is stored on the device. Nothing is sent to our server (there isn't one), and that includes your voice: speaking questions are checked on the device. The one exception is Talk, which is opt-in: it sends the conversation's audio to OpenAI with the learner's own key.
+
+## Talk
+
+Talk is a spoken conversation in English with the Tagalog the learner knows mixed in, using OpenAI's GPT-Live (`gpt-live-1`) over WebRTC.
+
+- **What gets mixed in** (`src/talk.ts`): every word the learner has met, grouped by how firmly it's stored, plus one word they haven't met yet (the next one in the chosen topic). The AI is asked to use all of them wherever they fit and no other Tagalog, so as words are learned, more of each conversation turns Tagalog on its own.
+- **On screen**: the live transcript of the call, with the deck's Tagalog underlined in its strength colour. Tapping one plays it and shows its meaning. The AI says the meaning of words met in the last day, and of the new word, aloud.
+- **Practice, not a test**: no scores, and the review schedule is never touched. Mistakes aren't marked; the AI uses the right form in its reply instead.
+- **The learner's own key** (`src/openai.ts`): Talk uses an OpenAI API key the learner pastes in. It's kept in `localStorage` apart from progress, so it never goes into a backup, and is sent only to `api.openai.com`. The browser sends its WebRTC offer straight to `POST /v1/live/sessions` with that key; there is no server of ours. Calls end after 10 minutes, and the call screen shows the running time and rough cost (GPT-Live is billed at about 5¢ a minute).
+
+Why not "Sign in with ChatGPT": its self-serve route is for open-source apps running on the user's own computer, with a `127.0.0.1` callback, and its sign-in endpoints don't allow calls from web pages. The hosted-website route needs OpenAI's approval and a backend. Neither fits a static PWA, so Talk uses a pasted key instead.
 
 ## Saved progress
 
