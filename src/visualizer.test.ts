@@ -1,13 +1,15 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { createVisualizer, follow, quiet, SAMPLES } from './visualizer';
+import { createVisualizer, follow, loudness, quiet, SAMPLES } from './visualizer';
 
-const silent = () => new Uint8Array(1024).fill(128);
-/** A tone at the given loudness (0 to 1) with the given number of samples per cycle. */
-const tone = (loudness: number, period = 64) => new Uint8Array(1024).map((_, i) => Math.round(128 + 127 * loudness * Math.sin((i / period) * 2 * Math.PI)));
+const silent = () => new Float32Array(1024);
+/** A tone with the given amplitude (0 to 1) and number of samples per cycle. */
+const tone = (amplitude: number, period = 64) => new Float32Array(1024).map((_, i) => amplitude * Math.sin((i / period) * 2 * Math.PI));
 const fresh = quiet;
-/** Background hiss: a byte or two either side of silence. */
-const hiss = () => new Uint8Array(1024).map((_, i) => 128 + ((i * 7919) % 5) - 2);
+/** Background hiss, around -55 dB. */
+const hiss = () => new Float32Array(1024).map((_, i) => (((i * 7919) % 5) - 2) * 0.001);
+/** A tone at this amplitude is about -30 dB, as ordinary talking reaches a phone's microphone. */
+const TALKING = 0.045;
 
 describe('follow', () => {
   it('shows a sound in the very frame it arrives, and lets it fall away smoothly', () => {
@@ -60,12 +62,43 @@ describe('follow', () => {
     expect(env).toEqual(fresh());
   });
 
-  it('passes the raw waveform on, spread over the samples', () => {
-    const out = new Uint8Array(SAMPLES);
-    const wave = tone(0.5);
-    follow(wave, fresh(), out, 1 / 60);
-    expect(out[0]).toBe(wave[0]);
-    expect(out[SAMPLES / 2]).toBe(wave[512]);
+  it('moves well for ordinary talking, and saves the top for singing or shouting', () => {
+    expect(loudness(0.0015)).toBe(0);
+    expect(loudness(TALKING / Math.SQRT2)).toBeGreaterThan(0.55);
+    expect(loudness(TALKING / Math.SQRT2)).toBeLessThan(0.75);
+    expect(loudness(0.5)).toBe(1);
+  });
+
+  /** How far the rings' waveform swings from the middle, 0 to 127. */
+  const swing = (out: Uint8Array) => Math.max(...out.map((v) => Math.abs(v - 128)));
+  const frames = (n: number, wave: () => Float32Array, env = fresh(), out = new Uint8Array(SAMPLES)) => {
+    for (let i = 0; i < n; i++) follow(wave(), env, out, 1 / 60);
+    return out;
+  };
+
+  it('scales quiet talk up so the rings still draw big shapes, and loud sound down', () => {
+    expect(swing(frames(30, () => tone(TALKING)))).toBeGreaterThan(55);
+    const loud = swing(frames(30, () => tone(0.9)));
+    expect(loud).toBeGreaterThan(80);
+    expect(loud).toBeLessThan(110);
+  });
+
+  /** Room noise around -45 dB, peaking near 0.02. */
+  const room = () => new Float32Array(1024).map((_, i) => Math.sin(i * 12.9898) * 0.0035 + (((i * 7919) % 9) - 4) * 0.0018);
+
+  it("doesn't blow room noise up to fill the rings once talking stops", () => {
+    const env = fresh();
+    frames(60, () => tone(0.2), env);
+    const out = frames(300, room, env);
+    expect(swing(out)).toBeLessThan(20);
+    expect(env.bright).toBeLessThan(0.5);
+  });
+
+  it("doesn't shrink talking for long after a click", () => {
+    const env = fresh();
+    frames(30, () => tone(TALKING), env);
+    frames(1, () => tone(1), env);
+    expect(swing(frames(30, () => tone(TALKING), env))).toBeGreaterThan(30);
   });
 
   it('is brighter for hissing sounds than for low ones', () => {
