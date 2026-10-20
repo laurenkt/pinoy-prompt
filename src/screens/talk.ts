@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey, MAX_CALL_SECONDS, startCall, type Call, type CallDeps } from '../openai';
 import { play } from '../speech';
-import { addPiece, findWords, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
+import { addPiece, findWords, talkGreeting, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
 import { h, icon } from '../ui';
 import { keyForm } from './settings';
 
@@ -54,7 +54,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     state = { name: 'connecting' };
     draw();
     try {
-      const call = await startCall(key, talkInstructions(plan), {
+      const call = await startCall(key, { instructions: talkInstructions(plan), greeting: talkGreeting(plan) }, {
         onStarted: () => {
           if (!current() || state.name !== 'connecting') return;
           state = { name: 'call', muted: false };

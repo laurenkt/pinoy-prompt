@@ -48,37 +48,71 @@ function list(words: KnownWord[]): string {
   return words.map((w) => `${w.card.tl} (${w.card.en})`).join('; ');
 }
 
-/** The AI's instructions for a conversation. */
+/** How much Tagalog to mix in: more as the learner knows more. */
+export function mixLevel(known: number): string {
+  if (known < 20) return 'one Tagalog word or short phrase in each sentence';
+  if (known < 60) return 'two or three Tagalog words or phrases in each sentence';
+  return 'as many of the listed Tagalog words as fit naturally, keeping English for everything else';
+}
+
+/**
+ * The AI's instructions for a call, laid out as OpenAI's GPT-Live prompting
+ * guide recommends. The conversation is in English with the learner's Tagalog
+ * swapped in, like the Taglish many Filipinos speak, so the instructions say
+ * plainly which language to speak and that no other Tagalog is wanted.
+ */
 export function talkInstructions(plan: TalkPlan): string {
   const firm = plan.known.filter((w) => w.strength === 'long' || w.strength === 'weeks');
   const settling = plan.known.filter((w) => w.strength === 'days');
   const fresh = plan.known.filter((w) => w.strength === 'new');
   const lines = [
-    'You are a friendly Filipino conversation partner. The learner is an English speaker learning beginner Tagalog. This is a spoken conversation.',
-    plan.topic
-      ? `Talk about everyday situations around this topic: ${plan.topic.title}.`
-      : 'Talk about everyday things, like how their day is going, food, family or plans.',
-    'Speak English, but use Tagalog for the words and phrases listed below, every time one fits naturally. The more of them you use, the better. Spell or say them exactly as listed. Use no other Tagalog.',
+    'You are a friendly Filipino friend helping an English speaker practise beginner Tagalog in a relaxed spoken chat. Speak warmly, at an unhurried pace.',
+    '',
+    'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below: every sentence is an English sentence with some of those words or phrases in place of the English.',
+    `Use ${mixLevel(plan.known.length)}.`,
+    'Never say a whole sentence in Tagalog unless every word of it is on the list. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
+    'The style, for illustration only (use your own words from the list): "Magandang umaga! Did you have kape yet? I am so gutom today."',
+    '',
   ];
-  if (firm.length) lines.push(`Words they know well: ${list(firm)}.`);
-  if (settling.length) lines.push(`Words they know, still settling: ${list(settling)}.`);
-  if (fresh.length) {
-    lines.push(
-      `Words they met in the last day or so: ${list(fresh)}. Say the English meaning straight after one of these the first time you use it.`,
-    );
-  }
+  if (firm.length) lines.push(`Tagalog they know well, use it freely: ${list(firm)}.`);
+  if (settling.length) lines.push(`Tagalog they know but are still settling: ${list(settling)}.`);
+  if (fresh.length) lines.push(`Tagalog they met in the last day or so; say the English meaning straight after it the first time: ${list(fresh)}.`);
   if (plan.newWord) {
     lines.push(
-      `Bring in one new word during the conversation: ${plan.newWord.tl} (${plan.newWord.en}). Use it in a sentence where its meaning is clear, say the English meaning straight after it, and use it again later if it fits.`,
+      `One new word to bring in during the call: ${plan.newWord.tl} (${plan.newWord.en}). Use it in a sentence where its meaning is clear, say the English meaning straight after it, and use it again later if it fits.`,
     );
   }
   lines.push(
+    'Use no other Tagalog. Say Tagalog words slowly and clearly.',
+    '',
+    plan.topic
+      ? `Talk about everyday situations around this topic: ${plan.topic.title}.`
+      : 'Talk about everyday things, like how their day is going, food, family or plans.',
     'Keep each turn to one to three short sentences, and end with a question or something easy to answer, so they can reply using their Tagalog.',
     'They may answer in English, Tagalog or a mix. If their Tagalog has a mistake, do not point it out; just use the right form naturally in your reply.',
-    'Say Tagalog words slowly and clearly. Start by greeting them in Tagalog.',
     'No scores, praise for every reply, or talk of streaks or progress.',
+    '',
+    'Backchannel policy: Use light backchannels. Acknowledge naturally without competing with the main response.',
+    '',
+    'Interruption policy: Stop speaking when the learner interrupts. Listen to what they say.',
+    '',
+    'Delegation policy:',
+    'Backend tools:',
+    '- None.',
+    '',
+    'Generate <|SpawnThinking|> when:',
+    '- Never. There is no backend; answer everything yourself.',
+    '',
+    'Do not generate <|SpawnThinking|> when:',
+    '- Any request. Reply from the conversation.',
   );
   return lines.join('\n');
+}
+
+/** What the AI is asked to open the call with: in English, with a Tagalog greeting if the learner knows one. */
+export function talkGreeting(plan: TalkPlan): string {
+  const about = plan.topic ? ` about ${plan.topic.title.toLowerCase()}` : '';
+  return `Greet the learner now in English, using a Tagalog greeting from the list if there is one. Ask one easy question${about}, in English with a Tagalog word or two from the list. Then pause and listen.`;
 }
 
 /** A piece of the AI's text: plain, or a Tagalog word the learner can tap. */

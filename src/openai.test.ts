@@ -44,6 +44,8 @@ describe('the API key', () => {
   });
 });
 
+const PROMPT = { instructions: '', greeting: 'Say hi.' };
+
 class FakeChannel {
   readyState = 'open';
   sent: unknown[] = [];
@@ -115,12 +117,13 @@ describe('startCall', () => {
 
   it('starts a GPT-Live session with the browser offer and applies the answer', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'v=0 answer' } }));
-    await startCall(KEY, 'Talk Tagalog.', f.events, f.deps);
+    await startCall(KEY, { instructions: 'Talk Taglish.', greeting: 'Say hi.' }, f.events, f.deps);
     const [url, init] = f.fetchFn.mock.calls[0];
     expect(url).toBe('https://api.openai.com/v1/live/sessions');
     const body = JSON.parse(String(init!.body));
     expect(body.session.model).toBe(VOICE_MODEL);
-    expect(body.session.instructions).toBe('Talk Tagalog.');
+    expect(body.session.instructions).toBe('Talk Taglish.');
+    expect(body.session.input).toEqual([{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: 'Say hi.' }] }]);
     expect(body.transport).toEqual({ type: 'webrtc', sdp: 'v=0 offer' });
     expect(f.peer.remote).toEqual({ type: 'answer', sdp: 'v=0 answer' });
     expect(f.peer.tracks).toHaveLength(1);
@@ -128,7 +131,7 @@ describe('startCall', () => {
 
   it('passes on transcripts and usage, and hangs up cleanly', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
-    const call = await startCall(KEY, '', f.events, f.deps);
+    const call = await startCall(KEY, PROMPT, f.events, f.deps);
     f.peer.channel.emit({ type: 'session.started', session: {} });
     f.peer.channel.emit({ type: 'session.output_transcript.delta', delta: 'Kumusta', start_ms: 100, end_ms: 600 });
     f.peer.channel.emit({ type: 'session.input_transcript.delta', delta: 'Mabuti', start_ms: 900, end_ms: 1400 });
@@ -140,7 +143,10 @@ describe('startCall', () => {
     expect(f.track.enabled).toBe(false);
     call.hangUp();
     call.hangUp();
-    expect(f.peer.channel.sent).toEqual([{ type: 'session.close' }]);
+    expect(f.peer.channel.sent).toEqual([
+      { type: 'session.commentary.append', event_id: 'greeting', delegation_id: null, content: 'Say hi.' },
+      { type: 'session.close' },
+    ]);
     expect(f.peer.closed).toBe(true);
     expect(f.track.stopped).toBe(true);
     expect(f.events.onEnded).toHaveBeenCalledOnce();
@@ -149,7 +155,7 @@ describe('startCall', () => {
   it('ends on its own after the time limit', async () => {
     vi.useFakeTimers();
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
-    await startCall(KEY, '', f.events, f.deps);
+    await startCall(KEY, PROMPT, f.events, f.deps);
     vi.advanceTimersByTime(MAX_CALL_SECONDS * 1000);
     expect(f.events.onEnded).toHaveBeenCalledOnce();
     expect(f.peer.closed).toBe(true);
@@ -157,7 +163,7 @@ describe('startCall', () => {
 
   it('releases the microphone when OpenAI refuses the call', async () => {
     const f = fakeCall(json(401, { error: { message: 'Incorrect API key' } }));
-    await expect(startCall(KEY, '', f.events, f.deps)).rejects.toMatchObject({ kind: 'key' });
+    await expect(startCall(KEY, PROMPT, f.events, f.deps)).rejects.toMatchObject({ kind: 'key' });
     expect(f.track.stopped).toBe(true);
     expect(f.peer.closed).toBe(true);
     expect(f.events.onEnded).not.toHaveBeenCalled();
@@ -170,7 +176,7 @@ describe('startCall', () => {
         if (response instanceof Error) throw response;
         return response;
       }) as typeof fetch;
-      return startCall(KEY, '', f.events, f.deps).then(
+      return startCall(KEY, PROMPT, f.events, f.deps).then(
         () => { throw new Error('expected a failure'); },
         (e: AiError) => e,
       );
@@ -187,7 +193,7 @@ describe('startCall', () => {
 
   it('ends with an error when the call drops without OpenAI closing it', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
-    await startCall(KEY, '', f.events, f.deps);
+    await startCall(KEY, PROMPT, f.events, f.deps);
     f.peer.channel.readyState = 'closed';
     f.peer.channel.onclose!();
     expect(f.events.onEnded).toHaveBeenCalledOnce();
@@ -198,7 +204,7 @@ describe('startCall', () => {
   it('gives a disconnection a few seconds to recover before ending', async () => {
     vi.useFakeTimers();
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
-    await startCall(KEY, '', f.events, f.deps);
+    await startCall(KEY, PROMPT, f.events, f.deps);
     f.peer.setState('disconnected');
     vi.advanceTimersByTime(3000);
     f.peer.setState('connected');
@@ -211,7 +217,7 @@ describe('startCall', () => {
 
   it('ends quietly when OpenAI closes the session', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
-    await startCall(KEY, '', f.events, f.deps);
+    await startCall(KEY, PROMPT, f.events, f.deps);
     f.peer.channel.emit({ type: 'session.closed', reason: 'expired' });
     expect(f.events.onEnded).toHaveBeenCalledWith(undefined);
     f.peer.channel.emit({ type: 'session.output_transcript.delta', delta: 'late' });
@@ -223,7 +229,7 @@ describe('startCall', () => {
     f.deps.createPeer = () => {
       throw new Error('no WebRTC');
     };
-    await expect(startCall(KEY, '', f.events, f.deps)).rejects.toMatchObject({ kind: 'other' });
+    await expect(startCall(KEY, PROMPT, f.events, f.deps)).rejects.toMatchObject({ kind: 'other' });
     expect(f.track.stopped).toBe(true);
     expect(f.fetchFn).not.toHaveBeenCalled();
   });
@@ -233,7 +239,7 @@ describe('startCall', () => {
     f.deps.getMicrophone = async () => {
       throw new DOMException('denied', 'NotAllowedError');
     };
-    await expect(startCall(KEY, '', f.events, f.deps)).rejects.toThrow(/microphone/);
+    await expect(startCall(KEY, PROMPT, f.events, f.deps)).rejects.toThrow(/microphone/);
     expect(f.fetchFn).not.toHaveBeenCalled();
   });
 });
