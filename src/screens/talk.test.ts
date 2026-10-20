@@ -231,7 +231,7 @@ describe('Talk', () => {
     const f = fakeCall();
     const root = talkScreen(fakeApp(), f.deps);
     button(root, 'Start talking').click();
-    expect(root.querySelector('canvas.talk-visual')).not.toBeNull();
+    expect(root.querySelector('canvas.talk-backdrop')).not.toBeNull();
     await flush();
     f.send({ type: 'session.started' });
     f.peer.ontrack!({ streams: [{} as MediaStream], track: {} as MediaStreamTrack });
@@ -240,7 +240,7 @@ describe('Talk', () => {
     expect(f.visual.muted).toBe(true);
     button(root, 'End call').click();
     expect(f.visual.stopped).toBe(true);
-    expect(root.querySelector('canvas.talk-visual')).toBeNull();
+    expect(root.querySelector('canvas.talk-backdrop')).toBeNull();
   });
 
   it('stops the visual when a call fails to start, or on leaving', async () => {

@@ -45,7 +45,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   /** The transcript's bubbles, one per turn, updated in place as pieces arrive. */
   let log: HTMLElement | null = null;
   /** Kept across redraws, so the visual keeps running when the screen changes around it. */
-  const canvas = h('canvas', { class: 'talk-visual', 'aria-hidden': 'true' }) as HTMLCanvasElement;
+  const canvas = h('canvas', { class: 'talk-backdrop', 'aria-hidden': 'true' }) as HTMLCanvasElement;
 
   async function begin(): Promise<void> {
     const key = getApiKey();
@@ -236,8 +236,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     return h(
       'div',
       { class: 'talk-chat' },
-      header('Talking', h('span', { class: 'session-title talk-meter' }, meterText())),
       live && canvas,
+      header('Talking', h('span', { class: 'session-title talk-meter' }, meterText())),
       log,
       status && h('p', { class: 'talk-status' }, status),
       error && h('div', { class: 'feedback bad', role: 'alert' }, error),
