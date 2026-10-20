@@ -69,20 +69,36 @@ describe('follow', () => {
     expect(loudness(0.5)).toBe(1);
   });
 
-  it('scales quiet talk up so the rings still draw big shapes', () => {
-    const out = new Uint8Array(SAMPLES);
-    follow(tone(TALKING), fresh(), out, 1 / 60);
-    expect(Math.max(...out)).toBeGreaterThan(220);
-    expect(Math.min(...out)).toBeLessThan(36);
-    const loud = new Uint8Array(SAMPLES);
-    follow(tone(0.9), fresh(), loud, 1 / 60);
-    expect(Math.max(...loud)).toBeLessThan(235);
+  /** How far the rings' waveform swings from the middle, 0 to 127. */
+  const swing = (out: Uint8Array) => Math.max(...out.map((v) => Math.abs(v - 128)));
+  const frames = (n: number, wave: () => Float32Array, env = fresh(), out = new Uint8Array(SAMPLES)) => {
+    for (let i = 0; i < n; i++) follow(wave(), env, out, 1 / 60);
+    return out;
+  };
+
+  it('scales quiet talk up so the rings still draw big shapes, and loud sound down', () => {
+    expect(swing(frames(30, () => tone(TALKING)))).toBeGreaterThan(55);
+    const loud = swing(frames(30, () => tone(0.9)));
+    expect(loud).toBeGreaterThan(80);
+    expect(loud).toBeLessThan(110);
   });
 
-  it("doesn't blow background hiss up to fill the rings", () => {
-    const out = new Uint8Array(SAMPLES);
-    follow(hiss(), fresh(), out, 1 / 60);
-    expect(Math.max(...out.map((v) => Math.abs(v - 128)))).toBeLessThan(12);
+  /** Room noise around -45 dB, peaking near 0.02. */
+  const room = () => new Float32Array(1024).map((_, i) => Math.sin(i * 12.9898) * 0.0035 + (((i * 7919) % 9) - 4) * 0.0018);
+
+  it("doesn't blow room noise up to fill the rings once talking stops", () => {
+    const env = fresh();
+    frames(60, () => tone(0.2), env);
+    const out = frames(300, room, env);
+    expect(swing(out)).toBeLessThan(20);
+    expect(env.bright).toBeLessThan(0.5);
+  });
+
+  it("doesn't shrink talking for long after a click", () => {
+    const env = fresh();
+    frames(30, () => tone(TALKING), env);
+    frames(1, () => tone(1), env);
+    expect(swing(frames(30, () => tone(TALKING), env))).toBeGreaterThan(30);
   });
 
   it('is brighter for hissing sounds than for low ones', () => {

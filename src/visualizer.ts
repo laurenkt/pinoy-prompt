@@ -36,7 +36,7 @@ export interface Envelope {
   kick: number;
   /** How often the wave crosses zero, 0 to 1: higher for hissing sounds, lower for vowels. */
   bright: number;
-  /** The recent peak of the wave, falling slowly, which the rings' waveform is scaled against. */
+  /** The recent peak of the wave, eased, which the rings' waveform is scaled against. */
   reach: number;
 }
 
@@ -53,7 +53,7 @@ const LOUD_DB = -16;
 const NOISE = 0.004;
 /** The rings' waveform is scaled to fill this much of their swing, up to MAX_GAIN, so quiet talk still draws big shapes. */
 const REACH = 0.8;
-const MAX_GAIN = 24;
+const MAX_GAIN = 12;
 
 /** Loudness from 0 to 1 for a wave's root mean square level. */
 export function loudness(rms: number): number {
@@ -80,10 +80,13 @@ export function follow(wave: Float32Array, env: Envelope, out: Uint8Array, dt: n
     if (side && now !== side) crossings++;
     side = now;
   }
+  if (!Number.isFinite(sum)) return;
   const loud = loudness(Math.sqrt(sum / Math.max(1, wave.length)));
-  // The ring follows a peak that rises at once and relaxes over a couple of seconds.
-  env.reach = Math.max(peak, env.reach * Math.exp(-dt * 0.5));
-  const gain = Math.min(MAX_GAIN, REACH / Math.max(env.reach, NOISE));
+  // The scale follows the peak: rising in a few frames, so one click doesn't shrink what follows for long,
+  // and relaxing over a couple of seconds, so it doesn't pump between words.
+  env.reach += (peak - env.reach) * (1 - Math.exp(-dt * (peak > env.reach ? 8 : 0.5)));
+  // Below talking level the scale fades out, so room noise isn't blown up to fill the rings.
+  const gain = Math.min(MAX_GAIN, REACH / Math.max(env.reach, NOISE)) * Math.min(1, loud * 2);
   const step = wave.length / out.length;
   for (let i = 0; i < out.length; i++) {
     const v = (wave[Math.floor(i * step)] ?? 0) * gain;
@@ -94,7 +97,7 @@ export function follow(wave: Float32Array, env: Envelope, out: Uint8Array, dt: n
   env.level = Math.max(loud, env.level * Math.exp(-dt * 4));
   // About a third of a second to brighten and twice that to fade: well under three flashes a second.
   env.glow += (loud - env.glow) * (1 - Math.exp(-dt * (loud > env.glow ? 3 : 1.5)));
-  if (loud > 0.15) env.bright += (Math.min(1, crossings / wave.length / 0.15) - env.bright) * (1 - Math.exp(-dt * 3));
+  if (loud > 0.25) env.bright += (Math.min(1, crossings / wave.length / 0.15) - env.bright) * (1 - Math.exp(-dt * 3));
 }
 
 const VERTEX = `
@@ -254,6 +257,7 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
   resume();
   const analysers: Partial<Record<Voice, { node: AnalyserNode; source: MediaStreamAudioSourceNode }>> = {};
   const wave = new Float32Array(FFT_SIZE);
+  const bytes = new Uint8Array(FFT_SIZE);
   const env: Record<Voice, Envelope> = { you: quiet(), ai: quiet() };
   const still = matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let muted = false;
@@ -290,8 +294,13 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     }
     (['you', 'ai'] as const).forEach((who, i) => {
       const a = who === 'you' && muted ? undefined : analysers[who];
-      if (a) a.node.getFloatTimeDomainData(wave);
-      else wave.fill(0);
+      if (!a) wave.fill(0);
+      else if (a.node.getFloatTimeDomainData) a.node.getFloatTimeDomainData(wave);
+      else {
+        // Safari before 14.1 only gives bytes.
+        a.node.getByteTimeDomainData(bytes);
+        for (let j = 0; j < FFT_SIZE; j++) wave[j] = (bytes[j] - 128) / 128;
+      }
       const row = texture.subarray(i * SAMPLES, (i + 1) * SAMPLES);
       follow(wave, env[who], row, dt);
       // With reduced motion the rings stay round, and only swell and fade with each voice.
