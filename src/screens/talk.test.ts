@@ -31,6 +31,7 @@ function fakeCall(response: Response = new Response(JSON.stringify({ session: { 
   let channel: { onmessage: ((e: { data: string }) => void) | null; readyState: string; send: () => void } | null = null;
   const peer = {
     closed: false,
+    ontrack: null as ((e: { streams: MediaStream[]; track: MediaStreamTrack }) => void) | null,
     addTrack() {},
     createDataChannel() {
       channel = { onmessage: null, readyState: 'open', send() {} };
@@ -44,17 +45,24 @@ function fakeCall(response: Response = new Response(JSON.stringify({ session: { 
     },
   };
   const track = { enabled: true, stop() {} };
+  const visual = { shown: [] as string[], muted: false, stopped: false };
+  const visualizer = () => ({
+    listen: (who: string) => void visual.shown.push(who),
+    setMuted: (m: boolean) => void (visual.muted = m),
+    stop: () => void (visual.stopped = true),
+  });
   const call: CallDeps = {
     fetch: (async () => response) as typeof fetch,
     getMicrophone: async () => ({ getTracks: () => [track], getAudioTracks: () => [track] }) as unknown as MediaStream,
     createPeer: () => peer as unknown as RTCPeerConnection,
-    createSpeaker: () => ({ srcObject: null }) as unknown as HTMLAudioElement,
+    createSpeaker: () => ({ srcObject: null, play: async () => {} }) as unknown as HTMLAudioElement,
   };
   const send = (event: object) => channel!.onmessage!({ data: JSON.stringify(event) });
   return {
     peer,
     track,
-    deps: { call, callSupported: () => true } satisfies TalkDeps,
+    visual,
+    deps: { call, callSupported: () => true, visualizer } satisfies TalkDeps,
     send,
     say: (who: 'ai' | 'you', delta: string) => send({ type: who === 'ai' ? 'session.output_transcript.delta' : 'session.input_transcript.delta', delta }),
   };
@@ -175,7 +183,7 @@ describe('Talk', () => {
     const slow = new Promise<void>((r) => (release = r));
     let calls = 0;
     const deps: TalkDeps = {
-      callSupported: () => true,
+      ...first.deps,
       call: {
         ...first.deps.call,
         createPeer: () => (calls === 0 ? first.deps.call.createPeer() : second.deps.call.createPeer()),
@@ -216,6 +224,43 @@ describe('Talk', () => {
     expect(button(root, 'End call')).toBe(end);
     expect(first).toBeNull();
     expect(transcript(root)).toEqual(['Kumusta! Salamat.']);
+  });
+
+  it('shows both voices moving while the call is on, and stops when it ends', async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    const root = talkScreen(fakeApp(), f.deps);
+    button(root, 'Start talking').click();
+    expect(root.querySelector('canvas.talk-visual')).not.toBeNull();
+    await flush();
+    f.send({ type: 'session.started' });
+    f.peer.ontrack!({ streams: [{} as MediaStream], track: {} as MediaStreamTrack });
+    expect(f.visual.shown).toEqual(['you', 'ai']);
+    button(root, 'Mute').click();
+    expect(f.visual.muted).toBe(true);
+    button(root, 'End call').click();
+    expect(f.visual.stopped).toBe(true);
+    expect(root.querySelector('canvas.talk-visual')).toBeNull();
+  });
+
+  it('follows new words in the transcript unless the learner has scrolled back', async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    const root = talkScreen(fakeApp(), f.deps);
+    button(root, 'Start talking').click();
+    await flush();
+    f.send({ type: 'session.started' });
+    const log = root.querySelector<HTMLElement>('.talk-log')!;
+    // Each bubble's height, as the browser would lay it out.
+    Object.defineProperty(log, 'scrollHeight', { get: () => 300 + [...log.children].reduce((sum, b) => sum + b.textContent!.length * 10, 0) });
+    Object.defineProperty(log, 'clientHeight', { get: () => 300 });
+    f.say('ai', 'Kumusta!');
+    expect(log.scrollTop).toBe(log.scrollHeight);
+    f.say('you', 'Mabuti naman.');
+    expect(log.scrollTop).toBe(log.scrollHeight);
+    log.scrollTop = 0;
+    f.say('you', ' Ikaw?');
+    expect(log.scrollTop).toBe(0);
   });
 
   it("explains when the browser can't make calls", () => {
