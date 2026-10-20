@@ -304,7 +304,7 @@ p {
   text-underline-offset: 3px;
 }
 
-/* Memory: solid blocks for the headline numbers, a stacked bar for how firmly words are stored. */
+/* Memory: solid blocks for the headline numbers, a stacked stream for how memory has grown. */
 
 .tiles {
   display: grid;
@@ -358,22 +358,118 @@ p {
   margin: 0 0 12px;
 }
 
-.strength-bar {
+.growth-caption {
   display: flex;
-  height: 22px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+  min-height: 1.6rem;
+}
+
+.growth-total {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  margin-right: 6px;
+}
+
+.growth-back {
+  margin-left: auto;
+}
+
+.growth-frame {
+  position: relative;
+  height: 160px;
   border: var(--outline);
-  border-radius: 99px;
+  border-radius: 14px;
   overflow: hidden;
   background: var(--surface-dim);
+  box-shadow: var(--shadow);
+  /* Vertical swipes still scroll the page; sideways ones look through time. */
+  touch-action: pan-y;
+  cursor: crosshair;
 }
 
-.strength-bar .seg {
-  flex: 1 1 0;
-  min-width: 6px;
+.growth-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
-.strength-bar .seg + .seg {
-  border-left: var(--outline);
+.growth-svg .layer {
+  stroke: none;
+}
+
+.growth-svg .layer.s-new {
+  fill: var(--cream);
+}
+
+.growth-svg .layer.s-days {
+  fill: var(--pink);
+}
+
+.growth-svg .layer.s-weeks {
+  fill: var(--saffron);
+}
+
+.growth-svg .layer.s-long {
+  fill: var(--teal);
+}
+
+.growth-svg .edge {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.5px;
+  stroke-linejoin: round;
+}
+
+.growth-svg .edge.outer {
+  stroke-width: 3px;
+}
+
+.growth-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 3px solid var(--ink);
+  transform: translateX(-1.5px);
+  pointer-events: none;
+}
+
+.growth-marker::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: -9.5px;
+  width: 10px;
+  height: 10px;
+  background: var(--text);
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+}
+
+.growth-hint {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  right: 56px;
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.growth-back[hidden],
+.growth-marker[hidden] {
+  display: none;
+}
+
+.growth-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-weight: 700;
 }
 
 .s-new {

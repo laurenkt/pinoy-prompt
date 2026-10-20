@@ -92,6 +92,15 @@ describe('damaged saved progress', () => {
     expect(card).toEqual({ ease: 2.5, interval: 0, reps: 0, lapses: 0, due: NOW, introduced: 1000 });
   });
 
+  it('keeps only well-formed strength moves, oldest first', () => {
+    const card = sanitizeCard({ ...newCardState(1000), log: [[3000, 7], 'x', [2000, 1], [-1, 2], [4000]] }, NOW)!;
+    expect(card.log).toEqual([
+      [2000, 1],
+      [3000, 7],
+    ]);
+    expect(sanitizeCard({ ...newCardState(1000), log: 'x' }, NOW)!).not.toHaveProperty('log');
+  });
+
   it('keeps a card that is only an empty object, so the word stays learned', () => {
     const card = sanitizeCard({}, NOW)!;
     expect(card.introduced).toBe(NOW);

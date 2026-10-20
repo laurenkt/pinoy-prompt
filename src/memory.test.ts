@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { memorySummary, recallChance, recentReviews, strengthOf } from './memory';
+import { memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
 import { DAY_MS, newCardState, review, startOfDayAfter, type CardState } from './srs';
 import { dayKey, emptyProgress, recordAnswer } from './store';
 
@@ -97,5 +97,68 @@ describe('recentReviews', () => {
     p.cards.isa = review(p.cards.isa, 'good', NOW - 2 * DAY_MS);
     recordAnswer(p, 'isa', 'again', NOW);
     expect(recentReviews(p, NOW)).toEqual({ reviews: 1, missed: 1 });
+  });
+});
+
+describe('strengthSteps', () => {
+  it('follows the moves recordAnswer logs, including a lapse', () => {
+    const p = emptyProgress(NOW);
+    const t0 = NOW - 40 * DAY_MS;
+    recordAnswer(p, 'isa', 'good', t0); // 1 day
+    recordAnswer(p, 'isa', 'good', t0 + DAY_MS); // 3 days, still "days"
+    recordAnswer(p, 'isa', 'good', t0 + 4 * DAY_MS); // 7.5 days
+    recordAnswer(p, 'isa', 'good', t0 + 12 * DAY_MS); // 18.8 days, still "weeks"
+    recordAnswer(p, 'isa', 'good', t0 + 31 * DAY_MS); // long-term
+    recordAnswer(p, 'isa', 'again', NOW);
+    expect(p.cards.isa.log).toHaveLength(4);
+    expect(strengthSteps(p.cards.isa, NOW)).toEqual([
+      [t0, 'new'],
+      [t0, 'days'],
+      [t0 + 4 * DAY_MS, 'weeks'],
+      [t0 + 31 * DAY_MS, 'long'],
+      [NOW, 'new'],
+    ]);
+  });
+
+  it('works out a likely past for cards saved before moves were logged', () => {
+    const c = card(30, 2, { introduced: NOW - 60 * DAY_MS });
+    const steps = strengthSteps(c, NOW);
+    expect(steps[0]).toEqual([c.introduced, 'new']);
+    expect(steps[steps.length - 1]).toEqual([c.reviewed, 'long']);
+    expect(steps.map((s) => s[1])).toEqual(expect.arrayContaining(['days', 'weeks']));
+    for (let i = 1; i < steps.length; i++) expect(steps[i][0]).toBeGreaterThanOrEqual(steps[i - 1][0]);
+  });
+
+  it('squeezes the guessed past into the time since the card was met', () => {
+    const c = card(30, 0, { introduced: NOW - 5 * DAY_MS });
+    for (const [at] of strengthSteps(c, NOW)) expect(at).toBeGreaterThanOrEqual(c.introduced);
+  });
+
+  it('ends on the current strength even if an older build missed a move', () => {
+    const c = card(30, 1, { log: [[NOW - 9 * DAY_MS, 3]] });
+    expect(strengthSteps(c, NOW).slice(-1)).toEqual([[c.reviewed, 'long']]);
+  });
+});
+
+describe('memoryHistory', () => {
+  it('counts words by strength over time, ending on today', () => {
+    const p = emptyProgress(NOW);
+    p.cards.isa = card(30, 1, { introduced: NOW - 20 * DAY_MS });
+    p.cards.dalawa = card(0, 0);
+    p.cards['removed-card'] = card(30, 1);
+    const { since, times, counts } = memoryHistory(p, NOW, 21);
+    expect(since).toBe(NOW - 20 * DAY_MS);
+    expect(times[0]).toBe(since);
+    expect(times[20]).toBe(NOW);
+    expect(counts.new[0] + counts.days[0] + counts.weeks[0] + counts.long[0]).toBe(1);
+    expect([counts.new[20], counts.days[20], counts.weeks[20], counts.long[20]]).toEqual([1, 0, 0, 1]);
+  });
+
+  it('covers at least a week, so a first day reads as a start', () => {
+    const p = emptyProgress(NOW);
+    p.cards.isa = card(0, 0);
+    const { times, counts } = memoryHistory(p, NOW, 8);
+    expect(times[0]).toBe(NOW - 7 * DAY_MS);
+    expect(counts.new).toEqual([0, 0, 0, 0, 0, 0, 0, 1]);
   });
 });
