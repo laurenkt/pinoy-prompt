@@ -1,17 +1,7 @@
 import type { App } from '../app';
-import {
-  browserCallDeps,
-  callSupported,
-  errorText,
-  getApiKey,
-  MAX_CALL_SECONDS,
-  startCall,
-  type Call,
-  type CallDeps,
-  type ChatTurn,
-} from '../openai';
+import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey, MAX_CALL_SECONDS, startCall, type Call, type CallDeps } from '../openai';
 import { play } from '../speech';
-import { findWords, talkInstructions, talkPlan, talkTopics, type TalkPlan } from '../talk';
+import { addPiece, findWords, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
 import { h, icon } from '../ui';
 import { keyForm } from './settings';
 
@@ -23,92 +13,93 @@ export interface TalkDeps {
 export const defaultTalkDeps: TalkDeps = { call: browserCallDeps, callSupported };
 
 const MIN_WORDS = 4;
-/** GPT-Live's price per minute, in US cents. */
-const CENTS_PER_MINUTE = 5;
 
 let activeCall: Call | null = null;
+/** Bumped whenever a call is started or abandoned, so a call still connecting can tell it's no longer wanted. */
+let generation = 0;
 
-/** End a spoken conversation that's still going, as when leaving the screen. */
+/** End a spoken conversation that's going or still connecting, as when leaving the screen. */
 export function hangUpTalk(): void {
+  generation++;
   activeCall?.hangUp();
   activeCall = null;
 }
 
-type State =
-  | { name: 'menu' }
-  | { name: 'connecting' }
-  | { name: 'call'; muted: boolean }
-  | { name: 'ended' };
+type State = { name: 'menu' } | { name: 'connecting' } | { name: 'call'; muted: boolean } | { name: 'ended' };
 
 export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElement {
   const root = h('div', { class: 'talk' });
   let topicId: string | null = null;
   let plan: TalkPlan = talkPlan(app.progress, null);
-  let turns: ChatTurn[] = [];
+  let turns: SpokenTurn[] = [];
   let state: State = { name: 'menu' };
   let error: string | null = null;
   let seconds = 0;
-  /** Words whose meaning the learner has tapped to see; kept as the transcript redraws. */
+  /** Words whose meaning the learner has tapped to see; kept as the transcript grows. */
   let revealed = new Set<string>();
+  /** The transcript's bubbles, one per turn, updated in place as pieces arrive. */
+  let log: HTMLElement | null = null;
 
-  function begin(): void {
+  async function begin(): Promise<void> {
+    const key = getApiKey();
+    if (!key) return;
+    hangUpTalk();
+    const mine = generation;
+    const current = () => mine === generation;
     plan = talkPlan(app.progress, topicId);
     turns = [];
     error = null;
     seconds = 0;
     revealed = new Set();
-    void call();
-  }
-
-  async function call(): Promise<void> {
-    const key = getApiKey();
-    if (!key) return;
     state = { name: 'connecting' };
     draw();
     try {
-      activeCall = await startCall(key, talkInstructions(plan), {
+      const call = await startCall(key, talkInstructions(plan), {
         onStarted: () => {
-          if (state.name === 'connecting') state = { name: 'call', muted: false };
+          if (!current() || state.name !== 'connecting') return;
+          state = { name: 'call', muted: false };
           draw();
         },
-        onTranscript: (who, text) => {
-          addSpeech(who, text);
-          if (state.name === 'connecting') state = { name: 'call', muted: false };
-          draw();
+        onTranscript: (who, text, start, end) => {
+          if (!current()) return;
+          const { index, added } = addPiece(turns, who, text, start, end);
+          if (state.name === 'connecting') {
+            state = { name: 'call', muted: false };
+            draw();
+          } else showTurn(index, added);
         },
         onUsage: (s) => {
+          if (!current()) return;
           seconds = s;
           const meter = root.querySelector('.talk-meter');
           if (meter) meter.textContent = meterText();
         },
         onEnded: (e) => {
+          if (!current()) return;
           activeCall = null;
-          if (state.name === 'menu') return;
           if (e) error = errorText(e);
           state = { name: 'ended' };
           draw();
         },
       }, deps.call);
-      // Ended or left while it was connecting.
-      const now = state as State;
-      if (now.name !== 'connecting' && now.name !== 'call') hangUpTalk();
+      // Ended, left or restarted while it was connecting.
+      if (current()) activeCall = call;
+      else call.hangUp();
     } catch (e) {
-      activeCall = null;
+      if (!current()) return;
       error = errorText(e);
       state = { name: 'ended' };
       draw();
     }
   }
 
-  /** Transcripts arrive in pieces; a piece from the same speaker continues their turn. */
-  function addSpeech(who: ChatTurn['who'], text: string): void {
-    const last = turns[turns.length - 1];
-    if (last?.who === who) last.text += text;
-    else turns.push({ who, text: text.trimStart() });
+  function end(): void {
+    hangUpTalk();
+    state = { name: 'ended' };
+    draw();
   }
 
   function leave(): void {
-    state = { name: 'menu' };
     hangUpTalk();
     app.navigate({ name: 'practice' });
   }
@@ -116,16 +107,25 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   function meterText(): string {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
-    const cents = Math.max(1, Math.ceil((seconds / 60) * CENTS_PER_MINUTE));
-    return `${m}:${String(s).padStart(2, '0')} · about ${cents}¢`;
+    const time = `${m}:${String(s).padStart(2, '0')}`;
+    return seconds > 0 ? `${time} · about ${Math.ceil((seconds / 60) * CENTS_PER_MINUTE)}¢` : time;
   }
 
   function draw(): void {
+    log = null;
     if (!getApiKey()) root.replaceChildren(setup());
     else if (state.name === 'menu') root.replaceChildren(menu());
     else root.replaceChildren(conversation());
-    const log = root.querySelector('.talk-log');
-    log?.lastElementChild?.scrollIntoView?.({ block: 'end' });
+  }
+
+  /** Show a turn that changed, without redrawing the rest of the screen under the learner's finger. */
+  function showTurn(index: number, added: boolean): void {
+    if (!log) return;
+    const near = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 80;
+    const el = bubble(turns[index]);
+    if (added) log.insertBefore(el, log.children[index] ?? null);
+    else log.children[index]?.replaceWith(el);
+    if (near && index === turns.length - 1) el.scrollIntoView?.({ block: 'end' });
   }
 
   function header(title: string, extra?: HTMLElement): HTMLElement {
@@ -139,16 +139,10 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   }
 
   function setup(): HTMLElement {
-    return h(
-      'div',
-      null,
-      header('Talk'),
-      h('section', { class: 'card' }, h('h2', null, 'Connect OpenAI'), keyForm(draw)),
-    );
+    return h('div', null, header('Talk'), h('section', { class: 'card' }, h('h2', null, 'Connect OpenAI'), keyForm(draw)));
   }
 
   function menu(): HTMLElement {
-    const topics = talkTopics(app.progress);
     if (plan.known.length < MIN_WORDS) {
       return h(
         'div',
@@ -170,13 +164,13 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
       h(
         'p',
         { class: 'muted' },
-        `A conversation in English with your ${plan.known.length} Tagalog words mixed in, plus one new one. The firmer you know a word, the more it comes up. Talk doesn't change your review schedule.`,
+        `A conversation in English with your ${plan.known.length} Tagalog words mixed in${plan.newWord ? ', plus one new one' : ''}. The firmer you know a word, the more it comes up. Talk doesn't change your review schedule.`,
       ),
       h('h2', { class: 'talk-label' }, 'Talk about'),
       h(
         'div',
         { class: 'talk-topics', role: 'radiogroup', 'aria-label': 'Topic' },
-        [{ id: null, title: 'Anything' }, ...topics].map((t) =>
+        [{ id: null, title: 'Anything' }, ...talkTopics(app.progress)].map((t) =>
           h(
             'button',
             {
@@ -194,12 +188,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
         ),
       ),
       plan.newWord && h('p', { class: 'muted small' }, 'New word this time: ', h('strong', { lang: 'fil' }, plan.newWord.tl), ` (${plan.newWord.en})`),
-      h(
-        'button',
-        { class: 'btn primary big', disabled: !canCall, onclick: begin },
-        icon('mic'),
-        ' Start talking',
-      ),
+      h('button', { class: 'btn primary big', disabled: !canCall, onclick: () => void begin() }, icon('mic'), ' Start talking'),
       h(
         'p',
         { class: 'muted small center' },
@@ -212,24 +201,14 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
 
   function conversation(): HTMLElement {
     const live = state.name === 'call' || state.name === 'connecting';
-    const status =
-      state.name === 'connecting'
-        ? 'Connecting…'
-        : state.name === 'call'
-          ? state.muted
-            ? 'Muted'
-            : 'Listening. Just talk.'
-          : null;
+    const status = state.name === 'connecting' ? 'Connecting…' : state.name === 'call' ? (state.muted ? 'Muted' : 'Listening. Just talk.') : null;
+    log = h('div', { class: 'talk-log', 'aria-live': 'polite' }, turns.map(bubble));
     return h(
       'div',
       { class: 'talk-chat' },
       header('Talking', h('span', { class: 'session-title talk-meter' }, meterText())),
-      h(
-        'div',
-        { class: 'talk-log', 'aria-live': 'polite' },
-        turns.map((t) => bubble(t)),
-        status && h('p', { class: 'talk-status' }, status),
-      ),
+      log,
+      status && h('p', { class: 'talk-status' }, status),
       error && h('div', { class: 'feedback bad', role: 'alert' }, error),
       h('p', { class: 'muted small talk-help' }, 'Tap a Tagalog word to hear it and see what it means.'),
       live &&
@@ -251,30 +230,19 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
             },
             state.name === 'call' && state.muted ? 'Unmute' : 'Mute',
           ),
-          h(
-            'button',
-            {
-              class: 'btn danger',
-              onclick: () => {
-                if (activeCall) return hangUpTalk();
-                state = { name: 'ended' };
-                draw();
-              },
-            },
-            'End call',
-          ),
+          h('button', { class: 'btn danger', onclick: end }, 'End call'),
         ),
       state.name === 'ended' &&
         h(
           'div',
           { class: 'row' },
           h('button', { class: 'btn secondary', onclick: () => { state = { name: 'menu' }; draw(); } }, 'Change topic'),
-          h('button', { class: 'btn primary', onclick: () => begin() }, 'Talk again'),
+          h('button', { class: 'btn primary', onclick: () => void begin() }, 'Talk again'),
         ),
     );
   }
 
-  function bubble(turn: ChatTurn): HTMLElement {
+  function bubble(turn: SpokenTurn): HTMLElement {
     if (turn.who === 'you') return h('p', { class: 'bubble you' }, turn.text);
     return h(
       'p',

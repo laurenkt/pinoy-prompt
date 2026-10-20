@@ -166,6 +166,58 @@ describe('Talk', () => {
     expect(root.querySelector('[role="alert"]')!.textContent).toContain('out of credit');
   });
 
+  it('hangs up a call that connects after it was ended, and keeps the next one', async () => {
+    setApiKey(KEY);
+    const answer = () => new Response(JSON.stringify({ session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }), { status: 201 });
+    const first = fakeCall();
+    const second = fakeCall();
+    let release: () => void = () => {};
+    const slow = new Promise<void>((r) => (release = r));
+    let calls = 0;
+    const deps: TalkDeps = {
+      callSupported: () => true,
+      call: {
+        ...first.deps.call,
+        createPeer: () => (calls === 0 ? first.deps.call.createPeer() : second.deps.call.createPeer()),
+        fetch: (async () => {
+          if (calls++ === 0) await slow;
+          return answer();
+        }) as typeof fetch,
+      },
+    };
+    const root = talkScreen(fakeApp(), deps);
+    button(root, 'Start talking').click();
+    await flush();
+    button(root, 'End call').click();
+    button(root, 'Talk again').click();
+    await flush();
+    second.send({ type: 'session.started' });
+    release();
+    await flush();
+    expect(first.peer.closed).toBe(true);
+    expect(second.peer.closed).toBe(false);
+    second.say('ai', 'Kumusta!');
+    expect(transcript(root)).toEqual(['Kumusta!']);
+    button(root, 'End call').click();
+    expect(second.peer.closed).toBe(true);
+  });
+
+  it("keeps the controls in place while the transcript grows", async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    const root = talkScreen(fakeApp(), f.deps);
+    button(root, 'Start talking').click();
+    await flush();
+    f.send({ type: 'session.started' });
+    const end = button(root, 'End call');
+    const first = root.querySelector('.bubble');
+    f.say('ai', 'Kumusta!');
+    f.say('ai', ' Salamat.');
+    expect(button(root, 'End call')).toBe(end);
+    expect(first).toBeNull();
+    expect(transcript(root)).toEqual(['Kumusta! Salamat.']);
+  });
+
   it("explains when the browser can't make calls", () => {
     setApiKey(KEY);
     const root = talkScreen(fakeApp(), { ...fakeCall().deps, callSupported: () => false });

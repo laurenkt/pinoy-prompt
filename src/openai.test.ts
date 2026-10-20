@@ -48,6 +48,7 @@ class FakeChannel {
   readyState = 'open';
   sent: unknown[] = [];
   onmessage: ((e: { data: string }) => void) | null = null;
+  onclose: (() => void) | null = null;
   send(data: string) {
     this.sent.push(JSON.parse(data));
   }
@@ -80,6 +81,12 @@ class FakePeer {
   }
   close() {
     this.closed = true;
+    this.channel.readyState = 'closed';
+    this.channel.onclose?.();
+  }
+  setState(state: string) {
+    this.connectionState = state;
+    this.onconnectionstatechange?.();
   }
 }
 
@@ -123,11 +130,11 @@ describe('startCall', () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
     const call = await startCall(KEY, '', f.events, f.deps);
     f.peer.channel.emit({ type: 'session.started', session: {} });
-    f.peer.channel.emit({ type: 'session.output_transcript.delta', delta: 'Kumusta' });
-    f.peer.channel.emit({ type: 'session.input_transcript.delta', delta: 'Mabuti' });
+    f.peer.channel.emit({ type: 'session.output_transcript.delta', delta: 'Kumusta', start_ms: 100, end_ms: 600 });
+    f.peer.channel.emit({ type: 'session.input_transcript.delta', delta: 'Mabuti', start_ms: 900, end_ms: 1400 });
     f.peer.channel.emit({ type: 'session.usage.updated', usage: { seconds: 12.5 } });
     expect(f.events.onStarted).toHaveBeenCalledOnce();
-    expect(f.events.onTranscript.mock.calls).toEqual([['ai', 'Kumusta'], ['you', 'Mabuti']]);
+    expect(f.events.onTranscript.mock.calls).toEqual([['ai', 'Kumusta', 100, 600], ['you', 'Mabuti', 900, 1400]]);
     expect(f.events.onUsage).toHaveBeenCalledWith(12.5);
     call.setMuted(true);
     expect(f.track.enabled).toBe(false);
@@ -176,6 +183,49 @@ describe('startCall', () => {
     expect(other.kind).toBe('other');
     expect(errorText(other)).toContain('Bad gateway');
     expect((await refused(json(201, { session: { id: 'live_1' } }))).message).toContain('without an answer');
+  });
+
+  it('ends with an error when the call drops without OpenAI closing it', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    await startCall(KEY, '', f.events, f.deps);
+    f.peer.channel.readyState = 'closed';
+    f.peer.channel.onclose!();
+    expect(f.events.onEnded).toHaveBeenCalledOnce();
+    expect(f.events.onEnded.mock.calls[0][0]).toMatchObject({ kind: 'network' });
+    expect(f.track.stopped).toBe(true);
+  });
+
+  it('gives a disconnection a few seconds to recover before ending', async () => {
+    vi.useFakeTimers();
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    await startCall(KEY, '', f.events, f.deps);
+    f.peer.setState('disconnected');
+    vi.advanceTimersByTime(3000);
+    f.peer.setState('connected');
+    vi.advanceTimersByTime(10_000);
+    expect(f.events.onEnded).not.toHaveBeenCalled();
+    f.peer.setState('disconnected');
+    vi.advanceTimersByTime(5000);
+    expect(f.events.onEnded).toHaveBeenCalledOnce();
+  });
+
+  it('ends quietly when OpenAI closes the session', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    await startCall(KEY, '', f.events, f.deps);
+    f.peer.channel.emit({ type: 'session.closed', reason: 'expired' });
+    expect(f.events.onEnded).toHaveBeenCalledWith(undefined);
+    f.peer.channel.emit({ type: 'session.output_transcript.delta', delta: 'late' });
+    expect(f.events.onTranscript).not.toHaveBeenCalled();
+  });
+
+  it('releases the microphone when setting up the connection fails', async () => {
+    const f = fakeCall(json(201, {}));
+    f.deps.createPeer = () => {
+      throw new Error('no WebRTC');
+    };
+    await expect(startCall(KEY, '', f.events, f.deps)).rejects.toMatchObject({ kind: 'other' });
+    expect(f.track.stopped).toBe(true);
+    expect(f.fetchFn).not.toHaveBeenCalled();
   });
 
   it('says so when the microphone is refused', async () => {

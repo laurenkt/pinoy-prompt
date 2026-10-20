@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { getCard } from '../deck';
-import { forgetApiKey, getApiKey, setApiKey } from '../openai';
+import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai';
 import { play, voiceQuality } from '../speech';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon } from '../ui';
@@ -175,7 +175,7 @@ export function keyForm(onChange: () => void): HTMLElement {
       { class: 'muted small' },
       'Talk is a conversation with an AI, using your own OpenAI API key. Create one at ',
       h('a', { href: 'https://platform.openai.com/api-keys', target: '_blank', rel: 'noopener' }, 'platform.openai.com'),
-      " and paste it here. API use is billed by OpenAI separately from a ChatGPT subscription, at about 5¢ a minute of talking.",
+      ` and paste it here. API use is billed by OpenAI separately from a ChatGPT subscription, at about ${CENTS_PER_MINUTE}¢ a minute of talking.`,
     ),
     h(
       'p',

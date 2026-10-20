@@ -6,6 +6,8 @@ const KEY_STORAGE = 'pinoy-prompt:openai-key';
 const API = 'https://api.openai.com/v1';
 /** Spoken conversations. Billed per second of the call. */
 export const VOICE_MODEL = 'gpt-live-1';
+/** GPT-Live's price per minute of call, in US cents. */
+export const CENTS_PER_MINUTE = 5;
 /** Calls end on their own after this long, so a forgotten one can't run up a bill. */
 export const MAX_CALL_SECONDS = 10 * 60;
 
@@ -111,8 +113,11 @@ export interface ChatTurn {
 }
 
 export interface CallEvents {
-  /** A piece of what was said, by the learner or the AI, in the order spoken. */
-  onTranscript(who: ChatTurn['who'], text: string): void;
+  /**
+   * A piece of what was said, by the learner or the AI, with when it was said
+   * in ms from the start of the call. Pieces carry no turn boundaries.
+   */
+  onTranscript(who: ChatTurn['who'], text: string, startMs: number, endMs: number): void;
   /** The call is connected and listening. */
   onStarted(): void;
   /** Seconds of the call so far, as OpenAI counts them for billing. */
@@ -163,48 +168,90 @@ export async function startCall(key: string, instructions: string, events: CallE
   } catch {
     throw new AiError('other', 'Talk needs the microphone. Allow it for this site and try again.');
   }
-  const peer = deps.createPeer();
+  let peer: RTCPeerConnection | null = null;
+  let channel: RTCDataChannel | null = null;
   let ended = false;
   let limit: ReturnType<typeof setTimeout> | undefined;
+  let dropping: ReturnType<typeof setTimeout> | undefined;
+
+  function release(): void {
+    clearTimeout(limit);
+    clearTimeout(dropping);
+    mic.getTracks().forEach((t) => t.stop());
+    peer?.close();
+    speaker.srcObject = null;
+  }
 
   function finish(error?: AiError): void {
     if (ended) return;
     ended = true;
-    clearTimeout(limit);
     try {
-      if (channel.readyState === 'open') channel.send(JSON.stringify({ type: 'session.close' }));
+      if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'session.close' }));
     } catch {
       // Closing the connection ends the session anyway.
     }
-    mic.getTracks().forEach((t) => t.stop());
-    peer.close();
-    speaker.srcObject = null;
+    release();
     events.onEnded(error);
   }
 
-  peer.ontrack = (e) => {
-    speaker.srcObject = e.streams[0] ?? new MediaStream([e.track]);
-    void speaker.play().catch(() => {});
-  };
-  for (const track of mic.getAudioTracks()) peer.addTrack(track, mic);
-  // Listeners go on before the offer, so no early event is missed.
-  const channel = peer.createDataChannel('oai-events');
-  channel.onmessage = (e) => {
-    let event: { type?: string; delta?: string; usage?: { seconds?: number }; error?: { message?: string } };
+  try {
+    peer = deps.createPeer();
+    const pc = peer;
+    pc.ontrack = (e) => {
+      speaker.srcObject = e.streams[0] ?? new MediaStream([e.track]);
+      void speaker.play().catch(() => {});
+    };
+    for (const track of mic.getAudioTracks()) pc.addTrack(track, mic);
+    // Listeners go on before the offer, so no early event is missed.
+    channel = pc.createDataChannel('oai-events');
+    channel.onmessage = (e) => onEvent(String(e.data));
+    // The channel closing without session.closed means the call was lost.
+    channel.onclose = () => finish(new AiError('network', 'The call dropped.'));
+    pc.onconnectionstatechange = () => {
+      clearTimeout(dropping);
+      if (pc.connectionState === 'failed') finish(new AiError('network', 'The call dropped.'));
+      // A disconnection can recover by itself, but not after a few seconds.
+      else if (pc.connectionState === 'disconnected') dropping = setTimeout(() => finish(new AiError('network', 'The call dropped.')), 5000);
+    };
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const response = await post(key, '/live/sessions', {
+      session: {
+        model: VOICE_MODEL,
+        instructions,
+        audio: { output: { voice: 'marin' } },
+        input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: '(The learner has joined the call.)' }] }],
+      },
+      transport: { type: 'webrtc', sdp: offer.sdp },
+    }, deps.fetch);
+    const body = (await response.json()) as { transport?: { sdp?: string } };
+    if (!body.transport?.sdp) throw new AiError('other', 'OpenAI started the call without an answer.');
+    await pc.setRemoteDescription({ type: 'answer', sdp: body.transport.sdp });
+  } catch (e) {
+    ended = true;
+    release();
+    throw e instanceof AiError ? e : new AiError('other', e instanceof Error ? e.message : String(e));
+  }
+
+  function onEvent(data: string): void {
+    let event: { type?: string; delta?: string; start_ms?: number; end_ms?: number; usage?: { seconds?: number }; error?: { message?: string } };
     try {
-      event = JSON.parse(String(e.data));
+      event = JSON.parse(data);
     } catch {
       return;
     }
+    if (ended) return;
     switch (event.type) {
       case 'session.started':
         events.onStarted();
         break;
       case 'session.input_transcript.delta':
-        if (event.delta) events.onTranscript('you', event.delta);
-        break;
       case 'session.output_transcript.delta':
-        if (event.delta) events.onTranscript('ai', event.delta);
+        if (event.delta) {
+          const who = event.type === 'session.input_transcript.delta' ? 'you' : 'ai';
+          events.onTranscript(who, event.delta, event.start_ms ?? 0, event.end_ms ?? event.start_ms ?? 0);
+        }
         break;
       case 'session.usage.updated':
         if (typeof event.usage?.seconds === 'number') events.onUsage(event.usage.seconds);
@@ -217,32 +264,6 @@ export async function startCall(key: string, instructions: string, events: CallE
         console.warn('Talk:', event.error?.message);
         break;
     }
-  };
-  peer.onconnectionstatechange = () => {
-    if (peer.connectionState === 'failed') finish(new AiError('network', 'The call dropped.'));
-  };
-
-  try {
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-    const response = await post(key, '/live/sessions', {
-      session: {
-        model: VOICE_MODEL,
-        instructions,
-        audio: { output: { voice: 'marin' } },
-        input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: '(The learner has joined the call.)' }] }],
-      },
-      transport: { type: 'webrtc', sdp: offer.sdp },
-    }, deps.fetch);
-    const body = (await response.json()) as { transport?: { sdp?: string } };
-    if (!body.transport?.sdp) throw new AiError('other', 'OpenAI started the call without an answer.');
-    await peer.setRemoteDescription({ type: 'answer', sdp: body.transport.sdp });
-  } catch (e) {
-    const error = e instanceof AiError ? e : new AiError('other', e instanceof Error ? e.message : String(e));
-    ended = true;
-    mic.getTracks().forEach((t) => t.stop());
-    peer.close();
-    throw error;
   }
 
   limit = setTimeout(() => finish(), MAX_CALL_SECONDS * 1000);

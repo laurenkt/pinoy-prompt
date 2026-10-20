@@ -5,7 +5,7 @@
 // learner can tap one to hear it and see its meaning.
 
 import { ALL_CARDS, getCard, UNITS, type Card, type Unit } from './deck';
-import { strengthOf, type Strength } from './memory';
+import { STRENGTHS, strengthOf, type Strength } from './memory';
 import type { Progress } from './progress-schema';
 
 export interface KnownWord {
@@ -22,7 +22,8 @@ export interface TalkPlan {
   newWord: Card | null;
 }
 
-const ORDER: Strength[] = ['long', 'weeks', 'days', 'new'];
+/** Firmest first. */
+const ORDER: Strength[] = STRENGTHS.map((s) => s.id).reverse();
 
 /** Topics with at least one word the learner has met. */
 export function talkTopics(progress: Progress): Unit[] {
@@ -84,24 +85,37 @@ const fold = (s: string) => s.toLowerCase().normalize('NFC');
 /** Letters and the hyphens inside words; everything else is punctuation. */
 const WORD = /^([^\p{L}]*)([\p{L}][\p{L}'’-]*[\p{L}]|[\p{L}])?([^\p{L}]*)$/u;
 
+/**
+ * Deck words that are also everyday English ("I ate", "Lima, Peru"). In a
+ * conversation that's mostly English they'd be marked wrongly more often than
+ * rightly, so they aren't marked at all.
+ */
+const ENGLISH_LOOKALIKES = new Set(['ate', 'lima']);
+
 interface Phrase {
   words: string[];
   card: Card;
   strength: Strength | 'unseen';
 }
 
+const phraseCache = new WeakMap<TalkPlan, Phrase[]>();
+
 function phrases(plan: TalkPlan): Phrase[] {
+  const cached = phraseCache.get(plan);
+  if (cached) return cached;
   const out: Phrase[] = [];
   const add = (card: Card, strength: Strength | 'unseen') => {
     for (const spelling of [card.tl, ...(card.accept ?? [])]) {
       const words = spelling.split(/\s+/).map((w) => fold(w.match(WORD)?.[2] ?? '')).filter(Boolean);
-      if (words.length) out.push({ words, card, strength });
+      if (words.length && !(words.length === 1 && ENGLISH_LOOKALIKES.has(words[0]))) out.push({ words, card, strength });
     }
   };
   for (const k of plan.known) add(k.card, k.strength);
   if (plan.newWord) add(plan.newWord, 'unseen');
   // Longest first, so "Maraming salamat" wins over "salamat".
-  return out.sort((a, b) => b.words.length - a.words.length);
+  out.sort((a, b) => b.words.length - a.words.length);
+  phraseCache.set(plan, out);
+  return out;
 }
 
 /** Split the AI's text into plain runs and the deck's Tagalog words and phrases. */
@@ -133,4 +147,38 @@ export function findWords(text: string, plan: TalkPlan): Segment[] {
   }
   if (plain) segments.push({ text: plain });
   return segments;
+}
+
+/** A turn of the call's transcript, timed in ms from the start of the call. */
+export interface SpokenTurn {
+  who: 'you' | 'ai';
+  text: string;
+  start: number;
+  end: number;
+}
+
+/** A pause longer than this between two pieces from one speaker starts a new turn. */
+export const TURN_GAP_MS = 1500;
+
+/**
+ * Add a piece of transcript to the turns, which are kept in the order they
+ * were spoken. A piece continues its speaker's latest turn unless there was a
+ * pause, so a late piece of the learner's speech doesn't split the AI's reply.
+ * Returns the index of the turn that changed, and whether it is new.
+ */
+export function addPiece(turns: SpokenTurn[], who: SpokenTurn['who'], text: string, start: number, end: number): { index: number; added: boolean } {
+  let index = turns.length - 1;
+  while (index >= 0 && turns[index].who !== who) index--;
+  const last = turns[index];
+  if (last && start - last.end <= TURN_GAP_MS) {
+    // Pieces split mid-word run on; after a gap, words need a space between them.
+    const space = start > last.end && !/\s$/.test(last.text) && !/^\s/.test(text) ? ' ' : '';
+    last.text += space + text;
+    last.end = Math.max(last.end, end);
+    return { index, added: false };
+  }
+  let at = turns.length;
+  while (at > 0 && turns[at - 1].start > start) at--;
+  turns.splice(at, 0, { who, text: text.trimStart(), start, end });
+  return { index: at, added: true };
 }
