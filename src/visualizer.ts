@@ -36,41 +36,65 @@ export interface Envelope {
   kick: number;
   /** How often the wave crosses zero, 0 to 1: higher for hissing sounds, lower for vowels. */
   bright: number;
+  /** The recent peak of the wave, falling slowly, which the rings' waveform is scaled against. */
+  reach: number;
 }
 
-export const quiet = (): Envelope => ({ level: 0, glow: 0, kick: 0, bright: 0 });
-
-/** Bytes either side of the centre a wave must swing past to count as crossing it, so hum and hiss don't. */
-const HYSTERESIS = 3;
+export const quiet = (): Envelope => ({ level: 0, glow: 0, kick: 0, bright: 0, reach: 0 });
 
 /**
- * Read a waveform (bytes centred on 128) into the shader's samples, and update
- * the voice's envelope. Level rises at once, so a sound shows in the very frame
- * it arrives; glow follows more gently, so the whole screen never flickers.
+ * Loudness is heard on a log scale, so it's measured in decibels: from about
+ * room noise up to a raised voice. Ordinary talking lands around the middle,
+ * and singing or shouting reaches the top.
  */
-export function follow(wave: Uint8Array, env: Envelope, out: Uint8Array, dt: number): void {
+const QUIET_DB = -54;
+const LOUD_DB = -16;
+/** Below this, a wave counts as silence; also how far either side of zero it must swing to count as crossing it. */
+const NOISE = 0.004;
+/** The rings' waveform is scaled to fill this much of their swing, up to MAX_GAIN, so quiet talk still draws big shapes. */
+const REACH = 0.8;
+const MAX_GAIN = 24;
+
+/** Loudness from 0 to 1 for a wave's root mean square level. */
+export function loudness(rms: number): number {
+  const db = 20 * Math.log10(Math.max(rms, 1e-6));
+  return Math.min(1, Math.max(0, (db - QUIET_DB) / (LOUD_DB - QUIET_DB)));
+}
+
+/**
+ * Read a waveform (samples from -1 to 1) into the shader's samples (bytes
+ * centred on 128), and update the voice's envelope. Level rises at once, so a
+ * sound shows in the very frame it arrives; glow follows more gently, so the
+ * whole screen never flickers.
+ */
+export function follow(wave: Float32Array, env: Envelope, out: Uint8Array, dt: number): void {
   let peak = 0;
   let sum = 0;
   let crossings = 0;
   let side = 0;
   for (let i = 0; i < wave.length; i++) {
-    const v = (wave[i] - 128) / 128;
+    const v = wave[i];
     peak = Math.max(peak, Math.abs(v));
     sum += v * v;
-    const now = wave[i] >= 128 + HYSTERESIS ? 1 : wave[i] <= 128 - HYSTERESIS ? -1 : side;
+    const now = v >= NOISE ? 1 : v <= -NOISE ? -1 : side;
     if (side && now !== side) crossings++;
     side = now;
   }
+  const loud = loudness(Math.sqrt(sum / Math.max(1, wave.length)));
+  // The ring follows a peak that rises at once and relaxes over a couple of seconds.
+  env.reach = Math.max(peak, env.reach * Math.exp(-dt * 0.5));
+  const gain = Math.min(MAX_GAIN, REACH / Math.max(env.reach, NOISE));
   const step = wave.length / out.length;
-  for (let i = 0; i < out.length; i++) out[i] = wave[Math.floor(i * step)] ?? 128;
-  // Speech sits far below full scale; this brings normal talking near the top.
-  const loud = Math.min(1, Math.sqrt(sum / Math.max(1, wave.length)) * 6 + peak * 0.5);
+  for (let i = 0; i < out.length; i++) {
+    const v = (wave[Math.floor(i * step)] ?? 0) * gain;
+    out[i] = Math.round(128 + 127 * Math.max(-1, Math.min(1, v)));
+  }
   if (loud - env.level > 0.12) env.kick = 1;
   else env.kick *= Math.exp(-dt * 9);
   env.level = Math.max(loud, env.level * Math.exp(-dt * 4));
   // About a third of a second to brighten and twice that to fade: well under three flashes a second.
   env.glow += (loud - env.glow) * (1 - Math.exp(-dt * (loud > env.glow ? 3 : 1.5)));
-  if (loud > 0.1) env.bright += (Math.min(1, crossings / wave.length / 0.15) - env.bright) * (1 - Math.exp(-dt * 3));
+  if (loud > 0.15) env.bright += (Math.min(1, crossings / wave.length / 0.15) - env.bright) * (1 - Math.exp(-dt * 3));
 }
 
 const VERTEX = `
@@ -229,7 +253,7 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
   const resume = () => void audio.resume?.()?.catch(() => {});
   resume();
   const analysers: Partial<Record<Voice, { node: AnalyserNode; source: MediaStreamAudioSourceNode }>> = {};
-  const wave = new Uint8Array(FFT_SIZE);
+  const wave = new Float32Array(FFT_SIZE);
   const env: Record<Voice, Envelope> = { you: quiet(), ai: quiet() };
   const still = matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let muted = false;
@@ -266,8 +290,8 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     }
     (['you', 'ai'] as const).forEach((who, i) => {
       const a = who === 'you' && muted ? undefined : analysers[who];
-      if (a) a.node.getByteTimeDomainData(wave);
-      else wave.fill(128);
+      if (a) a.node.getFloatTimeDomainData(wave);
+      else wave.fill(0);
       const row = texture.subarray(i * SAMPLES, (i + 1) * SAMPLES);
       follow(wave, env[who], row, dt);
       // With reduced motion the rings stay round, and only swell and fade with each voice.
