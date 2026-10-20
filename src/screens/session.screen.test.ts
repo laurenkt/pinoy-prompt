@@ -98,7 +98,7 @@ describe('open-ended study', () => {
     app.progress.settings.dailyNew = 4;
     const root = sessionScreen(app, null, undefined, noMic);
     expect(root.textContent).toContain("You're caught up");
-    expect(root.textContent).toContain('Learn new words');
+    expect(root.textContent).toContain('Learn something new');
     button(root, 'Keep practising').click();
     expect(root.textContent).toContain('Extra practice');
     expect(root.querySelectorAll('.choice').length).toBe(4);

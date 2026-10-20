@@ -40,7 +40,7 @@ describe('growthChart', () => {
     const el = growthChart(history, counts);
     expect(el.querySelectorAll('.layer')).toHaveLength(4);
     expect(el.querySelectorAll('.edge')).toHaveLength(4);
-    expect(el.querySelector('.growth-caption')!.textContent).toContain('7 words today');
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('7 cards today');
     expect(counts.weeks.textContent).toBe('4');
     expect(el.querySelector('.growth-hint')).toBeNull();
   });
@@ -51,11 +51,11 @@ describe('growthChart', () => {
     const frame = el.querySelector<HTMLElement>('.growth-frame')!;
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 140, pointerType: 'touch' }));
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^4 words on /);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^4 cards on /);
     expect(counts.days.textContent).toBe('3');
     expect(el.querySelector<HTMLElement>('.growth-marker')!.hidden).toBe(false);
     el.querySelector<HTMLButtonElement>('.growth-back')!.click();
-    expect(el.querySelector('.growth-caption')!.textContent).toContain('7 words today');
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('7 cards today');
     expect(counts.days.textContent).toBe('1');
   });
 

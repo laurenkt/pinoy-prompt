@@ -74,7 +74,7 @@ function tabBar(active: Tab): HTMLElement {
   const tabs: { id: Tab; label: string; route: Route }[] = [
     { id: 'home', label: 'Study', route: { name: 'home' } },
     { id: 'practice', label: 'Drills', route: { name: 'practice' } },
-    { id: 'words', label: 'Words', route: { name: 'words' } },
+    { id: 'words', label: 'Library', route: { name: 'words' } },
   ];
   return h(
     'nav',

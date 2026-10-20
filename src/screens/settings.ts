@@ -20,7 +20,7 @@ export function settingsScreen(app: App): HTMLElement {
       return;
     }
     app.commit();
-    alert(changed === 1 ? 'Restored 1 word.' : `Restored ${changed} words.`);
+    alert(changed === 1 ? 'Restored 1 card.' : `Restored ${changed} cards.`);
     draw();
   });
 
@@ -44,11 +44,11 @@ export function settingsScreen(app: App): HTMLElement {
       h(
         'section',
         { class: 'card' },
-        h('h2', null, 'New words per day'),
+        h('h2', null, 'New cards per day'),
         h('p', { class: 'muted small' }, 'Fewer means lighter reviews later. 8 is a good start.'),
         h(
           'div',
-          { class: 'segmented', role: 'radiogroup', 'aria-label': 'New words per day' },
+          { class: 'segmented', role: 'radiogroup', 'aria-label': 'New cards per day' },
           DAILY_OPTIONS.map((n) =>
             h(
               'button',

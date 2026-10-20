@@ -114,7 +114,7 @@ export function growthChart(
     const today = i === last;
     const n = total(i);
     value.textContent = String(n);
-    when.textContent = ` ${n === 1 ? 'word' : 'words'} ${today ? 'today' : `on ${shortDate(times[i])}`}`;
+    when.textContent = ` ${n === 1 ? 'card' : 'cards'} ${today ? 'today' : `on ${shortDate(times[i])}`}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][i]);
     marker.hidden = today;
     marker.style.left = `${(i / last) * 100}%`;
@@ -132,7 +132,7 @@ export function growthChart(
     marker,
     // In the first days the stream is a sliver at the edge; say what is coming.
     times[last] - history.since < 2 * DAY_MS &&
-      h('p', { class: 'growth-hint small' }, 'Keep coming back and this fills in, day by day, as your words settle.'),
+      h('p', { class: 'growth-hint small' }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
   );
   const pick = (e: PointerEvent) => {
     const box = frame.getBoundingClientRect();

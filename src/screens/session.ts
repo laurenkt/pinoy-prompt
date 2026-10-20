@@ -1,14 +1,18 @@
 import type { App } from '../app';
-import { ALL_CARDS, getCard, unitOf, type Card } from '../deck';
+import { VOCAB, getCard, isVocab, unitOf, type Card, type Drill } from '../deck';
+import { KIND_INFO } from '../guides';
 import {
   buildExtraSession,
   distractors,
+  buildTiles,
+  drillSentence,
   isIntroduced,
   nextStudyStep,
+  pickDrill,
   pickFormat,
   requeue,
   shuffle,
-  upcomingNewCards,
+  unmetCount,
   type Format,
   type Step,
 } from '../session';
@@ -18,7 +22,7 @@ import { recordAnswer, rollDay } from '../store';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
-type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'speak' | 'caught-up' | 'done';
+type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'caught-up' | 'done';
 
 const RATINGS: { rating: Rating; label: string }[] = [
   { rating: 'again', label: 'Again' },
@@ -43,8 +47,17 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   let phase: Phase = 'done';
   let format: Format = 'read';
   let choices: Card[] = [];
+  /** The picked choice: a card id for a word, the answer text for a guide. */
   let picked: string | null = null;
   let hookShown = false;
+  /** For a guide: the question being asked, its choices, and for `build`, its shuffled tiles and the order they were placed in. */
+  let drill: Drill | undefined;
+  let drillChoices: string[] = [];
+  let tiles: string[] = [];
+  let placed: number[] = [];
+  /** How many tiles the right sentence takes; the rest is a decoy. */
+  let tilesNeeded = 0;
+  const lastDrill = new Map<string, Drill>();
   let completed = 0;
   /** Set once the learner has seen the caught-up note, so it only shows once. */
   let caughtUpSeen = false;
@@ -64,8 +77,16 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     );
   }
 
-  /** Play the card, except while the microphone is open: it would record the app's voice. */
-  const say = (slow = false) => card && !speak?.recording() && void play(card, slow);
+  /**
+   * Play the card, except while the microphone is open: it would record the app's
+   * voice. A guide plays the sentence it is asking about, if there is one,
+   * but only once answered: the sentence is the answer.
+   */
+  const say = (slow = false) => {
+    if (!card || speak?.recording()) return;
+    if (isVocab(card)) void play(card, slow);
+    else if (drill?.tl && (phase === 'feedback' || phase === 'back' || phase === 'missed')) void play({ tl: drillSentence(drill) }, slow);
+  };
   const autoplay = () => app.progress.settings.autoplay && say();
 
   function take(): Step | undefined {
@@ -86,6 +107,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     picked = null;
     hookShown = false;
     format = 'read';
+    drill = undefined;
     if (card) recent.push(card.id);
     if (!step || !card) {
       phase = 'done';
@@ -101,7 +123,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         phase = 'topic-intro';
       } else {
         phase = 'intro';
-        autoplay();
+        if (isVocab(card)) autoplay();
       }
     } else {
       ask(card, step);
@@ -113,7 +135,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   /** Ask a review or practice step in its format. */
   function ask(c: Card, s: Step): void {
     const state = app.progress.cards[c.id] ?? newCardState(app.now());
-    format = s.format ?? pickFormat(state, { listen: canListen, speak: false });
+    format = s.format ?? pickFormat(state, { listen: canListen, speak: false }, Math.random, c.kind);
+    if (!isVocab(c)) {
+      askGuide(c);
+      return;
+    }
     if (format === 'speak') {
       phase = 'speak';
       speak = speakPanel(c, {
@@ -161,10 +187,72 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     else completed++;
   }
 
+  /** Ask a guide one of its drills, in the current format. */
+  function askGuide(c: Card): void {
+    if (format !== 'build' && format !== 'think') format = 'gap';
+    drill = pickDrill(c, app.progress, format, lastDrill.get(c.id));
+    if (!drill && format === 'build') {
+      format = 'think';
+      drill = pickDrill(c, app.progress, format, lastDrill.get(c.id));
+    }
+    if (!drill) return next();
+    lastDrill.set(c.id, drill);
+    if (format === 'gap') {
+      drillChoices = shuffle([drill.answer, ...drill.wrong]);
+      phase = 'quiz';
+    } else if (format === 'build') {
+      const { words, decoy } = buildTiles(drill);
+      tilesNeeded = words.length;
+      // Never hand over the tiles already in order.
+      do tiles = shuffle(decoy ? [...words, decoy] : words);
+      while (tiles.slice(0, words.length).join(' ') === words.join(' '));
+      placed = [];
+      phase = 'build';
+    } else {
+      phase = 'front';
+    }
+    draw();
+  }
+
+  function pickAnswer(text: string): void {
+    if (!drill || picked) return;
+    picked = text;
+    finish(text === drill.answer ? 'good' : 'again');
+    phase = 'feedback';
+    say();
+    draw();
+  }
+
+  function place(i: number): void {
+    if (phase !== 'build' || placed.includes(i)) return;
+    placed = [...placed, i];
+    draw();
+  }
+
+  function unplace(i: number): void {
+    if (phase !== 'build') return;
+    placed = placed.filter((p) => p !== i);
+    draw();
+  }
+
+  function checkBuild(): void {
+    if (!drill || phase !== 'build') return;
+    picked = placed.map((i) => tiles[i]).join(' ');
+    finish(picked === buildTiles(drill).words.join(' ') ? 'good' : 'again');
+    phase = 'feedback';
+    say();
+    draw();
+  }
+
   function startQuiz(): void {
     if (!card) return;
+    if (!isVocab(card)) {
+      format = 'gap';
+      askGuide(card);
+      return;
+    }
     const known = Object.keys(app.progress.cards).map(getCard).filter((c): c is Card => !!c);
-    choices = shuffle([card, ...distractors(card, format === 'recall' ? 'tl' : 'en', 3, known.length >= 6 ? known : ALL_CARDS)]);
+    choices = shuffle([card, ...distractors(card, format === 'recall' ? 'tl' : 'en', 3, known.filter(isVocab).length >= 6 ? known : VOCAB)]);
     phase = 'quiz';
     if (format === 'listen' || (format === 'read' && app.progress.settings.autoplay)) say();
     draw();
@@ -181,7 +269,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
 
   function reveal(): void {
     phase = 'back';
-    if (format === 'produce') say();
+    if (format === 'produce' || format === 'think') say();
     draw();
   }
 
@@ -250,15 +338,18 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       case 'topic-intro':
         return topicIntroView();
       case 'intro':
-        return introView(card);
+        return isVocab(card) ? introView(card) : guideIntroView(card);
       case 'quiz':
       case 'feedback':
-        return quizView(card);
+        if (isVocab(card)) return quizView(card);
+        return format === 'build' ? buildView(card) : guideQuizView(card);
+      case 'build':
+        return buildView(card);
       case 'front':
       case 'back':
-        return flashcardView(card);
+        return isVocab(card) ? flashcardView(card) : guideFlashcardView(card);
       case 'missed':
-        return missedView(card);
+        return isVocab(card) ? missedView(card) : guideMissedView(card);
       case 'speak':
         return speakView(card);
       case 'caught-up':
@@ -267,7 +358,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   function caughtUpView(): HTMLElement {
-    const unmet = upcomingNewCards(app.progress, 1).length > 0;
+    const unmet = unmetCount(app.progress) > 0;
     return h(
       'div',
       { class: 'panel center' },
@@ -276,8 +367,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       h(
         'p',
         null,
-        unmet ? "No reviews are due, and today's new words are in." : "No reviews are due, and you've met every word.",
-        ' You can keep going with practice on your weakest words. It won\'t change when they come back.',
+        unmet ? "No reviews are due, and today's new cards are in." : "No reviews are due, and you've met every card.",
+        ' You can keep going with practice on your weakest cards. It won\'t change when they come back.',
       ),
       h(
         'div',
@@ -286,8 +377,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         unmet &&
           h(
             'button',
-            { class: 'btn secondary', onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'New words' }) },
-            'Learn new words',
+            { class: 'btn secondary', onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'Something new' }) },
+            'Learn something new',
           ),
         h('button', { class: 'btn secondary', onclick: close }, 'Stop'),
       ),
@@ -332,7 +423,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     return h(
       'div',
       { class: 'panel' },
-      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, c.kind === 'phrase' ? 'New phrase' : 'New word'), tagalog(c)),
+      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, KIND_INFO[c.kind].eyebrow), tagalog(c)),
       c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
       h('p', { class: 'meaning' }, c.en),
       c.note && h('p', { class: 'note' }, c.note),
@@ -483,8 +574,194 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
             ? h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, stats.practised), h('span', { class: 'stat-label' }, 'practised'))
             : h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, `${accuracy}%`), h('span', { class: 'stat-label' }, 'first try')),
         ),
-      h('p', { class: 'muted' }, 'Words you just learned will come back for review when you are about to forget them.'),
+      h('p', { class: 'muted' }, 'What you just learned will come back for review when you are about to forget it.'),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: () => app.navigate({ name: 'home' }) }, 'Done'),
+    );
+  }
+
+  /** A guide's explanation: its rule in plain words, and examples to hear. */
+  function guideBody(c: Card): (HTMLElement | null)[] {
+    return [
+      c.hint ? h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint) : null,
+      c.note ? h('p', { class: 'guide-note' }, c.note) : null,
+      c.examples?.length
+        ? h(
+            'ul',
+            { class: 'examples' },
+            c.examples.map((ex) =>
+              h(
+                'li',
+                null,
+                audioButton(() => void play(ex), `Play ${ex.tl}`),
+                h('span', { class: 'example-text' }, h('span', { class: 'example-tl', lang: 'fil' }, ex.tl), h('span', { class: 'example-en' }, ex.en)),
+              ),
+            ),
+          )
+        : null,
+    ];
+  }
+
+  function guideHeading(c: Card, eyebrow = KIND_INFO[c.kind].eyebrow): HTMLElement {
+    return h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, eyebrow), h('p', { class: 'guide-title' }, c.en));
+  }
+
+  function guideIntroView(c: Card): HTMLElement {
+    return h(
+      'div',
+      { class: 'panel' },
+      guideHeading(c),
+      guideBody(c),
+      hookView(c),
+      h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: startQuiz }, 'Got it, try one'),
+    );
+  }
+
+  /** A drill's Tagalog with its gap shown, or filled once answered. */
+  function gapLine(d: Drill, filled: boolean): HTMLElement | null {
+    if (!d.tl) return null;
+    const [before, after] = d.tl.split('___');
+    return h(
+      'div',
+      { class: 'tl-row' },
+      h('p', { class: 'tl drill-tl', lang: 'fil' }, before, h('span', { class: `gap ${filled ? 'filled' : ''}` }, filled ? d.answer : '___'), after),
+      filled && h('div', { class: 'audio-group' }, audioButton(() => say()), audioButton(() => say(true), 'Play slowly', 'slow')),
+    );
+  }
+
+  /** The question, as asked: an English sentence to complete in Tagalog, or a plain question. */
+  function drillPrompt(c: Card, d: Drill, filled: boolean, eyebrow: string, showTl = true): HTMLElement {
+    return d.tl
+      ? h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, eyebrow), h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled))
+      : h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, c.en), h('p', { class: 'drill-q' }, d.q));
+  }
+
+  /** The right answer as a sentence, ending in a full stop if it has no punctuation of its own. */
+  function answerText(): string {
+    const text = drill ? drillSentence(drill) : '';
+    return /[.!?"]$/.test(text) ? text : `${text}.`;
+  }
+
+  function drillFeedback(c: Card, right: boolean): HTMLElement {
+    const extra = step?.kind === 'extra';
+    return h(
+      'div',
+      { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
+      h('strong', null, right ? PRAISE[Math.floor(Math.random() * PRAISE.length)] : 'Not quite.'),
+      ' ',
+      right ? (step?.kind === 'new' ? 'That one is yours now.' : '') : `The answer is ${answerText()}${extra ? '' : ' It will come back shortly.'}`,
+      !right && c.note && h('p', { class: 'feedback-note' }, c.note),
+    );
+  }
+
+  function guideQuizView(c: Card): HTMLElement {
+    const d = drill!;
+    const answered = picked !== null;
+    const right = picked === d.answer;
+    return h(
+      'div',
+      { class: 'panel' },
+      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label),
+      h(
+        'div',
+        { class: 'choices' },
+        drillChoices.map((choice, i) =>
+          h(
+            'button',
+            {
+              class: `choice ${answered && choice === d.answer ? 'correct' : ''} ${answered && choice === picked && !right ? 'wrong' : ''}`,
+              disabled: answered,
+              'data-autofocus': (!answered && i === 0) || undefined,
+              lang: d.tl ? 'fil' : undefined,
+              onclick: () => pickAnswer(choice),
+            },
+            h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
+            choice,
+          ),
+        ),
+      ),
+      answered && drillFeedback(c, right),
+      answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
+    );
+  }
+
+  function buildView(c: Card): HTMLElement {
+    const d = drill!;
+    const answered = phase === 'feedback';
+    const right = answered && picked === buildTiles(d).words.join(' ');
+    return h(
+      'div',
+      { class: 'panel' },
+      h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, 'Put it in order'), h('p', { class: 'drill-q' }, d.q)),
+      h(
+        'div',
+        { class: `build-line ${answered ? (right ? 'right' : 'wrong') : ''}`, lang: 'fil', 'aria-label': 'Your sentence' },
+        placed.length === 0
+          ? h('span', { class: 'muted small' }, 'Tap the words below in order.')
+          : placed.map((i) => h('button', { class: 'build-tile placed', disabled: answered, onclick: () => unplace(i) }, tiles[i])),
+      ),
+      !answered &&
+        h(
+          'div',
+          { class: 'tile-pool', lang: 'fil' },
+          tiles.map((t, i) => h('button', { class: 'build-tile', disabled: placed.includes(i), onclick: () => place(i) }, t)),
+        ),
+      !answered &&
+        h(
+          'button',
+          { class: 'btn primary big', disabled: placed.length < tilesNeeded, 'data-autofocus': placed.length === tilesNeeded || undefined, onclick: checkBuild },
+          'Check',
+        ),
+      answered && gapLine(d, true),
+      answered && drillFeedback(c, right),
+      answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
+    );
+  }
+
+  function guideFlashcardView(c: Card): HTMLElement {
+    const d = drill!;
+    const state = app.progress.cards[c.id] ?? newCardState(app.now());
+    const showBack = phase === 'back';
+    return h(
+      'div',
+      { class: 'panel' },
+      // Recalling a sentence means saying all of it, so the Tagalog only shows with the answer.
+      drillPrompt(c, d, showBack, d.tl ? 'How do you say…' : KIND_INFO[c.kind].label, showBack),
+      !showBack && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: reveal }, 'Show the answer'),
+      showBack &&
+        h(
+          'div',
+          { class: 'answer' },
+          !d.tl && h('p', { class: 'meaning' }, d.answer),
+          hookShown
+            ? h('div', null, guideBody(c), hookView(c))
+            : h('button', { class: 'btn hook-btn', onclick: showHook }, 'Show the explanation', h('span', { class: 'key', 'aria-hidden': 'true' }, 'H')),
+          h('p', { class: 'muted small center' }, 'How well did you remember?'),
+          h(
+            'div',
+            { class: 'ratings' },
+            RATINGS.map(({ rating, label }, i) =>
+              h(
+                'button',
+                { class: `rate rate-${rating}`, onclick: () => rate(rating), 'data-autofocus': rating === 'good' || undefined },
+                h('span', { class: 'rate-label' }, label),
+                h('span', { class: 'rate-when' }, formatInterval(nextInterval(state, rating))),
+                h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
+              ),
+            ),
+          ),
+        ),
+    );
+  }
+
+  function guideMissedView(c: Card): HTMLElement {
+    return h(
+      'div',
+      { class: 'panel' },
+      guideHeading(c, 'Coming back shortly'),
+      drill?.tl ? gapLine(drill, true) : drill && h('p', { class: 'meaning' }, drill.answer),
+      guideBody(c),
+      hookView(c),
+      h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
     );
   }
 
@@ -502,6 +779,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (phase === 'speak') return;
     // Enter and Space activate the focused primary button natively.
     const n = Number(e.key);
+    if (phase === 'quiz' && card && !isVocab(card)) {
+      if (n >= 1 && n <= drillChoices.length) pickAnswer(drillChoices[n - 1]);
+      return;
+    }
     if (phase === 'quiz' && n >= 1 && n <= choices.length) return pick(choices[n - 1]);
     if (phase === 'back' && n >= 1 && n <= 4) return rate(RATINGS[n - 1].rating);
     if (phase === 'back' && !hookShown && (e.key === 'h' || e.key === 'H')) return showHook();
