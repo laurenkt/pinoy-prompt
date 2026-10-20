@@ -1747,11 +1747,25 @@ p {
   z-index: 1;
 }
 
-/* Text sitting straight on the backdrop gets a shadow to stand out from it. */
-.talk-chat .session-header,
+/* Text sitting straight on the backdrop gets a dark backing, so it reads over the brightest colours. */
+.talk-chat .session-count,
+.talk-chat .talk-meter,
 .talk-chat .talk-status,
 .talk-chat .talk-help {
-  text-shadow: 0 1px 3px var(--ink), 0 0 12px var(--ink);
+  flex: none;
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: rgb(12 9 36 / 0.78);
+  color: var(--text);
+}
+
+.talk-chat .talk-help {
+  margin-top: 6px;
+}
+
+.talk-chat .talk-meter {
+  margin-left: auto;
 }
 
 .talk-chat > .talk-log {
