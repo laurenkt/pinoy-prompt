@@ -13,10 +13,22 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 - **Drills**: unscored rounds of 10 in one skill (listen, read, recall, speak, or mixed), weighted toward the words you find hardest. Drills never change the review schedule.
 - **Home**: what Study will do next, then a picture of your memory: how many words you know, how well you recall them (measured from your reviews over the last 30 days, or estimated from the schedule until there are enough), and how firmly each is stored (just met, days, weeks, long-term, read from its review interval). There are no lessons to complete or streaks to keep.
 - **Words**: a phrasebook by topic, tappable for audio, showing how firmly each word you know is stored.
+- **Talk** (in Drills): a conversation with an AI, spoken or typed, in English with the learner's Tagalog mixed in. See below.
 
 New words come in deck order, topic by topic (Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases), at the daily rate set in Settings.
 
 Progress is stored on the device. Nothing is sent to our server (there isn't one), and that includes your voice: speaking questions are checked on the device.
+
+## Talk
+
+Talk is a conversation in English with the Tagalog the learner knows mixed in. It is spoken by default, using OpenAI's GPT-Live (`gpt-live-1`) over WebRTC, with a typed fallback (`gpt-5.4-mini` through the Responses API).
+
+- **What gets mixed in** (`src/talk.ts`): every word the learner has met, grouped by how firmly it's stored, plus one word they haven't met yet (the next one in the chosen topic). The AI is asked to use all of them wherever they fit and no other Tagalog, so as words are learned, more of each conversation turns Tagalog on its own.
+- **On screen**: the AI's words, or the live transcript of a call, with the deck's Tagalog underlined in its strength colour. Tapping one plays it and shows its meaning; words met in the last day and the new word show their meaning straight away.
+- **Practice, not a test**: no scores, and the review schedule is never touched. Mistakes aren't marked; the AI uses the right form in its reply instead.
+- **The learner's own key** (`src/openai.ts`): Talk uses an OpenAI API key the learner pastes in. It's kept in `localStorage` apart from progress, so it never goes into a backup, and is sent only to `api.openai.com`. The browser sends its WebRTC offer straight to `POST /v1/live/sessions` with that key; there is no server of ours. Calls end after 10 minutes, and the call screen shows the running time and rough cost (GPT-Live is billed at about 5¢ a minute).
+
+Why not "Sign in with ChatGPT": its self-serve route is for open-source apps running on the user's own computer, with a `127.0.0.1` callback, and its sign-in endpoints don't allow calls from web pages. The hosted-website route needs OpenAI's approval and a backend. Neither fits a static PWA, so Talk uses a pasted key instead.
 
 ## Saved progress
 

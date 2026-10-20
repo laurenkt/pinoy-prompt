@@ -6,6 +6,7 @@ export type Route =
   | { name: 'study' }
   | { name: 'session'; steps: Step[]; title?: string }
   | { name: 'practice' }
+  | { name: 'talk' }
   | { name: 'words' }
   | { name: 'settings' };
 

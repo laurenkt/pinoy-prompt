@@ -1,5 +1,6 @@
 import type { App } from '../app';
 import { getCard } from '../deck';
+import { forgetApiKey, getApiKey, setApiKey } from '../openai';
 import { play, voiceQuality } from '../speech';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon } from '../ui';
@@ -87,6 +88,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('p', { class: 'muted small' }, voiceText),
         h('button', { class: 'btn secondary', onclick: () => void play(getCard('kumusta')!) }, icon('speaker'), ' Test voice'),
       ),
+      h('section', { class: 'card' }, h('h2', null, 'Talk'), keyForm(draw)),
       h(
         'section',
         { class: 'card' },
@@ -122,6 +124,68 @@ export function settingsScreen(app: App): HTMLElement {
 
   draw();
   return root;
+}
+
+/**
+ * The OpenAI key Talk uses: a box to paste one in, or, once saved, a way to
+ * forget it. Calls onChange after either.
+ */
+export function keyForm(onChange: () => void): HTMLElement {
+  if (getApiKey()) {
+    return h(
+      'div',
+      { class: 'key-form' },
+      h('p', { class: 'muted small' }, 'Your OpenAI API key is saved on this device. Talk uses it to chat with you; OpenAI bills that account.'),
+      h(
+        'button',
+        {
+          class: 'btn secondary',
+          onclick: () => {
+            forgetApiKey();
+            onChange();
+          },
+        },
+        'Forget key',
+      ),
+    );
+  }
+  const input = h('input', {
+    type: 'password',
+    class: 'key-input',
+    placeholder: 'sk-…',
+    autocomplete: 'off',
+    autocapitalize: 'off',
+    spellcheck: 'false',
+    'aria-label': 'OpenAI API key',
+  });
+  const problem = h('p', { class: 'key-problem', role: 'alert', hidden: true });
+  return h(
+    'form',
+    {
+      class: 'key-form',
+      onsubmit: (e: Event) => {
+        e.preventDefault();
+        if (setApiKey(input.value)) return onChange();
+        problem.textContent = "That doesn't look like an OpenAI API key. It starts with sk-.";
+        problem.hidden = false;
+      },
+    },
+    h(
+      'p',
+      { class: 'muted small' },
+      'Talk is a conversation with an AI, using your own OpenAI API key. Create one at ',
+      h('a', { href: 'https://platform.openai.com/api-keys', target: '_blank', rel: 'noopener' }, 'platform.openai.com'),
+      " and paste it here. API use is billed by OpenAI separately from a ChatGPT subscription: about 5¢ a minute to talk, about 1¢ for a typed chat.",
+    ),
+    h(
+      'p',
+      { class: 'muted small' },
+      "The key stays on this device. It's sent only to OpenAI, and it isn't included in backups.",
+    ),
+    input,
+    problem,
+    h('button', { class: 'btn primary', type: 'submit' }, 'Save key'),
+  );
 }
 
 /** Save a backup file: through the share sheet where there is one (iPhone), else as a download. */
