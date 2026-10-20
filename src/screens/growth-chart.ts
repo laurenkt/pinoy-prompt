@@ -4,9 +4,8 @@
 
 import { STRENGTHS, type MemoryHistory, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
-import { h } from '../ui';
+import { h, svg } from '../ui';
 
-const SVG = 'http://www.w3.org/2000/svg';
 const W = 320;
 const H = 160;
 /** Bottom layer first: the firmest words are the foundation the rest sit on. */
@@ -59,12 +58,6 @@ function f(n: number): string {
   return n.toFixed(1);
 }
 
-function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string>): SVGElementTagNameMap[K] {
-  const el = document.createElementNS(SVG, tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-}
-
 function shortDate(time: number): string {
   return new Date(time).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
@@ -79,7 +72,7 @@ export function growthChart(
 ): HTMLElement {
   const { times } = history;
   const last = times.length - 1;
-  const raw = Object.fromEntries(LAYERS.map((id) => [id, history.counts[id]])) as Record<Strength, number[]>;
+  const raw = history.counts;
   const smoothed = Object.fromEntries(LAYERS.map((id) => [id, smooth(raw[id])])) as Record<Strength, number[]>;
 
   // Running totals: tops[k] is the top edge of layer k.

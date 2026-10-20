@@ -134,6 +134,19 @@ describe('strengthSteps', () => {
     for (const [at] of strengthSteps(c, NOW)) expect(at).toBeGreaterThanOrEqual(c.introduced);
   });
 
+  it('keeps the likely past of an older card when it next moves', () => {
+    const p = emptyProgress(NOW);
+    p.cards.isa = card(30, 31, { introduced: NOW - 90 * DAY_MS });
+    recordAnswer(p, 'isa', 'again', NOW);
+    const strengths = strengthSteps(p.cards.isa, NOW).map((s) => s[1]);
+    expect(strengths).toEqual(['new', 'days', 'weeks', 'long', 'new']);
+  });
+
+  it('keeps every step within the time the card was met and now', () => {
+    const c = card(30, 0, { introduced: NOW + DAY_MS, log: [[NOW + 2 * DAY_MS, 30]] });
+    for (const [at] of strengthSteps(c, NOW)) expect(at).toBeLessThanOrEqual(NOW);
+  });
+
   it('ends on the current strength even if an older build missed a move', () => {
     const c = card(30, 1, { log: [[NOW - 9 * DAY_MS, 3]] });
     expect(strengthSteps(c, NOW).slice(-1)).toEqual([[c.reviewed, 'long']]);
@@ -152,6 +165,12 @@ describe('memoryHistory', () => {
     expect(times[20]).toBe(NOW);
     expect(counts.new[0] + counts.days[0] + counts.weeks[0] + counts.long[0]).toBe(1);
     expect([counts.new[20], counts.days[20], counts.weeks[20], counts.long[20]]).toEqual([1, 0, 0, 1]);
+  });
+
+  it('ignores a damaged start time from before the app existed', () => {
+    const p = emptyProgress(NOW);
+    p.cards.isa = card(3, 1, { introduced: 0 });
+    expect(memoryHistory(p, NOW).since).toBeGreaterThan(new Date(2024, 11, 31).getTime());
   });
 
   it('covers at least a week, so a first day reads as a start', () => {

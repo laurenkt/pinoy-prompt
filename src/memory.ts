@@ -119,14 +119,23 @@ export function recentReviews(progress: Progress, now: number, days = RECALL_WIN
  * before moves were logged get a likely past worked back from the schedule.
  */
 export function strengthSteps(card: CardState, now: number): [number, Strength][] {
-  const steps: [number, Strength][] = [[card.introduced, 'new']];
+  // Times are kept within [introduced, now], so a clock that ran ahead can't
+  // leave a word out of today's count.
+  const start = Math.min(card.introduced, now);
+  const steps: [number, Strength][] = [[start, 'new']];
   const seen = lastSeen(card, now);
   const current = strengthOf(card);
-  const log = card.log ?? guessedLog(card, seen);
-  for (const [at, interval] of log) steps.push([Math.max(at, card.introduced), strengthOf({ ...card, interval })]);
+  for (const [at, interval] of pastLog(card, now)) {
+    steps.push([Math.min(Math.max(at, start, steps[steps.length - 1][0]), now), strengthOf({ ...card, interval })]);
+  }
   // An older build may have reviewed the card without logging the move.
   if (steps[steps.length - 1][1] !== current) steps.push([Math.max(seen, steps[steps.length - 1][0]), current]);
   return steps;
+}
+
+/** The card's log, or for a card saved without one, a likely one. */
+export function pastLog(card: CardState, now: number): [number, number][] {
+  return card.log ?? guessedLog(card, lastSeen(card, now));
 }
 
 /**
@@ -140,6 +149,7 @@ function guessedLog(card: CardState, seen: number): [number, number][] {
   for (let next = 3; intervals[intervals.length - 1] < card.interval && next < card.interval; next *= card.ease) {
     intervals.push(next);
   }
+  // The interval reached might fall between two guessed ones; end on it.
   if (intervals[intervals.length - 1] !== card.interval) intervals.push(card.interval);
   // The last review was `seen`, and each earlier one an interval before the
   // next. Real paths often jump further in fewer reviews, so if the guess
@@ -153,7 +163,9 @@ function guessedLog(card: CardState, seen: number): [number, number][] {
     log.unshift([Math.max(at, card.introduced), intervals[i]]);
     if (i > 0) at -= gaps[i - 1] * scale;
   }
-  return log;
+  // Only moves to a new strength are logged.
+  const strength = (interval: number) => strengthOf({ ...card, interval });
+  return log.filter(([, interval], i) => strength(interval) !== strength(i ? log[i - 1][1] : 0));
 }
 
 export interface MemoryHistory {
@@ -167,16 +179,19 @@ export interface MemoryHistory {
 
 /** Shortest span the history covers, so a first day still reads as a start. */
 export const MIN_HISTORY_DAYS = 7;
+/** No word was met before the app existed; an earlier time is a damaged save. */
+const EARLIEST = new Date(2025, 0, 1).getTime();
 
 /**
  * How many words had each strength, sampled evenly from the first word met
  * (or a week ago, if later) up to now.
  */
 export function memoryHistory(progress: Progress, now: number, samples = 64): MemoryHistory {
+  samples = Math.max(2, Math.round(samples));
   const steps = Object.entries(progress.cards)
     .filter(([id]) => getCard(id))
     .map(([, card]) => strengthSteps(card, now));
-  const since = Math.min(now, ...steps.map((s) => s[0][0]));
+  const since = Math.min(now, Math.max(EARLIEST, Math.min(...steps.map((s) => s[0][0]))));
   const first = Math.min(now - MIN_HISTORY_DAYS * DAY_MS, since);
   const times = Array.from({ length: samples }, (_, i) => first + ((now - first) * i) / (samples - 1));
   const counts: Record<Strength, number[]> = {

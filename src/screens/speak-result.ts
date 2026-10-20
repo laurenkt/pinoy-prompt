@@ -9,7 +9,7 @@ import type { Player } from '../player';
 import REFERENCES from '../reference-sounds.json';
 import { MANNERS, PLACES, placeOf, soundName, type Place } from '../sound-map';
 import { createSpectrogram, type Segment, type Spectrogram } from '../spectrogram';
-import { h } from '../ui';
+import { h, svg } from '../ui';
 
 export interface Attempt {
   /** The card text (or accepted variant) the attempt was judged against. */
@@ -364,19 +364,11 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 
 // --- Charts -------------------------------------------------------------------
 
-const SVG = 'http://www.w3.org/2000/svg';
 const W = 300;
 const H = 190;
 const PAD = { left: 56, right: 14, top: 22, bottom: 26 };
 /** How far the vowel chart's front edge leans in at the bottom, as a share of its width. */
 const SLANT = 0.45;
-
-function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>, ...children: (SVGElement | string)[]) {
-  const el = document.createElementNS(SVG, tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
-  for (const c of children) el.append(c);
-  return el;
-}
 
 /** A place on a chart, in SVG units. */
 function chartPoint(place: Place): { x: number; y: number } | null {

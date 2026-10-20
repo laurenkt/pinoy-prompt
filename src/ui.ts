@@ -34,6 +34,18 @@ function append(el: Element, children: Child[]): void {
   }
 }
 
+/** The same for SVG elements, which need their namespace. */
+export function svg<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+  attrs: Record<string, string | number>,
+  ...children: (SVGElement | string)[]
+): SVGElementTagNameMap[K] {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+  for (const c of children) el.append(c);
+  return el;
+}
+
 const ICONS = {
   speaker: '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
