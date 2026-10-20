@@ -93,8 +93,8 @@ describe('findWords', () => {
   });
 
   it('leaves deck words that are everyday English alone', () => {
-    const lookalikes = talkPlan(progressWith(['ate', 'lima', 'salamat']), null);
-    expect(found(findWords('I ate in Lima, salamat.', lookalikes))).toEqual(['salamat=salamat']);
+    const lookalikes = talkPlan(progressWith(['at', 'ate', 'lima', 'salamat']), null);
+    expect(found(findWords('I ate at noon in Lima, salamat.', lookalikes))).toEqual(['salamat=salamat']);
   });
 
   it('leaves words inside other words alone', () => {
@@ -128,10 +128,19 @@ describe('addPiece', () => {
   it('starts a new turn after a pause, and spaces words across a short gap', () => {
     const turns: SpokenTurn[] = [];
     addPiece(turns, 'ai', 'Kumusta ka?', 0, 1000);
-    addPiece(turns, 'ai', 'Ano', 1200, 1500);
-    expect(text(turns)).toEqual(['ai: Kumusta ka? Ano']);
-    expect(addPiece(turns, 'ai', 'Salamat.', 1500 + TURN_GAP_MS + 1, 4000)).toEqual({ index: 1, added: true });
-    expect(text(turns)).toEqual(['ai: Kumusta ka? Ano', 'ai: Salamat.']);
+    addPiece(turns, 'ai', 'Ano', 1400, 1500);
+    addPiece(turns, 'ai', 'ng', 1550, 1700);
+    expect(text(turns)).toEqual(['ai: Kumusta ka? Anong']);
+    expect(addPiece(turns, 'ai', 'Salamat.', 1700 + TURN_GAP_MS + 1, 4000)).toEqual({ index: 1, added: true });
+    expect(text(turns)).toEqual(['ai: Kumusta ka? Anong', 'ai: Salamat.']);
+  });
+
+  it('puts a quick answer after the reply it answers', () => {
+    const turns: SpokenTurn[] = [];
+    addPiece(turns, 'ai', 'Gusto mo ba ng kape?', 8000, 10_000);
+    addPiece(turns, 'you', 'Oo.', 10_300, 10_800);
+    addPiece(turns, 'ai', 'Sige!', 11_200, 11_600);
+    expect(text(turns)).toEqual(['ai: Gusto mo ba ng kape?', 'you: Oo.', 'ai: Sige!']);
   });
 
   it("keeps the AI's reply whole when the learner's words arrive late, and orders turns by time", () => {

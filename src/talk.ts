@@ -86,11 +86,11 @@ const fold = (s: string) => s.toLowerCase().normalize('NFC');
 const WORD = /^([^\p{L}]*)([\p{L}][\p{L}'’-]*[\p{L}]|[\p{L}])?([^\p{L}]*)$/u;
 
 /**
- * Deck words that are also everyday English ("I ate", "Lima, Peru"). In a
+ * Deck words that are also everyday English ("at noon", "I ate", "Lima, Peru"). In a
  * conversation that's mostly English they'd be marked wrongly more often than
  * rightly, so they aren't marked at all.
  */
-const ENGLISH_LOOKALIKES = new Set(['ate', 'lima']);
+const ENGLISH_LOOKALIKES = new Set(['at', 'ate', 'lima']);
 
 interface Phrase {
   words: string[];
@@ -159,20 +159,25 @@ export interface SpokenTurn {
 
 /** A pause longer than this between two pieces from one speaker starts a new turn. */
 export const TURN_GAP_MS = 1500;
+/** A gap this long between pieces is a pause between words, not a word split in two. */
+const WORD_GAP_MS = 300;
 
 /**
  * Add a piece of transcript to the turns, which are kept in the order they
  * were spoken. A piece continues its speaker's latest turn unless there was a
- * pause, so a late piece of the learner's speech doesn't split the AI's reply.
+ * pause or the other speaker started talking since, so a late piece of the
+ * learner's speech doesn't split the AI's reply, and a quick answer doesn't
+ * land above the question it answers.
  * Returns the index of the turn that changed, and whether it is new.
  */
 export function addPiece(turns: SpokenTurn[], who: SpokenTurn['who'], text: string, start: number, end: number): { index: number; added: boolean } {
   let index = turns.length - 1;
   while (index >= 0 && turns[index].who !== who) index--;
   const last = turns[index];
-  if (last && start - last.end <= TURN_GAP_MS) {
-    // Pieces split mid-word run on; after a gap, words need a space between them.
-    const space = start > last.end && !/\s$/.test(last.text) && !/^\s/.test(text) ? ' ' : '';
+  const interrupted = turns.some((t) => t.who !== who && last && t.start >= last.end && t.start <= start);
+  if (last && !interrupted && start - last.end <= TURN_GAP_MS) {
+    // Pieces split mid-word run on; after a pause, words need a space between them.
+    const space = start - last.end >= WORD_GAP_MS && !/\s$/.test(last.text) && !/^\s/.test(text) ? ' ' : '';
     last.text += space + text;
     last.end = Math.max(last.end, end);
     return { index, added: false };

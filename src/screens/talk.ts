@@ -115,7 +115,10 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     log = null;
     if (!getApiKey()) root.replaceChildren(setup());
     else if (state.name === 'menu') root.replaceChildren(menu());
-    else root.replaceChildren(conversation());
+    else {
+      root.replaceChildren(conversation());
+      (log as HTMLElement | null)?.lastElementChild?.scrollIntoView?.({ block: 'end' });
+    }
   }
 
   /** Show a turn that changed, without redrawing the rest of the screen under the learner's finger. */
