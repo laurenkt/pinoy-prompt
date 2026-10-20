@@ -15,7 +15,7 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 - **Words**: a phrasebook by topic, tappable for audio, showing how firmly each word you know is stored.
 - **Talk** (in Drills): a spoken conversation with an AI in English, with the learner's Tagalog mixed in. See below.
 
-New words come in deck order, topic by topic (Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases), at the daily rate set in Settings.
+New words come in deck order, topic by topic, at the daily rate set in Settings. The deck is weighted towards getting by quickly: greetings and politeness, meeting people, numbers, questions, the building blocks (I, you, there is, I need, can I), telling time, when things happen, travelling ("I'm on my way", telling a driver where to stop), places and directions, making plans, food and eating out, money and shopping, family, everyday phrases, chat reactions, how you feel, and help in an emergency. Progress is kept by card id, so a card's id must never change once released (`src/deck.test.ts` checks this).
 
 Progress is stored on the device. Nothing is sent to our server (there isn't one), and that includes your voice: speaking questions are checked on the device.
 
