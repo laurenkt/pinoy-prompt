@@ -61,9 +61,9 @@ function welcomeCard(): HTMLElement {
     h(
       'ol',
       { class: 'how' },
-      h('li', null, h('strong', null, 'Meet new words.'), ' Hear them, read them, and see how to say them.'),
-      h('li', null, h('strong', null, 'Quick check.'), ' Pick the right meaning so it sticks.'),
-      h('li', null, h('strong', null, 'Review just in time.'), ' Words come back right before you would forget them.'),
+      h('li', null, h('strong', null, 'Meet something new.'), ' Words and phrases first, then how sentences fit together, sounds, and everyday know-how.'),
+      h('li', null, h('strong', null, 'Quick check.'), ' Answer one question so it sticks.'),
+      h('li', null, h('strong', null, 'Review just in time.'), ' Each card comes back right before you would forget it.'),
     ),
   );
 }
@@ -83,7 +83,7 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   const rateLine = h(
     'p',
     { class: 'today-meta' },
-    unmet === 0 ? "You've met every word in the deck." : `Up to ${plural(rate, 'new word')} a day`,
+    unmet === 0 ? "You've met every card in the deck." : `Up to ${plural(rate, 'new card')} a day`,
     unmet > 0 && h('button', { class: 'link-btn', onclick: () => app.navigate({ name: 'settings' }) }, 'Change'),
   );
 
@@ -93,14 +93,14 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
     title = 'Your first words';
     plan = 'Meet a few words, then check them before moving on.';
   } else if (reviews > 0) {
-    title = `${plural(reviews, 'word')} to review`;
-    plan = fresh > 0 ? 'Weakest first. New words come in once these have settled.' : 'Weakest first.';
+    title = `${plural(reviews, 'card')} to review`;
+    plan = fresh > 0 ? 'Weakest first. New cards come in once these have settled.' : 'Weakest first.';
   } else if (fresh > 0) {
-    title = 'Ready for new words';
-    plan = 'Nothing is due, so study starts with new words.';
+    title = 'Ready for something new';
+    plan = 'Nothing is due, so study starts with new cards.';
   } else {
     title = "You're caught up";
-    plan = "Nothing is due. Study gives extra practice on your weakest words, without changing when they come back.";
+    plan = "Nothing is due. Study gives extra practice on your weakest cards, without changing when they come back.";
   }
 
   return h(
@@ -116,9 +116,9 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
         'button',
         {
           class: 'link-btn learn-more',
-          onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'New words' }),
+          onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'Something new' }),
         },
-        'Learn new words now',
+        'Learn something new now',
       ),
   );
 }
@@ -148,7 +148,7 @@ function memorySection(memory: MemorySummary, history: MemoryHistory): HTMLEleme
         'div',
         { class: 'tile words-tile' },
         h('span', { class: 'tile-value' }, total),
-        h('span', { class: 'tile-label' }, total === 1 ? 'word or phrase' : 'words & phrases'),
+        h('span', { class: 'tile-label' }, total === 1 ? 'card known' : 'cards known'),
       ),
       h(
         'div',

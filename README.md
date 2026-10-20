@@ -6,13 +6,14 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 
 ## How it works
 
-- **Study**: one button, and it keeps going until you stop. Each step is picked as you go: due reviews first, weakest first (lowest estimated recall), then a new word, but only once nothing is due, fewer than 3 words are still being learned, and the daily new-word rate (8 by default) allows. When you're caught up it moves on to extra practice of your weakest words, which never changes the schedule.
+- **Study**: one button, and it keeps going until you stop. Each step is picked as you go: due reviews first, weakest first (lowest estimated recall), then a new card, but only once nothing is due, fewer than 3 cards are still being learned, and the daily new-card rate (8 by default) allows. When you're caught up it moves on to extra practice of your weakest words, which never changes the schedule.
 - **Question types**: each word is one memory with one schedule, asked in different ways. Words still being learned get a multiple-choice check (see the Tagalog, pick the meaning). Learned words are self-rated, so a lucky guess can't push one weeks out: you read or hear the Tagalog and recall the meaning, and as a word holds for longer, you produce the Tagalog from the English. Extra practice mixes in multiple choice both ways, listening, and speaking once the pronunciation model is on the device.
-- **New words**: every new card shows the Tagalog, audio, a pronunciation guide, the meaning, a usage tip and a memory hook, followed by a quick multiple-choice check. "Learn new words now" on Home adds 5 beyond the daily rate.
+- **New words**: every new card shows the Tagalog, audio, a pronunciation guide, the meaning, a usage tip and a memory hook, followed by a quick multiple-choice check. "Learn something new now" on Home adds 5 beyond the daily rate.
+- **Beyond words**: cards aren't only vocabulary. Guides (`src/guides.ts`) teach sentence patterns ("Gusto ko ng ___"), sounds (the "ng" at the start of a word), how to say things (questions go up at the end) and everyday know-how (calling people Kuya and Ate). Each is introduced with a plain-English explanation and examples you can hear, then checked with a gap to fill. Once learned, a pattern comes back as a fresh sentence to build from tiles or to say from the English, so the rule is practised rather than one sentence; other guides are recalled and self-rated. Guides share the same schedule and daily allowance, and are eased in: none before 8 cards (patterns not before 20), only once the cards they build on have been remembered a day later, and at most one in every 6 new cards (one in 4 after 100). Explanations avoid grammar terms.
 - **Schedule**: SM-2 style (1 day, 3 days, then growing by each card's ease). A missed word comes back after a short gap in the same session.
 - **Drills**: unscored rounds of 10 in one skill (listen, read, recall, speak, or mixed), weighted toward the words you find hardest. Drills never change the review schedule.
 - **Home**: what Study will do next, then a picture of your memory: how many words you know, how well you recall them (measured from your reviews over the last 30 days, or estimated from the schedule until there are enough), and how firmly each is stored (just met, days, weeks, long-term, read from its review interval). There are no lessons to complete or streaks to keep.
-- **Words**: a phrasebook by topic, tappable for audio, showing how firmly each word you know is stored.
+- **Library**: everything there is to learn, filterable by kind: words and phrases by topic (tappable for audio), then patterns, sounds, how to say things and know-how. Each card you know shows how firmly it is stored.
 
 New words come most useful first, whatever their topic, at the daily rate set in Settings: `LEARN_ORDER` in `src/deck.ts` ranks every card by how soon it helps in conversation (hello, thanks, yes/no and "I don't understand" first; "I'm on my way" and "now / later" early; "Traffic!" and the weekdays much later). Topics only group words on the Words screen, and a topic's intro shows before the first of its words a learner meets. The deck is weighted towards getting by quickly: greetings and politeness, meeting people, numbers, questions, the building blocks (I, you, there is, I need, can I), telling time, when things happen, travelling, places and directions, making plans, food and eating out, money and shopping, family, everyday phrases, chat reactions, how you feel, and help in an emergency. Progress is kept by card id, so a card's id must never change once released (`src/deck.test.ts` checks this).
 
@@ -79,7 +80,8 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 
 | Path | What's there |
 | --- | --- |
-| `src/deck.ts` | All word content, grouped by topic. Add topics or cards here. |
+| `src/deck.ts` | All word content, grouped by topic, and the learning order. Add topics or cards here. |
+| `src/guides.ts` | Cards beyond vocabulary: patterns, sounds, how to say it, know-how. |
 | `src/srs.ts` | The scheduler. |
 | `src/session.ts` | Building study sessions, new-word order, quiz distractors. |
 | `src/memory.ts` | Memory stats for Home: strength bands, estimated and measured recall. |

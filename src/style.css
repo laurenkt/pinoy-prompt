@@ -1789,3 +1789,199 @@ p {
   gap: 10px;
   margin-bottom: 14px;
 }
+
+/* Guides: patterns, sounds, how to say it, and know-how. Each kind gets its own prompt color. */
+
+.prompt.kind-pattern {
+  background: var(--saffron);
+}
+
+.prompt.kind-sound,
+.prompt.kind-tune {
+  background: var(--pink);
+}
+
+.prompt.kind-knowhow {
+  background: var(--cream);
+}
+
+.guide-title {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.guide-note {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.drill-q {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 10px;
+}
+
+.tl.drill-tl {
+  font-size: 1.8rem;
+}
+
+.gap {
+  display: inline-block;
+  min-width: 2.5em;
+  border-bottom: 4px solid currentColor;
+  text-align: center;
+}
+
+.gap.filled {
+  border-bottom-style: dashed;
+}
+
+.examples {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+}
+
+.examples li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 2px solid var(--line);
+}
+
+.examples li:first-child {
+  border-top: none;
+}
+
+.examples .audio-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 1rem;
+}
+
+.example-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.example-tl {
+  font-weight: 800;
+  color: var(--saffron);
+}
+
+.example-en {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.feedback-note {
+  margin: 8px 0 0;
+  font-size: 0.95rem;
+}
+
+.build-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 10px;
+  margin-bottom: 14px;
+  border: 3px dashed var(--line);
+  border-radius: 16px;
+}
+
+.build-line.right {
+  border: 3px solid var(--teal);
+}
+
+.build-line.wrong {
+  border: 3px solid var(--magenta);
+}
+
+.tile-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tile {
+  background: var(--cream);
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 8px 14px;
+  min-height: 44px;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.tile:disabled {
+  visibility: hidden;
+}
+
+.tile.placed {
+  background: var(--saffron);
+}
+
+.tile.placed:disabled {
+  visibility: visible;
+  box-shadow: none;
+}
+
+/* Library */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.chip {
+  border: 3px solid var(--line);
+  background: var(--surface);
+  border-radius: 99px;
+  padding: 6px 14px;
+  min-height: 40px;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.chip.selected {
+  background: var(--saffron);
+  color: var(--on-accent);
+  border-color: var(--ink);
+}
+
+.word.guide .word-en {
+  margin-bottom: 4px;
+}
+
+.guide-example {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.guide-example [lang] {
+  font-weight: 800;
+  color: var(--saffron);
+}
+
+.word .guide-example .audio-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+}

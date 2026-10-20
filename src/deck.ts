@@ -1,21 +1,32 @@
 // The starter deck, grouped by topic. New cards are introduced a few a day in
 // LEARN_ORDER, most useful first, whatever their topic; a topic's intro is
-// shown before the first of its cards a learner meets.
+// shown before the first of its cards a learner meets. Cards that aren't
+// vocabulary (sentence patterns, sounds, intonation, know-how) live in
+// guides.ts and share the same order and schedule.
 //
 // Pronunciation hints use CAPS for the stressed syllable. To add a recorded
 // clip for a card, drop the file in public/audio/ and set `audio` to its name;
 // it will be played instead of the browser's speech voice.
 
+import { GUIDES } from './guides';
+
+/**
+ * What a card teaches. Words and phrases are vocabulary; the rest are guides:
+ * a sentence pattern, a sound, how to say something (intonation and tone), or
+ * everyday know-how.
+ */
+export type CardKind = 'word' | 'phrase' | 'pattern' | 'sound' | 'tune' | 'knowhow';
+
 export interface Card {
   id: string;
-  /** Tagalog text. */
+  /** Tagalog text. For a guide, a short Tagalog example or frame ("___" marks a gap). */
   tl: string;
-  /** English meaning. */
+  /** English meaning. For a guide, its plain-English name. */
   en: string;
-  kind: 'word' | 'phrase';
+  kind: CardKind;
   /** Pronunciation guide. */
   hint?: string;
-  /** A short usage tip shown when the card is introduced. */
+  /** A short usage tip shown when the card is introduced. For a guide, the plain-English explanation. */
   note?: string;
   /**
    * A memory hook: an etymology, sound-alike, literal breakdown or fun fact
@@ -27,6 +38,37 @@ export interface Card {
   audio?: string;
   /** Other accepted pronunciations, as spelled, for when the learner says the card out loud. */
   accept?: string[];
+  /** Guides only: examples, each tappable to hear, built from cards met earlier where possible. */
+  examples?: Example[];
+  /** Guides only: cards that must be met, and have lasted a day, before this one is introduced. */
+  needs?: string[];
+  /** Guides only: the questions it is checked with. One is picked each time, so a pattern is practised in fresh sentences. */
+  drills?: Drill[];
+}
+
+export interface Example {
+  tl: string;
+  en: string;
+}
+
+/**
+ * One question for a guide: pick `answer` over `wrong`. With `tl`, the answer
+ * fills its "___" gap and the whole sentence can also be built from tiles.
+ */
+export interface Drill {
+  /** What is asked. For a sentence, its English meaning. */
+  q: string;
+  /** Tagalog with a "___" gap for the answer. */
+  tl?: string;
+  answer: string;
+  wrong: string[];
+  /** Cards the drill uses; drills whose cards are all met are preferred. */
+  uses?: string[];
+}
+
+/** Vocabulary, as opposed to a guide. */
+export function isVocab(card: Card): boolean {
+  return card.kind === 'word' || card.kind === 'phrase';
 }
 
 export interface Unit {
@@ -472,7 +514,10 @@ export const UNITS: Unit[] = [
   },
 ];
 
-export const ALL_CARDS: Card[] = UNITS.flatMap((u) => u.cards);
+/** Every vocabulary card, by topic. */
+export const VOCAB: Card[] = UNITS.flatMap((u) => u.cards);
+
+export const ALL_CARDS: Card[] = [...VOCAB, ...GUIDES];
 
 /**
  * The order new cards are introduced in, most useful first, across topics. Topics
@@ -486,40 +531,51 @@ export const LEARN_ORDER: readonly string[] = [
   'ano-pangalan', 'ako-si', 'taga-saan', 'taga-ako', 'paalam', 'ingat', 'pasensya-na', 'hindi-ko-alam',
   'hindi-maintindihan', 'pakiulit', 'paano-sabihin', 'ano-ibig-sabihin', 'dahan-dahan', 'ingles',
   'kaunti-lang',
+  // Guides (guides.ts) wait for the cards they build on and come in slowly (session.ts), so they sit
+  // roughly where they would first be useful.
+  'k-psst', 's-letters', 'p-po', 't-ha',
   // Asking for things: where, what, how much, I want, I need, can I.
   'saan', 'nasaan-banyo', 'ano-ito', 'magkano', 'gusto-ko-ito', 'ayoko', 'ako', 'ikaw', 'may-kape-ba', 'wala',
   'meron', 'puwede-ba', 'kailangan-ko', 'dito', 'isa', 'dalawa', 'tatlo', 'apat', 'lima', 'anim', 'pito',
   'walo', 'siyam', 'sampu', 'tara-na', 'sandali-lang',
+  'p-ba', 'p-hindi', 'p-may', 'k-eyebrows',
   // Where you are and when: on my way, here, almost there, now, later, tomorrow.
   'nasaan-ka', 'saan-ka-pupunta', 'papunta-na-ako', 'nandito-na-ako', 'malapit-na-ako', 'kailan', 'ngayon',
   'mamaya', 'kanina', 'mamaya-na-lang', 'bukas', 'anong-oras-na', 'sino', 'bakit', 'paano',
+  'p-si', 's-ng',
   // Thanks and greetings, eating together, and the small replies that keep a chat going.
   'maraming-salamat', 'magandang-umaga', 'magandang-hapon', 'magandang-gabi', 'kain-tayo', 'tubig', 'masarap',
   'busog-na-ako', 'gutom-na-ako', 'tayo', 'okay-lang-ba', 'okay-lang-ako', 'ayos-lang', 'talaga', 'oo-nga',
   'ako-rin', 'tama',
+  'p-first', 't-rise', 't-soft', 's-stress', 'k-kain', 's-r',
   // Directions and getting a ride, and running late.
   'kaliwa', 'kanan', 'diretso', 'diyan', 'doon', 'malapit', 'malayo', 'paano-pumunta', 'ate', 'kuya',
   'para-po', 'bayad-po', 'aalis-na-ako', 'pauwi-na-ako', 'nasaan-ka-na', 'mahuhuli-ako', 'hintayin-mo-ako',
   'teka',
+  'k-kuya',
   // More people words and joiners, ordering a drink, and buying things.
   'siya', 'kami', 'sila', 'at', 'pero', 'kasi', 'naku', 'grabe', 'siguro', 'kape', 'kanin', 'pahingi-tubig',
   'bill-po', 'isa-pa', 'ito-na-lang', 'iyan', 'iyon', 'mahal', 'mura', 'magkano-lahat', 'ilan', 'pabili-po',
   'meron-ba-kayong', 'tinapay',
+  'p-gusto', 's-sh', 't-react',
   // Clock times, and the parts of the day.
   'ala-una', 'alas-dos', 'alas-tres', 'kalahati', 'alas-singko', 'alas-sais', 'alas-siyete', 'alas-otso',
   'alas-diyes', 'alas-dose', 'kahapon', 'alas-siyete-umaga', 'alas-otso-gabi',
   // Making plans, and hedging.
   'libre-ka-ba', 'ano-ang-plano', 'saan-tayo-magkikita', 'anong-oras-magkikita', 'kita-tayo-bukas',
   'puwede-ako', 'hindi-ako-puwede', 'baka', 'ewan-ko', 'hindi-naman', 'ano-ulit', 'ganoon-ba',
+  'p-paki',
   // How you feel, getting help, home and family.
   'pagod-na-ako', 'mainit', 'masakit', 'may-sakit-ako', 'tulong', 'pakitulungan', 'naliligaw-ako', 'bahay',
   'nasa-bahay-ako', 'kaibigan', 'nanay', 'tatay', 'anak', 'mahal-kita', 'anong-balita', 'ikinagagalak',
+  'p-glue', 'p-ang',
   // More questions and reactions.
   'alin', 'gaano-katagal', 'gaano-kalayo', 'anong-ginagawa-mo', 'trapik', 'sayang', 'tama-na', 'makikiraan-po',
   // Days and weeks, riding, and where things are.
   'araw', 'linggo', 'tanghali', 'susunod-na-linggo', 'noong-isang-linggo', 'lagi', 'minsan', 'kaagad',
   'sumakay', 'bumaba', 'dyip', 'sa-tabi-lang', 'kumaliwa-ka', 'kumanan-ka', 'katabi', 'sa-harap', 'sa-likod',
   'kanto', 'kalye',
+  'p-sa',
   // Places in town, and eating out.
   'palengke', 'tindahan', 'paaralan', 'kainan', 'ospital', 'botika', 'nasaan-ospital', 'kailangan-doktor',
   'gamot', 'ano-masarap-dito', 'maanghang', 'huwag-maanghang', 'ulam', 'manok', 'isda', 'baso', 'kutsara',
@@ -527,9 +583,10 @@ export const LEARN_ORDER: readonly string[] = [
   // Money and shopping.
   'pera', 'piso', 'sukli', 'barya', 'dalawampu', 'limampu', 'isang-daan', 'limang-daan', 'isang-libo',
   'tumawad', 'tumitingin-lang', 'wala-na', 'malaki', 'maliit',
+  'p-when',
   // Less everyday feelings, plans and family.
   'nauuhaw-ako', 'inaantok-ako', 'malamig', 'masaya', 'malungkot', 'gusto-ko-umuwi', 'sasama-ako',
-  'tuloy-ba-tayo', 'mga', 'para-saan', 'kanino', 'lola', 'lolo',
+  'tuloy-ba-tayo', 'mga', 'p-mga', 'para-saan', 'kanino', 'lola', 'lolo',
   // Rarer places, dates and emergencies.
   'simbahan', 'opisina', 'bangko', 'paliparan', 'buwan', 'taon', 'lunes', 'biyernes', 'sabado', 'hatinggabi',
   'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',

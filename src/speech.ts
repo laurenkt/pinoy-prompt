@@ -57,7 +57,8 @@ let currentClip: HTMLAudioElement | null = null;
 /** Bumped by stop(), so a play() still loading a clip or voices doesn't start afterwards. */
 let generation = 0;
 
-export async function play(card: Card, slow = false): Promise<void> {
+/** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
+export async function play(card: Pick<Card, 'tl' | 'audio'>, slow = false): Promise<void> {
   stop();
   const mine = generation;
   if (card.audio) {
