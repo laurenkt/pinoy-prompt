@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import type { App } from '../app';
 import { getCard } from '../deck';
-import { drillSentence } from '../session';
+import { buildTiles, drillSentence } from '../session';
 import { emptyProgress, recordAnswer } from '../store';
 import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
@@ -67,9 +67,11 @@ describe('a learned pattern', () => {
     const root = sessionScreen(app, [{ kind: 'review', cardId: 'p-gusto', format: 'build' }], undefined, noMic);
     expect(root.textContent).toContain('Put it in order');
     const drill = answerOf(root);
-    const words = drillSentence(drill).split(' ');
+    const { words, decoy } = buildTiles(drill);
+    // A decoy word joins the tiles, so the last one left isn't a giveaway.
+    expect(root.querySelectorAll('.tile-pool .build-tile').length).toBe(words.length + (decoy ? 1 : 0));
     for (const w of words) {
-      const tile = [...root.querySelectorAll<HTMLButtonElement>('.tile-pool .tile')].find((t) => !t.disabled && t.textContent === w)!;
+      const tile = [...root.querySelectorAll<HTMLButtonElement>('.tile-pool .build-tile')].find((t) => !t.disabled && t.textContent === w)!;
       tile.click();
     }
     button(root, 'Check').click();

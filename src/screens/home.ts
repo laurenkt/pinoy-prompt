@@ -9,7 +9,7 @@ import {
   type MemorySummary,
   type Strength,
 } from '../memory';
-import { buildExtraSession, dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
+import { buildExtraSession, dueCards, newCardsLeftToday, unmetCount, upcomingNewCards } from '../session';
 import { h, icon } from '../ui';
 import { growthChart } from './growth-chart';
 
@@ -76,8 +76,8 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
   const now = app.now();
   const reviews = dueCards(progress, now).length;
-  const unmet = upcomingNewCards(progress, Infinity).length;
-  const fresh = Math.min(newCardsLeftToday(progress), unmet);
+  const unmet = unmetCount(progress);
+  const fresh = Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length);
   const rate = progress.settings.dailyNew;
 
   const rateLine = h(

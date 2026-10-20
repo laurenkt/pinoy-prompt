@@ -45,9 +45,18 @@ export function guideEvery(met: number): number {
   return met >= 100 ? 4 : 6;
 }
 
-/** A card has settled once it has been remembered at least a day after it was met. */
+/**
+ * A card has settled once it has been remembered at least a day after it was
+ * met. A card forgotten later and relearned still counts: it was remembered once.
+ */
 function settled(progress: Progress, id: string): boolean {
-  return (progress.cards[id]?.reps ?? 0) >= 2;
+  const state = progress.cards[id];
+  return !!state && state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
+}
+
+/** How many cards in the deck the learner hasn't met, guides that aren't ready yet included. */
+export function unmetCount(progress: Progress): number {
+  return LEARN_ORDER.filter((id) => getCard(id) && !isIntroduced(progress, id)).length;
 }
 
 /**
@@ -67,9 +76,10 @@ export function upcomingNewCards(progress: Progress, limit: number): string[] {
   });
   let sinceGuide = lastGuide === -1 ? Infinity : met.length - 1 - lastGuide;
 
+  // Once every word is met, there is nothing left to space guides out with.
   const ready = (card: Card) =>
     count >= (card.kind === 'pattern' ? PATTERN_START : GUIDE_START) &&
-    sinceGuide >= guideEvery(count) - 1 &&
+    (sinceGuide >= guideEvery(count) - 1 || i >= unmet.length) &&
     (card.needs ?? []).every((id) => settled(progress, id));
 
   const unmet = LEARN_ORDER.map(getCard).filter((c): c is Card => !!c && !isIntroduced(progress, c.id));
@@ -262,9 +272,28 @@ export function drillSentence(drill: Drill): string {
   return drill.tl ? drill.tl.replace('___', drill.answer) : drill.answer;
 }
 
+/**
+ * The words to build a drill's sentence from, lower case and without
+ * punctuation, so a capital or a full stop doesn't give the order away. A
+ * one-word wrong answer joins them as a decoy.
+ */
+export function buildTiles(drill: Drill): { words: string[]; decoy?: string } {
+  const words = tileWords(drillSentence(drill));
+  const decoy = drill.wrong.find((w) => !w.includes(' ') && !words.includes(tileWords(w)[0]));
+  return { words, decoy: decoy && tileWords(decoy)[0] };
+}
+
+function tileWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[.,!?"]/g, '')
+    .split(' ')
+    .filter(Boolean);
+}
+
 /** Whether a drill makes a sentence worth building from tiles. */
 export function canBuild(drill: Drill): boolean {
-  return !!drill.tl && drillSentence(drill).split(' ').length >= 3;
+  return !!drill.tl && buildTiles(drill).words.length >= 3;
 }
 
 /**

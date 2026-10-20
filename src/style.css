@@ -1912,7 +1912,7 @@ p {
   margin-bottom: 16px;
 }
 
-.tile {
+.build-tile {
   background: var(--cream);
   color: var(--on-accent);
   border: var(--outline);
@@ -1924,15 +1924,15 @@ p {
   font-weight: 800;
 }
 
-.tile:disabled {
+.build-tile:disabled {
   visibility: hidden;
 }
 
-.tile.placed {
+.build-tile.placed {
   background: var(--saffron);
 }
 
-.tile.placed:disabled {
+.build-tile.placed:disabled {
   visibility: visible;
   box-shadow: none;
 }

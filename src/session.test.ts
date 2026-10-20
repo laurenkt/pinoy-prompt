@@ -5,7 +5,9 @@ import {
   PATTERN_START,
   GUIDE_START,
   buildExtraSession,
+  buildTiles,
   canBuild,
+  unmetCount,
   drillSentence,
   pickDrill,
   distractors,
@@ -219,6 +221,29 @@ describe('new cards', () => {
     for (let i = 1; i < guideAt.length; i++) expect(guideAt[i] - guideAt[i - 1]).toBeGreaterThanOrEqual(6);
   });
 
+  it('keep bringing in guides once every word is met', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER);
+    const guides = upcomingNewCards(progress, Infinity);
+    expect(guides.length).toBeGreaterThan(1);
+    learn(progress, guides.slice(0, 1));
+    expect(upcomingNewCards(progress, Infinity).length).toBeGreaterThan(0);
+  });
+
+  it('still count a card forgotten and relearned as one a guide can build on', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 40));
+    // Missed once after weeks, then remembered again: reps start over, but it was known.
+    progress.cards['po'] = { ...progress.cards['po'], reps: 1, lapses: 1, interval: 1 };
+    expect(upcomingNewCards(progress, Infinity)).toContain('p-po');
+  });
+
+  it('count guides that are still waiting as unmet', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER);
+    expect(unmetCount(progress)).toBe(LEARN_ORDER.length - VOCAB_ORDER.length);
+  });
+
   it('count guides met earlier when spacing the next one', () => {
     const progress = emptyProgress(NOW);
     learn(progress, VOCAB_ORDER.slice(0, 80));
@@ -300,6 +325,8 @@ describe('guides', () => {
     const card = getCard('p-hindi')!;
     for (let i = 0; i < 10; i++) expect(canBuild(pickDrill(card, progress, 'build', undefined, () => i / 10)!)).toBe(true);
     expect(drillSentence({ q: 'I want coffee.', tl: 'Gusto ko ___ kape.', answer: 'ng', wrong: [] })).toBe('Gusto ko ng kape.');
+    // Capitals and punctuation would give the order away.
+    expect(buildTiles({ q: 'Who is Ana?', tl: 'Sino ___ Ana?', answer: 'si', wrong: ['ng', 'ba'] })).toEqual({ words: ['sino', 'si', 'ana'], decoy: 'ng' });
   });
 
   it('are never used as wrong answers for words', () => {

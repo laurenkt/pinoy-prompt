@@ -4,6 +4,7 @@ import { KIND_INFO } from '../guides';
 import {
   buildExtraSession,
   distractors,
+  buildTiles,
   drillSentence,
   isIntroduced,
   nextStudyStep,
@@ -11,7 +12,7 @@ import {
   pickFormat,
   requeue,
   shuffle,
-  upcomingNewCards,
+  unmetCount,
   type Format,
   type Step,
 } from '../session';
@@ -54,6 +55,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   let drillChoices: string[] = [];
   let tiles: string[] = [];
   let placed: number[] = [];
+  /** How many tiles the right sentence takes; the rest is a decoy. */
+  let tilesNeeded = 0;
   const lastDrill = new Map<string, Drill>();
   let completed = 0;
   /** Set once the learner has seen the caught-up note, so it only shows once. */
@@ -76,12 +79,13 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
 
   /**
    * Play the card, except while the microphone is open: it would record the app's
-   * voice. A guide plays the sentence it is asking about, if there is one.
+   * voice. A guide plays the sentence it is asking about, if there is one,
+   * but only once answered: the sentence is the answer.
    */
   const say = (slow = false) => {
     if (!card || speak?.recording()) return;
     if (isVocab(card)) void play(card, slow);
-    else if (drill?.tl) void play({ tl: drillSentence(drill) }, slow);
+    else if (drill?.tl && (phase === 'feedback' || phase === 'back' || phase === 'missed')) void play({ tl: drillSentence(drill) }, slow);
   };
   const autoplay = () => app.progress.settings.autoplay && say();
 
@@ -197,10 +201,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       drillChoices = shuffle([drill.answer, ...drill.wrong]);
       phase = 'quiz';
     } else if (format === 'build') {
-      const words = drillSentence(drill).split(' ');
+      const { words, decoy } = buildTiles(drill);
+      tilesNeeded = words.length;
       // Never hand over the tiles already in order.
-      do tiles = shuffle(words);
-      while (tiles.join(' ') === words.join(' '));
+      do tiles = shuffle(decoy ? [...words, decoy] : words);
+      while (tiles.slice(0, words.length).join(' ') === words.join(' '));
       placed = [];
       phase = 'build';
     } else {
@@ -233,7 +238,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function checkBuild(): void {
     if (!drill || phase !== 'build') return;
     picked = placed.map((i) => tiles[i]).join(' ');
-    finish(picked === drillSentence(drill) ? 'good' : 'again');
+    finish(picked === buildTiles(drill).words.join(' ') ? 'good' : 'again');
     phase = 'feedback';
     say();
     draw();
@@ -353,7 +358,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   function caughtUpView(): HTMLElement {
-    const unmet = upcomingNewCards(app.progress, 1).length > 0;
+    const unmet = unmetCount(app.progress) > 0;
     return h(
       'div',
       { class: 'panel center' },
@@ -682,7 +687,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function buildView(c: Card): HTMLElement {
     const d = drill!;
     const answered = phase === 'feedback';
-    const right = answered && picked === drillSentence(d);
+    const right = answered && picked === buildTiles(d).words.join(' ');
     return h(
       'div',
       { class: 'panel' },
@@ -692,18 +697,18 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         { class: `build-line ${answered ? (right ? 'right' : 'wrong') : ''}`, lang: 'fil', 'aria-label': 'Your sentence' },
         placed.length === 0
           ? h('span', { class: 'muted small' }, 'Tap the words below in order.')
-          : placed.map((i) => h('button', { class: 'tile placed', disabled: answered, onclick: () => unplace(i) }, tiles[i])),
+          : placed.map((i) => h('button', { class: 'build-tile placed', disabled: answered, onclick: () => unplace(i) }, tiles[i])),
       ),
       !answered &&
         h(
           'div',
           { class: 'tile-pool', lang: 'fil' },
-          tiles.map((t, i) => h('button', { class: 'tile', disabled: placed.includes(i), onclick: () => place(i) }, t)),
+          tiles.map((t, i) => h('button', { class: 'build-tile', disabled: placed.includes(i), onclick: () => place(i) }, t)),
         ),
       !answered &&
         h(
           'button',
-          { class: 'btn primary big', disabled: placed.length < tiles.length, 'data-autofocus': placed.length === tiles.length || undefined, onclick: checkBuild },
+          { class: 'btn primary big', disabled: placed.length < tilesNeeded, 'data-autofocus': placed.length === tilesNeeded || undefined, onclick: checkBuild },
           'Check',
         ),
       answered && gapLine(d, true),

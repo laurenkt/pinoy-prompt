@@ -63,7 +63,7 @@ export const GUIDES: Card[] = [
     kind: 'pattern',
     tl: '___ ba?',
     en: 'Yes/no questions with "ba"',
-    note: 'To turn a sentence into a yes/no question, drop "ba" in after the first word. "Gutom ka" is "you\'re hungry"; "Gutom ka ba?" is "are you hungry?". In casual talk people often skip "ba" and just let their voice rise.',
+    note: 'To turn a sentence into a yes/no question, put "ba" near the front: after the first word, and after a little word like "ka" if there is one. "Gutom ka" is "you\'re hungry"; "Gutom ka ba?" is "are you hungry?". In casual talk people often skip "ba" and just let their voice rise.',
     hook: '"Ba" is a question mark you can say out loud.',
     examples: [
       { tl: 'Gutom ka ba?', en: 'Are you hungry?' },
@@ -92,6 +92,8 @@ export const GUIDES: Card[] = [
     ],
     needs: ['hindi', 'hindi-ko-alam'],
     drills: [
+      { q: "I don't know.", tl: '___ ko alam.', answer: 'Hindi', wrong: ['Wala', 'Ayoko'] },
+      { q: "I don't understand.", tl: '___ ko maintindihan.', answer: 'Hindi', wrong: ['Wala', 'Ayoko'], uses: ['hindi-maintindihan'] },
       { q: "I'm not hungry.", tl: '___ ako gutom.', answer: 'Hindi', wrong: ['Wala', 'Ayoko'], uses: ['gutom-na-ako'] },
       { q: "I'm not tired.", tl: 'Hindi ___ pagod.', answer: 'ako', wrong: ['ka', 'si'], uses: ['pagod-na-ako'] },
       { q: "It's not far.", tl: '___ malayo.', answer: 'Hindi', wrong: ['Wala', 'Ayoko'], uses: ['malayo'] },
@@ -154,7 +156,7 @@ export const GUIDES: Card[] = [
     drills: [
       { q: 'Is there any water?', tl: '___ tubig ba?', answer: 'May', wrong: ['Gusto', 'Hindi'], uses: ['tubig'] },
       { q: 'Is there any rice?', tl: 'May kanin ___?', answer: 'ba', wrong: ['si', 'ng'], uses: ['kanin'] },
-      { q: '"May tinapay ba?" There isn\'t any. You say:', answer: 'Wala.', wrong: ['Meron.', 'Hindi.'] },
+      { q: '"May kape ba?" There isn\'t any. You say:', answer: 'Wala.', wrong: ['Meron.', 'Hindi.'] },
       { q: '"May kape ba?" Yes, there is. You say:', answer: 'Meron.', wrong: ['Wala.', 'Hindi.'] },
     ],
   },
@@ -163,7 +165,7 @@ export const GUIDES: Card[] = [
     kind: 'pattern',
     tl: 'magandang umaga',
     en: 'The little glue: -ng and na',
-    note: 'When a describing word sits next to its thing, Tagalog glues them together. If the first word ends in a vowel, add "-ng" to it: "maganda" + "umaga" = "magandang umaga". Otherwise put "na" between them: "mainit na tubig".',
+    note: 'When a describing word sits next to its thing, Tagalog glues them together. If the first word ends in a vowel, add "-ng" to it: "maganda" + "umaga" = "magandang umaga". If it ends in "n", that "n" becomes "-ng": "mayaman" (rich) gives "mayamang tao". Otherwise put "na" between them: "mainit na tubig".',
     hook: 'Vowel at the end? Stick on "-ng". Anything else? Use "na" as glue.',
     examples: [
       { tl: 'Magandang umaga.', en: 'Good morning. (Beautiful morning.)' },
@@ -286,13 +288,13 @@ export const GUIDES: Card[] = [
     examples: [
       { tl: 'Paalam', en: 'pah-AH-lahm: three beats' },
       { tl: 'Oo', en: 'OH-oh: two beats' },
-      { tl: 'kape', en: 'KAH-peh: the e is said' },
+      { tl: 'kape', en: 'kah-PEH: the e is said' },
     ],
     needs: ['paalam', 'oo'],
     drills: [
       { q: 'How many beats does "paalam" have?', answer: 'Three: pa-a-lam', wrong: ['Two: paa-lam', 'One: palm'] },
       { q: 'The "e" at the end of "kape" is…', answer: 'said, like the e in "bed"', wrong: ['silent', 'like the ee in "see"'] },
-      { q: '"Oo" (yes) is said…', answer: 'OH-oh, two beats', wrong: ['like the oo in "food"', 'like "uh-oh"'] },
+      { q: '"Oo" (yes) is said…', answer: 'OH-oh, two beats', wrong: ['like the oo in "food"', 'like "oh", one beat'] },
     ],
   },
   {
@@ -356,7 +358,7 @@ export const GUIDES: Card[] = [
     tl: 'siya',
     en: '"si" + vowel sounds like "sh"',
     hint: 'shah',
-    note: 'In everyday speech "si" before another vowel squashes into "sh": "siya" (he, she) sounds like "shah", "siyam" (nine) like "shahm", and "pasensya" like "pah-SEN-shah".',
+    note: 'In everyday speech "si" before another vowel often squashes into "sh": "siya" (he, she) sounds like "shah", "siyam" (nine) like "shahm", and "pasensya" like "pah-SEN-shah". Said carefully, you will also hear "see-YAH".',
     hook: 'Say "see-ya" fast enough and it turns into "sha".',
     examples: [
       { tl: 'siya', en: 'he / she: "shah"' },
@@ -404,7 +406,7 @@ export const GUIDES: Card[] = [
     ],
     needs: ['sandali-lang', 'mabuti', 'oo-nga'],
     drills: [
-      { q: 'Just a moment.', tl: 'Sandali ___.', answer: 'lang', wrong: ['nga', 'ba'] },
+      { q: 'Just a moment.', tl: 'Sandali ___.', answer: 'lang', wrong: ['si', 'ng'] },
       { q: 'Yes, exactly!', tl: 'Oo ___.', answer: 'nga', wrong: ['lang', 'ba'] },
       { q: '"Kumusta?" Answer warmly: fine, thanks.', tl: 'Mabuti ___.', answer: 'naman', wrong: ['nga', 'ba'] },
       { q: 'In "Ayos lang", what does "lang" do?', answer: 'Makes it small and easy: "just fine"', wrong: ['Makes it a question', 'Makes it polite to elders'], uses: ['ayos-lang'] },
@@ -470,14 +472,14 @@ export const GUIDES: Card[] = [
     kind: 'knowhow',
     tl: 'Psst!',
     en: 'Getting attention and pointing',
-    note: 'A short "psst!" is a normal way to catch someone\'s eye, like a waiter or a friend across the street. It isn\'t rude. To point at something, people often purse their lips toward it instead of using a finger.',
+    note: 'A short "psst!" is an everyday way to catch someone\'s eye, like a friend across the street or a waiter in a casual place. With elders or in formal places, say "Excuse me po" instead. To point at something, people often purse their lips toward it instead of using a finger.',
     hook: 'Hiss to call, pout to point.',
     examples: [
       { tl: 'Psst! Kuya!', en: 'Hey! (to catch a man\'s attention)' },
     ],
     drills: [
       { q: 'How do people often point at something?', answer: 'Purse their lips toward it', wrong: ['Point with the middle finger', 'Nod twice'] },
-      { q: 'Is "psst!" to call a waiter rude?', answer: "No, it's normal", wrong: ['Yes, very', 'Only after dark'] },
+      { q: 'Calling a friend across the street with "psst!" is…', answer: 'normal and friendly', wrong: ['very rude', 'only for emergencies'] },
     ],
   },
   {
