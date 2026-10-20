@@ -144,20 +144,20 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       return h(
         'div',
         null,
-        h('h1', null, 'Practice'),
+        h('h1', null, 'Drills'),
         h(
           'section',
           { class: 'card center' },
-          h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to play with them.`),
-          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'home' }) }, 'Go to lessons'),
+          h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to drill them.`),
+          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'home' }) }, 'Go to Study'),
         ),
       );
     }
     return h(
       'div',
       null,
-      h('h1', null, 'Practice'),
-      h('p', { class: 'muted' }, `Quick rounds of ${ROUND_SIZE} using the ${learned} words you know. Practice doesn't change your review schedule, so play as much as you like.`),
+      h('h1', null, 'Drills'),
+      h('p', { class: 'muted' }, `Pick one skill and drill it: quick rounds of ${ROUND_SIZE} using the ${learned} words you know. Study already mixes these in; drills are for working on one on purpose. They don't change your review schedule.`),
       h(
         'div',
         { class: 'modes' },
@@ -216,7 +216,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       h(
         'header',
         { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'End practice', onclick: () => app.navigate({ name: 'practice' }) }, icon('close')),
+        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: () => app.navigate({ name: 'practice' }) }, icon('close')),
         progressBar(index, questions.length, 'Round progress'),
         h('span', { class: 'session-title' }, `${score} right`),
       ),

@@ -6,13 +6,15 @@ A small, phone-first web app for learning beginner Tagalog with spaced repetitio
 
 ## How it works
 
-- **Learn**: each day introduces a handful of new words and phrases (8 by default). Every new card shows the Tagalog, audio, a pronunciation guide, the meaning and a usage tip, followed by a quick multiple-choice check.
-- **Review**: cards come back on an SM-2 style schedule (1 day, 3 days, then growing by each card's ease). You rate each recall as Again, Hard, Good or Easy; missed cards come round again in the same session.
-- **Practice**: unscored rounds of 10 (listen, read, recall, speak, or mixed) using the words you know, weighted toward the ones you find hardest. Practice never changes the review schedule.
-- **Home**: today's reviews and new words, then a picture of your memory: how many words you know, how well you recall them (measured from your reviews over the last 30 days, or estimated from the schedule until there are enough), and how firmly each is stored (just met, days, weeks, long-term, read from its review interval). There are no lessons to complete or streaks to keep.
+- **Study**: one button, and it keeps going until you stop. Each step is picked as you go: due reviews first, weakest first (lowest estimated recall), then a new word, but only once nothing is due, fewer than 3 words are still being learned, and the daily new-word rate (8 by default) allows. When you're caught up it moves on to extra practice of your weakest words, which never changes the schedule.
+- **Question types**: each word is one memory with one schedule, asked in different ways. Words still being learned get a multiple-choice check (see the Tagalog, pick the meaning). Learned words are self-rated, so a lucky guess can't push one weeks out: you read or hear the Tagalog and recall the meaning, and as a word holds for longer, you produce the Tagalog from the English. Extra practice mixes in multiple choice both ways, listening, and speaking once the pronunciation model is on the device.
+- **New words**: every new card shows the Tagalog, audio, a pronunciation guide, the meaning, a usage tip and a memory hook, followed by a quick multiple-choice check. "Learn new words now" on Home adds 5 beyond the daily rate.
+- **Schedule**: SM-2 style (1 day, 3 days, then growing by each card's ease). A missed word comes back after a short gap in the same session.
+- **Drills**: unscored rounds of 10 in one skill (listen, read, recall, speak, or mixed), weighted toward the words you find hardest. Drills never change the review schedule.
+- **Home**: what Study will do next, then a picture of your memory: how many words you know, how well you recall them (measured from your reviews over the last 30 days, or estimated from the schedule until there are enough), and how firmly each is stored (just met, days, weeks, long-term, read from its review interval). There are no lessons to complete or streaks to keep.
 - **Words**: a phrasebook by topic, tappable for audio, showing how firmly each word you know is stored.
 
-New words come in deck order, topic by topic (Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases), at the daily rate set in Settings. "Learn 5 more" adds extra when you want them.
+New words come in deck order, topic by topic (Greetings, Yes/no & politeness, Meeting people, Numbers 1–10, Question words, Food & eating, Family & friends, Everyday phrases), at the daily rate set in Settings.
 
 Progress is stored on the device. Nothing is sent to our server (there isn't one), and that includes your voice: speaking questions are checked on the device.
 

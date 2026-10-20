@@ -57,6 +57,9 @@ function render(route: Route): void {
       screen = wordsScreen(app);
       tab = 'words';
       break;
+    case 'study':
+      screen = sessionScreen(app, null);
+      break;
     case 'session':
       screen = sessionScreen(app, route.steps, route.title);
       break;
@@ -69,8 +72,8 @@ function render(route: Route): void {
 
 function tabBar(active: Tab): HTMLElement {
   const tabs: { id: Tab; label: string; route: Route }[] = [
-    { id: 'home', label: 'Learn', route: { name: 'home' } },
-    { id: 'practice', label: 'Practice', route: { name: 'practice' } },
+    { id: 'home', label: 'Study', route: { name: 'home' } },
+    { id: 'practice', label: 'Drills', route: { name: 'practice' } },
     { id: 'words', label: 'Words', route: { name: 'words' } },
   ];
   return h(

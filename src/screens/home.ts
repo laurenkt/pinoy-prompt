@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { MIN_MEASURED_REVIEWS, RECALL_WINDOW_DAYS, STRENGTHS, memorySummary, type MemorySummary } from '../memory';
-import { buildExtraSession, buildSession, dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
+import { buildExtraSession, dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
 import { h, icon } from '../ui';
 
 /** A Tagalog greeting for the time of day. */
@@ -65,7 +65,6 @@ function plural(n: number, one: string, many = `${one}s`): string {
 function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
   const now = app.now();
-  const steps = buildSession(progress, now);
   const reviews = dueCards(progress, now).length;
   const unmet = upcomingNewCards(progress, Infinity).length;
   const fresh = Math.min(newCardsLeftToday(progress), unmet);
@@ -74,53 +73,43 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   const rateLine = h(
     'p',
     { class: 'today-meta' },
-    unmet === 0 ? "You've met every word in the deck." : `${plural(rate, 'new word')} a day`,
+    unmet === 0 ? "You've met every word in the deck." : `Up to ${plural(rate, 'new word')} a day`,
     unmet > 0 && h('button', { class: 'link-btn', onclick: () => app.navigate({ name: 'settings' }) }, 'Change'),
   );
 
-  if (steps.length === 0) {
-    return h(
-      'section',
-      { class: 'card today done' },
-      rateLine,
-      h('h2', null, 'Nothing due'),
-      h('p', null, "Your reviews are done for now. Words come back as they're about to fade."),
-      h(
-        'div',
-        { class: 'row' },
-        h('button', { class: 'btn secondary', onclick: () => app.navigate({ name: 'practice' }) }, 'Practice'),
-        unmet > 0 &&
-          h(
-            'button',
-            {
-              class: 'btn primary',
-              onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'New words' }),
-            },
-            'Learn 5 more',
-          ),
-      ),
-    );
+  let title: string;
+  let plan: string;
+  if (isFirstRun) {
+    title = 'Your first words';
+    plan = 'Meet a few words, then check them before moving on.';
+  } else if (reviews > 0) {
+    title = `${plural(reviews, 'word')} to review`;
+    plan = fresh > 0 ? 'Weakest first. New words come in once these have settled.' : 'Weakest first.';
+  } else if (fresh > 0) {
+    title = 'Ready for new words';
+    plan = 'Nothing is due, so study starts with new words.';
+  } else {
+    title = "You're caught up";
+    plan = "Nothing is due. Study gives extra practice on your weakest words, without changing when they come back.";
   }
-
-  const parts: string[] = [];
-  if (reviews > 0) parts.push(`${reviews} to review`);
-  if (fresh > 0) parts.push(`${fresh} new`);
-  const minutes = Math.max(1, Math.round((reviews * 8 + fresh * 25) / 60));
 
   return h(
     'section',
     { class: 'card today' },
     rateLine,
-    h('h2', null, isFirstRun ? 'Your first words' : 'Today'),
-    h('p', null, `${parts.join(' · ')} · about ${minutes} min`),
-    h(
-      'button',
-      {
-        class: 'btn primary big',
-        onclick: () => app.navigate({ name: 'session', steps: buildSession(app.progress, app.now()) }),
-      },
-      isFirstRun ? 'Start learning' : 'Start',
-    ),
+    h('h2', null, title),
+    h('p', null, plan),
+    h('button', { class: 'btn primary big', onclick: () => app.navigate({ name: 'study' }) }, isFirstRun ? 'Start learning' : 'Study'),
+    !isFirstRun &&
+      unmet > 0 &&
+      h(
+        'button',
+        {
+          class: 'link-btn learn-more',
+          onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'New words' }),
+        },
+        'Learn new words now',
+      ),
   );
 }
 
