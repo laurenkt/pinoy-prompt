@@ -1716,10 +1716,6 @@ p {
   box-shadow: 2px 2px 0 var(--ink);
 }
 
-.btn.talk-type {
-  width: 100%;
-}
-
 .talk-log {
   display: flex;
   flex-direction: column;
@@ -1792,26 +1788,13 @@ p {
   margin-bottom: 12px;
 }
 
-.talk-composer {
-  display: flex;
-  gap: 10px;
-  align-items: stretch;
-}
-
-.talk-input,
 .key-input {
-  flex: 1;
-  min-width: 0;
   font: inherit;
   color: var(--on-accent);
   background: var(--cream);
   border: var(--outline);
   border-radius: 14px;
   padding: 10px 12px;
-  resize: none;
-}
-
-.key-input {
   width: 100%;
   margin-bottom: 10px;
 }

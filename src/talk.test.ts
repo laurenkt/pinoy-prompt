@@ -53,17 +53,19 @@ describe('talkInstructions', () => {
     const progress = progressWith(['salamat', 'kumusta']);
     progress.cards.kumusta.interval = 10;
     progress.cards.salamat.interval = 0;
-    const text = talkInstructions(talkPlan(progress, 'greetings'), 'text');
+    const text = talkInstructions(talkPlan(progress, 'greetings'));
     expect(text).toContain('Greetings');
     expect(text).toMatch(/know well: Kumusta\? \(How are you\? \/ Hello\)/);
     expect(text).toMatch(/last day or so: Salamat \(Thank you\)/);
     expect(text).toContain('new word');
   });
 
-  it('asks for spoken meanings only in a call, where the app cannot show them', () => {
-    const plan = talkPlan(progressWith(['salamat']), null);
-    expect(talkInstructions(plan, 'voice')).toContain('say the English meaning');
-    expect(talkInstructions(plan, 'text')).not.toContain('say the English meaning');
+  it('asks for the meaning of fresh and new words to be said aloud', () => {
+    const progress = progressWith(['salamat']);
+    progress.cards.salamat.interval = 0;
+    const text = talkInstructions(talkPlan(progress, null));
+    expect(text).toMatch(/last day or so: .*Say the English meaning/);
+    expect(text).toMatch(/new word.*say the English meaning straight after it/);
   });
 });
 

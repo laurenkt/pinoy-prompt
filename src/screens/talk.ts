@@ -6,23 +6,21 @@ import {
   getApiKey,
   MAX_CALL_SECONDS,
   startCall,
-  textReply,
   type Call,
   type CallDeps,
   type ChatTurn,
 } from '../openai';
 import { play } from '../speech';
-import { findWords, talkInstructions, talkPlan, talkTopics, type TalkMode, type TalkPlan } from '../talk';
+import { findWords, talkInstructions, talkPlan, talkTopics, type TalkPlan } from '../talk';
 import { h, icon } from '../ui';
 import { keyForm } from './settings';
 
 export interface TalkDeps {
-  textReply: typeof textReply;
   call: CallDeps;
   callSupported(): boolean;
 }
 
-export const defaultTalkDeps: TalkDeps = { textReply, call: browserCallDeps, callSupported };
+export const defaultTalkDeps: TalkDeps = { call: browserCallDeps, callSupported };
 
 const MIN_WORDS = 4;
 /** GPT-Live's price per minute, in US cents. */
@@ -40,32 +38,26 @@ type State =
   | { name: 'menu' }
   | { name: 'connecting' }
   | { name: 'call'; muted: boolean }
-  | { name: 'text'; waiting: boolean }
   | { name: 'ended' };
 
 export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElement {
   const root = h('div', { class: 'talk' });
   let topicId: string | null = null;
   let plan: TalkPlan = talkPlan(app.progress, null);
-  let mode: TalkMode = 'voice';
   let turns: ChatTurn[] = [];
   let state: State = { name: 'menu' };
   let error: string | null = null;
   let seconds = 0;
-  let draft = '';
+  /** Words whose meaning the learner has tapped to see; kept as the transcript redraws. */
+  let revealed = new Set<string>();
 
-  function begin(chosen: TalkMode): void {
-    mode = chosen;
+  function begin(): void {
     plan = talkPlan(app.progress, topicId);
     turns = [];
     error = null;
     seconds = 0;
-    if (mode === 'voice') void call();
-    else {
-      state = { name: 'text', waiting: true };
-      draw();
-      void reply();
-    }
+    revealed = new Set();
+    void call();
   }
 
   async function call(): Promise<void> {
@@ -74,7 +66,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     state = { name: 'connecting' };
     draw();
     try {
-      activeCall = await startCall(key, talkInstructions(plan, 'voice'), {
+      activeCall = await startCall(key, talkInstructions(plan), {
         onStarted: () => {
           if (state.name === 'connecting') state = { name: 'call', muted: false };
           draw();
@@ -115,30 +107,6 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     else turns.push({ who, text: text.trimStart() });
   }
 
-  async function reply(): Promise<void> {
-    const key = getApiKey();
-    if (!key) return;
-    try {
-      const text = await deps.textReply(key, talkInstructions(plan, 'text'), turns.slice());
-      turns.push({ who: 'ai', text });
-      error = null;
-    } catch (e) {
-      error = errorText(e);
-    }
-    if (state.name === 'text') state = { name: 'text', waiting: false };
-    draw();
-  }
-
-  function send(): void {
-    const text = draft.trim();
-    if (!text || state.name !== 'text' || state.waiting) return;
-    turns.push({ who: 'you', text });
-    draft = '';
-    state = { name: 'text', waiting: true };
-    draw();
-    void reply();
-  }
-
   function leave(): void {
     state = { name: 'menu' };
     hangUpTalk();
@@ -153,13 +121,11 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   }
 
   function draw(): void {
-    const hadFocus = document.activeElement?.classList.contains('talk-input');
     if (!getApiKey()) root.replaceChildren(setup());
     else if (state.name === 'menu') root.replaceChildren(menu());
     else root.replaceChildren(conversation());
     const log = root.querySelector('.talk-log');
     log?.lastElementChild?.scrollIntoView?.({ block: 'end' });
-    if (hadFocus) root.querySelector<HTMLElement>('.talk-input')?.focus();
   }
 
   function header(title: string, extra?: HTMLElement): HTMLElement {
@@ -230,7 +196,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
       plan.newWord && h('p', { class: 'muted small' }, 'New word this time: ', h('strong', { lang: 'fil' }, plan.newWord.tl), ` (${plan.newWord.en})`),
       h(
         'button',
-        { class: 'btn primary big', disabled: !canCall, onclick: () => begin('voice') },
+        { class: 'btn primary big', disabled: !canCall, onclick: begin },
         icon('mic'),
         ' Start talking',
       ),
@@ -239,9 +205,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
         { class: 'muted small center' },
         canCall
           ? `Spoken with GPT-Live, about ${CENTS_PER_MINUTE}¢ a minute on your OpenAI key. Calls end after ${MAX_CALL_SECONDS / 60} minutes.`
-          : "This browser can't make calls from the microphone. You can still type.",
+          : "This browser can't use the microphone for calls. Try Safari or Chrome.",
       ),
-      h('button', { class: 'btn secondary talk-type', onclick: () => begin('text') }, 'Type instead'),
     );
   }
 
@@ -254,13 +219,11 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
           ? state.muted
             ? 'Muted'
             : 'Listening. Just talk.'
-          : state.name === 'text' && state.waiting
-            ? 'Typing…'
-            : null;
+          : null;
     return h(
       'div',
       { class: 'talk-chat' },
-      header(mode === 'voice' ? 'Talking' : 'Chat', mode === 'voice' ? h('span', { class: 'session-title talk-meter' }, meterText()) : undefined),
+      header('Talking', h('span', { class: 'session-title talk-meter' }, meterText())),
       h(
         'div',
         { class: 'talk-log', 'aria-live': 'polite' },
@@ -301,39 +264,13 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
             'End call',
           ),
         ),
-      state.name === 'text' && composer(),
       state.name === 'ended' &&
         h(
           'div',
           { class: 'row' },
           h('button', { class: 'btn secondary', onclick: () => { state = { name: 'menu' }; draw(); } }, 'Change topic'),
-          h('button', { class: 'btn primary', onclick: () => begin(mode) }, mode === 'voice' ? 'Talk again' : 'Chat again'),
+          h('button', { class: 'btn primary', onclick: () => begin() }, 'Talk again'),
         ),
-    );
-  }
-
-  function composer(): HTMLElement {
-    const input = h('textarea', {
-      class: 'talk-input',
-      rows: 2,
-      placeholder: 'Reply in English, Tagalog or both',
-      'aria-label': 'Your reply',
-      lang: 'fil',
-    });
-    input.value = draft;
-    input.addEventListener('input', () => (draft = input.value));
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        send();
-      }
-    });
-    const waiting = state.name === 'text' && state.waiting;
-    return h(
-      'form',
-      { class: 'talk-composer', onsubmit: (e: Event) => { e.preventDefault(); send(); } },
-      input,
-      h('button', { class: 'btn primary', type: 'submit', disabled: waiting }, 'Send'),
     );
   }
 
@@ -347,9 +284,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   }
 
   function word(text: string, card: TalkPlan['known'][number]['card'], strength: string): HTMLElement {
-    // Words met in the last day, and the new one, show their meaning straight away.
-    const open = strength === 'new' || strength === 'unseen';
-    const meaning = h('span', { class: 'gloss', hidden: !open }, ` (${card.en})`);
+    // The AI says the meaning of new words aloud, so here meanings wait for a tap.
+    const meaning = h('span', { class: 'gloss', hidden: !revealed.has(card.id) }, ` (${card.en})`);
     return h(
       'span',
       { class: `tl-word w-${strength}` },
@@ -360,6 +296,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
           title: card.en,
           onclick: () => {
             meaning.hidden = false;
+            revealed.add(card.id);
             // While the call is on, the AI's voice is playing; don't talk over it.
             if (!activeCall) void play(card);
           },

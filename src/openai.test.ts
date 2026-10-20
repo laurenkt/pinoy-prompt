@@ -10,7 +10,6 @@ import {
   MAX_CALL_SECONDS,
   setApiKey,
   startCall,
-  textReply,
   VOICE_MODEL,
   type CallDeps,
   type CallEvents,
@@ -42,51 +41,6 @@ describe('the API key', () => {
   it('is kept apart from progress, so backups never include it', () => {
     setApiKey(KEY);
     expect(Object.keys(localStorage).filter((k) => localStorage.getItem(k) === KEY)).toEqual(['pinoy-prompt:openai-key']);
-  });
-});
-
-describe('textReply', () => {
-  it('sends the conversation and reads the reply text', async () => {
-    const fetchFn = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-      json(200, {
-        output: [
-          { type: 'reasoning', summary: [] },
-          { type: 'message', content: [{ type: 'output_text', text: 'Kumusta? ' }, { type: 'output_text', text: 'How was your day?' }] },
-        ],
-      }),
-    );
-    const text = await textReply(KEY, 'Be kind.', [
-      { who: 'ai', text: 'Hi!' },
-      { who: 'you', text: 'Mabuti naman.' },
-    ], fetchFn as typeof fetch);
-    expect(text).toBe('Kumusta? How was your day?');
-    const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe('https://api.openai.com/v1/responses');
-    expect((init!.headers as Record<string, string>).Authorization).toBe(`Bearer ${KEY}`);
-    const body = JSON.parse(String(init!.body));
-    expect(body.instructions).toBe('Be kind.');
-    expect(body.store).toBe(false);
-    // An opening user turn comes first, since the AI spoke first.
-    expect(body.input.map((m: { role: string }) => m.role)).toEqual(['user', 'assistant', 'user']);
-  });
-
-  it('turns failures into errors the learner can act on', async () => {
-    const reply = (response: Response | Error) =>
-      textReply(KEY, '', [], (async () => {
-        if (response instanceof Error) throw response;
-        return response;
-      }) as typeof fetch).then(
-        () => { throw new Error('expected a failure'); },
-        (e: AiError) => e,
-      );
-    expect((await reply(json(401, { error: { message: 'Incorrect API key' } }))).kind).toBe('key');
-    expect((await reply(json(429, { error: { code: 'insufficient_quota', message: 'quota' } }))).kind).toBe('quota');
-    expect((await reply(json(404, { error: { code: 'model_not_found', message: 'nope' } }))).kind).toBe('access');
-    expect((await reply(new TypeError('Failed to fetch'))).kind).toBe('network');
-    const other = await reply(new Response('Bad gateway', { status: 502 }));
-    expect(other.kind).toBe('other');
-    expect(errorText(other)).toContain('Bad gateway');
-    expect((await reply(json(200, { output: [] }))).message).toBe('The reply was empty.');
   });
 });
 
@@ -200,6 +154,28 @@ describe('startCall', () => {
     expect(f.track.stopped).toBe(true);
     expect(f.peer.closed).toBe(true);
     expect(f.events.onEnded).not.toHaveBeenCalled();
+  });
+
+  it('turns refusals into errors the learner can act on', async () => {
+    const refused = async (response: Response | Error) => {
+      const f = fakeCall(json(201, {}));
+      f.deps.fetch = (async () => {
+        if (response instanceof Error) throw response;
+        return response;
+      }) as typeof fetch;
+      return startCall(KEY, '', f.events, f.deps).then(
+        () => { throw new Error('expected a failure'); },
+        (e: AiError) => e,
+      );
+    };
+    expect((await refused(json(401, { error: { message: 'Incorrect API key' } }))).kind).toBe('key');
+    expect((await refused(json(429, { error: { code: 'insufficient_quota', message: 'quota' } }))).kind).toBe('quota');
+    expect((await refused(json(404, { error: { code: 'model_not_found', message: 'nope' } }))).kind).toBe('access');
+    expect((await refused(new TypeError('Failed to fetch'))).kind).toBe('network');
+    const other = await refused(new Response('Bad gateway', { status: 502 }));
+    expect(other.kind).toBe('other');
+    expect(errorText(other)).toContain('Bad gateway');
+    expect((await refused(json(201, { session: { id: 'live_1' } }))).message).toContain('without an answer');
   });
 
   it('says so when the microphone is refused', async () => {

@@ -6,8 +6,6 @@ const KEY_STORAGE = 'pinoy-prompt:openai-key';
 const API = 'https://api.openai.com/v1';
 /** Spoken conversations. Billed per second of the call. */
 export const VOICE_MODEL = 'gpt-live-1';
-/** Typed conversations. */
-export const TEXT_MODEL = 'gpt-5.4-mini';
 /** Calls end on their own after this long, so a forgotten one can't run up a bill. */
 export const MAX_CALL_SECONDS = 10 * 60;
 
@@ -110,34 +108,6 @@ async function post(key: string, path: string, body: unknown, fetchFn: typeof fe
 export interface ChatTurn {
   who: 'you' | 'ai';
   text: string;
-}
-
-/** Turns sent with each typed message; older ones are dropped to keep requests small. */
-const HISTORY = 24;
-
-/** The AI's next message in a typed conversation. */
-export async function textReply(key: string, instructions: string, turns: ChatTurn[], fetchFn: typeof fetch = fetch): Promise<string> {
-  // The conversation opens with the AI's greeting, which needs something to answer.
-  const history = turns.slice(-HISTORY).map((t) => ({ role: t.who === 'you' ? 'user' : 'assistant', content: t.text }));
-  if (history[0]?.role !== 'user') history.unshift({ role: 'user', content: '(The learner has opened the chat.)' });
-  const response = await post(key, '/responses', {
-    model: TEXT_MODEL,
-    instructions,
-    input: history,
-    store: false,
-    reasoning: { effort: 'low' },
-    max_output_tokens: 1200,
-  }, fetchFn);
-  const body = (await response.json()) as { output?: { type: string; content?: { type: string; text?: string }[] }[] };
-  const text = (body.output ?? [])
-    .filter((item) => item.type === 'message')
-    .flatMap((item) => item.content ?? [])
-    .filter((part) => part.type === 'output_text')
-    .map((part) => part.text ?? '')
-    .join('')
-    .trim();
-  if (!text) throw new AiError('other', 'The reply was empty.');
-  return text;
 }
 
 export interface CallEvents {

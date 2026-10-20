@@ -175,7 +175,7 @@ export function keyForm(onChange: () => void): HTMLElement {
       { class: 'muted small' },
       'Talk is a conversation with an AI, using your own OpenAI API key. Create one at ',
       h('a', { href: 'https://platform.openai.com/api-keys', target: '_blank', rel: 'noopener' }, 'platform.openai.com'),
-      " and paste it here. API use is billed by OpenAI separately from a ChatGPT subscription: about 5¢ a minute to talk, about 1¢ for a typed chat.",
+      " and paste it here. API use is billed by OpenAI separately from a ChatGPT subscription, at about 5¢ a minute of talking.",
     ),
     h(
       'p',
