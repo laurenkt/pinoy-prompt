@@ -159,7 +159,12 @@ export function callSupported(): boolean {
  * offer straight to OpenAI with the learner's key, and audio then flows both
  * ways while transcripts arrive on the data channel.
  */
-export async function startCall(key: string, instructions: string, events: CallEvents, deps: CallDeps = browserCallDeps): Promise<Call> {
+export async function startCall(
+  key: string,
+  { instructions, greeting }: { instructions: string; greeting: string },
+  events: CallEvents,
+  deps: CallDeps = browserCallDeps,
+): Promise<Call> {
   // Made inside the tap that started the call, so iOS lets it play.
   const speaker = deps.createSpeaker();
   let mic: MediaStream;
@@ -171,6 +176,7 @@ export async function startCall(key: string, instructions: string, events: CallE
   let peer: RTCPeerConnection | null = null;
   let channel: RTCDataChannel | null = null;
   let ended = false;
+  let greeted = false;
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
 
@@ -221,7 +227,8 @@ export async function startCall(key: string, instructions: string, events: CallE
         model: VOICE_MODEL,
         instructions,
         audio: { output: { voice: 'marin' } },
-        input: [{ type: 'message', role: 'user', content: [{ type: 'input_text', text: '(The learner has joined the call.)' }] }],
+        // OpenAI's guide: greeting instructions as a developer message at startup, then again once started.
+        input: [{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: greeting }] }],
       },
       transport: { type: 'webrtc', sdp: offer.sdp },
     }, deps.fetch);
@@ -245,6 +252,14 @@ export async function startCall(key: string, instructions: string, events: CallE
     switch (event.type) {
       case 'session.started':
         events.onStarted();
+        if (!greeted && channel?.readyState === 'open') {
+          greeted = true;
+          try {
+            channel.send(JSON.stringify({ type: 'session.commentary.append', event_id: 'greeting', delegation_id: null, content: greeting }));
+          } catch {
+            // The developer message already asks for the greeting; this is a nudge.
+          }
+        }
         break;
       case 'session.input_transcript.delta':
       case 'session.output_transcript.delta':

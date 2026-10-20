@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard, isVocab, LEARN_ORDER, UNITS } from './deck';
 import { emptyProgress, recordAnswer } from './store';
-import { addPiece, findWords, talkInstructions, talkPlan, talkTopics, TURN_GAP_MS, type Segment, type SpokenTurn } from './talk';
+import { addPiece, findWords, mixLevel, talkGreeting, talkInstructions, talkPlan, talkTopics, TURN_GAP_MS, type Segment, type SpokenTurn } from './talk';
 
 const NOW = new Date(2026, 5, 1, 12).getTime();
 
@@ -62,8 +62,8 @@ describe('talkInstructions', () => {
     progress.cards.salamat.interval = 0;
     const text = talkInstructions(talkPlan(progress, 'greetings'));
     expect(text).toContain('Greetings');
-    expect(text).toMatch(/know well: Kumusta\? \(How are you\? \/ Hello\)/);
-    expect(text).toMatch(/last day or so: Salamat \(Thank you\)/);
+    expect(text).toMatch(/know well, use it freely: Kumusta\? \(How are you\? \/ Hello\)/);
+    expect(text).toMatch(/last day or so; say the English meaning straight after it the first time: Salamat \(Thank you\)/);
     expect(text).toContain('new word');
   });
 
@@ -71,8 +71,47 @@ describe('talkInstructions', () => {
     const progress = progressWith(['salamat']);
     progress.cards.salamat.interval = 0;
     const text = talkInstructions(talkPlan(progress, null));
-    expect(text).toMatch(/last day or so: .*Say the English meaning/);
+    expect(text).toMatch(/last day or so; say the English meaning/);
     expect(text).toMatch(/new word.*say the English meaning straight after it/);
+  });
+});
+
+describe('the mix of English and Tagalog', () => {
+  it('asks for English with only the listed Tagalog swapped in', () => {
+    const text = talkInstructions(talkPlan(progressWith(['salamat', 'kumusta', 'oo', 'kape']), null));
+    expect(text).toContain('Language: speak English.');
+    expect(text).toContain('never say a whole sentence in Tagalog');
+    expect(text).toContain('Use no other Tagalog.');
+    expect(text).not.toMatch(/greet(ing)? them in Tagalog/);
+  });
+
+  it('mixes in more Tagalog as more words are known', () => {
+    expect(mixLevel(19)).toMatch(/^at most one/);
+    expect(mixLevel(20)).toMatch(/^up to two or three/);
+    expect(mixLevel(59)).toMatch(/^up to two or three/);
+    expect(mixLevel(60)).toMatch(/most of each sentence English/);
+    expect(talkInstructions(talkPlan(progressWith(['salamat', 'kape']), null))).toContain(`Use ${mixLevel(2)}.`);
+  });
+
+  it("shows the style with one of the learner's own words, not other Tagalog", () => {
+    const progress = progressWith(['kape', 'salamat']);
+    progress.cards.kape.interval = 30;
+    const text = talkInstructions(talkPlan(progress, null));
+    expect(text).toMatch(/For example, with "Kape" \(Coffee\)/i);
+    expect(text).not.toMatch(/umaga|gutom/i);
+  });
+
+  it('keeps the policies the GPT-Live guide asks for', () => {
+    const text = talkInstructions(talkPlan(progressWith(['salamat']), null));
+    for (const heading of ['Backchannel policy:', 'Interruption policy:', 'Delegation policy:', 'Backend tools:', 'Generate <|SpawnThinking|> when:', 'Do not generate <|SpawnThinking|> when:']) {
+      expect(text).toContain(heading);
+    }
+  });
+
+  it('opens the call in English, on the topic', () => {
+    const progress = progressWith(['kape']);
+    expect(talkGreeting(talkPlan(progress, null))).toMatch(/^Greet the learner now in English/);
+    expect(talkGreeting(talkPlan(progress, 'food'))).toContain('about food & eating');
   });
 });
 
