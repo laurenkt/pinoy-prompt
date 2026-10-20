@@ -67,7 +67,8 @@ function render(route: Route): void {
       screen = settingsScreen(app);
       break;
   }
-  root.replaceChildren(h('main', { class: 'screen' }, screen), ...(tab ? [tabBar(tab)] : []));
+  // The tab bar sits at the top of the page and scrolls away with it, so it never covers content.
+  root.replaceChildren(h('main', { class: 'screen' }, ...(tab ? [tabBar(tab)] : []), screen));
 }
 
 function tabBar(active: Tab): HTMLElement {
