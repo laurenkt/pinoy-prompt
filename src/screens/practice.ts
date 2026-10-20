@@ -3,7 +3,7 @@ import { ALL_CARDS, getCard, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { play, speechSupported, stop } from '../speech';
-import { audioButton, h, icon, progressBar } from '../ui';
+import { audioButton, h, hookView, icon, progressBar } from '../ui';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
@@ -251,6 +251,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
             ' ',
             `${q.card.tl} = ${q.card.en}`,
           ),
+        q.mode !== 'speak' && answered && !right &&
+          hookView(q.card),
         q.mode !== 'speak' && answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: advance }, 'Next'),
       ),
     );

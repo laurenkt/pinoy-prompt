@@ -40,6 +40,7 @@ export function wordsScreen(app: App): HTMLElement {
                 h('span', { class: 'word-tl', lang: 'fil' }, card.tl, ' ', badge),
                 h('span', { class: 'word-en' }, card.en),
                 card.hint && h('span', { class: 'word-hint' }, card.hint),
+                h('span', { class: 'word-hook' }, card.hook),
               ),
             );
           }),

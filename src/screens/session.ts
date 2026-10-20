@@ -4,9 +4,9 @@ import { distractors, isIntroduced, requeue, shuffle, type Step } from '../sessi
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { play } from '../speech';
 import { recordAnswer } from '../store';
-import { audioButton, h, icon, progressBar } from '../ui';
+import { audioButton, h, hookView, icon, progressBar } from '../ui';
 
-type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'done';
+type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'done';
 
 const RATINGS: { rating: Rating; label: string }[] = [
   { rating: 'again', label: 'Again' },
@@ -26,6 +26,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
   let choices: Card[] = [];
   let picked: string | null = null;
   let reverse = false;
+  let hookShown = false;
   let completed = 0;
   const topicsIntroduced = new Set<string>();
   const stats = { learned: 0, reviewed: 0, correct: 0, answered: 0 };
@@ -39,6 +40,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
       card = step && getCard(step.cardId);
     } while (step && !card);
     picked = null;
+    hookShown = false;
     if (!step || !card) {
       phase = 'done';
     } else if (step.kind === 'new' && !isIntroduced(app.progress, card.id)) {
@@ -97,11 +99,23 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
 
   function rate(rating: Rating): void {
     finish(rating);
-    next();
+    // A miss is the moment a hook helps most, so give it a beat before moving on.
+    if (rating === 'again' && !hookShown) {
+      phase = 'missed';
+      draw();
+    } else {
+      next();
+    }
+  }
+
+  function showHook(): void {
+    hookShown = true;
+    draw();
   }
 
   function draw(): void {
-    const remaining = queue.length + (phase === 'done' ? 0 : 1);
+    // On the missed screen the card is already back in the queue.
+    const remaining = queue.length + (phase === 'done' || phase === 'missed' ? 0 : 1);
     root.replaceChildren(
       h(
         'header',
@@ -128,6 +142,8 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
       case 'front':
       case 'back':
         return flashcardView(card);
+      case 'missed':
+        return missedView(card);
     }
   }
 
@@ -164,6 +180,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
       c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
       h('p', { class: 'meaning' }, c.en),
       c.note && h('p', { class: 'note' }, c.note),
+      hookView(c),
       h('p', { class: 'muted small' }, 'Listen, then say it out loud a couple of times.'),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: startQuiz }, 'Got it, quiz me'),
     );
@@ -201,6 +218,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
           ' ',
           right ? 'That one is yours now.' : `"${c.tl}" means "${c.en}". It will come back shortly.`,
         ),
+      answered && !right && hookView(c),
       answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
     );
   }
@@ -228,6 +246,9 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
           { class: 'answer' },
           reverse ? tagalog(c) : h('p', { class: 'meaning' }, c.en),
           c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
+          hookShown
+            ? hookView(c)
+            : h('button', { class: 'btn hook-btn', onclick: showHook }, 'Show memory hook', h('span', { class: 'key', 'aria-hidden': 'true' }, 'H')),
           h('p', { class: 'muted small center' }, 'How well did you remember?'),
           h(
             'div',
@@ -243,6 +264,18 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
             ),
           ),
         ),
+    );
+  }
+
+  function missedView(c: Card): HTMLElement {
+    return h(
+      'div',
+      { class: 'panel' },
+      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Coming back shortly'), tagalog(c)),
+      h('p', { class: 'meaning' }, c.en),
+      c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
+      hookView(c),
+      h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
     );
   }
 
@@ -280,6 +313,7 @@ export function sessionScreen(app: App, steps: Step[], title?: string): HTMLElem
     const n = Number(e.key);
     if (phase === 'quiz' && n >= 1 && n <= choices.length) return pick(choices[n - 1]);
     if (phase === 'back' && n >= 1 && n <= 4) return rate(RATINGS[n - 1].rating);
+    if (phase === 'back' && !hookShown && (e.key === 'h' || e.key === 'H')) return showHook();
   });
 
   next();

@@ -70,3 +70,8 @@ export function progressBar(value: number, max: number, label?: string): HTMLEle
     h('div', { class: 'bar-fill', style: { width: `${pct}%` } }),
   );
 }
+
+/** A card's memory hook, for the moments it helps: introduction and after a miss. */
+export function hookView(card: { hook: string }): HTMLElement {
+  return h('div', { class: 'hook' }, h('p', { class: 'hook-label' }, 'Remember it by'), h('p', null, card.hook));
+}

@@ -622,6 +622,45 @@ p {
   font-size: 0.95rem;
 }
 
+.hook {
+  background: var(--cream);
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 10px 14px 12px;
+  margin: 12px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.hook p {
+  margin: 0;
+}
+
+.hook .hook-label {
+  color: #b01e4c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.btn.hook-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 12px 0;
+  background: var(--surface);
+  color: var(--text);
+  border-style: dashed;
+  border-color: var(--teal);
+  box-shadow: none;
+}
+
 .choices {
   display: flex;
   flex-direction: column;
@@ -1497,6 +1536,11 @@ p {
   font-size: 0.8rem;
   color: var(--muted);
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+.word-hook {
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 .badge {
