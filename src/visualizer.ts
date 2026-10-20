@@ -47,8 +47,13 @@ void main() {
 
 // The bands sit in a 16 by 2 texture, the learner's in the first row and the
 // AI's in the second, so the GPU blends between bands for smooth ribbons.
+// Time keeps growing through a call, so the phase needs high precision where the GPU has it.
 const FRAGMENT = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 uniform float u_time;
 uniform float u_muted;
 uniform sampler2D u_bands;
@@ -69,7 +74,7 @@ float spectrum(float row, float x) {
 float ribbon(vec2 p, float amp, float freq, float speed, float phase, float width) {
   float y = amp * sin(3.14159 * p.x) * sin(p.x * freq + u_time * speed + phase);
   float d = abs(p.y - y);
-  return smoothstep(width, 0.0, d) + 0.3 * smoothstep(width * 7.0, 0.0, d);
+  return (1.0 - smoothstep(0.0, width, d)) + 0.3 * (1.0 - smoothstep(0.0, width * 7.0, d));
 }
 
 void main() {
@@ -117,12 +122,14 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return NOTHING;
   gl.useProgram(program);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  const buffer = gl.createBuffer();
+  const tex = gl.createTexture();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   const pos = gl.getAttribLocation(program, 'a_pos');
   gl.enableVertexAttribArray(pos);
   gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-  gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+  gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -132,10 +139,13 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
   const uMuted = gl.getUniformLocation(program, 'u_muted');
 
   const audio = new Context();
-  void audio.resume().catch(() => {});
+  // Older WebKit has no promise-returning resume or close.
+  const resume = () => void audio.resume?.()?.catch(() => {});
+  resume();
   const analysers: Partial<Record<Voice, { node: AnalyserNode; source: MediaStreamAudioSourceNode }>> = {};
   const bins = new Uint8Array(FFT_SIZE / 2);
   const texture = new Uint8Array(BANDS * 2);
+  const row = new Uint8Array(BANDS);
   const still = matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
   let muted = false;
   let frame = 0;
@@ -151,11 +161,11 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
       canvas.width = w;
       canvas.height = h;
     }
-    (['you', 'ai'] as const).forEach((who, row) => {
+    (['you', 'ai'] as const).forEach((who, i) => {
       const a = analysers[who];
       if (a) a.node.getByteFrequencyData(bins);
       else bins.fill(0);
-      texture.set(bands(bins), row * BANDS);
+      texture.set(bands(bins, row), i * BANDS);
     });
     gl!.viewport(0, 0, w, h);
     gl!.texImage2D(gl!.TEXTURE_2D, 0, gl!.LUMINANCE, BANDS, 2, 0, gl!.LUMINANCE, gl!.UNSIGNED_BYTE, texture);
@@ -179,6 +189,8 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
       const source = audio.createMediaStreamSource(stream);
       source.connect(node);
       analysers[who] = { node, source };
+      // Starting the microphone can suspend audio on iOS.
+      if (audio.state !== 'running') resume();
     },
     setMuted(m) {
       muted = m;
@@ -186,7 +198,13 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     stop() {
       cancelAnimationFrame(frame);
       for (const a of Object.values(analysers)) a?.source.disconnect();
-      void audio.close().catch(() => {});
+      void audio.close?.()?.catch(() => {});
+      // The canvas is reused by the next call, which sets up its own.
+      gl.deleteTexture(tex);
+      gl.deleteBuffer(buffer);
+      gl.deleteProgram(program);
+      gl.deleteShader(vertex);
+      gl.deleteShader(fragment);
     },
   };
 }

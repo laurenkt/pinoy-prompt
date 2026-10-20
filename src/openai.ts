@@ -239,7 +239,7 @@ export async function startCall(
     const body = (await response.json()) as { transport?: { sdp?: string } };
     if (!body.transport?.sdp) throw new AiError('other', 'OpenAI started the call without an answer.');
     await pc.setRemoteDescription({ type: 'answer', sdp: body.transport.sdp });
-    events.onAudio?.('you', mic);
+    if (!ended) events.onAudio?.('you', mic);
   } catch (e) {
     ended = true;
     release();

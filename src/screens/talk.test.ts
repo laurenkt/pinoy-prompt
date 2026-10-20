@@ -243,6 +243,21 @@ describe('Talk', () => {
     expect(root.querySelector('canvas.talk-visual')).toBeNull();
   });
 
+  it('stops the visual when a call fails to start, or on leaving', async () => {
+    setApiKey(KEY);
+    const failed = fakeCall(new Response('{}', { status: 401 }));
+    let root = talkScreen(fakeApp(), failed.deps);
+    button(root, 'Start talking').click();
+    await flush();
+    expect(failed.visual.stopped).toBe(true);
+    const left = fakeCall();
+    root = talkScreen(fakeApp(), left.deps);
+    button(root, 'Start talking').click();
+    await flush();
+    root.querySelector<HTMLButtonElement>('[aria-label="Leave Talk"]')!.click();
+    expect(left.visual.stopped).toBe(true);
+  });
+
   it('follows new words in the transcript unless the learner has scrolled back', async () => {
     setApiKey(KEY);
     const f = fakeCall();

@@ -1732,10 +1732,16 @@ p {
   margin-bottom: 12px;
 }
 
+.talk-chat > .talk-visual {
+  flex: 0 1 auto;
+}
+
 .talk-visual {
   display: block;
   width: 100%;
   height: 96px;
+  /* Gives way to the transcript on short screens, such as a phone on its side. */
+  min-height: 40px;
   margin-bottom: 14px;
   background: var(--surface);
   border: var(--outline);
@@ -1744,7 +1750,7 @@ p {
 }
 
 .talk-chat > .talk-log {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
