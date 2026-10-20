@@ -48,11 +48,17 @@ function list(words: KnownWord[]): string {
   return words.map((w) => `${w.card.tl} (${w.card.en})`).join('; ');
 }
 
+/** A word from the learner's own list to show the mix with, so the example brings in no other Tagalog. */
+function example(plan: TalkPlan): string {
+  const card = plan.known[0]?.card ?? plan.newWord;
+  return card ? `"${card.tl}" (${card.en})` : 'a word';
+}
+
 /** How much Tagalog to mix in: more as the learner knows more. */
 export function mixLevel(known: number): string {
-  if (known < 20) return 'one Tagalog word or short phrase in each sentence';
-  if (known < 60) return 'two or three Tagalog words or phrases in each sentence';
-  return 'as many of the listed Tagalog words as fit naturally, keeping English for everything else';
+  if (known < 20) return 'at most one Tagalog word or phrase in a sentence, where one fits; plain English sentences are fine';
+  if (known < 60) return 'up to two or three Tagalog words or phrases in a sentence';
+  return 'the listed Tagalog wherever it fits, but keep most of each sentence English';
 }
 
 /**
@@ -70,8 +76,8 @@ export function talkInstructions(plan: TalkPlan): string {
     '',
     'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below: every sentence is an English sentence with some of those words or phrases in place of the English.',
     `Use ${mixLevel(plan.known.length)}.`,
-    'Never say a whole sentence in Tagalog unless every word of it is on the list. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
-    'The style, for illustration only (use your own words from the list): "Magandang umaga! Did you have kape yet? I am so gutom today."',
+    'A listed phrase counts as one swap. Apart from short listed greetings and replies, never say a whole sentence in Tagalog. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
+    `For example, with ${example(plan)} on the list, say an English sentence with it in place of its English meaning.`,
     '',
   ];
   if (firm.length) lines.push(`Tagalog they know well, use it freely: ${list(firm)}.`);
@@ -89,7 +95,7 @@ export function talkInstructions(plan: TalkPlan): string {
       ? `Talk about everyday situations around this topic: ${plan.topic.title}.`
       : 'Talk about everyday things, like how their day is going, food, family or plans.',
     'Keep each turn to one to three short sentences, and end with a question or something easy to answer, so they can reply using their Tagalog.',
-    'They may answer in English, Tagalog or a mix. If their Tagalog has a mistake, do not point it out; just use the right form naturally in your reply.',
+    'They may answer in English, Tagalog or a mix. If their Tagalog has a mistake, do not point it out; use the right form in your reply if it is on the list, otherwise reply in English.',
     'No scores, praise for every reply, or talk of streaks or progress.',
     '',
     'Backchannel policy: Use light backchannels. Acknowledge naturally without competing with the main response.',

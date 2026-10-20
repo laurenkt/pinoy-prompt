@@ -176,6 +176,7 @@ export async function startCall(
   let peer: RTCPeerConnection | null = null;
   let channel: RTCDataChannel | null = null;
   let ended = false;
+  let greeted = false;
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
 
@@ -250,8 +251,15 @@ export async function startCall(
     if (ended) return;
     switch (event.type) {
       case 'session.started':
-        channel?.send(JSON.stringify({ type: 'session.commentary.append', event_id: 'greeting', delegation_id: null, content: greeting }));
         events.onStarted();
+        if (!greeted && channel?.readyState === 'open') {
+          greeted = true;
+          try {
+            channel.send(JSON.stringify({ type: 'session.commentary.append', event_id: 'greeting', delegation_id: null, content: greeting }));
+          } catch {
+            // The developer message already asks for the greeting; this is a nudge.
+          }
+        }
         break;
       case 'session.input_transcript.delta':
       case 'session.output_transcript.delta':

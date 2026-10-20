@@ -80,15 +80,25 @@ describe('the mix of English and Tagalog', () => {
   it('asks for English with only the listed Tagalog swapped in', () => {
     const text = talkInstructions(talkPlan(progressWith(['salamat', 'kumusta', 'oo', 'kape']), null));
     expect(text).toContain('Language: speak English.');
-    expect(text).toContain('Never say a whole sentence in Tagalog');
+    expect(text).toContain('never say a whole sentence in Tagalog');
     expect(text).toContain('Use no other Tagalog.');
     expect(text).not.toMatch(/greet(ing)? them in Tagalog/);
   });
 
   it('mixes in more Tagalog as more words are known', () => {
-    expect(mixLevel(5)).toMatch(/^one Tagalog word/);
-    expect(mixLevel(30)).toMatch(/^two or three/);
-    expect(mixLevel(100)).toMatch(/^as many/);
+    expect(mixLevel(19)).toMatch(/^at most one/);
+    expect(mixLevel(20)).toMatch(/^up to two or three/);
+    expect(mixLevel(59)).toMatch(/^up to two or three/);
+    expect(mixLevel(60)).toMatch(/most of each sentence English/);
+    expect(talkInstructions(talkPlan(progressWith(['salamat', 'kape']), null))).toContain(`Use ${mixLevel(2)}.`);
+  });
+
+  it("shows the style with one of the learner's own words, not other Tagalog", () => {
+    const progress = progressWith(['kape', 'salamat']);
+    progress.cards.kape.interval = 30;
+    const text = talkInstructions(talkPlan(progress, null));
+    expect(text).toMatch(/For example, with "Kape" \(Coffee\)/i);
+    expect(text).not.toMatch(/umaga|gutom/i);
   });
 
   it('keeps the policies the GPT-Live guide asks for', () => {

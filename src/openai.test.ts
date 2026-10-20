@@ -152,6 +152,20 @@ describe('startCall', () => {
     expect(f.events.onEnded).toHaveBeenCalledOnce();
   });
 
+  it('asks for the greeting once, and still starts if that fails', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    await startCall(KEY, PROMPT, f.events, f.deps);
+    let tries = 0;
+    f.peer.channel.send = () => {
+      tries++;
+      throw new Error('closing');
+    };
+    f.peer.channel.emit({ type: 'session.started', session: {} });
+    f.peer.channel.emit({ type: 'session.started', session: {} });
+    expect(f.events.onStarted).toHaveBeenCalledTimes(2);
+    expect(tries).toBe(1);
+  });
+
   it('ends on its own after the time limit', async () => {
     vi.useFakeTimers();
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
