@@ -1,7 +1,17 @@
 import type { App } from '../app';
-import { MIN_MEASURED_REVIEWS, RECALL_WINDOW_DAYS, STRENGTHS, memorySummary, type MemorySummary } from '../memory';
+import {
+  MIN_MEASURED_REVIEWS,
+  RECALL_WINDOW_DAYS,
+  STRENGTHS,
+  memoryHistory,
+  memorySummary,
+  type MemoryHistory,
+  type MemorySummary,
+  type Strength,
+} from '../memory';
 import { buildExtraSession, dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
 import { h, icon } from '../ui';
+import { growthChart } from './growth-chart';
 
 /** A Tagalog greeting for the time of day. */
 function greeting(hour: number): { tl: string; en: string } {
@@ -38,7 +48,7 @@ export function homeScreen(app: App): HTMLElement {
 
     isFirstRun ? welcomeCard() : null,
     todayCard(app, isFirstRun),
-    isFirstRun ? null : memorySection(memory),
+    isFirstRun ? null : memorySection(memory, memoryHistory(progress, now)),
   );
 }
 
@@ -113,11 +123,15 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   );
 }
 
-function memorySection(memory: MemorySummary): HTMLElement {
+function memorySection(memory: MemorySummary, history: MemoryHistory): HTMLElement {
   const { total, strengths, recent, due } = memory;
   const measured = recent.reviews >= MIN_MEASURED_REVIEWS;
   const recall = measured ? 1 - recent.missed / recent.reviews : (memory.estimatedRecall ?? 0);
   const pct = `${Math.round(recall * 100)}%`;
+
+  const counts = Object.fromEntries(
+    STRENGTHS.map((s) => [s.id, h('span', { class: 'legend-count' }, strengths[s.id])]),
+  ) as Record<Strength, HTMLElement>;
 
   const coming: string[] = [];
   if (due.tomorrow > 0) coming.push(`${due.tomorrow} by tomorrow`);
@@ -154,8 +168,8 @@ function memorySection(memory: MemorySummary): HTMLElement {
     h(
       'div',
       { class: 'card strength-card' },
-      h('h3', null, "How firmly they're stored"),
-      strengthBar(memory),
+      h('h3', null, 'How your memory has grown'),
+      growthChart(history, counts),
       h(
         'ul',
         { class: 'strength-legend' },
@@ -165,22 +179,11 @@ function memorySection(memory: MemorySummary): HTMLElement {
             null,
             h('span', { class: `swatch s-${s.id}`, 'aria-hidden': 'true' }),
             h('span', { class: 'legend-label' }, h('strong', null, s.label), ' ', h('span', { class: 'muted' }, s.desc)),
-            h('span', { class: 'legend-count' }, strengths[s.id]),
+            counts[s.id],
           ),
         ),
       ),
       coming.length > 0 && h('p', { class: 'coming muted small' }, `Coming up for review: ${coming.join(' · ')}`),
-    ),
-  );
-}
-
-function strengthBar({ total, strengths }: MemorySummary): HTMLElement {
-  const label = STRENGTHS.map((s) => `${strengths[s.id]} ${s.label.toLowerCase()}`).join(', ');
-  return h(
-    'div',
-    { class: 'strength-bar', role: 'img', 'aria-label': label },
-    STRENGTHS.filter((s) => strengths[s.id] > 0).map((s) =>
-      h('span', { class: `seg s-${s.id}`, style: { flexGrow: String(strengths[s.id] / total) } }),
     ),
   );
 }

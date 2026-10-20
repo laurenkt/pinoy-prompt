@@ -201,6 +201,17 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
   const reviewed = time(value.reviewed);
   if (reviewed === undefined) delete card.reviewed;
   else card.reviewed = reviewed;
+  // Keep only well-formed steps, in time order; the log is a nicety, never worth failing over.
+  const log = Array.isArray(value.log)
+    ? value.log
+        .filter(
+          (step): step is [number, number] =>
+            Array.isArray(step) && step.length === 2 && time(step[0]) !== undefined && time(step[1]) !== undefined,
+        )
+        .sort((a, b) => a[0] - b[0])
+    : [];
+  if (log.length) card.log = log;
+  else delete card.log;
   return card;
 }
 

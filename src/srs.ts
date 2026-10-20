@@ -20,6 +20,12 @@ export interface CardState {
   introduced: number;
   /** When the card was last reviewed. Missing on cards saved before it was tracked. */
   reviewed?: number;
+  /**
+   * Each time the card moved to a different strength (see memory.ts), as
+   * [time, new interval] pairs, oldest first. Missing on cards saved before it
+   * was tracked; their past is worked out from the schedule instead.
+   */
+  log?: [number, number][];
 }
 
 export const DAY_MS = 24 * 60 * 60 * 1000;

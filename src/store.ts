@@ -24,6 +24,7 @@ import {
   type Envelope,
   type Progress,
 } from './progress-schema';
+import { pastLog, strengthOf } from './memory';
 import { newCardState, review, type Rating } from './srs';
 
 export { DEFAULT_SETTINGS, dayKey, emptyProgress, type DayTally, type Progress, type Settings } from './progress-schema';
@@ -232,7 +233,14 @@ export function recordAnswer(progress: Progress, cardId: string, rating: Rating,
     const tally = progress.history[day] ?? { reviews: 0, missed: 0 };
     progress.history[day] = { reviews: tally.reviews + 1, missed: tally.missed + (rating === 'again' ? 1 : 0) };
   }
-  progress.cards[cardId] = review(existing ?? newCardState(now), rating, now);
+  const before = existing ?? newCardState(now);
+  const after = review(before, rating, now);
+  // Note each move to a new strength, so Home can chart how memory has grown.
+  // A card saved before moves were logged starts from its likely past.
+  if (strengthOf(after) !== strengthOf(before)) {
+    after.log = [...pastLog(before, now), [now, after.interval] as [number, number]].sort((a, b) => a[0] - b[0]);
+  }
+  progress.cards[cardId] = after;
   return progress;
 }
 
