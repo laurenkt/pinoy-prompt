@@ -1,5 +1,6 @@
-// The starter deck, grouped by topic. New cards are introduced in this order,
-// a few a day; a topic's intro is shown before its first card.
+// The starter deck, grouped by topic. New cards are introduced a few a day in
+// LEARN_ORDER, most useful first, whatever their topic; a topic's intro is
+// shown before the first of its cards a learner meets.
 //
 // Pronunciation hints use CAPS for the stressed syllable. To add a recorded
 // clip for a card, drop the file in public/audio/ and set `audio` to its name;
@@ -472,6 +473,68 @@ export const UNITS: Unit[] = [
 ];
 
 export const ALL_CARDS: Card[] = UNITS.flatMap((u) => u.cards);
+
+/**
+ * The order new cards are introduced in, most useful first, across topics. Topics
+ * only group cards for display. Each tier is roughly what a learner needs next to
+ * get by in conversation; within a tier, cards a hook builds on come first. Every
+ * card appears exactly once (deck.test.ts checks).
+ */
+export const LEARN_ORDER: string[] = [
+  // Hello, thanks, yes, no, and getting through a conversation you barely follow.
+  'kumusta', 'mabuti', 'salamat', 'oo', 'hindi', 'po', 'opo', 'salamat-po', 'walang-anuman', 'ano', 'sige',
+  'ano-pangalan', 'ako-si', 'taga-saan', 'taga-ako', 'paalam', 'ingat', 'pasensya-na', 'hindi-ko-alam',
+  'hindi-maintindihan', 'pakiulit', 'dahan-dahan', 'ingles', 'kaunti-lang',
+  // Asking for things: where, what, how much, I want, I need, can I.
+  'saan', 'nasaan-banyo', 'ano-ito', 'magkano', 'gusto-ko-ito', 'ayoko', 'ako', 'ikaw', 'may-kape-ba', 'wala',
+  'meron', 'puwede-ba', 'kailangan-ko', 'dito', 'isa', 'dalawa', 'tatlo', 'tara-na', 'sandali-lang',
+  // Where you are and when: on my way, here, almost there, now, later, tomorrow.
+  'nasaan-ka', 'saan-ka-pupunta', 'papunta-na-ako', 'nandito-na-ako', 'malapit-na-ako', 'kailan', 'ngayon',
+  'mamaya', 'bukas', 'anong-oras-na', 'sino', 'bakit', 'paano',
+  // Thanks and greetings, eating together, and the small replies that keep a chat going.
+  'maraming-salamat', 'magandang-umaga', 'kain-tayo', 'tubig', 'masarap', 'busog-na-ako', 'gutom-na-ako',
+  'tayo', 'okay-lang-ba', 'ayos-lang', 'talaga', 'oo-nga', 'ako-rin', 'ikinagagalak',
+  // The rest of one to ten.
+  'apat', 'lima', 'anim', 'pito', 'walo', 'siyam', 'sampu',
+  // Directions and getting a ride, and running late.
+  'kaliwa', 'kanan', 'diretso', 'diyan', 'doon', 'malapit', 'malayo', 'paano-pumunta', 'para-po', 'bayad-po',
+  'aalis-na-ako', 'pauwi-na-ako', 'nasaan-ka-na', 'mahuhuli-ako', 'hintayin-mo-ako',
+  // More people words and joiners, ordering a drink, and buying things.
+  'siya', 'kami', 'sila', 'at', 'pero', 'kasi', 'kape', 'kanin', 'pahingi-tubig', 'bill-po', 'isa-pa',
+  'ito-na-lang', 'iyan', 'iyon', 'mahal', 'mura', 'magkano-lahat', 'pabili-po', 'meron-ba-kayong', 'tinapay',
+  // Clock times, and the parts of the day.
+  'ala-una', 'alas-dos', 'alas-tres', 'kalahati', 'alas-singko', 'alas-sais', 'alas-siyete', 'alas-otso',
+  'alas-diyes', 'alas-dose', 'magandang-hapon', 'kahapon', 'magandang-gabi', 'alas-siyete-umaga',
+  'alas-otso-gabi', 'kanina',
+  // Making plans, and hedging.
+  'libre-ka-ba', 'ano-ang-plano', 'saan-tayo-magkikita', 'anong-oras-magkikita', 'kita-tayo-bukas',
+  'puwede-ako', 'hindi-ako-puwede', 'mamaya-na-lang', 'teka', 'baka', 'siguro', 'ewan-ko', 'hindi-naman',
+  'ano-ulit', 'ganoon-ba',
+  // How you feel, getting help, home and family.
+  'pagod-na-ako', 'mainit', 'okay-lang-ako', 'masakit', 'may-sakit-ako', 'tulong', 'pakitulungan',
+  'naliligaw-ako', 'bahay', 'nasa-bahay-ako', 'kaibigan', 'nanay', 'tatay', 'ate', 'kuya', 'anak',
+  'mahal-kita', 'anong-balita',
+  // More questions and reactions.
+  'ano-ibig-sabihin', 'paano-sabihin', 'ilan', 'alin', 'gaano-katagal', 'gaano-kalayo', 'anong-ginagawa-mo',
+  'trapik', 'grabe', 'naku', 'sayang', 'tama', 'tama-na', 'makikiraan-po',
+  // Days and weeks, riding, and where things are.
+  'araw', 'linggo', 'tanghali', 'susunod-na-linggo', 'noong-isang-linggo', 'lagi', 'minsan', 'kaagad',
+  'sumakay', 'bumaba', 'dyip', 'sa-tabi-lang', 'kumaliwa-ka', 'kumanan-ka', 'katabi', 'sa-harap', 'sa-likod',
+  'kanto', 'kalye',
+  // Places in town, and eating out.
+  'palengke', 'tindahan', 'paaralan', 'kainan', 'ospital', 'botika', 'nasaan-ospital', 'kailangan-doktor',
+  'gamot', 'ano-masarap-dito', 'maanghang', 'huwag-maanghang', 'ulam', 'manok', 'isda', 'baso', 'kutsara',
+  'tinidor', 'isa-pong-adobo',
+  // Money and shopping.
+  'pera', 'piso', 'sukli', 'barya', 'dalawampu', 'limampu', 'isang-daan', 'limang-daan', 'isang-libo',
+  'tumawad', 'tumitingin-lang', 'wala-na', 'malaki', 'maliit',
+  // Less everyday feelings, plans and family.
+  'nauuhaw-ako', 'inaantok-ako', 'malamig', 'masaya', 'malungkot', 'gusto-ko-umuwi', 'sasama-ako',
+  'tuloy-ba-tayo', 'mga', 'para-saan', 'kanino', 'lola', 'lolo',
+  // Rarer places, dates and emergencies.
+  'simbahan', 'opisina', 'bangko', 'paliparan', 'buwan', 'taon', 'lunes', 'biyernes', 'sabado', 'hatinggabi',
+  'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',
+];
 
 const byId = new Map(ALL_CARDS.map((c) => [c.id, c]));
 
