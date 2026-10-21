@@ -6,13 +6,15 @@ import { h, icon } from '../ui';
  * the learner to speak. Audio still plays, since headphones are likely in.
  * The toggle sits where studying starts, so it's one tap rather than a trip to Settings.
  */
-export function quietToggle(app: App, onChange: () => void, { wide = false } = {}): HTMLButtonElement {
+export function quietToggle(app: App, onChange: () => void, { iconOnly = false } = {}): HTMLButtonElement {
   const on = app.progress.settings.quiet;
   return h(
     'button',
     {
-      class: `quiet-toggle${on ? ' on' : ''}${wide ? ' wide' : ''}`,
+      // Icon only, it matches the icon buttons beside it; otherwise it's a labelled pill.
+      class: `${iconOnly ? 'icon-btn quiet-icon' : 'quiet-toggle'}${on ? ' on' : ''}`,
       'aria-pressed': String(on),
+      'aria-label': iconOnly ? 'Quiet mode' : undefined,
       title: on ? 'Quiet mode is on: no speaking cards or drills' : 'Quiet mode: no speaking cards or drills',
       onclick: () => {
         app.progress.settings.quiet = !on;
@@ -21,13 +23,6 @@ export function quietToggle(app: App, onChange: () => void, { wide = false } = {
       },
     },
     icon(on ? 'quiet' : 'mic'),
-    wide
-      ? h(
-          'span',
-          { class: 'quiet-text' },
-          h('span', null, 'Quiet mode'),
-          h('span', { class: 'quiet-desc' }, on ? 'On: no speaking cards or drills' : 'For the tube: no speaking'),
-        )
-      : h('span', null, 'Quiet'),
+    !iconOnly && h('span', null, 'Quiet'),
   );
 }
