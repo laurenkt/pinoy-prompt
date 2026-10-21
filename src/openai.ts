@@ -93,7 +93,7 @@ export function errorText(e: unknown): string {
     case 'quota':
       return "OpenAI says this key is out of credit or sending too much. Check billing on your OpenAI account, or wait a minute.";
     case 'access':
-      return `This OpenAI key can't use the model Talk needs. ${e.message}`;
+      return `This OpenAI key can't use the model Chat needs. ${e.message}`;
     case 'network':
       return "Couldn't reach OpenAI. Check your connection and try again.";
     default:
@@ -206,7 +206,7 @@ export async function startCall(
   try {
     mic = await deps.getMicrophone();
   } catch {
-    throw new AiError('other', 'Talk needs the microphone. Allow it for this site and try again.');
+    throw new AiError('other', 'Chat needs the microphone. Allow it for this site and try again.');
   }
   let peer: RTCPeerConnection | null = null;
   let channel: RTCDataChannel | null = null;

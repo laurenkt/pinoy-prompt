@@ -88,7 +88,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('p', { class: 'muted small' }, voiceText),
         h('button', { class: 'btn secondary', onclick: () => void play(getCard('kumusta')!) }, icon('speaker'), ' Test voice'),
       ),
-      h('section', { class: 'card' }, h('h2', null, 'Talk'), keyForm(draw), voicePicker()),
+      h('section', { class: 'card' }, h('h2', null, 'Chat'), keyForm(draw), voicePicker()),
       h(
         'section',
         { class: 'card' },
@@ -135,7 +135,7 @@ export function keyForm(onChange: () => void): HTMLElement {
     return h(
       'div',
       { class: 'key-form' },
-      h('p', { class: 'muted small' }, 'Your OpenAI API key is saved on this device. Talk uses it to chat with you; OpenAI bills that account.'),
+      h('p', { class: 'muted small' }, 'Your OpenAI API key is saved on this device. Chat uses it to talk with you; OpenAI bills that account.'),
       h(
         'button',
         {
@@ -173,7 +173,7 @@ export function keyForm(onChange: () => void): HTMLElement {
     h(
       'p',
       { class: 'muted small' },
-      'Talk is a conversation with an AI, using your own OpenAI API key. Create one at ',
+      'Chat is a spoken conversation with an AI, using your own OpenAI API key. Create one at ',
       h('a', { href: 'https://platform.openai.com/api-keys', target: '_blank', rel: 'noopener' }, 'platform.openai.com'),
       ` and paste it here. API use is billed by OpenAI separately from a ChatGPT subscription, at about ${CENTS_PER_MINUTE}¢ a minute of talking.`,
     ),
@@ -198,7 +198,7 @@ function voicePicker(): HTMLElement {
     h('h3', null, 'Voice'),
     h(
       'div',
-      { class: 'segmented', role: 'radiogroup', 'aria-label': 'Talk voice' },
+      { class: 'segmented', role: 'radiogroup', 'aria-label': 'Chat voice' },
       TALK_VOICES.map((v) =>
         h(
           'button',
