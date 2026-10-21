@@ -117,7 +117,8 @@ export function mixLevel(known: number): string {
  * The AI's instructions for a call, laid out as OpenAI's GPT-Live prompting
  * guide recommends. The conversation is in English with the learner's Tagalog
  * swapped in, like the Taglish many Filipinos speak, so the instructions say
- * plainly which language to speak and that no other Tagalog is wanted.
+ * plainly which language to speak and that no other Tagalog is wanted, unless
+ * the learner asks how to say something: then they just get the answer.
  */
 export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): string {
   const firm = plan.known.filter((w) => w.strength === 'long' || w.strength === 'weeks');
@@ -132,7 +133,7 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     'Accent: keep a natural Filipino accent the whole call, in English as well as Tagalog, the way someone from Manila speaks Taglish. Never switch to an American accent.',
     'Say every Tagalog word as a native Manila speaker would, not with English sounds: pure vowels a, e, i, o, u, never softened to "uh"; ng as one sound, even at the start of a word; a light tapped r; and, where a word has a guide after it, the stress that guide shows in capitals. Never say the guides themselves aloud.',
     '',
-    'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below: every sentence is an English sentence with some of those words or phrases in place of the English.',
+    'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below (the one exception is when they ask how to say something): every sentence is an English sentence with some of those words or phrases in place of the English.',
     `Use ${mixLevel(plan.known.length)}.`,
     'A listed phrase counts as one swap. Apart from short listed greetings and replies, never say a whole sentence in Tagalog. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
     `For example, with ${example(plan)} on the list, say an English sentence with it in place of its English meaning.`,
@@ -159,7 +160,7 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     'When they are stuck, help before moving on. They are stuck if they stop partway through and do not finish, or put "um", "something" or similar where a word should go and leave it there. Give them a moment to think first. Then, in one short sentence, offer the listed Tagalog for what they meant, with its meaning' +
       (stuck ? ` (for example: "You could say: ${stuck}.")` : '') +
       ', ask them to try it, and wait. When they try, just carry on the conversation. If nothing on the list fits, put it simply in English and carry on. Do not skip past a stuck moment.',
-    'When they ask how to say something ("how do I say cereal?", "what\'s the word for tired?"), always just tell them: give the everyday Tagalog a Manila speaker would use, listed or not, say it slowly with its English meaning, invite them to try it, and carry on. Never refuse, deflect, or say it is not in their words. If Filipinos normally just use the English word (as with cereal), say so. Answering a direct ask is the only time to use Tagalog that is not on the list.',
+    'When they ask how to say something ("how do I say cereal?", "what\'s the word for tired?", "Paano sabihin ito sa Tagalog?"), always just tell them: if it is on the list, give that; otherwise give the everyday Tagalog a Manila speaker would use. Say it slowly with its English meaning, ask them to try it, and wait; when they try, carry on the conversation. Never refuse, deflect, or say it is not in their words. If Filipinos normally just use the English word (as with cereal), say so. If they ask for a whole sentence, give the whole sentence in Tagalog; this overrides the limits on how much Tagalog to use. After that, they may use the word they asked for, and you may use it again in this call too.',
     'No scores, praise for every reply, or talk of streaks or progress.',
     '',
     'Backchannel policy: Use light backchannels. Acknowledge naturally without competing with the main response.',
