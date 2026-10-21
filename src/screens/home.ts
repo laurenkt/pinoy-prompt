@@ -108,7 +108,8 @@ function memoryCard(memory: MemorySummary, history: MemoryHistory): HTMLElement 
 
   return h(
     'section',
-    { class: 'card strength-card', 'aria-label': 'Your memory' },
+    { class: 'card strength-card', 'aria-labelledby': 'memory-title' },
+    h('h2', { class: 'sr-only', id: 'memory-title' }, 'Your memory'),
     growthChart(history, counts),
     h(
       'ul',
@@ -118,7 +119,8 @@ function memoryCard(memory: MemorySummary, history: MemoryHistory): HTMLElement 
           'li',
           { title: s.desc },
           h('span', { class: `swatch s-${s.id}`, 'aria-hidden': 'true' }),
-          h('span', { class: 'legend-label' }, s.label),
+          // The legend stays short on screen; screen readers still get what each strength means.
+          h('span', { class: 'legend-label' }, s.label, h('span', { class: 'sr-only' }, `, ${s.desc}`)),
           counts[s.id],
         ),
       ),

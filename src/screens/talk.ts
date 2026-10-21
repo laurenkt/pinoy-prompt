@@ -182,7 +182,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
           'section',
           { class: 'card center' },
           h('p', null, `Learn at least ${MIN_WORDS} words first. Talk mixes the words you know into the conversation.`),
-          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'home' }) }, 'Go to Study'),
+          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
         ),
       );
     }
