@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Speak mode inside a practice round, with a stand-in microphone and model.
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
 import { getCard } from '../deck';
 import { toPhones } from '../phonetics';
@@ -72,5 +72,22 @@ describe('Speak mode', () => {
   it('is offered but explained when the browser cannot record', async () => {
     document.body.append(practiceScreen(fakeApp(), deps({ recordingSupported: () => false })));
     expect(document.body.textContent).toContain("can't record from the microphone");
+  });
+});
+
+describe('back gesture in Drills', () => {
+  it('goes from a round to the drills menu, and from the menu Home', async () => {
+    const app = fakeApp();
+    const navigate = vi.fn<App['navigate']>();
+    app.navigate = navigate;
+    let back = () => {};
+    app.onBack = (handler) => (back = handler ?? (() => {}));
+    document.body.append(practiceScreen(app, deps()));
+    await flush();
+    back();
+    expect(navigate).toHaveBeenLastCalledWith({ name: 'home' });
+    button('Speak').click();
+    back();
+    expect(navigate).toHaveBeenLastCalledWith({ name: 'practice' });
   });
 });

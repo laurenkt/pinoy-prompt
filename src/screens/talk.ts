@@ -309,7 +309,6 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     );
   }
 
-  app.onBack(leave);
   draw();
   // Still inside the tap that opened the screen, so the browser lets the call's audio and microphone start.
   if (start && getApiKey() && plan.known.length >= MIN_WORDS && deps.callSupported()) void begin();

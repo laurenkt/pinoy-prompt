@@ -150,4 +150,17 @@ describe('back gesture', () => {
     vi.advanceTimersByTime(500);
     expect(drawn).toEqual(['home']);
   });
+
+  it('keeps the fallback from firing after history has stepped back', async () => {
+    vi.useFakeTimers();
+    const { browser, drawn, screens } = setup();
+    screens.go('home');
+    screens.go('settings');
+    screens.go('home');
+    await vi.advanceTimersByTimeAsync(0);
+    screens.go('study');
+    vi.advanceTimersByTime(500);
+    expect(drawn).toEqual(['home', 'settings', 'home', 'study']);
+    expect(browser.entries).toHaveLength(2);
+  });
 });

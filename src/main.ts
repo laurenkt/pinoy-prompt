@@ -34,6 +34,12 @@ const app: App = {
     saved(save(progress));
   },
   navigate(route: Route) {
+    // Done at once: going Home waits a moment for history, and the old screen mustn't act meanwhile.
+    stop();
+    cancelRecording();
+    hangUpTalk();
+    keyHandler = null;
+    backHandler = null;
     screens.go(route);
   },
   onKey(handler) {
@@ -44,16 +50,13 @@ const app: App = {
   },
 };
 
+// Each screen starts at the top, including when back draws it.
+history.scrollRestoration = 'manual';
 const screens = backHistory<Route>({
   history: window.history,
   events: window,
   isHome: (route) => route.name === 'home',
   draw(route) {
-    stop();
-    cancelRecording();
-    hangUpTalk();
-    keyHandler = null;
-    backHandler = null;
     app.progress = rollDay(app.progress, Date.now());
     // Another tab may have changed quiet mode.
     applyAudioMode(app.progress.settings);

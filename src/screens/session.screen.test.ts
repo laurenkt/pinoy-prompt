@@ -114,6 +114,18 @@ describe('open-ended study', () => {
     expect(root.textContent).toContain('Session finished');
   });
 
+  it('shows what was done on the back gesture too', () => {
+    const app = fakeApp();
+    let back = () => {};
+    app.onBack = (handler) => (back = handler ?? (() => {}));
+    const root = sessionScreen(app, null, undefined, noMic);
+    button(root, "Let's go").click();
+    button(root, 'Got it, quiz me').click();
+    root.querySelector<HTMLButtonElement>('.choice')!.click();
+    back();
+    expect(root.textContent).toContain('Session finished');
+  });
+
   it("starts the new day's counts when study runs past midnight", () => {
     const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
     app.progress.settings.dailyNew = 4;

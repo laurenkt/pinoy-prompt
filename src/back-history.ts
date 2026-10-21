@@ -27,6 +27,7 @@ export function backHistory<R>(opts: BackHistoryOptions<R>): { go(route: R): voi
   let current: R | null = null;
   // Going Home from above it steps history back first, then draws this once it has.
   let pending: R | null = null;
+  let fallback: ReturnType<typeof setTimeout> | undefined;
 
   function show(route: R): void {
     current = route;
@@ -40,14 +41,16 @@ export function backHistory<R>(opts: BackHistoryOptions<R>): { go(route: R): voi
     away = true;
   }
 
+  function showPending(): void {
+    clearTimeout(fallback);
+    const route = pending!;
+    pending = null;
+    show(route);
+  }
+
   opts.events.addEventListener('popstate', (e) => {
     away = isAway((e as PopStateEvent).state);
-    if (pending !== null) {
-      const route = pending;
-      pending = null;
-      show(route);
-      return;
-    }
+    if (pending !== null) return showPending();
     // Forward again (a desktop browser) just restores the entry; nothing to draw.
     if (!away && current !== null && !opts.isHome(current)) opts.back();
     // A screen that handled back in place (Study's summary, say) still needs its entry.
@@ -62,12 +65,9 @@ export function backHistory<R>(opts: BackHistoryOptions<R>): { go(route: R): voi
         pending = route;
         history.back();
         // If history can't step back after all, don't leave the old screen up.
-        setTimeout(() => {
-          if (pending === null) return;
-          away = false;
-          const next = pending;
-          pending = null;
-          show(next);
+        fallback = setTimeout(() => {
+          away = isAway(history.state);
+          showPending();
         }, 500);
       } else {
         show(route);
