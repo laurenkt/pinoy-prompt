@@ -32,7 +32,8 @@ export function hangUpTalk(): void {
 
 type State = { name: 'menu' } | { name: 'connecting' } | { name: 'call'; muted: boolean } | { name: 'ended' };
 
-export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElement {
+/** With `start`, the call begins straight away when it can, so Chat is one tap from Home; topics stay a tap away after it ends. */
+export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = false): HTMLElement {
   const root = h('div', { class: 'talk' });
   let topicId: string | null = null;
   let plan: TalkPlan = talkPlan(app.progress, null);
@@ -125,7 +126,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     const time = `${m}:${String(s).padStart(2, '0')}`;
-    return seconds > 0 ? `${time} · about ${Math.ceil((seconds / 60) * CENTS_PER_MINUTE)}¢` : time;
+    // Before any time is billed, say the rate: a call from Home starts without the menu that mentions it.
+    return seconds > 0 ? `${time} · about ${Math.ceil((seconds / 60) * CENTS_PER_MINUTE)}¢` : `${time} · ${CENTS_PER_MINUTE}¢ a minute`;
   }
 
   function draw(): void {
@@ -308,5 +310,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
   }
 
   draw();
+  // Still inside the tap that opened the screen, so the browser lets the call's audio and microphone start.
+  if (start && getApiKey() && plan.known.length >= MIN_WORDS && deps.callSupported()) void begin();
   return root;
 }
