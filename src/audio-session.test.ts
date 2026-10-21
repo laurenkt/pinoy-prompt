@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeMicrophone, getMicrophone, releaseMicrophone } from './microphone';
-import { play } from './speech';
+import { play, stop } from './speech';
 
 let audioSession: { type: string };
 
@@ -34,6 +34,32 @@ describe('audio session', () => {
     expect(audioSession.type).toBe('auto');
     void play({ tl: 'Salamat' });
     expect(audioSession.type).toBe('playback');
+  });
+
+  it('plays a looping silent track with the voice, so the silent switch lets it through, and stops it after', () => {
+    const tracks: { src: string; loop: boolean; paused: boolean }[] = [];
+    vi.stubGlobal(
+      'Audio',
+      class {
+        loop = false;
+        paused = true;
+        constructor(public src: string) {
+          tracks.push(this);
+        }
+        play() {
+          this.paused = false;
+          return Promise.resolve();
+        }
+        pause() {
+          this.paused = true;
+        }
+      },
+    );
+    void play({ tl: 'Salamat' });
+    const silence = tracks.find((t) => t.src.startsWith('data:audio/wav'));
+    expect(silence).toMatchObject({ loop: true, paused: false });
+    stop();
+    expect(silence!.paused).toBe(true);
   });
 
   it('does nothing where the browser has no audio session', async () => {
