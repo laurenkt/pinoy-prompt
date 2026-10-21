@@ -9,6 +9,8 @@ import {
   getApiKey,
   MAX_CALL_SECONDS,
   setApiKey,
+  getTalkVoice,
+  setTalkVoice,
   startCall,
   VOICE_MODEL,
   type CallDeps,
@@ -112,6 +114,21 @@ function fakeCall(response: Response) {
   return { peer, track, fetchFn, deps, events };
 }
 
+describe('the Talk voice', () => {
+  afterEach(() => localStorage.clear());
+
+  it('is Beacon, the Filipino-accented voice, until another is chosen', () => {
+    expect(getTalkVoice()).toBe('beacon');
+    setTalkVoice('marin');
+    expect(getTalkVoice()).toBe('marin');
+  });
+
+  it('falls back to the default for a voice Talk no longer offers', () => {
+    localStorage.setItem('pinoy-prompt:talk-voice', 'alloy');
+    expect(getTalkVoice()).toBe('beacon');
+  });
+});
+
 describe('startCall', () => {
   afterEach(() => vi.useRealTimers());
 
@@ -127,6 +144,13 @@ describe('startCall', () => {
     expect(body.transport).toEqual({ type: 'webrtc', sdp: 'v=0 offer' });
     expect(f.peer.remote).toEqual({ type: 'answer', sdp: 'v=0 answer' });
     expect(f.peer.tracks).toHaveLength(1);
+    expect(body.session.audio).toEqual({ output: { voice: 'beacon' } });
+  });
+
+  it('speaks in the chosen voice', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    await startCall(KEY, { ...PROMPT, voice: 'marin' }, f.events, f.deps);
+    expect(JSON.parse(String(f.fetchFn.mock.calls[0][1]!.body)).session.audio).toEqual({ output: { voice: 'marin' } });
   });
 
   it('passes on transcripts and usage, and hangs up cleanly', async () => {

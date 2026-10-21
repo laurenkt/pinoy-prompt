@@ -44,8 +44,45 @@ export function talkPlan(progress: Progress, topicId: string | null): TalkPlan {
   return { topic, known, newWord };
 }
 
+/** A card for the instructions, with its stress guide: OpenAI's prompting guide asks for pronunciations that matter to be spelled out. */
+function say(card: Card): string {
+  return `${card.tl} (${card.en})${card.hint ? `, said ${card.hint}` : ''}`;
+}
+
 function list(words: KnownWord[]): string {
-  return words.map((w) => `${w.card.tl} (${w.card.en})`).join('; ');
+  return words.map((w) => say(w.card)).join('; ');
+}
+
+/** The learner's own time zone, such as "Europe/London"; undefined if the browser won't say. */
+function localTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The part of the day an hour falls in, as a greeting would see it. */
+export function partOfDay(hour: number): string {
+  if (hour < 5) return 'late at night';
+  if (hour < 12) return 'morning';
+  if (hour < 13) return 'midday';
+  if (hour < 18) return 'afternoon';
+  if (hour < 22) return 'evening';
+  return 'night';
+}
+
+/**
+ * The learner's local day and time, so the AI greets them for the right part
+ * of the day. Their time zone stands in for where they are; the app never asks
+ * for their location.
+ */
+export function timeContext(now: Date, timeZone = localTimeZone()): string {
+  const options = { timeZone } as const;
+  const when = new Intl.DateTimeFormat('en-GB', { ...options, weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', hour12: true }).format(now);
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { ...options, hour: 'numeric', hourCycle: 'h23' }).format(now));
+  const zone = timeZone ? ` (their time zone is ${timeZone})` : '';
+  return `For the learner it is ${partOfDay(hour)}: ${when}${zone}. Fit greetings and small talk to that time of day; never wish them a good morning, afternoon or evening at the wrong time.`;
 }
 
 /** A word from the learner's own list to show the mix with, so the example brings in no other Tagalog. */
@@ -83,13 +120,18 @@ export function mixLevel(known: number): string {
  * swapped in, like the Taglish many Filipinos speak, so the instructions say
  * plainly which language to speak and that no other Tagalog is wanted.
  */
-export function talkInstructions(plan: TalkPlan): string {
+export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): string {
   const firm = plan.known.filter((w) => w.strength === 'long' || w.strength === 'weeks');
   const settling = plan.known.filter((w) => w.strength === 'days');
   const fresh = plan.known.filter((w) => w.strength === 'new');
   const stuck = stuckExample(plan);
   const lines = [
-    'You are a friendly Filipino friend helping an English speaker practise beginner Tagalog in a relaxed spoken chat. Speak warmly, at an unhurried pace.',
+    'You are a friendly Filipino friend from Manila helping an English speaker practise beginner Tagalog in a relaxed spoken chat. Speak warmly, at an unhurried pace.',
+    '',
+    timeContext(now, timeZone),
+    '',
+    'Accent: keep a natural Filipino accent the whole call, in English as well as Tagalog, the way someone from Manila speaks Taglish. Never switch to an American accent.',
+    'Say every Tagalog word as a native Manila speaker would, not with English sounds: pure vowels a, e, i, o, u, never softened to "uh"; ng as one sound, even at the start of a word; a light tapped r; and the stress the guide after each word shows in capitals. Never say the guides themselves aloud.',
     '',
     'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below: every sentence is an English sentence with some of those words or phrases in place of the English.',
     `Use ${mixLevel(plan.known.length)}.`,
@@ -103,7 +145,7 @@ export function talkInstructions(plan: TalkPlan): string {
   if (fresh.length) lines.push(`Tagalog they met in the last day or so; say the English meaning straight after it the first time: ${list(fresh)}.`);
   if (plan.newWord) {
     lines.push(
-      `One new word to bring in during the call: ${plan.newWord.tl} (${plan.newWord.en}). Use it in a sentence where its meaning is clear, say the English meaning straight after it, and use it again later if it fits.`,
+      `One new word to bring in during the call: ${say(plan.newWord)}. Use it in a sentence where its meaning is clear, say the English meaning straight after it, and use it again later if it fits.`,
     );
   }
   lines.push(
@@ -140,7 +182,7 @@ export function talkInstructions(plan: TalkPlan): string {
 /** What the AI is asked to open the call with: in English, with a Tagalog greeting if the learner knows one. */
 export function talkGreeting(plan: TalkPlan): string {
   const about = plan.topic ? ` about ${plan.topic.title.toLowerCase()}` : '';
-  return `Greet the learner now in English, using a Tagalog greeting from the list if there is one. Ask one easy question${about} in English, with a listed Tagalog word only where one fits. Then pause and listen.`;
+  return `Greet the learner now in English, for their time of day, using a Tagalog greeting from the list if one fits that time. Ask one easy question${about} in English, with a listed Tagalog word only where one fits. Then pause and listen.`;
 }
 
 /** A piece of the AI's text: plain, or a Tagalog word the learner can tap. */
