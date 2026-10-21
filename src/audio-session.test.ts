@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 // speech.ts keeps one silent track for good, so every test sees the tracks made so far.
-const tracks: { src: string; loop: boolean; paused: boolean }[] = [];
+const tracks: { src: string; loop: boolean; paused: boolean; plays: number }[] = [];
 const silentTrack = () => tracks.find((t) => t.src.startsWith('data:audio/wav'));
 
 function stubAudio() {
@@ -28,11 +28,13 @@ function stubAudio() {
     class {
       loop = false;
       paused = true;
+      plays = 0;
       constructor(public src: string) {
         tracks.push(this);
       }
       play() {
         this.paused = false;
+        this.plays++;
         return Promise.resolve();
       }
       pause() {
@@ -67,6 +69,7 @@ describe('audio session', () => {
   });
 
   it('plays a looping silent track with the voice, so the silent switch lets it through, and stops it after', async () => {
+    vi.useFakeTimers();
     stubAudio();
     const spoken: { onend: (() => void) | null }[] = [];
     const speechSynthesis = {
@@ -83,11 +86,22 @@ describe('audio session', () => {
     expect(silence).toMatchObject({ loop: true, paused: false });
     await playing;
     spoken[0].onend!();
+    // Kept running between words, as restarting it delays the next one on iOS.
+    vi.advanceTimersByTime(5_000);
+    expect(silence!.paused).toBe(false);
+    const plays = silence!.plays;
+    void play({ tl: 'Salamat' });
+    stop();
+    void play({ tl: 'Salamat' });
+    expect(silence!.plays).toBe(plays);
+    stop();
+    vi.advanceTimersByTime(15_000);
     expect(silence!.paused).toBe(true);
     void play({ tl: 'Salamat' });
     expect(silence!.paused).toBe(false);
-    stop();
+    stop(true);
     expect(silence!.paused).toBe(true);
+    vi.useRealTimers();
   });
 
   it('does nothing where the browser has no audio session', async () => {

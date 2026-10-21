@@ -61,7 +61,7 @@ let muted = false;
 
 export function setMuted(on: boolean): void {
   muted = on;
-  if (on) stop();
+  if (on) stop(true);
 }
 /** Bumped by stop(), so a play() still loading a clip or voices doesn't start afterwards. */
 let generation = 0;
@@ -72,6 +72,22 @@ let generation = 0;
  * voice makes iOS treat the page as a media player, so the voice is heard too.
  */
 let silence: HTMLAudioElement | null = null;
+/**
+ * Restarting the track makes iOS switch the audio session again, which delays or drops
+ * the next word, so it keeps running between words and stops only after a quiet spell.
+ */
+const RELEASE_AFTER_MS = 15_000;
+let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+
+function releaseSoon(): void {
+  clearTimeout(releaseTimer);
+  releaseTimer = setTimeout(releaseMediaSession, RELEASE_AFTER_MS);
+}
+
+function releaseMediaSession(): void {
+  clearTimeout(releaseTimer);
+  silence?.pause();
+}
 
 /** Half a second of silence as an 8 kHz, 8-bit WAV. */
 function silentWav(): string {
@@ -99,8 +115,9 @@ function silentWav(): string {
 function holdMediaSession(): void {
   // The microphone's session isn't muted by the switch, and recording shouldn't share it with a track.
   if (typeof Audio === 'undefined' || microphoneOpen()) return;
+  clearTimeout(releaseTimer);
   silence ??= Object.assign(new Audio(silentWav()), { loop: true });
-  void silence.play()?.catch(() => {});
+  if (silence.paused) void silence.play()?.catch(() => {});
 }
 
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
@@ -117,14 +134,14 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
     try {
       await currentClip.play();
       // The clip is media itself, so it doesn't need the track.
-      silence?.pause();
+      releaseMediaSession();
       return;
     } catch {
       // Fall through to speech if the clip can't play.
     }
   }
   if (!speechSupported()) {
-    silence?.pause();
+    releaseMediaSession();
     return;
   }
   if (mine !== generation) return;
@@ -139,24 +156,29 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
   }
   utterance.rate = slow ? 0.6 : 0.9;
   utterance.onend = utterance.onerror = () => {
-    if (mine === generation) silence?.pause();
+    if (mine === generation) releaseSoon();
   };
+  // Also counted from the start, as iOS sometimes skips onend; no word takes this long.
+  releaseSoon();
   speechSynthesis.speak(utterance);
 }
 
 // iOS sometimes skips an utterance's onend, so never leave the track looping in the background.
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stop();
+    if (document.hidden) stop(true);
   });
 }
 
-export function stop(): void {
+/** Stop any word playing. `release` also stops the silent track now: for leaving a screen or recording. */
+export function stop(release = false): void {
   generation++;
   currentClip?.pause();
   currentClip = null;
-  silence?.pause();
-  if (speechSupported()) speechSynthesis.cancel();
+  if (release) releaseMediaSession();
+  else if (silence && !silence.paused) releaseSoon();
+  // Safari can drop a word spoken straight after a cancel, so only cancel when something is playing.
+  if (speechSupported() && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
 }
 
 /** Whether a card is still being heard, so a screen moving on by itself can wait for it. */
