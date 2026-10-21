@@ -19,7 +19,7 @@ What a review of a change to this app should check, beyond "does the code work".
 
 - **Practical, not gamified.** No streaks, points, badges, levels, lesson chapters to complete, or nudges to come back. Praise stays small (a "Tama!"), and nothing should push the learner by guilt or reward loops.
 - **The schedule is honest.** Only answers to scheduled reviews and new cards change a card's schedule. Extra practice, drills, speaking and Chat never do. A step that is skipped (for example by quiet mode) leaves the card exactly as it was.
-- **Quiet mode holds.** With `settings.quiet` on, nothing in Study or Drills asks the learner to speak, including steps chosen before it was turned on.
+- **Quiet mode holds.** With `settings.quiet` on, nothing in Study or Drills asks the learner to speak, including steps chosen before it was turned on. Without `settings.headphones` it is silent too: no audio plays, no play buttons show, and nothing needs listening.
 
 ## Saved progress
 
