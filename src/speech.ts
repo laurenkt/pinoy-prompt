@@ -99,3 +99,9 @@ export function stop(): void {
   currentClip = null;
   if (speechSupported()) speechSynthesis.cancel();
 }
+
+/** Whether a card is still being heard, so a screen moving on by itself can wait for it. */
+export function speaking(): boolean {
+  if (currentClip && !currentClip.paused && !currentClip.ended) return true;
+  return speechSupported() && speechSynthesis.speaking;
+}
