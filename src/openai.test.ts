@@ -9,8 +9,7 @@ import {
   getApiKey,
   MAX_CALL_SECONDS,
   setApiKey,
-  getTalkVoice,
-  setTalkVoice,
+  forgetRetiredVoiceChoice,
   startCall,
   VOICE_MODEL,
   type CallDeps,
@@ -46,7 +45,7 @@ describe('the API key', () => {
   });
 });
 
-const PROMPT = { instructions: '', greeting: 'Say hi.', voice: 'beacon' } as const;
+const PROMPT = { instructions: '', greeting: 'Say hi.' };
 
 class FakeChannel {
   readyState = 'open';
@@ -114,27 +113,24 @@ function fakeCall(response: Response) {
   return { peer, track, fetchFn, deps, events };
 }
 
-describe('the Talk voice', () => {
+describe('the retired voice choice', () => {
   afterEach(() => localStorage.clear());
 
-  it('is Beacon, the Filipino-accented voice, until another is chosen', () => {
-    expect(getTalkVoice()).toBe('beacon');
-    setTalkVoice('marin');
-    expect(getTalkVoice()).toBe('marin');
-  });
-
-  it('falls back to the default for a voice Talk no longer offers', () => {
-    localStorage.setItem('pinoy-prompt:talk-voice', 'alloy');
-    expect(getTalkVoice()).toBe('beacon');
+  it('is cleared, leaving the key alone', () => {
+    localStorage.setItem('pinoy-prompt:talk-voice', 'marin');
+    localStorage.setItem('pinoy-prompt:openai-key', KEY);
+    forgetRetiredVoiceChoice();
+    expect(localStorage.getItem('pinoy-prompt:talk-voice')).toBeNull();
+    expect(localStorage.getItem('pinoy-prompt:openai-key')).toBe(KEY);
   });
 });
 
 describe('startCall', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('starts a GPT-Live session with the browser offer and applies the answer', async () => {
+  it('starts a GPT-Live session in the Beacon voice with the browser offer and applies the answer', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'v=0 answer' } }));
-    await startCall(KEY, { instructions: 'Talk Taglish.', greeting: 'Say hi.', voice: 'beacon' }, f.events, f.deps);
+    await startCall(KEY, { instructions: 'Talk Taglish.', greeting: 'Say hi.' }, f.events, f.deps);
     const [url, init] = f.fetchFn.mock.calls[0];
     expect(url).toBe('https://api.openai.com/v1/live/sessions');
     const body = JSON.parse(String(init!.body));
@@ -145,12 +141,6 @@ describe('startCall', () => {
     expect(f.peer.remote).toEqual({ type: 'answer', sdp: 'v=0 answer' });
     expect(f.peer.tracks).toHaveLength(1);
     expect(body.session.audio).toEqual({ output: { voice: 'beacon' } });
-  });
-
-  it('speaks in the chosen voice', async () => {
-    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
-    await startCall(KEY, { ...PROMPT, voice: 'marin' }, f.events, f.deps);
-    expect(JSON.parse(String(f.fetchFn.mock.calls[0][1]!.body)).session.audio).toEqual({ output: { voice: 'marin' } });
   });
 
   it('passes on transcripts and usage, and hangs up cleanly', async () => {
