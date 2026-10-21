@@ -66,24 +66,68 @@ export function setMuted(on: boolean): void {
 /** Bumped by stop(), so a play() still loading a clip or voices doesn't start afterwards. */
 let generation = 0;
 
+/**
+ * iOS mutes the built-in voice when the phone is on silent, whatever the audio
+ * session says, but lets media through. A silent track playing alongside the
+ * voice makes iOS treat the page as a media player, so the voice is heard too.
+ */
+let silence: HTMLAudioElement | null = null;
+
+/** Half a second of silence as an 8 kHz, 8-bit WAV. */
+function silentWav(): string {
+  const samples = 4000;
+  const bytes = new Uint8Array(44 + samples);
+  const view = new DataView(bytes.buffer);
+  const text = (at: number, s: string) => [...s].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
+  text(0, 'RIFF');
+  view.setUint32(4, 36 + samples, true);
+  text(8, 'WAVEfmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, 8000, true);
+  view.setUint32(28, 8000, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  text(36, 'data');
+  view.setUint32(40, samples, true);
+  bytes.fill(128, 44); // 8-bit silence is the midpoint
+  return `data:audio/wav;base64,${btoa(String.fromCharCode(...bytes))}`;
+}
+
+/** Start the silent track. Called straight from the tap, as iOS only starts media then. */
+function holdMediaSession(): void {
+  // The microphone's session isn't muted by the switch, and recording shouldn't share it with a track.
+  if (typeof Audio === 'undefined' || microphoneOpen()) return;
+  silence ??= Object.assign(new Audio(silentWav()), { loop: true });
+  void silence.play()?.catch(() => {});
+}
+
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
 export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
   stop();
   if (muted) return;
   // Play through the iPhone's silent switch, unless the microphone needs the session.
   if (!microphoneOpen()) setAudioSession('playback');
+  holdMediaSession();
   const mine = generation;
   if (card.audio) {
     currentClip = new Audio(`${import.meta.env.BASE_URL}audio/${card.audio}`);
     currentClip.playbackRate = slow ? 0.75 : 1;
     try {
       await currentClip.play();
+      // The clip is media itself, so it doesn't need the track.
+      silence?.pause();
       return;
     } catch {
       // Fall through to speech if the clip can't play.
     }
   }
-  if (!speechSupported() || mine !== generation) return;
+  if (!speechSupported()) {
+    silence?.pause();
+    return;
+  }
+  if (mine !== generation) return;
   await initVoices();
   if (mine !== generation) return;
   const utterance = new SpeechSynthesisUtterance(card.say ?? card.tl);
@@ -94,13 +138,24 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
     utterance.lang = 'fil-PH';
   }
   utterance.rate = slow ? 0.6 : 0.9;
+  utterance.onend = utterance.onerror = () => {
+    if (mine === generation) silence?.pause();
+  };
   speechSynthesis.speak(utterance);
+}
+
+// iOS sometimes skips an utterance's onend, so never leave the track looping in the background.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stop();
+  });
 }
 
 export function stop(): void {
   generation++;
   currentClip?.pause();
   currentClip = null;
+  silence?.pause();
   if (speechSupported()) speechSynthesis.cancel();
 }
 
