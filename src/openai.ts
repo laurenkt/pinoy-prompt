@@ -187,7 +187,11 @@ export async function startCall(
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
 
+  let released = false;
   function release(): void {
+    // Can be reached twice (the call fails while it's still being set up), but the microphone is handed back once.
+    if (released) return;
+    released = true;
     clearTimeout(limit);
     clearTimeout(dropping);
     if (deps.releaseMicrophone) deps.releaseMicrophone(mic);

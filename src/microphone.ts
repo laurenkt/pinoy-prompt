@@ -8,8 +8,9 @@
 /** Close the stream after this long unused, so the microphone isn't held forever. */
 export const IDLE_CLOSE_MS = 3 * 60 * 1000;
 
+// Auto gain is left at the browser's default, as both callers had it before.
 const CONSTRAINTS: MediaStreamConstraints = {
-  audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+  audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
 };
 
 let stream: MediaStream | null = null;
@@ -17,7 +18,8 @@ let opening: Promise<MediaStream> | null = null;
 let users = 0;
 let idle: ReturnType<typeof setTimeout> | undefined;
 
-const live = (s: MediaStream) => s.getAudioTracks().some((t) => t.readyState === 'live');
+// A track iOS muted (a phone call, Siri) can stay "live" but silent, so it doesn't count.
+const live = (s: MediaStream) => s.getAudioTracks().some((t) => t.readyState === 'live' && !t.muted);
 
 /** The microphone, switched on. Only asks for permission when no stream is open. Pair with releaseMicrophone(). */
 export async function getMicrophone(): Promise<MediaStream> {
@@ -28,12 +30,11 @@ export async function getMicrophone(): Promise<MediaStream> {
     stream = await opening;
   }
   users++;
-  const current = stream;
-  for (const t of current.getTracks()) t.enabled = true;
-  return current;
+  for (const t of stream.getTracks()) t.enabled = true;
+  return stream;
 }
 
-/** Done with the stream from getMicrophone(). It's switched off now and closed later if nothing else wants it. */
+/** Done with the stream from getMicrophone(). Call once per getMicrophone(). It's switched off now and closed later if nothing else wants it. */
 export function releaseMicrophone(released: MediaStream): void {
   if (released !== stream) {
     released.getTracks().forEach((t) => t.stop());

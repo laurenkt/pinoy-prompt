@@ -71,3 +71,13 @@ describe('shared microphone', () => {
     expect(opened).toHaveLength(2);
   });
 });
+
+describe('shared microphone after an interruption', () => {
+  it('opens a new stream when the old one was muted by the system', async () => {
+    const mic = await getMicrophone();
+    releaseMicrophone(mic);
+    (opened[0].track as { muted?: boolean }).muted = true;
+    expect(await getMicrophone()).not.toBe(mic);
+    expect(opened).toHaveLength(2);
+  });
+});
