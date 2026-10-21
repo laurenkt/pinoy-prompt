@@ -1064,10 +1064,84 @@ p {
 }
 
 /* Sound-by-sound breakdown. */
-.sound-results {
-  margin-top: 14px;
+/* After an attempt with a breakdown, the result card stands in for the prompt
+   card: same word, now coloured by how each sound came out. */
+.prompt:has(+ .speak.has-breakdown) {
+  display: none;
 }
 
+.result-card {
+  margin-top: 0;
+  padding: 8px 14px 12px;
+  background: var(--teal);
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: 22px;
+  box-shadow: var(--shadow-big);
+}
+
+.feedback.result-card strong {
+  color: var(--on-accent);
+}
+
+.result-card .eyebrow {
+  margin: 0;
+  color: var(--on-accent);
+}
+
+.result-card .letters {
+  font-size: 2rem;
+  line-height: 1.1;
+  margin: 2px 0 0;
+}
+
+.result-card .letters.long {
+  font-size: 1.5rem;
+}
+
+.result-card .sound-good {
+  color: var(--on-accent);
+}
+
+.result-meaning {
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.result-card .dial {
+  width: 56px;
+  height: 56px;
+}
+
+.result-card .dial-track {
+  stroke: rgb(12 9 36 / 0.35);
+}
+
+.result-card .dial-fill,
+.feedback.good.result-card .dial-fill {
+  stroke: var(--on-accent);
+}
+
+.result-card .word-actions {
+  margin-top: 8px;
+}
+
+.result-card .word-actions-label {
+  color: var(--on-accent);
+}
+
+.result-card .audio-btn.small {
+  width: 44px;
+  height: 38px;
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.sound-results {
+  margin-top: 10px;
+}
+
+/* The recording with its sounds marked on it: aimed-for sound above, what was heard below. */
 .ribbon {
   position: relative;
   border: var(--outline);
@@ -1075,6 +1149,19 @@ p {
   box-shadow: var(--shadow);
   overflow: hidden;
   background: var(--ink);
+}
+
+.ribbon-lane {
+  height: 22px;
+}
+
+.lane-target {
+  background: var(--surface-dim);
+  border-bottom: 2px solid var(--line);
+}
+
+.lane-heard {
+  border-top: 2px solid var(--line);
 }
 
 .spectrogram {
@@ -1091,20 +1178,35 @@ p {
   position: absolute;
   top: 0;
   bottom: 0;
+  min-width: 0;
   border: 0;
-  padding: 0 0 4px;
+  padding: 0;
   background: transparent;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  border-bottom: 5px solid var(--mark, var(--teal));
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--cream);
+  font-weight: 800;
+  line-height: 22px;
 }
 
-.ribbon-mark span {
-  font-weight: 800;
-  font-size: 0.8rem;
-  color: var(--cream);
-  text-shadow: 0 1px 0 var(--ink), 0 0 6px var(--ink);
+.ribbon-mark + .ribbon-mark {
+  border-left: 1px solid rgb(74 66 144 / 0.6);
+}
+
+.mark-target,
+.mark-heard {
+  font-size: 0.85rem;
+  height: 22px;
+  white-space: nowrap;
+}
+
+.mark-heard {
+  width: 100%;
+  color: var(--on-accent);
+  background: var(--mark, var(--teal));
+  border-top: 2px solid var(--ink);
 }
 
 .mark-good {
@@ -1116,141 +1218,69 @@ p {
 }
 
 .mark-off,
-.mark-missing {
+.mark-missing,
+.mark-extra {
   --mark: var(--magenta);
 }
 
-.mark-extra {
+.mark-harmless {
   --mark: var(--line);
 }
 
-.ribbon-actions {
-  margin-top: 12px;
-}
-
-.strip-label {
-  margin: 14px 0 6px;
-}
-
-.sound-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px 18px;
-  padding: 4px 0 12px;
-}
-
-.word-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 6px;
-}
-
-.pair {
-  --c: var(--teal);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.pair-close {
-  --c: var(--saffron);
-}
-
-.pair-off,
-.pair-missing {
-  --c: var(--magenta);
-}
-
-.pair-extra {
-  --c: var(--pink);
-}
-
-.pair-harmless {
-  --c: var(--line);
-}
-
-.tile {
-  gap: 4px;
-  text-align: left;
-  color: var(--on-accent);
-  min-width: 46px;
-  min-height: 50px;
-  padding: 4px 8px;
-  border: var(--outline);
-  border-radius: 14px;
-  box-shadow: 3px 3px 0 var(--ink);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  line-height: 1.05;
-}
-
-.tile:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--ink);
-}
-
-.tile-ipa {
-  font-size: 1.35rem;
-}
-
-.tile-letters {
-  font-size: 0.72rem;
-  opacity: 0.8;
-}
-
-.tile-target {
-  background: var(--cream);
-  color: var(--on-accent);
-}
-
-.tile-heard {
-  background: var(--c);
-  color: var(--on-accent);
-}
-
-.tile-missing {
-  background: transparent;
-  color: var(--c);
-  border-style: dashed;
-  border-color: var(--c);
-  box-shadow: none;
-}
-
-.tile-empty {
-  border-style: dashed;
-  border-color: var(--line);
+.mark-extra .mark-target {
   color: var(--faint);
-  box-shadow: none;
+}
+
+/* A sound that wasn't said: a dashed slot where it should have been. */
+.ribbon-mark.mark-gap {
+  /* Centred on where the sound should have been (--at), shifted along when
+     several are missing in a row (--shift), and kept inside the ribbon. */
+  left: clamp(0px, calc(var(--at) + var(--shift)), calc(100% - 26px));
+  width: 26px;
+  z-index: 1;
+  border: 2px dashed var(--mark);
+  border-radius: 8px;
+}
+
+.mark-gap .mark-heard {
   background: transparent;
+  color: var(--mark);
+  border-top: 0;
 }
 
-/* The link between target and heard: longer and more broken the further off it was. */
-.link {
-  width: 5px;
-  height: calc(10px + (1 - var(--closeness)) * 18px);
-  background: var(--c);
-  border-left: 2px solid var(--ink);
-  border-right: 2px solid var(--ink);
+.ribbon-mark.selected {
+  z-index: 2;
+  box-shadow: inset 0 0 0 3px var(--saffron);
+  border-radius: 6px;
 }
 
-.pair-off .link,
-.pair-missing .link,
-.pair-extra .link {
-  background: repeating-linear-gradient(var(--c) 0 4px, transparent 4px 8px);
-  border: 0;
+.ribbon-mark.selected .mark-target {
+  color: var(--saffron);
 }
 
-.pair.selected .tile-target {
-  outline: 3px solid var(--saffron);
-  outline-offset: 2px;
+/* Play the whole word: yours, or how it should sound. */
+.word-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.word-actions-label {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.btn.small {
+  min-height: 38px;
+  padding: 4px 12px;
+  font-size: 0.9rem;
 }
 
 .sound-detail {
-  margin-top: 8px;
-  padding: 14px;
+  margin-top: 10px;
+  padding: 10px 12px 12px;
   background: var(--surface);
   border: var(--outline);
   border-radius: var(--radius);
@@ -1271,7 +1301,7 @@ p {
   margin: 0;
   flex: none;
   font-weight: 800;
-  font-size: 1.3rem;
+  font-size: 1.2rem;
 }
 
 .verdict-chip {
@@ -1321,8 +1351,9 @@ p {
 .detail-sounds {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 4px 12px;
-  margin: 12px 0 6px;
+  gap: 0 10px;
+  margin: 6px 0 0;
+  font-size: 0.9rem;
 }
 
 .detail-sounds dt {
@@ -1336,21 +1367,13 @@ p {
 }
 
 .detail-sounds strong {
-  font-size: 1.2rem;
-}
-
-.tip-link {
-  border: 0;
-  padding: 0 4px;
-  border-radius: 6px;
-  background: var(--pink);
-  color: var(--on-accent);
-  font-weight: 800;
-  text-decoration: underline;
+  font-size: 1.05rem;
 }
 
 .detail-tip {
-  margin: 8px 0 0;
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.3;
 }
 
 .detail-actions .btn {
@@ -1364,7 +1387,7 @@ p {
 .sound-chart {
   display: block;
   width: 100%;
-  margin-top: 6px;
+  margin-top: 4px;
   font-family: var(--font-sans);
 }
 
@@ -1449,13 +1472,8 @@ p {
   margin: 16px 0 10px;
 }
 
-.skip-link {
-  width: 100%;
-  margin-top: 10px;
-}
-
 .speak .row {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 /* Words */

@@ -55,11 +55,13 @@ How it works:
 4. **Comparing** (`src/phonetics.ts`): the two sound sequences are aligned with an edit distance weighted by phonetic features, so a near miss (aspirated p, o said as ou) costs less than a different sound. Tagalog allophones (o/ɔ, e/ɛ, r/ɾ) count as right, and added sounds count against the attempt (except a glottal catch or a released final consonant). A card can list other standard pronunciations with `accept: [...]` (Kumusta accepts Kamusta); the attempt is judged against the closest one.
 5. **Coaching** (`src/coach.ts`): common English-speaker patterns get a specific tip; anything else gets "sounded like X".
 
-**The results screen** breaks the attempt down sound by sound (`src/screens/speak-result.ts`):
+**The results screen** breaks the attempt down sound by sound (`src/screens/speak-result.ts`), and fits on one phone screen:
+
+- The card becomes the result: the word with each letter coloured by how its sound came out, and the whole word to play back, yours or the target.
 
 - The recording is drawn as a ribbon (`src/spectrogram.ts`, WebGL with a 2D canvas fallback): it swells with loudness, holds the pitch spectrum inside, and is outlined in each sound's verdict colour. A glowing playhead follows whatever is playing.
-- Every expected sound sits above what was heard, grouped by word. Tap the top tile to hear a native speaker say that sound, or the bottom one to hear that slice of your own recording. The link between them gets longer and breaks up the further off it was.
-- The selected sound gets a closeness bar and a map of where it's made in the mouth (`src/sound-map.ts`): the vowel chart for vowels, a where × how grid for consonants. Your mark and the target sit on it with a path between them, and "Yours, then the target" plays both while your mark travels to the target.
+- Each sound is marked along the ribbon: the sound aimed for above, what was heard below, in its verdict colour. A sound that wasn't said gets a dashed slot where it should have been. Tap a mark to open that sound and hear your slice of the recording.
+- The open sound gets its tip, a closeness bar and a map of where it's made in the mouth (`src/sound-map.ts`): the vowel chart for vowels, a where × how grid for consonants. Your mark and the target sit on it with a path between them. Its buttons play yours, a native speaker saying the target, or both, while your mark travels to the target.
 
 The recogniser's output gives each sound a time (from the CTC frames), which is how a tap finds its slice of the recording. The native reference clips in `public/sounds/` are short syllables (like "ŋa" and "aɾa") cut from the [FLEURS](https://huggingface.co/datasets/google/fleurs) Filipino recordings (CC BY 4.0), each checked by running the recogniser on the cut clip; `src/reference-sounds.json` lists the word each came from.
 

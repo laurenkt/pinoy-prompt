@@ -163,11 +163,21 @@ describe('an attempt', () => {
     await flush();
     expect(onAttempt).toHaveBeenCalledWith(false);
     expect(panel.el.querySelector('.sound-off')?.textContent).toBe('ng');
-    expect(text('.tips')).toContain('sing');
-    // The breakdown pairs the ng with the n that was heard, and starts on it.
-    expect(text('.pair-off .tile-target .tile-ipa')).toBe('ŋ');
-    expect(text('.pair-off .tile-heard')).toBe('n');
+    // The breakdown marks the ng and the n that was heard, and starts on it with its tip.
+    expect(text('.mark-off .mark-target')).toBe('ŋ');
+    expect(text('.mark-off .mark-heard')).toBe('n');
     expect(text('.sound-detail .detail-letters')).toBe('“ng”');
+    expect(text('.sound-detail')).toContain('sing');
+    // The whole word, yours and the target, from the result card.
+    expect(panel.el.classList).toContain('has-breakdown');
+    const card = panel.el.querySelector('.result-card')!;
+    const wordButton = (label: string) => [...card.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label || b.getAttribute('aria-label') === label)!;
+    wordButton('▶ Yours').click();
+    expect(player.calls.at(-1)).toMatchObject({ kind: 'slice' });
+    wordButton('▶ Target').click();
+    expect(say).toHaveBeenLastCalledWith();
+    wordButton('Target, slowly').click();
+    expect(say).toHaveBeenLastCalledWith(true);
     // Another go, or move on.
     expect(button('Try again')).toBeTruthy();
     button('Next word').click();
