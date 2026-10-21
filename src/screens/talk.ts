@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey, MAX_CALL_SECONDS, startCall, type Call, type CallDeps } from '../openai';
-import { play } from '../speech';
+import { play, stop } from '../speech';
 import { addPiece, findWords, talkGreeting, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
 import { h, icon } from '../ui';
 import { createVisualizer, type Visualizer } from '../visualizer';
@@ -51,6 +51,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
   async function begin(): Promise<void> {
     const key = getApiKey();
     if (!key) return;
+    // A word tapped earlier leaves the silent track running, which mustn't share the microphone's session.
+    stop(true);
     hangUpTalk();
     const mine = generation;
     const current = () => mine === generation;
