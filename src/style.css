@@ -232,6 +232,72 @@ p {
   margin: 6px 0 0;
 }
 
+/* Quiet mode: one tap wherever studying starts. Teal when on, so it's clear at a glance. */
+.quiet-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 12px;
+  flex: none;
+  border: var(--outline);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow);
+}
+
+.quiet-toggle.wide {
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  padding: 8px 16px;
+  gap: 12px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.quiet-toggle.wide .icon {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+.quiet-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.quiet-desc {
+  font-weight: 500;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.quiet-toggle.on {
+  background: var(--teal);
+  color: var(--on-accent);
+}
+
+.quiet-toggle:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0.5rem;
+}
+
+.title-row h1 {
+  margin: 0;
+}
+
 .welcome {
   background: var(--teal);
   color: var(--on-accent);
@@ -461,6 +527,9 @@ p {
 }
 
 .session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 0.85rem;
   color: var(--muted);
   font-weight: 700;

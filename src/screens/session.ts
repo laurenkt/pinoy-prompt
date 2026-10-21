@@ -20,6 +20,7 @@ import { formatInterval, nextInterval, newCardState, type Rating } from '../srs'
 import { play, speechSupported, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
+import { quietToggle } from './quiet';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'caught-up' | 'done';
@@ -93,7 +94,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (!open) return queue.shift();
     // Study can run past midnight without leaving the screen, so start the new day's counts here.
     app.progress = rollDay(app.progress, app.now());
-    return nextStudyStep(app.progress, app.now(), recent, { listen: canListen, speak: speakReady }, misses) ?? undefined;
+    // Quiet mode leaves speaking out; skipped speaking is extra practice, so the schedule doesn't notice.
+    const canSpeak = speakReady && !app.progress.settings.quiet;
+    return nextStudyStep(app.progress, app.now(), recent, { listen: canListen, speak: canSpeak }, misses) ?? undefined;
   }
 
   function next(): void {
@@ -136,6 +139,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function ask(c: Card, s: Step): void {
     const state = app.progress.cards[c.id] ?? newCardState(app.now());
     format = s.format ?? pickFormat(state, { listen: canListen, speak: false }, Math.random, c.kind);
+    // A speaking step picked before quiet mode was turned on (say, behind the caught-up note) is asked another way.
+    if (format === 'speak' && app.progress.settings.quiet) format = 'read';
     if (!isVocab(c)) {
       askGuide(c);
       return;
@@ -289,6 +294,12 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     draw();
   }
 
+  /** Quiet mode on mid-step skips a speaking step: it's practice only, so nothing is recorded and the card stays as it was. */
+  function quietChanged(): void {
+    if (phase === 'speak' && app.progress.settings.quiet) next();
+    else draw();
+  }
+
   /** Stopping open-ended study shows what was done, if anything was. */
   function close(): void {
     if (open && stats.answered + stats.practised > 0 && phase !== 'done') {
@@ -311,6 +322,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         h('button', { class: 'icon-btn', 'aria-label': 'Stop studying', onclick: close }, icon('close')),
         h('span', { class: 'session-count' }, done === 1 ? '1 done' : `${done} done`),
         h('span', { class: 'session-title' }, step?.kind === 'extra' && phase !== 'done' ? 'Extra practice' : 'Study'),
+        quietToggle(app, quietChanged),
       );
     }
     // On the missed screen the card is already back in the queue.
@@ -321,6 +333,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       h('button', { class: 'icon-btn', 'aria-label': 'Close session', onclick: close }, icon('close')),
       progressBar(completed, completed + remaining, 'Session progress'),
       title ? h('span', { class: 'session-title' }, title) : null,
+      quietToggle(app, quietChanged),
     );
   }
 
@@ -428,7 +441,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       h('p', { class: 'meaning' }, c.en),
       c.note && h('p', { class: 'note' }, c.note),
       hookView(c),
-      h('p', { class: 'muted small' }, 'Listen, then say it out loud a couple of times.'),
+      h('p', { class: 'muted small' }, app.progress.settings.quiet ? 'Listen, then say it in your head a couple of times.' : 'Listen, then say it out loud a couple of times.'),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: startQuiz }, 'Got it, quiz me'),
     );
   }
