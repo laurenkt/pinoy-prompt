@@ -104,7 +104,7 @@ function memoryCard(memory: MemorySummary, history: MemoryHistory): HTMLElement 
   ) as Record<Strength, HTMLElement>;
 
   const facts = [measured ? `${pct} recalled` : `≈${pct} recall`];
-  if (due.tomorrow > 0) facts.push(`${due.tomorrow} due tomorrow`);
+  if (due.tomorrow > 0) facts.push(`${due.tomorrow} more due by tomorrow`);
 
   return h(
     'section',
