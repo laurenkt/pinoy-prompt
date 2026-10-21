@@ -20,7 +20,7 @@ function fakeApp(): App {
   const progress = emptyProgress(now);
   progress.settings.autoplay = false;
   for (const id of KNOWN) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {} };
+  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
 }
 
 /** Mount a screen, since one that has been left never moves on. */

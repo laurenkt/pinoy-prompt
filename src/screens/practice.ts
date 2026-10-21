@@ -332,6 +332,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     const n = Number(e.key);
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });
+  // Back from a round goes to the drills menu, as its close button does.
+  app.onBack(() => app.navigate(questions.length > 0 ? { name: 'practice' } : { name: 'home' }));
 
   draw();
   return root;

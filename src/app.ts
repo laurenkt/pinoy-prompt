@@ -22,6 +22,8 @@ export interface App {
   navigate(route: Route): void;
   /** Screen-level keyboard shortcuts; cleared on every navigation. */
   onKey(handler: ((e: KeyboardEvent) => void) | null): void;
+  /** What the system back gesture does on this screen, if not going Home; cleared on every navigation. */
+  onBack(handler: (() => void) | null): void;
 }
 
 export type Screen = (app: App) => HTMLElement;

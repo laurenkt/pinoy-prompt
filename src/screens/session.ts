@@ -900,6 +900,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (phase === 'back' && n >= 1 && n <= 4) return rate(RATINGS[n - 1].rating);
     if (phase === 'back' && !hookShown && (e.key === 'h' || e.key === 'H')) return showHook();
   });
+  app.onBack(close);
 
   next();
   return root;

@@ -17,7 +17,7 @@ function fakeApp(known: string[] = []): App {
   const progress = emptyProgress(now);
   progress.settings.autoplay = false;
   for (const id of known) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {} };
+  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
 }
 
 function button(root: HTMLElement, text: string): HTMLButtonElement {
