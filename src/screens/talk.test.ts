@@ -14,7 +14,7 @@ function fakeApp(known = KNOWN) {
   const now = Date.now();
   const progress = emptyProgress(now);
   for (const id of known) recordAnswer(progress, id, 'good', now);
-  const app = { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: vi.fn<App['navigate']>(), onKey: () => {} };
+  const app = { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: vi.fn<App['navigate']>(), onKey: () => {}, onBack: () => {} };
   return app satisfies App;
 }
 

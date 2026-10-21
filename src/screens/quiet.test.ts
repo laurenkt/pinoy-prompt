@@ -29,7 +29,7 @@ function fakeApp(quiet: boolean, headphones = true): App {
   progress.settings.quiet = quiet;
   progress.settings.headphones = headphones;
   for (const id of KNOWN) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {} };
+  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
 }
 
 function button(root: HTMLElement, text: string): HTMLButtonElement {

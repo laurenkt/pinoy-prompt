@@ -16,7 +16,7 @@ function fakeApp(known: string[] = []): App {
   const progress = emptyProgress(now);
   progress.settings.autoplay = false;
   for (const id of known) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {} };
+  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
 }
 
 function button(root: HTMLElement, text: string): HTMLButtonElement {
@@ -111,6 +111,18 @@ describe('open-ended study', () => {
     button(root, 'Got it, quiz me').click();
     root.querySelector<HTMLButtonElement>('.choice')!.click();
     root.querySelector<HTMLButtonElement>('[aria-label="Stop studying"]')!.click();
+    expect(root.textContent).toContain('Session finished');
+  });
+
+  it('shows what was done on the back gesture too', () => {
+    const app = fakeApp();
+    let back = () => {};
+    app.onBack = (handler) => (back = handler ?? (() => {}));
+    const root = sessionScreen(app, null, undefined, noMic);
+    button(root, "Let's go").click();
+    button(root, 'Got it, quiz me').click();
+    root.querySelector<HTMLButtonElement>('.choice')!.click();
+    back();
     expect(root.textContent).toContain('Session finished');
   });
 

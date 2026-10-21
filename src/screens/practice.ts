@@ -160,6 +160,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   }
 
   /** Stop counting down: the learner wants another look. */
+  function endRound(): void {
+    app.navigate({ name: 'practice' });
+  }
+
   function hold(): void {
     auto?.cancel();
     auto = null;
@@ -261,7 +265,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       h(
         'header',
         { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: () => app.navigate({ name: 'practice' }) }, icon('close')),
+        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: endRound }, icon('close')),
         progressBar(index, questions.length, 'Round progress'),
         h('span', { class: 'session-title' }, `${score} right`),
       ),
@@ -332,6 +336,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     const n = Number(e.key);
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });
+  // Back from a round goes to the drills menu, as its close button does.
+  app.onBack(() => (questions.length > 0 ? endRound() : app.navigate({ name: 'home' })));
 
   draw();
   return root;

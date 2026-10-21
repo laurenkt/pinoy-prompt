@@ -1,6 +1,7 @@
 import '@fontsource-variable/bricolage-grotesque';
 import './style.css';
 import type { App, Route } from './app';
+import { backHistory } from './back-history';
 import { homeScreen } from './screens/home';
 import { practiceScreen } from './screens/practice';
 import { sessionScreen } from './screens/session';
@@ -17,6 +18,7 @@ import { h, icon } from './ui';
 
 const root = document.getElementById('app')!;
 let keyHandler: ((e: KeyboardEvent) => void) | null = null;
+let backHandler: (() => void) | null = null;
 
 let warnedSaveFailed = false;
 
@@ -32,20 +34,38 @@ const app: App = {
     saved(save(progress));
   },
   navigate(route: Route) {
+    // Done at once: going Home waits a moment for history, and the old screen mustn't act meanwhile.
     stop();
     cancelRecording();
     hangUpTalk();
     keyHandler = null;
+    backHandler = null;
+    screens.go(route);
+  },
+  onKey(handler) {
+    keyHandler = handler;
+  },
+  onBack(handler) {
+    backHandler = handler;
+  },
+};
+
+// Each screen starts at the top, including when back draws it.
+history.scrollRestoration = 'manual';
+const screens = backHistory<Route>({
+  history: window.history,
+  events: window,
+  isHome: (route) => route.name === 'home',
+  draw(route) {
     app.progress = rollDay(app.progress, Date.now());
     // Another tab may have changed quiet mode.
     applyAudioMode(app.progress.settings);
     render(route);
     window.scrollTo(0, 0);
   },
-  onKey(handler) {
-    keyHandler = handler;
-  },
-};
+  // Back does what the screen's own back or close button does; most just go Home.
+  back: () => (backHandler ?? (() => app.navigate({ name: 'home' })))(),
+});
 
 function render(route: Route): void {
   let screen: HTMLElement;
