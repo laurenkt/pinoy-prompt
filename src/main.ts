@@ -8,6 +8,7 @@ import { settingsScreen } from './screens/settings';
 import { hangUpTalk, talkScreen } from './screens/talk';
 import { wordsScreen } from './screens/words';
 import { forgetRetiredVoiceChoice } from './openai';
+import { applyAudioMode } from './screens/quiet';
 import { cancelRecording } from './recorder';
 import { initVoices, stop } from './speech';
 import { replaceContents } from './progress-schema';
@@ -36,6 +37,8 @@ const app: App = {
     hangUpTalk();
     keyHandler = null;
     app.progress = rollDay(app.progress, Date.now());
+    // Another tab may have changed quiet mode.
+    applyAudioMode(app.progress.settings);
     render(route);
     window.scrollTo(0, 0);
   },
@@ -127,7 +130,10 @@ function saved(ok: boolean): void {
 
 async function start(): Promise<void> {
   // Another tab saved: pick up its progress in place, so screens holding it see the change.
-  onExternalChange((progress) => replaceContents(app.progress, progress));
+  onExternalChange((progress) => {
+    replaceContents(app.progress, progress);
+    applyAudioMode(app.progress.settings);
+  });
   try {
     replaceContents(app.progress, await loadDurable(Date.now()));
   } catch {

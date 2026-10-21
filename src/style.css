@@ -232,6 +232,59 @@ p {
   margin: 6px 0 0;
 }
 
+.home-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: none;
+}
+
+/* Quiet mode: one tap wherever studying starts. Teal when on, so it's clear at a glance. */
+.quiet-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 12px;
+  flex: none;
+  border: var(--outline);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.9rem;
+  box-shadow: var(--shadow);
+}
+
+.quiet-toggle.on,
+.quiet-icon.on {
+  background: var(--teal);
+  color: var(--on-accent);
+}
+
+/* Silent quiet mode: nothing can play, so the play buttons go. */
+.silent .audio-btn {
+  display: none;
+}
+
+.quiet-toggle:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0.5rem;
+}
+
+.title-row h1 {
+  margin: 0;
+}
+
 .welcome {
   background: var(--teal);
   color: var(--on-accent);
@@ -461,6 +514,9 @@ p {
 }
 
 .session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 0.85rem;
   color: var(--muted);
   font-weight: 700;
@@ -771,19 +827,21 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
-  margin: -8px 0 8px;
-  padding: 4px 12px 4px 8px;
+  min-height: 44px;
+  margin: -8px 0 12px;
+  padding: 4px 14px 4px 10px;
   background: var(--surface);
-  color: var(--muted);
-  border: 2px solid var(--line);
-  border-radius: 12px;
+  color: var(--text);
+  border: var(--outline);
+  border-radius: 14px;
+  box-shadow: 3px 3px 0 var(--ink);
   font-size: 0.9rem;
   font-weight: 800;
 }
 
 .prev-btn:active {
-  transform: translate(1px, 1px);
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
 }
 
 .feedback {

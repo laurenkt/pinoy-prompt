@@ -11,6 +11,7 @@ import {
 import { MAX_LEARNING, learningCount, newCardsLeftToday, studyQueue, upcomingNewCards } from '../session';
 import { h, icon } from '../ui';
 import { growthChart } from './growth-chart';
+import { quietToggle } from './quiet';
 
 /** A Tagalog greeting for the time of day. */
 function greeting(hour: number): { tl: string; en: string } {
@@ -42,7 +43,13 @@ export function homeScreen(app: App): HTMLElement {
         h('h1', { class: 'greeting', lang: 'fil' }, hello.tl.slice(0, split + 1), h('span', { class: 'accent' }, hello.tl.slice(split + 1))),
         h('p', { class: 'muted' }, hello.en),
       ),
-      h('button', { class: 'icon-btn', 'aria-label': 'Settings', onclick: () => app.navigate({ name: 'settings' }) }, icon('settings')),
+      // Settings above quiet mode, stacked so the greeting keeps its width and Home still fits one screen.
+      h(
+        'div',
+        { class: 'home-actions' },
+        h('button', { class: 'icon-btn', 'aria-label': 'Settings', onclick: () => app.navigate({ name: 'settings' }) }, icon('settings')),
+        quietSwitch(app),
+      ),
     ),
 
     isFirstRun ? welcomeCard() : null,
@@ -61,6 +68,12 @@ export function homeScreen(app: App): HTMLElement {
     ),
     isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now)),
   );
+}
+
+/** The quiet toggle, redrawn in place so the page doesn't jump. */
+function quietSwitch(app: App): HTMLElement {
+  const el: HTMLElement = quietToggle(app, () => el.replaceWith(quietSwitch(app)), { iconOnly: true });
+  return el;
 }
 
 function welcomeCard(): HTMLElement {

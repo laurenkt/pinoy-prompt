@@ -5,6 +5,7 @@ import type { CardState } from '../srs';
 import { play, speechSupported, stop } from '../speech';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
+import { isSilent, quietToggle } from './quiet';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
@@ -78,12 +79,17 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   holdOnTap(root, hold);
 
   function start(menuMode: MenuMode): void {
+    // Silence may have come on in another tab since the menu was drawn.
+    if (menuMode === 'listen' && isSilent(app.progress.settings)) {
+      questions = [];
+      return draw();
+    }
     lastMode = menuMode;
     const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
     const distractorPool = known.length >= 6 ? known : VOCAB;
     const modes: Mode[] = ['read', 'recall'];
-    if (canListen) modes.push('listen');
-    if (canSpeak && speakReady) modes.push('speak');
+    if (canListen && !isSilent(app.progress.settings)) modes.push('listen');
+    if (canSpeak && speakReady && !app.progress.settings.quiet) modes.push('speak');
     questions = pickRound(app, ROUND_SIZE).map((card) => {
       const mode = menuMode === 'mix' ? modes[Math.floor(Math.random() * modes.length)] : menuMode;
       const field = mode === 'recall' ? 'tl' : 'en';
@@ -191,7 +197,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     return h(
       'div',
       null,
-      h('h1', null, 'Drills'),
+      h('div', { class: 'title-row' }, h('h1', null, 'Drills'), quietToggle(app, draw)),
       h('p', { class: 'muted' }, `Pick one skill and drill it: quick rounds of ${ROUND_SIZE} using the ${learned} words you know. Study already mixes these in; drills are for working on one on purpose. They don't change your review schedule.`),
       h(
         'div',
@@ -199,7 +205,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         MODES.map((m) => {
           let unavailable: string | null = null;
           if (m.id === 'listen' && !canListen) unavailable = 'No voice on this device';
+          else if (m.id === 'listen' && isSilent(app.progress.settings)) unavailable = 'Silent mode: needs headphones';
           if (m.id === 'speak' && !canSpeak) unavailable = "This browser can't record from the microphone";
+          else if (m.id === 'speak' && app.progress.settings.quiet) unavailable = 'Off in quiet mode';
           return h(
             'button',
             { class: `mode mode-${m.id}`, disabled: unavailable !== null, onclick: () => start(m.id) },

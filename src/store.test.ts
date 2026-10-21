@@ -5,7 +5,7 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mirrorSettled, readMirror, resetMirrorForTests, writeMirror } from './progress-mirror';
-import { SCHEMA, decode, encode } from './progress-schema';
+import { DEFAULT_SETTINGS, SCHEMA, decode, encode } from './progress-schema';
 import { DAY_MS } from './srs';
 import {
   BEFORE_RESET_KEY,
@@ -103,7 +103,7 @@ describe('review history', () => {
     const before = JSON.parse(SCHEMA_2).progress;
     const p = load(NOW);
     expect(p.cards).toEqual(before.cards);
-    expect(p.settings).toEqual(before.settings);
+    expect(p.settings).toEqual({ ...DEFAULT_SETTINGS, ...before.settings });
     expect(p.history).toEqual({});
 
     recordAnswer(p, 'kumusta', 'good', NOW);
@@ -153,7 +153,7 @@ describe('upgrading from the first storage format', () => {
     storage.setItem(LEGACY_KEY, LEGACY_V1);
     const p = load(NOW);
     expect(Object.keys(p.cards).sort()).toEqual(['kumusta', 'oo', 'salamat']);
-    expect(p.settings).toEqual({ dailyNew: 12, autoplay: false });
+    expect(p.settings).toEqual({ dailyNew: 12, autoplay: false, quiet: false, headphones: false });
     expect('streak' in p).toBe(false);
 
     recordAnswer(p, 'isa', 'good', NOW);
