@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, LEARN_ORDER, UNITS, getCard, isVocab } from './deck';
+import { ALL_CARDS, CORE_WORDS, LEARN_ORDER, UNITS, VOCAB, getCard, isVocab } from './deck';
 import { GUIDES } from './guides';
 import { canBuild, upcomingNewCards } from './session';
 import { emptyProgress, recordAnswer } from './store';
@@ -33,6 +33,19 @@ describe('deck', () => {
 
   it('puts every card in the learning order exactly once', () => {
     expect([...LEARN_ORDER].sort()).toEqual(ALL_CARDS.map((c) => c.id).sort());
+  });
+
+  it('gives every core word its own card', () => {
+    for (const id of CORE_WORDS) expect(getCard(id)?.tl.toLowerCase(), id).toBe(id);
+  });
+
+  it('introduces the core words a phrase is built from before the phrase', () => {
+    for (const card of VOCAB) {
+      const words = card.tl.toLowerCase().split(/[^a-z-]+/);
+      for (const word of words.filter((w) => w !== card.id && CORE_WORDS.includes(w))) {
+        expect(LEARN_ORDER.indexOf(word), `${card.id} uses ${word}`).toBeLessThan(LEARN_ORDER.indexOf(card.id));
+      }
+    }
   });
 
   it('gives every card a memory hook', () => {

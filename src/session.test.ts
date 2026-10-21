@@ -186,7 +186,7 @@ describe('new cards', () => {
     for (const id of guides) for (const need of getCard(id)!.needs ?? []) expect(met).toContain(need);
 
     // Everything met so far has lasted a few days, so guides that build on it can come.
-    learn(progress, VOCAB_ORDER.slice(GUIDE_START - 1, PATTERN_START + 10));
+    learn(progress, VOCAB_ORDER.slice(GUIDE_START - 1, PATTERN_START + 20));
     const next = upcomingNewCards(progress, Infinity);
     const [first] = next.filter((id) => !isVocab(getCard(id)!));
     expect(first).toBe('k-psst');

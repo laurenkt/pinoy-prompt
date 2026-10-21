@@ -192,10 +192,20 @@ export const UNITS: Unit[] = [
     id: 'basics',
     title: 'Building blocks',
     tlTitle: 'Pundasyon',
-    intro: 'A handful of words that build hundreds of sentences: I, you, we, there is, there isn\'t, I need, can I. Pair them with any word you know.',
+    intro: 'A handful of words that build hundreds of sentences: I, you, my, your, this, the, already, just. They turn up in almost every phrase, so knowing them makes each new phrase one new word instead of four.',
     cards: [
-      { id: 'ako', tl: 'ako', en: 'I / me', kind: 'word', hint: 'ah-KOH', hook: 'You have used it already in "Ako si Ana". In a sentence it often comes last: "Gutom na ako", hungry already, me.' },
+      { id: 'ako', tl: 'ako', en: 'I / me', kind: 'word', hint: 'ah-KOH', hook: 'Introduce yourself with "Ako si ___", I am ___. In a sentence it often comes last: "Gutom na ako", hungry already, me.' },
       { id: 'ikaw', tl: 'ikaw', en: 'you', kind: 'word', hint: 'ee-KAOW', note: 'After another word it usually shrinks to "ka": "Taga-saan ka?".', hook: '"Ikaw?" on its own is the bounce-back: "Mabuti naman. Ikaw?", "Fine. And you?"' },
+      { id: 'ka', tl: 'ka', en: 'you (after a word)', kind: 'word', hint: 'kah', note: 'The short "ikaw". It never starts a sentence.', hook: '"Ikaw" shrunk to fit after another word: "Taga-saan ka?", from where, you?' },
+      { id: 'ko', tl: 'ko', en: 'my', kind: 'word', hint: 'koh', note: 'After a doing word it means "I": "Hindi ko alam", I don\'t know.', hook: 'It comes after what it owns: "bag ko", my bag. Its partner is "mo", your: k for me, m for you.' },
+      { id: 'mo', tl: 'mo', en: 'your', kind: 'word', hint: 'moh', note: 'After a doing word it means "you": "Hintayin mo ako", wait for me.', hook: '"Ano ang pangalan mo?" is "what is the name, yours?". Swap in "ko" and it is "my name".' },
+      { id: 'ang', tl: 'ang', en: 'the', kind: 'word', hint: 'ahng', note: 'It points at what the sentence is about, so you will hear it everywhere.', hook: '"Nasaan ang banyo?", where is the bathroom? Where English says "the", Tagalog usually says "ang".' },
+      { id: 'ito', tl: 'ito', en: 'this', kind: 'word', hint: 'ee-TOH', hook: 'Point and ask: "Ano ito?", what is this? "Magkano ito?", how much is this?' },
+      { id: 'na', tl: 'na', en: 'already / now', kind: 'word', hint: 'nah', hook: 'It marks a change: "Tara na!", let\'s go now; "Gutom na ako", I\'m hungry already.' },
+      { id: 'lang', tl: 'lang', en: 'just / only', kind: 'word', hint: 'lahng', hook: '"Sandali lang", just a moment. Adding "lang" makes anything sound smaller and easier, so it softens a lot of requests.' },
+      { id: 'sa', tl: 'sa', en: 'to / at / in', kind: 'word', hint: 'sah', hook: 'One little word for to, at and in: "sa bahay", at home; "sa Tagalog", in Tagalog.' },
+      { id: 'ba', tl: 'ba', en: '(makes a yes/no question)', kind: 'word', hint: 'bah', hook: 'A spoken question mark: "Puwede?" (it\'s allowed) becomes "Puwede ba?" (is it allowed?).' },
+      { id: 'ng', tl: 'ng', en: 'of / some', kind: 'word', hint: 'nahng', accept: ['nang'], hook: 'Spelled n-g but said "nahng". "Pahingi po ng tubig", some water please; "alas-siyete ng umaga", seven in the morning.' },
       { id: 'siya', tl: 'siya', en: 'he / she', kind: 'word', hint: 'shah', hook: 'One word for he and she: Tagalog doesn\'t mark gender. Said as one quick syllable, "shah", like "siyam".' },
       { id: 'tayo', tl: 'tayo', en: 'we (including you)', kind: 'word', hint: 'tah-YOH', hook: 'The "we" that includes the person you are talking to. "Kain tayo!", let\'s eat, invites everyone at the table.' },
       { id: 'kami', tl: 'kami', en: 'we (not including you)', kind: 'word', hint: 'kah-MEE', hook: '"Kami" leaves the listener out. Tell a waiter "Dalawa kami", "we are two", because the waiter isn\'t eating with you.' },
@@ -520,22 +530,34 @@ export const VOCAB: Card[] = UNITS.flatMap((u) => u.cards);
 export const ALL_CARDS: Card[] = [...VOCAB, ...GUIDES];
 
 /**
+ * The little words that hold phrases together: I, you, my, your, the, this,
+ * already, just, to, of, the question "ba", polite "po" and "not". Each has its
+ * own card, met before any phrase that uses it, so a new phrase is never several
+ * unknowns at once. Other words in a phrase are learned in context.
+ */
+export const CORE_WORDS: readonly string[] = [
+  'ako', 'ikaw', 'ka', 'ko', 'mo', 'tayo', 'ang', 'ito', 'na', 'lang', 'sa', 'ba', 'ng', 'po', 'hindi',
+];
+
+/**
  * The order new cards are introduced in, most useful first, across topics. Topics
  * only group cards for display. Each tier is roughly what a learner needs next to
- * get by in conversation; within a tier, cards a hook builds on come first. Every
- * card appears exactly once (deck.test.ts checks).
+ * get by in conversation; within a tier, cards a hook builds on come first, and
+ * CORE_WORDS come before the phrases built from them. Every card appears exactly
+ * once (deck.test.ts checks both).
  */
 export const LEARN_ORDER: readonly string[] = [
-  // Hello, thanks, yes, no, and getting through a conversation you barely follow.
+  // Hello, thanks, yes, no, and getting through a conversation you barely follow. The little words a phrase
+  // is built from (I, you, my, the, already) come just before it, so each phrase brings one new thing.
   'kumusta', 'mabuti', 'salamat', 'oo', 'hindi', 'po', 'opo', 'salamat-po', 'walang-anuman', 'ano', 'sige',
-  'ano-pangalan', 'ako-si', 'taga-saan', 'taga-ako', 'paalam', 'ingat', 'pasensya-na', 'hindi-ko-alam',
-  'hindi-maintindihan', 'pakiulit', 'paano-sabihin', 'ano-ibig-sabihin', 'dahan-dahan', 'ingles',
-  'kaunti-lang',
+  'ako', 'ikaw', 'ako-si', 'taga-ako', 'ka', 'taga-saan', 'mo', 'ang', 'ano-pangalan', 'paalam', 'ingat',
+  'na', 'pasensya-na', 'ko', 'hindi-ko-alam', 'hindi-maintindihan', 'pakiulit', 'ito', 'sa', 'paano-sabihin',
+  'ano-ibig-sabihin', 'lang', 'dahan-dahan', 'kaunti-lang', 'ingles',
   // Guides (guides.ts) wait for the cards they build on and come in slowly (session.ts), so they sit
   // roughly where they would first be useful.
   'k-psst', 's-letters', 'p-po', 't-ha',
   // Asking for things: where, what, how much, I want, I need, can I.
-  'saan', 'nasaan-banyo', 'ano-ito', 'magkano', 'gusto-ko-ito', 'ayoko', 'ako', 'ikaw', 'may-kape-ba', 'wala',
+  'saan', 'nasaan-banyo', 'ano-ito', 'magkano', 'gusto-ko-ito', 'ayoko', 'ba', 'may-kape-ba', 'wala',
   'meron', 'puwede-ba', 'kailangan-ko', 'dito', 'isa', 'dalawa', 'tatlo', 'apat', 'lima', 'anim', 'pito',
   'walo', 'siyam', 'sampu', 'tara-na', 'sandali-lang',
   'p-ba', 'p-hindi', 'p-may', 'k-eyebrows',
@@ -544,8 +566,8 @@ export const LEARN_ORDER: readonly string[] = [
   'mamaya', 'kanina', 'mamaya-na-lang', 'bukas', 'anong-oras-na', 'sino', 'bakit', 'paano',
   'p-si', 's-ng',
   // Thanks and greetings, eating together, and the small replies that keep a chat going.
-  'maraming-salamat', 'magandang-umaga', 'magandang-hapon', 'magandang-gabi', 'kain-tayo', 'tubig', 'masarap',
-  'busog-na-ako', 'gutom-na-ako', 'tayo', 'okay-lang-ba', 'okay-lang-ako', 'ayos-lang', 'talaga', 'oo-nga',
+  'maraming-salamat', 'magandang-umaga', 'magandang-hapon', 'magandang-gabi', 'tayo', 'kain-tayo', 'tubig',
+  'masarap', 'busog-na-ako', 'gutom-na-ako', 'okay-lang-ba', 'okay-lang-ako', 'ayos-lang', 'talaga', 'oo-nga',
   'ako-rin', 'tama',
   'p-first', 't-rise', 't-soft', 's-stress', 'k-kain', 's-r',
   // Directions and getting a ride, and running late.
@@ -554,9 +576,9 @@ export const LEARN_ORDER: readonly string[] = [
   'teka',
   'k-kuya',
   // More people words and joiners, ordering a drink, and buying things.
-  'siya', 'kami', 'sila', 'at', 'pero', 'kasi', 'naku', 'grabe', 'siguro', 'kape', 'kanin', 'pahingi-tubig',
-  'bill-po', 'isa-pa', 'ito-na-lang', 'iyan', 'iyon', 'mahal', 'mura', 'magkano-lahat', 'ilan', 'pabili-po',
-  'meron-ba-kayong', 'tinapay',
+  'siya', 'kami', 'sila', 'at', 'pero', 'kasi', 'naku', 'grabe', 'siguro', 'kape', 'kanin', 'ng',
+  'pahingi-tubig', 'bill-po', 'isa-pa', 'ito-na-lang', 'iyan', 'iyon', 'mahal', 'mura', 'magkano-lahat', 'ilan',
+  'pabili-po', 'meron-ba-kayong', 'tinapay',
   'p-gusto', 's-sh', 't-react',
   // Clock times, and the parts of the day.
   'ala-una', 'alas-dos', 'alas-tres', 'kalahati', 'alas-singko', 'alas-sais', 'alas-siyete', 'alas-otso',
