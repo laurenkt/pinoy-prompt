@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MIGRATIONS, SCHEMA, decode, decodeValue, emptyProgress, encode, mergeInto, sanitizeCard, type Progress } from './progress-schema';
+import { DEFAULT_SETTINGS, MIGRATIONS, SCHEMA, decode, decodeValue, emptyProgress, encode, mergeInto, sanitizeCard, type Progress } from './progress-schema';
 import { newCardState, review } from './srs';
 
 const NOW = new Date(2026, 9, 19, 12).getTime();
@@ -39,7 +39,8 @@ describe('saved progress from every schema version', () => {
       expect(schema).toBe(SCHEMA);
       expect(progress.cards).toEqual(cardsIn(text));
       const raw = JSON.parse(text);
-      expect(progress.settings).toEqual((raw.progress ?? raw).settings);
+      // Settings added since keep their defaults.
+      expect(progress.settings).toEqual({ ...DEFAULT_SETTINGS, ...(raw.progress ?? raw).settings });
       expect(progress.today).toEqual((raw.progress ?? raw).today);
       // Review results were first kept in schema 3; earlier copies start with none.
       expect(progress.history).toEqual((raw.progress ?? raw).history ?? {});
@@ -129,8 +130,8 @@ describe('damaged saved progress', () => {
   });
 
   it('falls back to defaults for out-of-range settings', () => {
-    const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 0, autoplay: 'yes' } }));
-    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true });
+    const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 0, autoplay: 'yes', quiet: 1 } }));
+    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true, quiet: false });
   });
 
   it('never throws and always yields valid progress, whatever is stored', () => {

@@ -21,6 +21,8 @@ export interface Settings {
   dailyNew: number;
   /** Play audio automatically when a card is shown. */
   autoplay: boolean;
+  /** Quiet mode, for public places: nothing asks the learner to speak. Audio still plays. */
+  quiet: boolean;
 }
 
 /** How a day's reviews of already-learned cards went. */
@@ -66,7 +68,7 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   2: (data) => ({ history: {}, ...data }),
 };
 
-export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true };
+export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false };
 
 /** Local calendar day as YYYY-MM-DD. */
 export function dayKey(time: number): string {
@@ -175,6 +177,7 @@ export function sanitize(data: Data, now: number): Progress {
     ...s,
     dailyNew: isWhole(s.dailyNew) && s.dailyNew >= 1 && s.dailyNew <= 100 ? s.dailyNew : DEFAULT_SETTINGS.dailyNew,
     autoplay: typeof s.autoplay === 'boolean' ? s.autoplay : DEFAULT_SETTINGS.autoplay,
+    quiet: typeof s.quiet === 'boolean' ? s.quiet : DEFAULT_SETTINGS.quiet,
   };
 
   return { ...data, cards, today, history, settings };
