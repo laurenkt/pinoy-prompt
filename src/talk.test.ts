@@ -122,7 +122,7 @@ describe('the mix of English and Tagalog', () => {
     const text = talkInstructions(talkPlan(progressWith(['salamat', 'kumusta', 'oo', 'kape']), null), new Date(NOW));
     expect(text).toContain('Language: speak English.');
     expect(text).toContain('never say a whole sentence in Tagalog');
-    expect(text).toContain('Use no other Tagalog.');
+    expect(text).toContain('Use no other Tagalog, except');
     expect(text).not.toMatch(/greet(ing)? them in Tagalog/);
   });
 
