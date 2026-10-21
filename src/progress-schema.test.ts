@@ -129,9 +129,14 @@ describe('damaged saved progress', () => {
     expect(progress.history).toEqual({ '2026-10-17': { reviews: 4, missed: 4 }, '2026-10-19': { reviews: 2, missed: 0 } });
   });
 
+  it('keeps audio for quiet mode saved before the headphones setting', () => {
+    const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 8, autoplay: true, quiet: true } }));
+    expect(progress.settings.headphones).toBe(true);
+  });
+
   it('falls back to defaults for out-of-range settings', () => {
     const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 0, autoplay: 'yes', quiet: 1 } }));
-    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true, quiet: false });
+    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true, quiet: false, headphones: false });
   });
 
   it('never throws and always yields valid progress, whatever is stored', () => {

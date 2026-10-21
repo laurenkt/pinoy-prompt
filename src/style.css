@@ -263,6 +263,11 @@ p {
   color: var(--on-accent);
 }
 
+/* Silent quiet mode: nothing can play, so the play buttons go. */
+.silent .audio-btn {
+  display: none;
+}
+
 .quiet-toggle:active {
   transform: translate(2px, 2px);
   box-shadow: 1px 1px 0 var(--ink);

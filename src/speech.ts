@@ -54,12 +54,20 @@ export function voiceQuality(): VoiceQuality {
 }
 
 let currentClip: HTMLAudioElement | null = null;
+/** Set by quiet mode without headphones: nothing plays at all. */
+let muted = false;
+
+export function setMuted(on: boolean): void {
+  muted = on;
+  if (on) stop();
+}
 /** Bumped by stop(), so a play() still loading a clip or voices doesn't start afterwards. */
 let generation = 0;
 
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
 export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
   stop();
+  if (muted) return;
   const mine = generation;
   if (card.audio) {
     currentClip = new Audio(`${import.meta.env.BASE_URL}audio/${card.audio}`);

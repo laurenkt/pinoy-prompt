@@ -2,6 +2,7 @@ import type { App } from '../app';
 import { getCard } from '../deck';
 import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai';
 import { play, voiceQuality } from '../speech';
+import { isSilent } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon } from '../ui';
 
@@ -86,7 +87,9 @@ export function settingsScreen(app: App): HTMLElement {
           h('span', null, 'Play words automatically'),
         ),
         h('p', { class: 'muted small' }, voiceText),
-        h('button', { class: 'btn secondary', onclick: () => void play(getCard('kumusta')!) }, icon('speaker'), ' Test voice'),
+        isSilent(settings)
+          ? h('p', { class: 'muted small' }, 'Quiet mode is on without headphones, so nothing plays. Tap the quiet button on Home to change it.')
+          : h('button', { class: 'btn secondary', onclick: () => void play(getCard('kumusta')!) }, icon('speaker'), ' Test voice'),
       ),
       h('section', { class: 'card' }, h('h2', null, 'Chat'), keyForm(draw)),
       h(
