@@ -971,12 +971,6 @@ p {
   min-height: 96px;
 }
 
-.mode-talk {
-  background: var(--saffron);
-  grid-column: 1 / -1;
-  min-height: 96px;
-}
-
 .mode:disabled {
   background: var(--surface);
   color: var(--faint);
@@ -2181,4 +2175,100 @@ p {
   height: 32px;
   border-radius: 10px;
   font-size: 0.85rem;
+}
+
+/* Home: the study card leads with what you know; Talk gets its own block; Drills and Library sit below. */
+
+.study-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  /* Clear of the weave in the corner. */
+  padding-right: 48px;
+}
+
+.study-stat {
+  margin: 0;
+  padding: 4px 10px;
+  border: 2px solid var(--ink);
+  border-radius: 99px;
+  background: var(--cream);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.study-stats strong {
+  font-weight: 800;
+}
+
+.talk-card {
+  background: var(--teal);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-big);
+}
+
+.talk-card h2 {
+  font-size: 1.8rem;
+  letter-spacing: -0.01em;
+  margin-bottom: 2px;
+}
+
+.talk-card .talk-start {
+  background: var(--on-accent);
+  color: var(--teal);
+}
+
+.more-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.more-link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px;
+}
+
+.more-link:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+.drills-link {
+  background: var(--saffron);
+}
+
+.library-link {
+  background: var(--cream);
+}
+
+.more-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.more-desc {
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.back-bar {
+  margin-bottom: 18px;
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
 }

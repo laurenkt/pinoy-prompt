@@ -48,6 +48,7 @@ export function svg<K extends keyof SVGElementTagNameMap>(
 
 const ICONS = {
   speaker: '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>',
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   settings: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',

@@ -173,12 +173,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
             h('span', { class: 'mode-desc' }, unavailable ?? m.desc),
           );
         }),
-        h(
-          'button',
-          { class: 'mode mode-talk', onclick: () => app.navigate({ name: 'talk' }) },
-          h('span', { class: 'mode-title' }, 'Talk'),
-          h('span', { class: 'mode-desc' }, 'A spoken conversation in English, with the Tagalog you know mixed in'),
-        ),
       ),
     );
   }

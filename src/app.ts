@@ -10,8 +10,6 @@ export type Route =
   | { name: 'words' }
   | { name: 'settings' };
 
-export type Tab = 'home' | 'practice' | 'words';
-
 /** What every screen gets: shared progress plus navigation. */
 export interface App {
   progress: Progress;

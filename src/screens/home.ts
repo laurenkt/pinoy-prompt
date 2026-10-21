@@ -10,6 +10,7 @@ import {
   type Strength,
 } from '../memory';
 import { buildExtraSession, dueCards, newCardsLeftToday, unmetCount, upcomingNewCards } from '../session';
+import { talkPlan } from '../talk';
 import { h, icon } from '../ui';
 import { growthChart } from './growth-chart';
 
@@ -47,7 +48,9 @@ export function homeScreen(app: App): HTMLElement {
     ),
 
     isFirstRun ? welcomeCard() : null,
-    todayCard(app, isFirstRun),
+    todayCard(app, memory, isFirstRun),
+    isFirstRun ? null : talkCard(app),
+    isFirstRun ? null : moreLinks(app),
     isFirstRun ? null : memorySection(memory, memoryHistory(progress, now)),
   );
 }
@@ -72,7 +75,7 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-function todayCard(app: App, isFirstRun: boolean): HTMLElement {
+function todayCard(app: App, memory: MemorySummary, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
   const now = app.now();
   const reviews = dueCards(progress, now).length;
@@ -106,6 +109,7 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   return h(
     'section',
     { class: 'card today' },
+    !isFirstRun && studyStats(memory),
     rateLine,
     h('h2', null, title),
     h('p', null, plan),
@@ -123,12 +127,59 @@ function todayCard(app: App, isFirstRun: boolean): HTMLElement {
   );
 }
 
-function memorySection(memory: MemorySummary, history: MemoryHistory): HTMLElement {
-  const { total, strengths, recent, due } = memory;
+/** How often reviews come back right: measured once there are enough of them, estimated before. */
+function recallOf(memory: MemorySummary): { measured: boolean; pct: string } {
+  const { recent } = memory;
   const measured = recent.reviews >= MIN_MEASURED_REVIEWS;
   const recall = measured ? 1 - recent.missed / recent.reviews : (memory.estimatedRecall ?? 0);
-  const pct = `${Math.round(recall * 100)}%`;
+  return { measured, pct: `${Math.round(recall * 100)}%` };
+}
 
+/** What you know and how well it's holding, at the top of the card that keeps it that way. */
+function studyStats(memory: MemorySummary): HTMLElement {
+  const { measured, pct } = recallOf(memory);
+  return h(
+    'div',
+    { class: 'study-stats' },
+    h('p', { class: 'study-stat' }, h('strong', null, memory.total), ' ', memory.total === 1 ? 'card known' : 'cards known'),
+    h('p', { class: 'study-stat' }, h('strong', null, measured ? pct : `≈${pct}`), ' ', measured ? 'recalled' : 'recall, estimated'),
+  );
+}
+
+/** Talk is the payoff for everything else, so it gets its own block on Home. */
+function talkCard(app: App): HTMLElement {
+  const known = talkPlan(app.progress, null).known.length;
+  return h(
+    'section',
+    { class: 'card talk-card' },
+    h('h2', null, 'Talk'),
+    h('p', null, `A spoken conversation in English, with the ${plural(known, 'Tagalog word')} you know mixed in.`),
+    h('button', { class: 'btn big talk-start', onclick: () => app.navigate({ name: 'talk' }) }, icon('mic'), ' Start talking'),
+  );
+}
+
+function moreLinks(app: App): HTMLElement {
+  return h(
+    'div',
+    { class: 'more-links' },
+    h(
+      'button',
+      { class: 'more-link drills-link', onclick: () => app.navigate({ name: 'practice' }) },
+      h('span', { class: 'more-title' }, 'Drills'),
+      h('span', { class: 'more-desc' }, 'Listen, read, recall or speak'),
+    ),
+    h(
+      'button',
+      { class: 'more-link library-link', onclick: () => app.navigate({ name: 'words' }) },
+      h('span', { class: 'more-title' }, 'Library'),
+      h('span', { class: 'more-desc' }, 'Everything there is to learn'),
+    ),
+  );
+}
+
+function memorySection(memory: MemorySummary, history: MemoryHistory): HTMLElement {
+  const { strengths, due, recent } = memory;
+  const { measured, pct } = recallOf(memory);
   const counts = Object.fromEntries(
     STRENGTHS.map((s) => [s.id, h('span', { class: 'legend-count' }, strengths[s.id])]),
   ) as Record<Strength, HTMLElement>;
@@ -142,29 +193,12 @@ function memorySection(memory: MemorySummary, history: MemoryHistory): HTMLEleme
     { class: 'memory', 'aria-labelledby': 'memory-title' },
     h('h2', { class: 'section-title', id: 'memory-title' }, 'Your memory'),
     h(
-      'div',
-      { class: 'tiles' },
-      h(
-        'div',
-        { class: 'tile words-tile' },
-        h('span', { class: 'tile-value' }, total),
-        h('span', { class: 'tile-label' }, total === 1 ? 'card known' : 'cards known'),
-      ),
-      h(
-        'div',
-        { class: 'tile recall-tile' },
-        h('span', { class: 'tile-value' }, measured ? pct : `≈${pct}`),
-        h('span', { class: 'tile-label' }, measured ? `recalled, last ${RECALL_WINDOW_DAYS} days` : 'recall, estimated'),
-      ),
-    ),
-    h(
       'p',
       { class: 'memory-note muted small' },
       measured
-        ? `Right on ${recent.reviews - recent.missed} of ${plural(recent.reviews, 'review')}.`
-        : `Estimated from your review schedule. Once you've done ${MIN_MEASURED_REVIEWS} reviews, this shows how often you actually remember.`,
+        ? `${pct} recalled over the last ${RECALL_WINDOW_DAYS} days: right on ${recent.reviews - recent.missed} of ${plural(recent.reviews, 'review')}.`
+        : `Recall is estimated from your review schedule. Once you've done ${MIN_MEASURED_REVIEWS} reviews, it shows how often you actually remember.`,
     ),
-
     h(
       'div',
       { class: 'card strength-card' },

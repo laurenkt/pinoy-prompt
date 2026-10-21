@@ -1,6 +1,6 @@
 import '@fontsource-variable/bricolage-grotesque';
 import './style.css';
-import type { App, Route, Tab } from './app';
+import type { App, Route } from './app';
 import { homeScreen } from './screens/home';
 import { practiceScreen } from './screens/practice';
 import { sessionScreen } from './screens/session';
@@ -11,7 +11,7 @@ import { cancelRecording } from './recorder';
 import { initVoices, stop } from './speech';
 import { replaceContents } from './progress-schema';
 import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
-import { h } from './ui';
+import { h, icon } from './ui';
 
 const root = document.getElementById('app')!;
 let keyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -45,19 +45,19 @@ const app: App = {
 
 function render(route: Route): void {
   let screen: HTMLElement;
-  let tab: Tab | null = null;
+  // Drills and Library open from Home, so they get a way back to it.
+  let back = false;
   switch (route.name) {
     case 'home':
       screen = homeScreen(app);
-      tab = 'home';
       break;
     case 'practice':
       screen = practiceScreen(app);
-      tab = 'practice';
+      back = true;
       break;
     case 'words':
       screen = wordsScreen(app);
-      tab = 'words';
+      back = true;
       break;
     case 'study':
       screen = sessionScreen(app, null);
@@ -72,30 +72,14 @@ function render(route: Route): void {
       screen = settingsScreen(app);
       break;
   }
-  // The tab bar sits at the top of the page and scrolls away with it, so it never covers content.
-  root.replaceChildren(h('main', { class: 'screen' }, ...(tab ? [tabBar(tab)] : []), screen));
+  root.replaceChildren(h('main', { class: 'screen' }, back && backBar(), screen));
 }
 
-function tabBar(active: Tab): HTMLElement {
-  const tabs: { id: Tab; label: string; route: Route }[] = [
-    { id: 'home', label: 'Study', route: { name: 'home' } },
-    { id: 'practice', label: 'Drills', route: { name: 'practice' } },
-    { id: 'words', label: 'Library', route: { name: 'words' } },
-  ];
+function backBar(): HTMLElement {
   return h(
     'nav',
-    { class: 'tabbar', 'aria-label': 'Main' },
-    tabs.map((t) =>
-      h(
-        'button',
-        {
-          class: `tab ${t.id === active ? 'active' : ''}`,
-          'aria-current': t.id === active ? 'page' : undefined,
-          onclick: () => app.navigate(t.route),
-        },
-        t.label,
-      ),
-    ),
+    { class: 'back-bar' },
+    h('button', { class: 'btn secondary back-btn', onclick: () => app.navigate({ name: 'home' }) }, icon('back'), 'Home'),
   );
 }
 

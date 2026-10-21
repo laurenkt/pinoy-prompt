@@ -132,7 +132,7 @@ describe('Talk', () => {
     expect(root.textContent).toContain('Muted');
     root.querySelector<HTMLButtonElement>('[aria-label="Leave Talk"]')!.click();
     expect(f.peer.closed).toBe(true);
-    expect(app.navigate).toHaveBeenCalledWith({ name: 'practice' });
+    expect(app.navigate).toHaveBeenCalledWith({ name: 'home' });
   });
 
   it('shows a word\'s meaning once tapped, and keeps it through later redraws', async () => {

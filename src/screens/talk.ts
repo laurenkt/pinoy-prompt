@@ -118,7 +118,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
 
   function leave(): void {
     hangUpTalk();
-    app.navigate({ name: 'practice' });
+    app.navigate({ name: 'home' });
   }
 
   function meterText(): string {
