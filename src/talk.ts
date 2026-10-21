@@ -54,6 +54,22 @@ function example(plan: TalkPlan): string {
   return card ? `"${card.tl}" (${card.en})` : 'a word';
 }
 
+/**
+ * A worked example of helping a stuck learner, from their own firmest everyday
+ * word, or null if they know none. Only the first meaning is kept, so a voice
+ * model isn't handed slashes or a question mark to read out.
+ */
+export function stuckExample(plan: TalkPlan): string | null {
+  const known = plan.known.map((k) => k.card);
+  const card = known.find((c) => c.kind === 'word') ?? known[0];
+  if (!card) return null;
+  const tl = card.tl.replace(/[.!?]+$/, '');
+  const en = card.en.split('/')[0].trim().replace(/[.!?]+$/, '');
+  // Lower-case the first letter for the middle of a sentence, but keep "I" and "I'm".
+  const meaning = /^I\b/.test(en) ? en : en.charAt(0).toLowerCase() + en.slice(1);
+  return `${tl}, ${meaning}`;
+}
+
 /** How much Tagalog to mix in: more as the learner knows more. */
 export function mixLevel(known: number): string {
   if (known < 20) return 'at most one Tagalog word or phrase in a sentence, where one fits; plain English sentences are fine';
@@ -71,6 +87,7 @@ export function talkInstructions(plan: TalkPlan): string {
   const firm = plan.known.filter((w) => w.strength === 'long' || w.strength === 'weeks');
   const settling = plan.known.filter((w) => w.strength === 'days');
   const fresh = plan.known.filter((w) => w.strength === 'new');
+  const stuck = stuckExample(plan);
   const lines = [
     'You are a friendly Filipino friend helping an English speaker practise beginner Tagalog in a relaxed spoken chat. Speak warmly, at an unhurried pace.',
     '',
@@ -78,6 +95,7 @@ export function talkInstructions(plan: TalkPlan): string {
     `Use ${mixLevel(plan.known.length)}.`,
     'A listed phrase counts as one swap. Apart from short listed greetings and replies, never say a whole sentence in Tagalog. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
     `For example, with ${example(plan)} on the list, say an English sentence with it in place of its English meaning.`,
+    'Only use a Tagalog word where it means exactly what that spot in the sentence needs. Never tack one onto the end of a sentence or question just to fit it in; a plain English sentence is better than a misplaced word.',
     '',
   ];
   if (firm.length) lines.push(`Tagalog they know well, use it freely: ${list(firm)}.`);
@@ -95,7 +113,11 @@ export function talkInstructions(plan: TalkPlan): string {
       ? `Talk about everyday situations around this topic: ${plan.topic.title}.`
       : 'Talk about everyday things, like how their day is going, food, family or plans.',
     'Keep each turn to one to three short sentences, and end with a question or something easy to answer, so they can reply using their Tagalog.',
-    'They may answer in English, Tagalog or a mix. If their Tagalog has a mistake, do not point it out; use the right form in your reply if it is on the list, otherwise reply in English.',
+    'They may answer in English, Tagalog or a mix; English answers are fine. If their Tagalog has a mistake, do not point it out; use the right form in your reply if it is on the list, otherwise reply in English.',
+    '',
+    'When they are stuck, help before moving on. They are stuck if they stop partway through and do not finish, or put "um", "something" or similar where a word should go and leave it there, or ask how to say something. Give them a moment to think first. Then, in one short sentence, offer the listed Tagalog for what they meant, with its meaning' +
+      (stuck ? ` (for example: "You could say: ${stuck}.")` : '') +
+      ', ask them to try it, and wait. When they try, just carry on the conversation. If nothing on the list fits, or they ask for a word that is not on the list, say that one is not in their words yet, put it simply in English, and carry on. Do not skip past a stuck moment.',
     'No scores, praise for every reply, or talk of streaks or progress.',
     '',
     'Backchannel policy: Use light backchannels. Acknowledge naturally without competing with the main response.',
@@ -118,7 +140,7 @@ export function talkInstructions(plan: TalkPlan): string {
 /** What the AI is asked to open the call with: in English, with a Tagalog greeting if the learner knows one. */
 export function talkGreeting(plan: TalkPlan): string {
   const about = plan.topic ? ` about ${plan.topic.title.toLowerCase()}` : '';
-  return `Greet the learner now in English, using a Tagalog greeting from the list if there is one. Ask one easy question${about}, in English with a Tagalog word or two from the list. Then pause and listen.`;
+  return `Greet the learner now in English, using a Tagalog greeting from the list if there is one. Ask one easy question${about} in English, with a listed Tagalog word only where one fits. Then pause and listen.`;
 }
 
 /** A piece of the AI's text: plain, or a Tagalog word the learner can tap. */

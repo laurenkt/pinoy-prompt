@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard, isVocab, LEARN_ORDER, UNITS } from './deck';
 import { emptyProgress, recordAnswer } from './store';
-import { addPiece, findWords, mixLevel, talkGreeting, talkInstructions, talkPlan, talkTopics, TURN_GAP_MS, type Segment, type SpokenTurn } from './talk';
+import { addPiece, findWords, mixLevel, stuckExample, talkGreeting, talkInstructions, talkPlan, talkTopics, TURN_GAP_MS, type Segment, type SpokenTurn } from './talk';
 
 const NOW = new Date(2026, 5, 1, 12).getTime();
 
@@ -83,6 +83,27 @@ describe('the mix of English and Tagalog', () => {
     expect(text).toContain('never say a whole sentence in Tagalog');
     expect(text).toContain('Use no other Tagalog.');
     expect(text).not.toMatch(/greet(ing)? them in Tagalog/);
+  });
+
+  it('helps when the learner is stuck, with Tagalog they know', () => {
+    const progress = progressWith(['kumusta', 'kape']);
+    progress.cards.kape.interval = 30;
+    const text = talkInstructions(talkPlan(progress, null));
+    expect(text).toContain('When they are stuck, help before moving on.');
+    expect(text).toContain('"You could say: kape, coffee."');
+    expect(text).toContain('say that one is not in their words yet');
+    expect(text).toContain('do not point it out');
+  });
+
+  it('gives a stuck example a voice can read: one meaning, no slashes or question marks, "I" kept', () => {
+    expect(stuckExample(talkPlan(progressWith(['kumusta']), null))).toBe('Kumusta, how are you');
+    expect(stuckExample(talkPlan(progressWith(['mabuti']), null))).toBe("Mabuti naman, I'm fine");
+    expect(stuckExample(talkPlan(progressWith([]), null))).toBeNull();
+    expect(talkInstructions(talkPlan(progressWith([]), null))).not.toContain('You could say');
+  });
+
+  it("asks for Tagalog only where it fits, not tacked on", () => {
+    expect(talkInstructions(talkPlan(progressWith(['salamat']), null))).toContain('Never tack one onto the end');
   });
 
   it('mixes in more Tagalog as more words are known', () => {
