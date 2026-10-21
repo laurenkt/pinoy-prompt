@@ -3,6 +3,7 @@
 // sent only to api.openai.com. There is no server of ours in between.
 
 const KEY_STORAGE = 'pinoy-prompt:openai-key';
+const VOICE_STORAGE = 'pinoy-prompt:talk-voice';
 const API = 'https://api.openai.com/v1';
 /** Spoken conversations. Billed per second of the call. */
 export const VOICE_MODEL = 'gpt-live-1';
@@ -36,6 +37,33 @@ export function forgetApiKey(): void {
     localStorage.removeItem(KEY_STORAGE);
   } catch {
     // Nothing stored, or nothing we can do.
+  }
+}
+
+/** GPT-Live voices Talk offers, the default first. Beacon is the one GPT-Live voice with a Filipino accent. */
+export const TALK_VOICES = [
+  { id: 'beacon', name: 'Beacon', about: 'Filipino accent, male' },
+  { id: 'marin', name: 'Marin', about: 'American accent, female' },
+] as const;
+export type TalkVoice = (typeof TALK_VOICES)[number]['id'];
+
+/** The voice Talk speaks in; kept on this device, like the key. */
+export function getTalkVoice(): TalkVoice {
+  try {
+    const saved = localStorage.getItem(VOICE_STORAGE);
+    const known = TALK_VOICES.find((v) => v.id === saved);
+    if (known) return known.id;
+  } catch {
+    // Fall through to the default.
+  }
+  return TALK_VOICES[0].id;
+}
+
+export function setTalkVoice(voice: TalkVoice): void {
+  try {
+    localStorage.setItem(VOICE_STORAGE, voice);
+  } catch {
+    // Not saved; the default is used next time.
   }
 }
 
@@ -163,7 +191,7 @@ export function callSupported(): boolean {
  */
 export async function startCall(
   key: string,
-  { instructions, greeting }: { instructions: string; greeting: string },
+  { instructions, greeting, voice }: { instructions: string; greeting: string; voice: TalkVoice },
   events: CallEvents,
   deps: CallDeps = browserCallDeps,
 ): Promise<Call> {
@@ -230,7 +258,7 @@ export async function startCall(
       session: {
         model: VOICE_MODEL,
         instructions,
-        audio: { output: { voice: 'marin' } },
+        audio: { output: { voice } },
         // OpenAI's guide: greeting instructions as a developer message at startup, then again once started.
         input: [{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: greeting }] }],
       },

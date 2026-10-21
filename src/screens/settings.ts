@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { getCard } from '../deck';
-import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai';
+import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, getTalkVoice, setApiKey, setTalkVoice, TALK_VOICES } from '../openai';
 import { play, voiceQuality } from '../speech';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon } from '../ui';
@@ -88,7 +88,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('p', { class: 'muted small' }, voiceText),
         h('button', { class: 'btn secondary', onclick: () => void play(getCard('kumusta')!) }, icon('speaker'), ' Test voice'),
       ),
-      h('section', { class: 'card' }, h('h2', null, 'Talk'), keyForm(draw)),
+      h('section', { class: 'card' }, h('h2', null, 'Talk'), keyForm(draw), voicePicker()),
       h(
         'section',
         { class: 'card' },
@@ -186,6 +186,39 @@ export function keyForm(onChange: () => void): HTMLElement {
     problem,
     h('button', { class: 'btn primary', type: 'submit' }, 'Save key'),
   );
+}
+
+/** Which GPT-Live voice Talk speaks in. */
+function voicePicker(): HTMLElement {
+  const current = getTalkVoice();
+  const chosen = TALK_VOICES.find((v) => v.id === current)!;
+  const picker = h(
+    'div',
+    { class: 'voice-picker' },
+    h('h3', null, 'Voice'),
+    h(
+      'div',
+      { class: 'segmented', role: 'radiogroup', 'aria-label': 'Talk voice' },
+      TALK_VOICES.map((v) =>
+        h(
+          'button',
+          {
+            role: 'radio',
+            'aria-checked': String(v.id === current),
+            class: v.id === current ? 'selected' : '',
+            onclick: () => {
+              setTalkVoice(v.id);
+              // Only the picker redraws, so a key being typed above isn't lost.
+              picker.replaceWith(voicePicker());
+            },
+          },
+          v.name,
+        ),
+      ),
+    ),
+    h('p', { class: 'muted small' }, `${chosen.name}: ${chosen.about}. Used from the next call.`),
+  );
+  return picker;
 }
 
 /** Save a backup file: through the share sheet where there is one (iPhone), else as a download. */

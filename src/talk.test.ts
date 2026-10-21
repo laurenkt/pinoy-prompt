@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCard, isVocab, LEARN_ORDER, UNITS } from './deck';
 import { emptyProgress, recordAnswer } from './store';
-import { addPiece, findWords, mixLevel, stuckExample, talkGreeting, talkInstructions, talkPlan, talkTopics, TURN_GAP_MS, type Segment, type SpokenTurn } from './talk';
+import { addPiece, findWords, mixLevel, partOfDay, stuckExample, talkGreeting, talkInstructions, talkPlan, talkTopics, timeContext, TURN_GAP_MS, type Segment, type SpokenTurn } from './talk';
 
 const NOW = new Date(2026, 5, 1, 12).getTime();
 
@@ -60,7 +60,7 @@ describe('talkInstructions', () => {
     const progress = progressWith(['salamat', 'kumusta']);
     progress.cards.kumusta.interval = 10;
     progress.cards.salamat.interval = 0;
-    const text = talkInstructions(talkPlan(progress, 'greetings'));
+    const text = talkInstructions(talkPlan(progress, 'greetings'), new Date(NOW));
     expect(text).toContain('Greetings');
     expect(text).toMatch(/know well, use it freely: Kumusta\? \(How are you\? \/ Hello\)/);
     expect(text).toMatch(/last day or so; say the English meaning straight after it the first time: Salamat \(Thank you\)/);
@@ -70,15 +70,56 @@ describe('talkInstructions', () => {
   it('asks for the meaning of fresh and new words to be said aloud', () => {
     const progress = progressWith(['salamat']);
     progress.cards.salamat.interval = 0;
-    const text = talkInstructions(talkPlan(progress, null));
+    const text = talkInstructions(talkPlan(progress, null), new Date(NOW));
     expect(text).toMatch(/last day or so; say the English meaning/);
     expect(text).toMatch(/new word.*say the English meaning straight after it/);
   });
 });
 
+describe('pronunciation and accent', () => {
+  it('gives each word its stress guide and asks for a Filipino accent throughout', () => {
+    const text = talkInstructions(talkPlan(progressWith(['salamat']), null), new Date(NOW));
+    expect(text).toContain('Salamat (Thank you), said sah-LAH-maht');
+    expect(text).toMatch(/Filipino accent the whole call/);
+    expect(text).toMatch(/Never say the guides themselves aloud/);
+  });
+});
+
+describe('the time of day', () => {
+  it('names the part of the day by the hour', () => {
+    expect([0, 4, 5, 11, 12, 13, 17, 18, 21, 22, 23].map(partOfDay)).toEqual([
+      'late at night',
+      'late at night',
+      'morning',
+      'morning',
+      'afternoon',
+      'afternoon',
+      'afternoon',
+      'evening',
+      'evening',
+      'night',
+      'night',
+    ]);
+  });
+
+  it("tells the AI the learner's own day and time, in their time zone", () => {
+    // Just after midnight in London is still the afternoon in Los Angeles.
+    const when = new Date(Date.UTC(2026, 9, 20, 23, 5));
+    expect(timeContext(when, 'Europe/London')).toContain('late at night: Wednesday 21 October');
+    expect(timeContext(when, 'Europe/London')).toContain('12:05 am');
+    expect(timeContext(when, 'Europe/London')).toContain('Europe/London');
+    expect(timeContext(when, 'America/Los_Angeles')).toContain('afternoon: Tuesday 20 October');
+  });
+
+  it('puts the time in the instructions', () => {
+    const text = talkInstructions(talkPlan(progressWith(['salamat']), null), new Date(Date.UTC(2026, 9, 20, 23, 5)), 'Europe/London');
+    expect(text).toMatch(/For the learner it is late at night/);
+  });
+});
+
 describe('the mix of English and Tagalog', () => {
   it('asks for English with only the listed Tagalog swapped in', () => {
-    const text = talkInstructions(talkPlan(progressWith(['salamat', 'kumusta', 'oo', 'kape']), null));
+    const text = talkInstructions(talkPlan(progressWith(['salamat', 'kumusta', 'oo', 'kape']), null), new Date(NOW));
     expect(text).toContain('Language: speak English.');
     expect(text).toContain('never say a whole sentence in Tagalog');
     expect(text).toContain('Use no other Tagalog.');
@@ -88,7 +129,7 @@ describe('the mix of English and Tagalog', () => {
   it('helps when the learner is stuck, with Tagalog they know', () => {
     const progress = progressWith(['kumusta', 'kape']);
     progress.cards.kape.interval = 30;
-    const text = talkInstructions(talkPlan(progress, null));
+    const text = talkInstructions(talkPlan(progress, null), new Date(NOW));
     expect(text).toContain('When they are stuck, help before moving on.');
     expect(text).toContain('"You could say: kape, coffee."');
     expect(text).toContain('say that one is not in their words yet');
@@ -99,11 +140,11 @@ describe('the mix of English and Tagalog', () => {
     expect(stuckExample(talkPlan(progressWith(['kumusta']), null))).toBe('Kumusta, how are you');
     expect(stuckExample(talkPlan(progressWith(['mabuti']), null))).toBe("Mabuti naman, I'm fine");
     expect(stuckExample(talkPlan(progressWith([]), null))).toBeNull();
-    expect(talkInstructions(talkPlan(progressWith([]), null))).not.toContain('You could say');
+    expect(talkInstructions(talkPlan(progressWith([]), null), new Date(NOW))).not.toContain('You could say');
   });
 
   it("asks for Tagalog only where it fits, not tacked on", () => {
-    expect(talkInstructions(talkPlan(progressWith(['salamat']), null))).toContain('Never tack one onto the end');
+    expect(talkInstructions(talkPlan(progressWith(['salamat']), null), new Date(NOW))).toContain('Never tack one onto the end');
   });
 
   it('mixes in more Tagalog as more words are known', () => {
@@ -111,19 +152,19 @@ describe('the mix of English and Tagalog', () => {
     expect(mixLevel(20)).toMatch(/^up to two or three/);
     expect(mixLevel(59)).toMatch(/^up to two or three/);
     expect(mixLevel(60)).toMatch(/most of each sentence English/);
-    expect(talkInstructions(talkPlan(progressWith(['salamat', 'kape']), null))).toContain(`Use ${mixLevel(2)}.`);
+    expect(talkInstructions(talkPlan(progressWith(['salamat', 'kape']), null), new Date(NOW))).toContain(`Use ${mixLevel(2)}.`);
   });
 
   it("shows the style with one of the learner's own words, not other Tagalog", () => {
     const progress = progressWith(['kape', 'salamat']);
     progress.cards.kape.interval = 30;
-    const text = talkInstructions(talkPlan(progress, null));
+    const text = talkInstructions(talkPlan(progress, null), new Date(NOW));
     expect(text).toMatch(/For example, with "Kape" \(Coffee\)/i);
     expect(text).not.toMatch(/umaga|gutom/i);
   });
 
   it('keeps the policies the GPT-Live guide asks for', () => {
-    const text = talkInstructions(talkPlan(progressWith(['salamat']), null));
+    const text = talkInstructions(talkPlan(progressWith(['salamat']), null), new Date(NOW));
     for (const heading of ['Backchannel policy:', 'Interruption policy:', 'Delegation policy:', 'Backend tools:', 'Generate <|SpawnThinking|> when:', 'Do not generate <|SpawnThinking|> when:']) {
       expect(text).toContain(heading);
     }
