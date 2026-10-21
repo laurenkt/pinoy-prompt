@@ -5,7 +5,8 @@
 import { getMicrophone, releaseMicrophone } from './microphone';
 
 const KEY_STORAGE = 'pinoy-prompt:openai-key';
-const VOICE_STORAGE = 'pinoy-prompt:talk-voice';
+/** Where the old voice choice was kept, before Talk only used Beacon. */
+const RETIRED_VOICE_STORAGE = 'pinoy-prompt:talk-voice';
 const API = 'https://api.openai.com/v1';
 /** Spoken conversations. Billed per second of the call. */
 export const VOICE_MODEL = 'gpt-live-1';
@@ -42,30 +43,15 @@ export function forgetApiKey(): void {
   }
 }
 
-/** GPT-Live voices Talk offers, the default first. Beacon is the one GPT-Live voice with a Filipino accent. */
-export const TALK_VOICES = [
-  { id: 'beacon', name: 'Beacon', about: 'Filipino accent, male' },
-  { id: 'marin', name: 'Marin', about: 'American accent, female' },
-] as const;
-export type TalkVoice = (typeof TALK_VOICES)[number]['id'];
+/** Talk always speaks as Beacon, the one GPT-Live voice with a Filipino accent. */
+export const TALK_VOICE = 'beacon';
 
-/** The voice Talk speaks in; kept on this device, like the key. */
-export function getTalkVoice(): TalkVoice {
+/** Clear the voice choice Settings used to offer, now that there's only Beacon. */
+export function forgetRetiredVoiceChoice(): void {
   try {
-    const saved = localStorage.getItem(VOICE_STORAGE);
-    const known = TALK_VOICES.find((v) => v.id === saved);
-    if (known) return known.id;
+    localStorage.removeItem(RETIRED_VOICE_STORAGE);
   } catch {
-    // Fall through to the default.
-  }
-  return TALK_VOICES[0].id;
-}
-
-export function setTalkVoice(voice: TalkVoice): void {
-  try {
-    localStorage.setItem(VOICE_STORAGE, voice);
-  } catch {
-    // Not saved; the default is used next time.
+    // Nothing stored, or nothing we can do.
   }
 }
 
@@ -196,7 +182,7 @@ export function callSupported(): boolean {
  */
 export async function startCall(
   key: string,
-  { instructions, greeting, voice }: { instructions: string; greeting: string; voice: TalkVoice },
+  { instructions, greeting }: { instructions: string; greeting: string },
   events: CallEvents,
   deps: CallDeps = browserCallDeps,
 ): Promise<Call> {
@@ -268,7 +254,7 @@ export async function startCall(
       session: {
         model: VOICE_MODEL,
         instructions,
-        audio: { output: { voice } },
+        audio: { output: { voice: TALK_VOICE } },
         // OpenAI's guide: greeting instructions as a developer message at startup, then again once started.
         input: [{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: greeting }] }],
       },

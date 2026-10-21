@@ -7,6 +7,7 @@ import { sessionScreen } from './screens/session';
 import { settingsScreen } from './screens/settings';
 import { hangUpTalk, talkScreen } from './screens/talk';
 import { wordsScreen } from './screens/words';
+import { forgetRetiredVoiceChoice } from './openai';
 import { cancelRecording } from './recorder';
 import { initVoices, stop } from './speech';
 import { replaceContents } from './progress-schema';
@@ -145,6 +146,7 @@ function askToPersist(): void {
 }
 
 void initVoices();
+forgetRetiredVoiceChoice();
 void start();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
