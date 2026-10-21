@@ -5,7 +5,9 @@
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
 // Malay, then Spanish) and let the UI say so.
 
+import { setAudioSession } from './audio-session';
 import type { Card } from './deck';
+import { microphoneOpen } from './microphone';
 
 /** Language codes to try, best first. "fil" and "tl" are both used for Filipino/Tagalog. */
 const PREFERRED = ['fil', 'tl', 'id', 'ms', 'es'];
@@ -68,6 +70,8 @@ let generation = 0;
 export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
   stop();
   if (muted) return;
+  // Play through the iPhone's silent switch, unless the microphone needs the session.
+  if (!microphoneOpen()) setAudioSession('playback');
   const mine = generation;
   if (card.audio) {
     currentClip = new Audio(`${import.meta.env.BASE_URL}audio/${card.audio}`);

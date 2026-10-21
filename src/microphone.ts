@@ -5,6 +5,8 @@
 // Between uses the tracks are switched off, and the stream is closed for real
 // after a few idle minutes or when the app goes into the background.
 
+import { setAudioSession } from './audio-session';
+
 /** Close the stream after this long unused, so the microphone isn't held forever. */
 export const IDLE_CLOSE_MS = 3 * 60 * 1000;
 
@@ -16,6 +18,11 @@ const CONSTRAINTS: MediaStreamConstraints = {
 let stream: MediaStream | null = null;
 let opening: Promise<MediaStream> | null = null;
 let users = 0;
+
+/** Whether a microphone stream is open, even if switched off between uses. */
+export function microphoneOpen(): boolean {
+  return stream !== null || opening !== null;
+}
 let idle: ReturnType<typeof setTimeout> | undefined;
 
 // A track iOS muted (a phone call, Siri) can stay "live" but silent, so it doesn't count.
@@ -26,6 +33,7 @@ export async function getMicrophone(): Promise<MediaStream> {
   clearTimeout(idle);
   if (stream && !live(stream)) closeMicrophone();
   if (!stream) {
+    setAudioSession('play-and-record');
     opening ??= navigator.mediaDevices.getUserMedia(CONSTRAINTS).finally(() => (opening = null));
     stream = await opening;
   }
@@ -53,6 +61,7 @@ export function closeMicrophone(): void {
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   users = 0;
+  setAudioSession('auto');
 }
 
 if (typeof document !== 'undefined') {
