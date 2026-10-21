@@ -92,7 +92,7 @@ describe('the time of day', () => {
       'late at night',
       'morning',
       'morning',
-      'midday',
+      'afternoon',
       'afternoon',
       'afternoon',
       'evening',

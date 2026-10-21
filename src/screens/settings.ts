@@ -88,7 +88,7 @@ export function settingsScreen(app: App): HTMLElement {
         h('p', { class: 'muted small' }, voiceText),
         h('button', { class: 'btn secondary', onclick: () => void play(getCard('kumusta')!) }, icon('speaker'), ' Test voice'),
       ),
-      h('section', { class: 'card' }, h('h2', null, 'Talk'), keyForm(draw), voicePicker(draw)),
+      h('section', { class: 'card' }, h('h2', null, 'Talk'), keyForm(draw), voicePicker()),
       h(
         'section',
         { class: 'card' },
@@ -189,10 +189,10 @@ export function keyForm(onChange: () => void): HTMLElement {
 }
 
 /** Which GPT-Live voice Talk speaks in. */
-function voicePicker(onChange: () => void): HTMLElement {
+function voicePicker(): HTMLElement {
   const current = getTalkVoice();
   const chosen = TALK_VOICES.find((v) => v.id === current)!;
-  return h(
+  const picker = h(
     'div',
     { class: 'voice-picker' },
     h('h3', null, 'Voice'),
@@ -208,7 +208,8 @@ function voicePicker(onChange: () => void): HTMLElement {
             class: v.id === current ? 'selected' : '',
             onclick: () => {
               setTalkVoice(v.id);
-              onChange();
+              // Only the picker redraws, so a key being typed above isn't lost.
+              picker.replaceWith(voicePicker());
             },
           },
           v.name,
@@ -217,6 +218,7 @@ function voicePicker(onChange: () => void): HTMLElement {
     ),
     h('p', { class: 'muted small' }, `${chosen.name}: ${chosen.about}. Used from the next call.`),
   );
+  return picker;
 }
 
 /** Save a backup file: through the share sheet where there is one (iPhone), else as a download. */

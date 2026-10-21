@@ -191,7 +191,7 @@ export function callSupported(): boolean {
  */
 export async function startCall(
   key: string,
-  { instructions, greeting, voice = TALK_VOICES[0].id }: { instructions: string; greeting: string; voice?: TalkVoice },
+  { instructions, greeting, voice }: { instructions: string; greeting: string; voice: TalkVoice },
   events: CallEvents,
   deps: CallDeps = browserCallDeps,
 ): Promise<Call> {

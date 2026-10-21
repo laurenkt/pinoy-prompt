@@ -66,7 +66,6 @@ function localTimeZone(): string | undefined {
 export function partOfDay(hour: number): string {
   if (hour < 5) return 'late at night';
   if (hour < 12) return 'morning';
-  if (hour < 13) return 'midday';
   if (hour < 18) return 'afternoon';
   if (hour < 22) return 'evening';
   return 'night';
@@ -131,7 +130,7 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     timeContext(now, timeZone),
     '',
     'Accent: keep a natural Filipino accent the whole call, in English as well as Tagalog, the way someone from Manila speaks Taglish. Never switch to an American accent.',
-    'Say every Tagalog word as a native Manila speaker would, not with English sounds: pure vowels a, e, i, o, u, never softened to "uh"; ng as one sound, even at the start of a word; a light tapped r; and the stress the guide after each word shows in capitals. Never say the guides themselves aloud.',
+    'Say every Tagalog word as a native Manila speaker would, not with English sounds: pure vowels a, e, i, o, u, never softened to "uh"; ng as one sound, even at the start of a word; a light tapped r; and, where a word has a guide after it, the stress that guide shows in capitals. Never say the guides themselves aloud.',
     '',
     'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below: every sentence is an English sentence with some of those words or phrases in place of the English.',
     `Use ${mixLevel(plan.known.length)}.`,

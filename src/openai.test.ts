@@ -46,7 +46,7 @@ describe('the API key', () => {
   });
 });
 
-const PROMPT = { instructions: '', greeting: 'Say hi.' };
+const PROMPT = { instructions: '', greeting: 'Say hi.', voice: 'beacon' } as const;
 
 class FakeChannel {
   readyState = 'open';
@@ -134,7 +134,7 @@ describe('startCall', () => {
 
   it('starts a GPT-Live session with the browser offer and applies the answer', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'v=0 answer' } }));
-    await startCall(KEY, { instructions: 'Talk Taglish.', greeting: 'Say hi.' }, f.events, f.deps);
+    await startCall(KEY, { instructions: 'Talk Taglish.', greeting: 'Say hi.', voice: 'beacon' }, f.events, f.deps);
     const [url, init] = f.fetchFn.mock.calls[0];
     expect(url).toBe('https://api.openai.com/v1/live/sessions');
     const body = JSON.parse(String(init!.body));
