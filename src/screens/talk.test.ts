@@ -130,7 +130,7 @@ describe('Talk', () => {
     button(root, 'Mute').click();
     expect(f.track.enabled).toBe(false);
     expect(root.textContent).toContain('Muted');
-    root.querySelector<HTMLButtonElement>('[aria-label="Leave Talk"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Leave Chat"]')!.click();
     expect(f.peer.closed).toBe(true);
     expect(app.navigate).toHaveBeenCalledWith({ name: 'home' });
   });
@@ -162,7 +162,7 @@ describe('Talk', () => {
     f.send({ type: 'session.started' });
     button(root, 'End call').click();
     expect(f.peer.closed).toBe(true);
-    expect(button(root, 'Talk again')).toBeTruthy();
+    expect(button(root, 'Chat again')).toBeTruthy();
   });
 
   it('says what went wrong when OpenAI refuses the call', async () => {
@@ -197,7 +197,7 @@ describe('Talk', () => {
     button(root, 'Start talking').click();
     await flush();
     button(root, 'End call').click();
-    button(root, 'Talk again').click();
+    button(root, 'Chat again').click();
     await flush();
     second.send({ type: 'session.started' });
     release();
@@ -254,7 +254,7 @@ describe('Talk', () => {
     root = talkScreen(fakeApp(), left.deps);
     button(root, 'Start talking').click();
     await flush();
-    root.querySelector<HTMLButtonElement>('[aria-label="Leave Talk"]')!.click();
+    root.querySelector<HTMLButtonElement>('[aria-label="Leave Chat"]')!.click();
     expect(left.visual.stopped).toBe(true);
   });
 

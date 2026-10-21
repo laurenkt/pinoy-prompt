@@ -162,14 +162,14 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     return h(
       'header',
       { class: 'session-header' },
-      h('button', { class: 'icon-btn', 'aria-label': 'Leave Talk', onclick: leave }, icon('close')),
+      h('button', { class: 'icon-btn', 'aria-label': 'Leave Chat', onclick: leave }, icon('close')),
       h('span', { class: 'session-count' }, title),
       extra,
     );
   }
 
   function setup(): HTMLElement {
-    return h('div', null, header('Talk'), h('section', { class: 'card' }, h('h2', null, 'Connect OpenAI'), keyForm(draw)));
+    return h('div', null, header('Chat'), h('section', { class: 'card' }, h('h2', null, 'Connect OpenAI'), keyForm(draw)));
   }
 
   function menu(): HTMLElement {
@@ -177,11 +177,11 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
       return h(
         'div',
         null,
-        header('Talk'),
+        header('Chat'),
         h(
           'section',
           { class: 'card center' },
-          h('p', null, `Learn at least ${MIN_WORDS} words first. Talk mixes the words you know into the conversation.`),
+          h('p', null, `Learn at least ${MIN_WORDS} words first. Chat mixes the words you know into the conversation.`),
           h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
         ),
       );
@@ -190,13 +190,13 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
     return h(
       'div',
       null,
-      header('Talk'),
+      header('Chat'),
       h(
         'p',
         { class: 'muted' },
-        `A conversation in English with your ${plan.known.length} Tagalog words mixed in${plan.newWord ? ', plus one new one' : ''}. The firmer you know a word, the more it comes up. Talk doesn't change your review schedule.`,
+        `A conversation in English with your ${plan.known.length} Tagalog words mixed in${plan.newWord ? ', plus one new one' : ''}. The firmer you know a word, the more it comes up. Chat doesn't change your review schedule.`,
       ),
-      h('h2', { class: 'talk-label' }, 'Talk about'),
+      h('h2', { class: 'talk-label' }, 'Chat about'),
       h(
         'div',
         { class: 'talk-topics', role: 'radiogroup', 'aria-label': 'Topic' },
@@ -269,7 +269,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps): HTMLElem
           'div',
           { class: 'row' },
           h('button', { class: 'btn secondary', onclick: () => { state = { name: 'menu' }; draw(); } }, 'Change topic'),
-          h('button', { class: 'btn primary', onclick: () => void begin() }, 'Talk again'),
+          h('button', { class: 'btn primary', onclick: () => void begin() }, 'Chat again'),
         ),
     );
   }
