@@ -116,12 +116,18 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
     currentClip.playbackRate = slow ? 0.75 : 1;
     try {
       await currentClip.play();
+      // The clip is media itself, so it doesn't need the track.
+      silence?.pause();
       return;
     } catch {
       // Fall through to speech if the clip can't play.
     }
   }
-  if (!speechSupported() || mine !== generation) return;
+  if (!speechSupported()) {
+    silence?.pause();
+    return;
+  }
+  if (mine !== generation) return;
   await initVoices();
   if (mine !== generation) return;
   const utterance = new SpeechSynthesisUtterance(card.say ?? card.tl);
@@ -136,6 +142,13 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
     if (mine === generation) silence?.pause();
   };
   speechSynthesis.speak(utterance);
+}
+
+// iOS sometimes skips an utterance's onend, so never leave the track looping in the background.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stop();
+  });
 }
 
 export function stop(): void {
