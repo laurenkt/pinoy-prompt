@@ -47,6 +47,8 @@ export function quietToggle(app: App, onChange: () => void, { iconOnly = false }
       'aria-label': `Quiet mode: ${mode(settings) === 'off' ? 'off' : mode(settings) === 'silent' ? 'silent' : 'headphones in'}`,
       title: current.title,
       onclick: () => {
+        // Another tab's save may have replaced the settings object since this was drawn.
+        const settings = app.progress.settings;
         const next = current.next;
         settings.quiet = next !== 'off';
         settings.headphones = next === 'headphones';

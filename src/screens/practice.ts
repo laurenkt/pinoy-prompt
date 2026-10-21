@@ -69,6 +69,11 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   let spokenRight = false;
 
   function start(menuMode: MenuMode): void {
+    // Silence may have come on in another tab since the menu was drawn.
+    if (menuMode === 'listen' && isSilent(app.progress.settings)) {
+      questions = [];
+      return draw();
+    }
     lastMode = menuMode;
     const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
     const distractorPool = known.length >= 6 ? known : VOCAB;

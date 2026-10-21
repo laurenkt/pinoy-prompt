@@ -130,7 +130,10 @@ function saved(ok: boolean): void {
 
 async function start(): Promise<void> {
   // Another tab saved: pick up its progress in place, so screens holding it see the change.
-  onExternalChange((progress) => replaceContents(app.progress, progress));
+  onExternalChange((progress) => {
+    replaceContents(app.progress, progress);
+    applyAudioMode(app.progress.settings);
+  });
   try {
     replaceContents(app.progress, await loadDurable(Date.now()));
   } catch {
