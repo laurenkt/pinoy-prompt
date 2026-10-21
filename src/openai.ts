@@ -2,6 +2,8 @@
 // browser only, apart from progress so it never ends up in a backup, and is
 // sent only to api.openai.com. There is no server of ours in between.
 
+import { getMicrophone, releaseMicrophone } from './microphone';
+
 const KEY_STORAGE = 'pinoy-prompt:openai-key';
 const VOICE_STORAGE = 'pinoy-prompt:talk-voice';
 const API = 'https://api.openai.com/v1';
@@ -164,6 +166,8 @@ export interface Call {
 export interface CallDeps {
   fetch: typeof fetch;
   getMicrophone(): Promise<MediaStream>;
+  /** Hands the microphone back when the call ends. Without it, the tracks are stopped. */
+  releaseMicrophone?(mic: MediaStream): void;
   createPeer(): RTCPeerConnection;
   /** Plays the AI's voice. */
   createSpeaker(): HTMLAudioElement;
@@ -171,7 +175,8 @@ export interface CallDeps {
 
 export const browserCallDeps: CallDeps = {
   fetch: (...args) => fetch(...args),
-  getMicrophone: () => navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }),
+  getMicrophone,
+  releaseMicrophone,
   createPeer: () => new RTCPeerConnection(),
   createSpeaker: () => {
     const audio = new Audio();
@@ -210,10 +215,15 @@ export async function startCall(
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
 
+  let released = false;
   function release(): void {
+    // Can be reached twice (the call fails while it's still being set up), but the microphone is handed back once.
+    if (released) return;
+    released = true;
     clearTimeout(limit);
     clearTimeout(dropping);
-    mic.getTracks().forEach((t) => t.stop());
+    if (deps.releaseMicrophone) deps.releaseMicrophone(mic);
+    else mic.getTracks().forEach((t) => t.stop());
     peer?.close();
     speaker.srcObject = null;
   }
