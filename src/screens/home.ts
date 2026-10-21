@@ -8,7 +8,7 @@ import {
   type MemorySummary,
   type Strength,
 } from '../memory';
-import { dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
+import { MAX_LEARNING, learningCount, newCardsLeftToday, studyQueue, upcomingNewCards } from '../session';
 import { h, icon } from '../ui';
 import { growthChart } from './growth-chart';
 
@@ -83,8 +83,9 @@ function plural(n: number, one: string, many = `${one}s`): string {
  */
 function studyButton(app: App, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
-  const reviews = dueCards(progress, app.now()).length;
-  const fresh = Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length);
+  // The same checks Study makes for its next step, so the button never promises something else.
+  const reviews = studyQueue(progress, app.now()).length;
+  const fresh = learningCount(progress) < MAX_LEARNING ? Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length) : 0;
   let mode: { kind: string; icon: 'cards' | 'plus'; kicker: string; title: string };
   if (isFirstRun) mode = { kind: 'learn', icon: 'plus', kicker: 'Start here', title: 'Learn' };
   else if (reviews > 0) mode = { kind: 'review', icon: 'cards', kicker: `${plural(reviews, 'card')} due`, title: 'Review' };

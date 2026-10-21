@@ -126,7 +126,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     const time = `${m}:${String(s).padStart(2, '0')}`;
-    return seconds > 0 ? `${time} · about ${Math.ceil((seconds / 60) * CENTS_PER_MINUTE)}¢` : time;
+    // Before any time is billed, say the rate: a call from Home starts without the menu that mentions it.
+    return seconds > 0 ? `${time} · about ${Math.ceil((seconds / 60) * CENTS_PER_MINUTE)}¢` : `${time} · ${CENTS_PER_MINUTE}¢ a minute`;
   }
 
   function draw(): void {
