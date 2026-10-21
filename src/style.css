@@ -19,7 +19,6 @@
   --shadow: 4px 4px 0 var(--ink);
   --shadow-big: 6px 6px 0 var(--ink);
   --radius: 20px;
-  --tabbar-h: 64px;
   --font-sans: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color-scheme: dark;
 }
@@ -1802,40 +1801,6 @@ p {
   width: 22px;
   height: 22px;
   accent-color: var(--teal);
-}
-
-/* Tab bar: first thing on the page, in the normal flow, so it scrolls away with the content. */
-
-.tabbar {
-  margin-bottom: 22px;
-  height: var(--tabbar-h);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  gap: 4px;
-  padding: 0 8px;
-  background: var(--cream);
-  border: var(--outline);
-  border-radius: 20px;
-  box-shadow: var(--shadow);
-}
-
-.tab {
-  flex: 1;
-  max-width: 160px;
-  min-height: 44px;
-  border: 2px solid transparent;
-  border-radius: 12px;
-  background: none;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--on-accent);
-}
-
-.tab.active {
-  background: var(--teal);
-  border-color: var(--ink);
-  font-weight: 800;
 }
 
 .save-warning {
