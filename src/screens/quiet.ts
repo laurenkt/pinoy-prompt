@@ -11,7 +11,8 @@ export function quietToggle(app: App, onChange: () => void, { iconOnly = false }
   return h(
     'button',
     {
-      class: `quiet-toggle${on ? ' on' : ''}${iconOnly ? ' icon-only' : ''}`,
+      // Icon only, it matches the icon buttons beside it; otherwise it's a labelled pill.
+      class: `${iconOnly ? 'icon-btn quiet-icon' : 'quiet-toggle'}${on ? ' on' : ''}`,
       'aria-pressed': String(on),
       'aria-label': iconOnly ? 'Quiet mode' : undefined,
       title: on ? 'Quiet mode is on: no speaking cards or drills' : 'Quiet mode: no speaking cards or drills',
@@ -21,8 +22,7 @@ export function quietToggle(app: App, onChange: () => void, { iconOnly = false }
         onChange();
       },
     },
-    // Always the crossed-out mic: it names the mode, and teal says it's on.
-    icon('quiet'),
+    icon(on ? 'quiet' : 'mic'),
     !iconOnly && h('span', null, 'Quiet'),
   );
 }

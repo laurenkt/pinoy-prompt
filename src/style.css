@@ -257,13 +257,8 @@ p {
   box-shadow: var(--shadow);
 }
 
-.quiet-toggle.icon-only {
-  width: 44px;
-  padding: 0;
-  justify-content: center;
-}
-
-.quiet-toggle.on {
+.quiet-toggle.on,
+.quiet-icon.on {
   background: var(--teal);
   color: var(--on-accent);
 }
