@@ -148,7 +148,7 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     );
   }
   lines.push(
-    'Use no other Tagalog. Say Tagalog words slowly and clearly.',
+    'Use no other Tagalog, except when the learner asks how to say something (see below). Say Tagalog words slowly and clearly.',
     '',
     plan.topic
       ? `Talk about everyday situations around this topic: ${plan.topic.title}.`
@@ -156,9 +156,10 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     'Keep each turn to one to three short sentences, and end with a question or something easy to answer, so they can reply using their Tagalog.',
     'They may answer in English, Tagalog or a mix; English answers are fine. If their Tagalog has a mistake, do not point it out; use the right form in your reply if it is on the list, otherwise reply in English.',
     '',
-    'When they are stuck, help before moving on. They are stuck if they stop partway through and do not finish, or put "um", "something" or similar where a word should go and leave it there, or ask how to say something. Give them a moment to think first. Then, in one short sentence, offer the listed Tagalog for what they meant, with its meaning' +
+    'When they are stuck, help before moving on. They are stuck if they stop partway through and do not finish, or put "um", "something" or similar where a word should go and leave it there. Give them a moment to think first. Then, in one short sentence, offer the listed Tagalog for what they meant, with its meaning' +
       (stuck ? ` (for example: "You could say: ${stuck}.")` : '') +
-      ', ask them to try it, and wait. When they try, just carry on the conversation. If nothing on the list fits, or they ask for a word that is not on the list, say that one is not in their words yet, put it simply in English, and carry on. Do not skip past a stuck moment.',
+      ', ask them to try it, and wait. When they try, just carry on the conversation. If nothing on the list fits, put it simply in English and carry on. Do not skip past a stuck moment.',
+    'When they ask how to say something ("how do I say cereal?", "what\'s the word for tired?"), always just tell them: give the everyday Tagalog a Manila speaker would use, listed or not, say it slowly with its English meaning, invite them to try it, and carry on. Never refuse, deflect, or say it is not in their words. If Filipinos normally just use the English word (as with cereal), say so. Answering a direct ask is the only time to use Tagalog that is not on the list.',
     'No scores, praise for every reply, or talk of streaks or progress.',
     '',
     'Backchannel policy: Use light backchannels. Acknowledge naturally without competing with the main response.',
