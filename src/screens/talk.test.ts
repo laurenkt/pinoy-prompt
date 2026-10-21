@@ -110,6 +110,23 @@ describe('Talk', () => {
     expect(root.textContent).toMatch(/New word this time: \S/);
   });
 
+  it('starts the call straight away when opened from Home, and offers topics after', async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    const root = talkScreen(fakeApp(), f.deps, true);
+    expect(root.textContent).toContain('Connecting');
+    await flush();
+    f.send({ type: 'session.started' });
+    button(root, 'End call').click();
+    button(root, 'Change topic').click();
+    expect(button(root, 'Start talking')).toBeTruthy();
+  });
+
+  it('still asks for a key first when opened from Home', () => {
+    const root = talkScreen(fakeApp(), fakeCall().deps, true);
+    expect(root.textContent).toContain('own OpenAI API key');
+  });
+
   it('runs a call, shows its transcript, and hangs up on leaving', async () => {
     setApiKey(KEY);
     const f = fakeCall();

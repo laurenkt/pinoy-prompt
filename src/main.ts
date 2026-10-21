@@ -66,7 +66,7 @@ function render(route: Route): void {
       screen = sessionScreen(app, route.steps, route.title);
       break;
     case 'talk':
-      screen = talkScreen(app);
+      screen = talkScreen(app, undefined, route.start);
       break;
     case 'settings':
       screen = settingsScreen(app);
@@ -79,7 +79,8 @@ function backBar(): HTMLElement {
   return h(
     'nav',
     { class: 'back-bar' },
-    h('button', { class: 'btn secondary back-btn', onclick: () => app.navigate({ name: 'home' }) }, icon('back'), 'Home'),
+    // The same size and place as the close button on Study and Chat.
+    h('button', { class: 'icon-btn', 'aria-label': 'Home', title: 'Home', onclick: () => app.navigate({ name: 'home' }) }, icon('back')),
   );
 }
 

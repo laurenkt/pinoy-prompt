@@ -49,16 +49,11 @@ export function homeScreen(app: App): HTMLElement {
     h(
       'nav',
       { class: 'hub', 'aria-label': 'Main' },
+      studyButton(app, isFirstRun),
       h(
         'button',
-        { class: 'hub-btn big study-btn', onclick: () => app.navigate({ name: 'study' }) },
-        h('span', { class: 'hub-top' }, icon('cards'), h('span', { class: 'hub-badge' }, studyLabel(app, isFirstRun))),
-        h('span', { class: 'hub-title' }, 'Study'),
-      ),
-      h(
-        'button',
-        { class: 'hub-btn big chat-btn', onclick: () => app.navigate({ name: 'talk' }) },
-        h('span', { class: 'hub-top' }, icon('mic')),
+        { class: 'hub-btn big chat-btn', onclick: () => app.navigate({ name: 'talk', start: true }) },
+        icon('mic'),
         h('span', { class: 'hub-title' }, 'Chat'),
       ),
       h('button', { class: 'hub-btn drills-btn', onclick: () => app.navigate({ name: 'practice' }) }, h('span', { class: 'hub-title' }, 'Drills')),
@@ -81,15 +76,27 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** What Study will do next, in a couple of words. */
-function studyLabel(app: App, isFirstRun: boolean): string {
+/**
+ * Study does one of three things, and the button says which: review what's due,
+ * learn new cards, or extra practice once caught up. Each looks different, so
+ * it's clear at a glance.
+ */
+function studyButton(app: App, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
   const reviews = dueCards(progress, app.now()).length;
   const fresh = Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length);
-  if (isFirstRun) return 'Start here';
-  if (reviews > 0) return `${reviews} due`;
-  if (fresh > 0) return `${plural(fresh, 'new card')}`;
-  return 'All caught up';
+  let mode: { kind: string; icon: 'cards' | 'plus'; kicker: string; title: string };
+  if (isFirstRun) mode = { kind: 'learn', icon: 'plus', kicker: 'Start here', title: 'Learn' };
+  else if (reviews > 0) mode = { kind: 'review', icon: 'cards', kicker: `${plural(reviews, 'card')} due`, title: 'Review' };
+  else if (fresh > 0) mode = { kind: 'learn', icon: 'plus', kicker: plural(fresh, 'new card'), title: 'Learn' };
+  else mode = { kind: 'extra', icon: 'cards', kicker: 'All caught up', title: 'Practice' };
+  return h(
+    'button',
+    { class: `hub-btn big study-btn study-${mode.kind}`, onclick: () => app.navigate({ name: 'study' }) },
+    icon(mode.icon),
+    h('span', { class: 'hub-kicker' }, mode.kicker),
+    h('span', { class: 'hub-title' }, mode.title),
+  );
 }
 
 /** The chart carries the story; the text around it is just the numbers it can't show. */

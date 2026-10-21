@@ -6,7 +6,8 @@ export type Route =
   | { name: 'study' }
   | { name: 'session'; steps: Step[]; title?: string }
   | { name: 'practice' }
-  | { name: 'talk' }
+  /** `start` begins a call straight away, so Home's Chat button is one tap. */
+  | { name: 'talk'; start?: boolean }
   | { name: 'words' }
   | { name: 'settings' };
 
