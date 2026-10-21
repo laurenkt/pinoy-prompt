@@ -18,12 +18,12 @@ const CONSTRAINTS: MediaStreamConstraints = {
 let stream: MediaStream | null = null;
 let opening: Promise<MediaStream> | null = null;
 let users = 0;
+let idle: ReturnType<typeof setTimeout> | undefined;
 
 /** Whether a microphone stream is open, even if switched off between uses. */
 export function microphoneOpen(): boolean {
   return stream !== null || opening !== null;
 }
-let idle: ReturnType<typeof setTimeout> | undefined;
 
 // A track iOS muted (a phone call, Siri) can stay "live" but silent, so it doesn't count.
 const live = (s: MediaStream) => s.getAudioTracks().some((t) => t.readyState === 'live' && !t.muted);
@@ -35,7 +35,13 @@ export async function getMicrophone(): Promise<MediaStream> {
   if (!stream) {
     setAudioSession('play-and-record');
     opening ??= navigator.mediaDevices.getUserMedia(CONSTRAINTS).finally(() => (opening = null));
-    stream = await opening;
+    try {
+      stream = await opening;
+    } catch (error) {
+      // No microphone after all (refused, or none), so don't keep the session it needed.
+      if (!microphoneOpen()) setAudioSession('auto');
+      throw error;
+    }
   }
   users++;
   for (const t of stream.getTracks()) t.enabled = true;
@@ -58,10 +64,12 @@ export function releaseMicrophone(released: MediaStream): void {
 /** Stop the stream now. The next getMicrophone() opens a new one. */
 export function closeMicrophone(): void {
   clearTimeout(idle);
+  // Only hand the session back if the microphone had it: this also runs on every trip to the background.
+  const had = stream !== null;
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   users = 0;
-  setAudioSession('auto');
+  if (had) setAudioSession('auto');
 }
 
 if (typeof document !== 'undefined') {

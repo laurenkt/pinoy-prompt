@@ -36,8 +36,20 @@ describe('audio session', () => {
     expect(audioSession.type).toBe('playback');
   });
 
-  it('does nothing where the browser has no audio session', () => {
+  it('does nothing where the browser has no audio session', async () => {
     vi.stubGlobal('navigator', {});
-    expect(() => play({ tl: 'Salamat' })).not.toThrow();
+    await expect(play({ tl: 'Salamat' })).resolves.toBeUndefined();
+  });
+
+  it('hands the session back if the microphone is refused', async () => {
+    vi.stubGlobal('navigator', { audioSession, mediaDevices: { getUserMedia: async () => Promise.reject(new Error('denied')) } });
+    await expect(getMicrophone()).rejects.toThrow('denied');
+    expect(audioSession.type).toBe('auto');
+  });
+
+  it("doesn't touch the session when closing a microphone that wasn't open", () => {
+    void play({ tl: 'Salamat' });
+    closeMicrophone();
+    expect(audioSession.type).toBe('playback');
   });
 });

@@ -2,6 +2,9 @@
 // learner's own recording, or a reference clip of a sound. One at a time;
 // starting another stops the last.
 
+import { setAudioSession } from './audio-session';
+import { microphoneOpen } from './microphone';
+
 export interface Playback {
   /** Resolves when it finishes or is stopped. */
   done: Promise<void>;
@@ -19,6 +22,8 @@ let context: AudioContext | null = null;
 const decoded = new Map<string, Promise<AudioBuffer>>();
 
 function audio(): AudioContext {
+  // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback.
+  if (!microphoneOpen()) setAudioSession('playback');
   context ??= new AudioContext();
   void context.resume().catch(() => {});
   return context;
