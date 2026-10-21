@@ -3,6 +3,7 @@
 // stops by itself shortly after the learner stops speaking.
 
 import { SAMPLE_RATE } from './fbank';
+import { getMicrophone, releaseMicrophone } from './microphone';
 
 /** Level (RMS, 0–1) above which a block counts as speech. */
 const SPEECH_LEVEL = 0.02;
@@ -91,7 +92,7 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
     if (!context) throw new RecordError('unsupported');
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+      stream = await getMicrophone();
     } catch (err) {
       void context.close().catch(() => {});
       const name = err instanceof DOMException ? err.name : '';
@@ -117,7 +118,7 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
         clearTimeout(limit);
         processor.disconnect();
         source.disconnect();
-        stream.getTracks().forEach((t) => t.stop());
+        releaseMicrophone(stream);
         void context.close().catch(() => {});
         const total = chunks.reduce((n, c) => n + c.length, 0);
         const all = new Float32Array(total);
