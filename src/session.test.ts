@@ -186,7 +186,8 @@ describe('new cards', () => {
     for (const id of guides) for (const need of getCard(id)!.needs ?? []) expect(met).toContain(need);
 
     // Everything met so far has lasted a few days, so guides that build on it can come.
-    learn(progress, VOCAB_ORDER.slice(GUIDE_START - 1, PATTERN_START + 10));
+    const pastPsst = LEARN_ORDER.slice(0, LEARN_ORDER.indexOf('k-psst')).filter(isVocabId).length;
+    learn(progress, VOCAB_ORDER.slice(GUIDE_START - 1, Math.max(pastPsst, PATTERN_START) + 10));
     const next = upcomingNewCards(progress, Infinity);
     const [first] = next.filter((id) => !isVocab(getCard(id)!));
     expect(first).toBe('k-psst');
@@ -284,6 +285,16 @@ describe('distractors', () => {
       expect(picks.map((p) => p.id)).not.toContain(card.id);
       expect(new Set(picks.map((p) => p.en)).size).toBe(3);
       expect(picks.every((p) => p.kind === 'word')).toBe(true);
+    }
+  });
+
+  it('never offers a card that could also be right', () => {
+    const pool = ['ako', 'ko', 'ikaw', 'ka', 'mo', 'na', 'ngayon', 'tubig', 'kape', 'kanin'].map((id) => getCard(id)!);
+    for (let i = 0; i < 20; i++) {
+      expect(distractors(getCard('ka')!, 'en', 3, pool).map((c) => c.id)).not.toContain('ikaw');
+      expect(distractors(getCard('ka')!, 'en', 3, pool).map((c) => c.id)).not.toContain('mo');
+      expect(distractors(getCard('ako')!, 'en', 3, pool).map((c) => c.id)).not.toContain('ko');
+      expect(distractors(getCard('ngayon')!, 'tl', 3, pool).map((c) => c.id)).not.toContain('na');
     }
   });
 });
