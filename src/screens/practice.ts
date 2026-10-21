@@ -150,7 +150,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
           'section',
           { class: 'card center' },
           h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to drill them.`),
-          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'home' }) }, 'Go to Study'),
+          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
         ),
       );
     }
@@ -173,12 +173,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
             h('span', { class: 'mode-desc' }, unavailable ?? m.desc),
           );
         }),
-        h(
-          'button',
-          { class: 'mode mode-talk', onclick: () => app.navigate({ name: 'talk' }) },
-          h('span', { class: 'mode-title' }, 'Talk'),
-          h('span', { class: 'mode-desc' }, 'A spoken conversation in English, with the Tagalog you know mixed in'),
-        ),
       ),
     );
   }

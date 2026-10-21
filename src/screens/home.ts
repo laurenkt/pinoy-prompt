@@ -1,7 +1,6 @@
 import type { App } from '../app';
 import {
   MIN_MEASURED_REVIEWS,
-  RECALL_WINDOW_DAYS,
   STRENGTHS,
   memoryHistory,
   memorySummary,
@@ -9,7 +8,7 @@ import {
   type MemorySummary,
   type Strength,
 } from '../memory';
-import { buildExtraSession, dueCards, newCardsLeftToday, unmetCount, upcomingNewCards } from '../session';
+import { dueCards, newCardsLeftToday, upcomingNewCards } from '../session';
 import { h, icon } from '../ui';
 import { growthChart } from './growth-chart';
 
@@ -47,8 +46,25 @@ export function homeScreen(app: App): HTMLElement {
     ),
 
     isFirstRun ? welcomeCard() : null,
-    todayCard(app, isFirstRun),
-    isFirstRun ? null : memorySection(memory, memoryHistory(progress, now)),
+    h(
+      'nav',
+      { class: 'hub', 'aria-label': 'Main' },
+      h(
+        'button',
+        { class: 'hub-btn big study-btn', onclick: () => app.navigate({ name: 'study' }) },
+        h('span', { class: 'hub-top' }, icon('cards'), h('span', { class: 'hub-badge' }, studyLabel(app, isFirstRun))),
+        h('span', { class: 'hub-title' }, 'Study'),
+      ),
+      h(
+        'button',
+        { class: 'hub-btn big chat-btn', onclick: () => app.navigate({ name: 'talk' }) },
+        h('span', { class: 'hub-top' }, icon('mic')),
+        h('span', { class: 'hub-title' }, 'Chat'),
+      ),
+      h('button', { class: 'hub-btn drills-btn', onclick: () => app.navigate({ name: 'practice' }) }, h('span', { class: 'hub-title' }, 'Drills')),
+      h('button', { class: 'hub-btn library-btn', onclick: () => app.navigate({ name: 'words' }) }, h('span', { class: 'hub-title' }, 'Library')),
+    ),
+    isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now)),
   );
 }
 
@@ -57,14 +73,7 @@ function welcomeCard(): HTMLElement {
     'section',
     { class: 'card welcome' },
     h('h2', null, 'Mabuhay! Welcome'),
-    h('p', null, 'Learn Tagalog a few minutes a day. Here is how it works:'),
-    h(
-      'ol',
-      { class: 'how' },
-      h('li', null, h('strong', null, 'Meet something new.'), ' Words and phrases first, then how sentences fit together, sounds, and everyday know-how.'),
-      h('li', null, h('strong', null, 'Quick check.'), ' Answer one question so it sticks.'),
-      h('li', null, h('strong', null, 'Review just in time.'), ' Each card comes back right before you would forget it.'),
-    ),
+    h('p', null, 'Tap Study to meet your first words. Each card comes back right before you would forget it.'),
   );
 }
 
@@ -72,59 +81,20 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-function todayCard(app: App, isFirstRun: boolean): HTMLElement {
+/** What Study will do next, in a couple of words. */
+function studyLabel(app: App, isFirstRun: boolean): string {
   const { progress } = app;
-  const now = app.now();
-  const reviews = dueCards(progress, now).length;
-  const unmet = unmetCount(progress);
+  const reviews = dueCards(progress, app.now()).length;
   const fresh = Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length);
-  const rate = progress.settings.dailyNew;
-
-  const rateLine = h(
-    'p',
-    { class: 'today-meta' },
-    unmet === 0 ? "You've met every card in the deck." : `Up to ${plural(rate, 'new card')} a day`,
-    unmet > 0 && h('button', { class: 'link-btn', onclick: () => app.navigate({ name: 'settings' }) }, 'Change'),
-  );
-
-  let title: string;
-  let plan: string;
-  if (isFirstRun) {
-    title = 'Your first words';
-    plan = 'Meet a few words, then check them before moving on.';
-  } else if (reviews > 0) {
-    title = `${plural(reviews, 'card')} to review`;
-    plan = fresh > 0 ? 'Weakest first. New cards come in once these have settled.' : 'Weakest first.';
-  } else if (fresh > 0) {
-    title = 'Ready for something new';
-    plan = 'Nothing is due, so study starts with new cards.';
-  } else {
-    title = "You're caught up";
-    plan = "Nothing is due. Study gives extra practice on your weakest cards, without changing when they come back.";
-  }
-
-  return h(
-    'section',
-    { class: 'card today' },
-    rateLine,
-    h('h2', null, title),
-    h('p', null, plan),
-    h('button', { class: 'btn primary big', onclick: () => app.navigate({ name: 'study' }) }, isFirstRun ? 'Start learning' : 'Study'),
-    !isFirstRun &&
-      unmet > 0 &&
-      h(
-        'button',
-        {
-          class: 'link-btn learn-more',
-          onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'Something new' }),
-        },
-        'Learn something new now',
-      ),
-  );
+  if (isFirstRun) return 'Start here';
+  if (reviews > 0) return `${reviews} due`;
+  if (fresh > 0) return `${plural(fresh, 'new card')}`;
+  return 'All caught up';
 }
 
-function memorySection(memory: MemorySummary, history: MemoryHistory): HTMLElement {
-  const { total, strengths, recent, due } = memory;
+/** The chart carries the story; the text around it is just the numbers it can't show. */
+function memoryCard(memory: MemorySummary, history: MemoryHistory): HTMLElement {
+  const { strengths, recent, due } = memory;
   const measured = recent.reviews >= MIN_MEASURED_REVIEWS;
   const recall = measured ? 1 - recent.missed / recent.reviews : (memory.estimatedRecall ?? 0);
   const pct = `${Math.round(recall * 100)}%`;
@@ -133,57 +103,28 @@ function memorySection(memory: MemorySummary, history: MemoryHistory): HTMLEleme
     STRENGTHS.map((s) => [s.id, h('span', { class: 'legend-count' }, strengths[s.id])]),
   ) as Record<Strength, HTMLElement>;
 
-  const coming: string[] = [];
-  if (due.tomorrow > 0) coming.push(`${due.tomorrow} by tomorrow`);
-  if (due.week > 0) coming.push(`${due.week} ${due.tomorrow > 0 ? 'more ' : ''}this week`);
+  const facts = [measured ? `${pct} recalled` : `≈${pct} recall`];
+  if (due.tomorrow > 0) facts.push(`${due.tomorrow} due tomorrow`);
 
   return h(
     'section',
-    { class: 'memory', 'aria-labelledby': 'memory-title' },
-    h('h2', { class: 'section-title', id: 'memory-title' }, 'Your memory'),
+    { class: 'card strength-card', 'aria-labelledby': 'memory-title' },
+    h('h2', { class: 'sr-only', id: 'memory-title' }, 'Your memory'),
+    growthChart(history, counts),
     h(
-      'div',
-      { class: 'tiles' },
-      h(
-        'div',
-        { class: 'tile words-tile' },
-        h('span', { class: 'tile-value' }, total),
-        h('span', { class: 'tile-label' }, total === 1 ? 'card known' : 'cards known'),
-      ),
-      h(
-        'div',
-        { class: 'tile recall-tile' },
-        h('span', { class: 'tile-value' }, measured ? pct : `≈${pct}`),
-        h('span', { class: 'tile-label' }, measured ? `recalled, last ${RECALL_WINDOW_DAYS} days` : 'recall, estimated'),
-      ),
-    ),
-    h(
-      'p',
-      { class: 'memory-note muted small' },
-      measured
-        ? `Right on ${recent.reviews - recent.missed} of ${plural(recent.reviews, 'review')}.`
-        : `Estimated from your review schedule. Once you've done ${MIN_MEASURED_REVIEWS} reviews, this shows how often you actually remember.`,
-    ),
-
-    h(
-      'div',
-      { class: 'card strength-card' },
-      h('h3', null, 'How your memory has grown'),
-      growthChart(history, counts),
-      h(
-        'ul',
-        { class: 'strength-legend' },
-        STRENGTHS.map((s) =>
-          h(
-            'li',
-            null,
-            h('span', { class: `swatch s-${s.id}`, 'aria-hidden': 'true' }),
-            h('span', { class: 'legend-label' }, h('strong', null, s.label), ' ', h('span', { class: 'muted' }, s.desc)),
-            counts[s.id],
-          ),
+      'ul',
+      { class: 'strength-legend' },
+      STRENGTHS.map((s) =>
+        h(
+          'li',
+          { title: s.desc },
+          h('span', { class: `swatch s-${s.id}`, 'aria-hidden': 'true' }),
+          // The legend stays short on screen; screen readers still get what each strength means.
+          h('span', { class: 'legend-label' }, s.label, h('span', { class: 'sr-only' }, `, ${s.desc}`)),
+          counts[s.id],
         ),
       ),
-      coming.length > 0 && h('p', { class: 'coming muted small' }, `Coming up for review: ${coming.join(' · ')}`),
     ),
+    h('p', { class: 'coming muted small' }, facts.join(' · ')),
   );
 }
