@@ -60,10 +60,16 @@ export function homeScreen(app: App): HTMLElement {
       h('button', { class: 'hub-btn drills-btn', onclick: () => app.navigate({ name: 'practice' }) }, h('span', { class: 'hub-title' }, 'Drills')),
       h('button', { class: 'hub-btn library-btn', onclick: () => app.navigate({ name: 'words' }) }, h('span', { class: 'hub-title' }, 'Library')),
     ),
-    // Right under Study, so it's one tap before starting on the tube.
-    quietToggle(app, () => app.navigate({ name: 'home' }), { wide: true }),
+    // Next to Study, so it's one tap before starting on the tube.
+    quietSwitch(app),
     isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now)),
   );
+}
+
+/** The quiet toggle, redrawn in place so the page doesn't jump. */
+function quietSwitch(app: App): HTMLElement {
+  const el: HTMLElement = quietToggle(app, () => el.replaceWith(quietSwitch(app)), { wide: true });
+  return el;
 }
 
 function welcomeCard(): HTMLElement {

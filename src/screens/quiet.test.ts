@@ -78,6 +78,13 @@ describe('quiet mode in study', () => {
     expect(button(root, 'Quiet').getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('asks a speaking step that was already picked another way', async () => {
+    const root = sessionScreen(fakeApp(true), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, micReady);
+    await flush();
+    button(root, 'Keep practising').click();
+    expect(speaking(root)).toBe(false);
+  });
+
   it('asks new words to be said in your head', () => {
     const app = fakeApp(true);
     const root = sessionScreen(app, [{ kind: 'new', cardId: 'mabuti' }], undefined, micReady);

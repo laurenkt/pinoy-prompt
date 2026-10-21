@@ -13,7 +13,7 @@ export function quietToggle(app: App, onChange: () => void, { wide = false } = {
     {
       class: `quiet-toggle${on ? ' on' : ''}${wide ? ' wide' : ''}`,
       'aria-pressed': String(on),
-      title: on ? 'Quiet mode is on: nothing asks you to speak' : 'Quiet mode: nothing asks you to speak',
+      title: on ? 'Quiet mode is on: no speaking cards or drills' : 'Quiet mode: no speaking cards or drills',
       onclick: () => {
         app.progress.settings.quiet = !on;
         app.commit();
@@ -26,7 +26,7 @@ export function quietToggle(app: App, onChange: () => void, { wide = false } = {
           'span',
           { class: 'quiet-text' },
           h('span', null, 'Quiet mode'),
-          h('span', { class: 'quiet-desc' }, on ? 'On: nothing asks you to speak' : 'For the tube: no speaking'),
+          h('span', { class: 'quiet-desc' }, on ? 'On: no speaking cards or drills' : 'For the tube: no speaking'),
         )
       : h('span', null, 'Quiet'),
   );

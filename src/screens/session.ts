@@ -139,6 +139,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function ask(c: Card, s: Step): void {
     const state = app.progress.cards[c.id] ?? newCardState(app.now());
     format = s.format ?? pickFormat(state, { listen: canListen, speak: false }, Math.random, c.kind);
+    // A speaking step picked before quiet mode was turned on (say, behind the caught-up note) is asked another way.
+    if (format === 'speak' && app.progress.settings.quiet) format = 'read';
     if (!isVocab(c)) {
       askGuide(c);
       return;
