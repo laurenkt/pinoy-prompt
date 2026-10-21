@@ -7,8 +7,8 @@ const NOW = new Date(2026, 9, 19, 12).getTime();
 
 function card(interval: number, reviewedDaysAgo: number, extra: Partial<CardState> = {}): CardState {
   const reviewed = NOW - reviewedDaysAgo * DAY_MS;
-  // Scheduled as review() does: local midnight a whole number of days on.
-  const due = interval > 0 ? startOfDayAfter(reviewed, interval) : reviewed + 60_000;
+  // Scheduled as review() does: a whole interval after the review.
+  const due = interval > 0 ? reviewed + interval * DAY_MS : reviewed + 60_000;
   return { ...newCardState(reviewed), interval, reps: interval > 0 ? 2 : 0, reviewed, due, ...extra };
 }
 
@@ -34,13 +34,22 @@ describe('recallChance', () => {
   });
 
   it('works out the last review for cards saved before it was recorded', () => {
-    // Reviewed late in the evening; the guess is midday that day, so within half a day.
+    // Due is exactly one interval after the review, so the review time comes back exactly.
     const reviewed = new Date(2026, 9, 15, 22).getTime();
     const old = review({ ...newCardState(reviewed - 3 * DAY_MS), reps: 2, interval: 2 }, 'good', reviewed);
     const exact = recallChance(old, NOW);
     delete old.reviewed;
     const guessed = recallChance(old, NOW);
-    expect(Math.abs(guessed - exact)).toBeLessThan(0.02);
+    expect(guessed).toBeCloseTo(exact, 10);
+  });
+
+  it('works out the last review for old saves that were due at local midnight', () => {
+    // Older builds put due at midnight of the day the interval landed on.
+    const reviewed = new Date(2026, 9, 15, 22).getTime();
+    const exact = recallChance(card(2, (NOW - reviewed) / DAY_MS), NOW);
+    const old = { ...card(2, 0), due: startOfDayAfter(reviewed, 2) };
+    delete old.reviewed;
+    expect(Math.abs(recallChance(old, NOW) - exact)).toBeLessThan(0.02);
   });
 
   it('treats a word still being learned, or just forgotten, as half likely at best', () => {

@@ -2,6 +2,9 @@
 //
 // Each card carries an ease factor and an interval in days. Ratings move the
 // interval forward (or reset it on a miss) and nudge the ease up or down.
+// Intervals run from the moment of the review, so a card seen at 3pm with a
+// one-day interval is due at 3pm tomorrow, and reviews trickle in through the
+// day instead of all landing at midnight.
 
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
 
@@ -75,7 +78,7 @@ export function review(card: CardState, rating: Rating, now: number): CardState 
       break;
   }
   next.reps = card.reps + 1;
-  next.due = startOfDayAfter(now, interval);
+  next.due = now + interval * DAY_MS;
   return next;
 }
 
@@ -96,10 +99,7 @@ export function formatInterval(days: number): string {
   return `${round1(days / 365)}y`;
 }
 
-/**
- * Local midnight of the day an interval lands on, so a card due "in 1 day" is
- * ready first thing tomorrow rather than at this exact time tomorrow.
- */
+/** Local midnight a whole number of days after (or before) the day of `now`. */
 export function startOfDayAfter(now: number, days: number): number {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);

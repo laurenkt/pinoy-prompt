@@ -34,14 +34,19 @@ export function strengthOf(card: CardState): Strength {
 
 /**
  * When the card was last answered. Older saves don't record it, so it is
- * worked back from the schedule: due is local midnight a whole number of days
- * after the review, so the review was on that day; midday is the best guess.
+ * worked back from the schedule. Those saves come from builds that put due at
+ * local midnight a whole number of days after the review, so the review was on
+ * that day and midday is the best guess; otherwise due is exactly one interval
+ * after the review.
  */
 function lastSeen(card: CardState, now: number): number {
-  const seen =
-    card.reviewed ??
-    (card.interval >= 1 ? startOfDayAfter(card.due, -Math.round(card.interval)) + DAY_MS / 2 : card.introduced);
-  return Math.min(seen, now);
+  return Math.min(card.reviewed ?? guessedReview(card), now);
+}
+
+function guessedReview(card: CardState): number {
+  if (card.interval < 1) return card.introduced;
+  if (startOfDayAfter(card.due, 0) === card.due) return startOfDayAfter(card.due, -Math.round(card.interval)) + DAY_MS / 2;
+  return card.due - card.interval * DAY_MS;
 }
 
 /**

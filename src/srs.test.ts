@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatInterval, isDue, newCardState, nextInterval, review, startOfDayAfter } from './srs';
+import { DAY_MS, formatInterval, isDue, newCardState, nextInterval, review } from './srs';
 
 const NOW = Date.UTC(2026, 0, 1);
 
@@ -12,7 +12,7 @@ describe('review', () => {
     expect(card.interval).toBe(3);
     card = review(card, 'good', NOW);
     expect(card.interval).toBe(7.5);
-    expect(card.due).toBe(startOfDayAfter(NOW, 7.5));
+    expect(card.due).toBe(NOW + 7.5 * DAY_MS);
   });
 
   it('resets a forgotten card, lowers ease and counts a lapse', () => {
@@ -43,12 +43,13 @@ describe('review', () => {
     expect(g).toBeLessThan(e);
   });
 
-  it('makes a card due at the start of the day its interval lands on', () => {
+  it('makes a card due a whole interval after the review, not at midnight', () => {
     const evening = new Date(2026, 0, 1, 20).getTime();
     const card = review(newCardState(evening), 'good', evening);
-    expect(isDue(card, new Date(2026, 0, 1, 23, 59).getTime())).toBe(false);
-    expect(isDue(card, new Date(2026, 0, 2, 0, 1).getTime())).toBe(true);
-    expect(card.due).toBe(new Date(2026, 0, 2).getTime());
+    expect(isDue(card, new Date(2026, 0, 2, 0, 1).getTime())).toBe(false);
+    expect(isDue(card, new Date(2026, 0, 2, 19, 59).getTime())).toBe(false);
+    expect(isDue(card, new Date(2026, 0, 2, 20).getTime())).toBe(true);
+    expect(card.due).toBe(evening + DAY_MS);
   });
 });
 
