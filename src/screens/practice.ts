@@ -72,8 +72,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   /** What was picked on the question before, when it moved on by itself; null when there's nothing to look back at. */
   let previousPick: string | null = null;
   let lookingBack = false;
+  /** Set as a question moves on by itself, so the next one doesn't take focus: an Enter meant for Next would answer it. */
+  let autoMoved = false;
 
-  holdOnTap(root, () => auto !== null, hold);
+  holdOnTap(root, hold);
 
   function start(menuMode: MenuMode): void {
     lastMode = menuMode;
@@ -132,10 +134,13 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (!q || picked) return;
     picked = choice.id;
     if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
-    if (choice.id === q.card.id) {
-      score++;
-      auto = countdown(root, () => advance(choice.id));
-    }
+    if (choice.id === q.card.id) score++;
+    // The last question stays up: the results that follow have no way back to it.
+    if (choice.id === q.card.id && index < questions.length - 1)
+      auto = countdown(root, () => {
+        autoMoved = true;
+        advance(choice.id);
+      });
     draw();
   }
 
@@ -165,7 +170,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     else if (index >= questions.length) root.replaceChildren(results());
     else if (lookingBack && previousPick) root.replaceChildren(questionView(questions[index - 1], previousPick));
     else root.replaceChildren(questionView(questions[index], picked));
-    root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
+    if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
+    autoMoved = false;
   }
 
   function menu(): HTMLElement {
@@ -312,7 +318,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (!q) return;
     if (e.key === 'r' || e.key === 'R') {
       hold();
-      root.querySelector('.counting')?.classList.remove('counting');
       return sayCard(q.card);
     }
     if (q.mode === 'speak' || lookingBack) return;

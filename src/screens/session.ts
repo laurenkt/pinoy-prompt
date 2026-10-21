@@ -77,6 +77,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   let auto: Countdown | null = null;
   /** The card that moved on by itself, as it was left, so the learner can look back at it. */
   let previous: Shown | null = null;
+  /** Set as a card moves on by itself, so the next one doesn't take focus: an Enter meant for Continue would answer it. */
+  let autoMoved = false;
   /** While looking back, the card to return to. */
   let reviewing: Shown | null = null;
 
@@ -89,7 +91,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     ({ step, card, phase, format, choices, picked, hookShown, drill, drillChoices, tiles, placed, tilesNeeded, praise } = s);
   }
 
-  holdOnTap(root, () => auto !== null, hold);
+  holdOnTap(root, hold);
 
   const canListen = speechSupported();
   // Speaking joins the mix only once the model is on the device, so study never stops for a download.
@@ -180,7 +182,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
           if (picked) return;
           picked = c.id;
           stats.practised++;
-          if (!right) misses.set(c.id, (misses.get(c.id) ?? 0) + 1);
+          if (right) return;
+          misses.set(c.id, (misses.get(c.id) ?? 0) + 1);
+          struggled.add(c.id);
         },
         onNext: next,
         onReady: () => (speakReady = true),
@@ -227,7 +231,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       format = 'think';
       drill = pickDrill(c, app.progress, format, lastDrill.get(c.id));
     }
-    if (!drill) return next();
+    // Skip a guide with nothing to ask, still offering the card that moved on before it.
+    if (!drill) return moveOn(previous);
     lastDrill.set(c.id, drill);
     if (format === 'gap') {
       drillChoices = shuffle([drill.answer, ...drill.wrong]);
@@ -298,7 +303,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     phase = 'feedback';
     praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
     say();
-    if (right && firstGo) auto = countdown(root, () => moveOn(snapshot()));
+    if (right && firstGo)
+      auto = countdown(root, () => {
+        autoMoved = true;
+        moveOn(snapshot());
+      });
     draw();
   }
 
@@ -360,6 +369,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function close(): void {
     hold();
     if (reviewing) returnToCurrent();
+    previous = null;
     if (open && stats.answered + stats.practised > 0 && phase !== 'done') {
       speak?.dispose();
       speak = null;
@@ -398,7 +408,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       header(),
       h('div', { class: 'session-body' }, previous && !reviewing && UNANSWERED.includes(phase) && previousButton(lookBack), body()),
     );
-    root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
+    if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
+    autoMoved = false;
   }
 
   function body(): HTMLElement {
@@ -848,7 +859,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   app.onKey((e) => {
     if (e.key === 'r' || e.key === 'R') {
       hold();
-      root.querySelector('.counting')?.classList.remove('counting');
       return say();
     }
     if (phase === 'speak') return;

@@ -21,6 +21,11 @@ export interface Countdown {
 export function countdown(root: HTMLElement, onDone: () => void): Countdown {
   let waited = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const cancel = () => {
+    clearTimeout(timer);
+    // The bar goes without a redraw, which would swallow a tap on the screen.
+    root.querySelector('.counting')?.classList.remove('counting');
+  };
   const tick = () => {
     timer = undefined;
     if (!root.isConnected) return;
@@ -32,21 +37,19 @@ export function countdown(root: HTMLElement, onDone: () => void): Countdown {
     onDone();
   };
   timer = setTimeout(tick, ADVANCE_MS);
-  return { cancel: () => clearTimeout(timer) };
+  return { cancel };
 }
 
 /**
- * Any tap on the screen other than Continue means the learner wants another
- * look (to replay the audio, say), so the countdown stops there. The bar on
- * Continue goes too, without a redraw that would swallow the tap.
+ * Pressing anything on the screen other than Continue, by tap or key, means
+ * the learner wants another look (to replay the audio, say), so the countdown
+ * stops there.
  */
-export function holdOnTap(root: HTMLElement, pending: () => boolean, hold: () => void): void {
+export function holdOnTap(root: HTMLElement, hold: () => void): void {
   root.addEventListener(
-    'pointerdown',
+    'click',
     (e) => {
-      if (!pending() || (e.target as Element).closest?.('.counting')) return;
-      hold();
-      root.querySelector('.counting')?.classList.remove('counting');
+      if (!(e.target as Element).closest?.('.counting')) hold();
     },
     true,
   );

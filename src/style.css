@@ -760,7 +760,7 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .choices .choice.correct,
+  .choices:not(:has(.wrong)) .choice.correct,
   .build-line.right {
     animation: none;
   }

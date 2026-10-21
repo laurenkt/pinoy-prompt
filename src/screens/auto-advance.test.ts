@@ -96,7 +96,7 @@ describe('moving on after a right answer in a session', () => {
   it('stops counting down when the learner taps something else', () => {
     const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
     answer(root, true);
-    root.querySelector('.audio-btn')!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    root.querySelector<HTMLButtonElement>('.audio-btn')!.click();
     expect(root.querySelector('.counting')).toBeNull();
     vi.advanceTimersByTime(ADVANCE_MS * 5);
     expect(shownCard(root).id).toBe('salamat');
@@ -110,6 +110,14 @@ describe('moving on after a right answer in a session', () => {
     expect(has(root, 'Previous card')).toBe(false);
     vi.advanceTimersByTime(ADVANCE_MS * 5);
     expect(shownCard(root).id).toBe('oo');
+  });
+
+  it("doesn't put focus on the next card's choices, so a late Enter can't answer it", () => {
+    const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
+    answer(root, true);
+    vi.advanceTimersByTime(ADVANCE_MS);
+    expect(shownCard(root).id).toBe('oo');
+    expect(document.activeElement?.classList.contains('choice')).toBe(false);
   });
 
   it('does nothing once the screen has been left', () => {
