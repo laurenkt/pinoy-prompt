@@ -81,11 +81,18 @@ let releaseTimer: ReturnType<typeof setTimeout> | undefined;
 
 function releaseSoon(): void {
   clearTimeout(releaseTimer);
-  releaseTimer = setTimeout(releaseMediaSession, RELEASE_AFTER_MS);
+  releaseTimer = setTimeout(releaseWhenQuiet, RELEASE_AFTER_MS);
+}
+
+/** Pausing the track mid-word would let iOS mute the rest of it, so wait for the word to end. */
+function releaseWhenQuiet(): void {
+  if (speechSupported() && speechSynthesis.speaking) releaseSoon();
+  else releaseMediaSession();
 }
 
 function releaseMediaSession(): void {
   clearTimeout(releaseTimer);
+  releaseTimer = undefined;
   silence?.pause();
 }
 
@@ -116,6 +123,7 @@ function holdMediaSession(): void {
   // The microphone's session isn't muted by the switch, and recording shouldn't share it with a track.
   if (typeof Audio === 'undefined' || microphoneOpen()) return;
   clearTimeout(releaseTimer);
+  releaseTimer = undefined;
   silence ??= Object.assign(new Audio(silentWav()), { loop: true });
   if (silence.paused) void silence.play()?.catch(() => {});
 }
@@ -176,9 +184,12 @@ export function stop(release = false): void {
   currentClip?.pause();
   currentClip = null;
   if (release) releaseMediaSession();
-  else if (silence && !silence.paused) releaseSoon();
-  // Safari can drop a word spoken straight after a cancel, so only cancel when something is playing.
-  if (speechSupported() && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
+  // Keeps a countdown already running, so stepping on through cards doesn't hold the track forever.
+  else if (silence && !silence.paused && releaseTimer === undefined) releaseSoon();
+  // Safari can drop a word spoken straight after a cancel, so only cancel when something is playing or stuck.
+  if (speechSupported() && (speechSynthesis.speaking || speechSynthesis.pending || speechSynthesis.paused)) {
+    speechSynthesis.cancel();
+  }
 }
 
 /** Whether a card is still being heard, so a screen moving on by itself can wait for it. */

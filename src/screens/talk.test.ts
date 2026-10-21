@@ -4,8 +4,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
 import { setApiKey, type CallDeps } from '../openai';
+import { stop } from '../speech';
 import { emptyProgress, recordAnswer } from '../store';
 import { hangUpTalk, talkScreen, type TalkDeps } from './talk';
+
+vi.mock('../speech', async (actual) => ({ ...(await actual<typeof import('../speech')>()), stop: vi.fn() }));
 
 const KEY = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123';
 const KNOWN = ['salamat', 'kumusta', 'oo', 'kape'];
@@ -180,6 +183,15 @@ describe('Talk', () => {
     button(root, 'End call').click();
     expect(f.peer.closed).toBe(true);
     expect(button(root, 'Chat again')).toBeTruthy();
+  });
+
+  it("stops a word's silent track before the microphone opens", async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    const root = talkScreen(fakeApp(), f.deps);
+    vi.mocked(stop).mockClear();
+    button(root, 'Start talking').click();
+    expect(stop).toHaveBeenCalledWith(true);
   });
 
   it('says what went wrong when OpenAI refuses the call', async () => {

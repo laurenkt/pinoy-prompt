@@ -14,6 +14,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  stop(true);
+  vi.useRealTimers();
   closeMicrophone();
   vi.unstubAllGlobals();
 });
@@ -44,6 +46,24 @@ function stubAudio() {
   );
 }
 
+function stubSpeech() {
+  const speech = {
+    spoken: [] as { onend: (() => void) | null }[],
+    speaking: false,
+    pending: false,
+    paused: false,
+    cancels: 0,
+    getVoices: () => [{ lang: 'fil-PH', name: 'Test' }],
+    speak: (u: { onend: (() => void) | null }) => speech.spoken.push(u),
+    cancel: () => speech.cancels++,
+    addEventListener() {},
+  };
+  vi.stubGlobal('speechSynthesis', speech);
+  vi.stubGlobal('window', { speechSynthesis: speech });
+  vi.stubGlobal('SpeechSynthesisUtterance', class { onend = null; constructor(public text: string) {} });
+  return speech;
+}
+
 describe('audio session', () => {
   it('asks for playback, which ignores the silent switch, when a card plays', () => {
     void play({ tl: 'Salamat' });
@@ -71,21 +91,12 @@ describe('audio session', () => {
   it('plays a looping silent track with the voice, so the silent switch lets it through, and stops it after', async () => {
     vi.useFakeTimers();
     stubAudio();
-    const spoken: { onend: (() => void) | null }[] = [];
-    const speechSynthesis = {
-      getVoices: () => [{ lang: 'fil-PH', name: 'Test' }],
-      speak: (u: { onend: (() => void) | null }) => spoken.push(u),
-      cancel() {},
-      addEventListener() {},
-    };
-    vi.stubGlobal('speechSynthesis', speechSynthesis);
-    vi.stubGlobal('window', { speechSynthesis });
-    vi.stubGlobal('SpeechSynthesisUtterance', class { onend = null; constructor(public text: string) {} });
+    const speech = stubSpeech();
     const playing = play({ tl: 'Salamat' });
     const silence = silentTrack();
     expect(silence).toMatchObject({ loop: true, paused: false });
     await playing;
-    spoken[0].onend!();
+    speech.spoken[0].onend!();
     // Kept running between words, as restarting it delays the next one on iOS.
     vi.advanceTimersByTime(5_000);
     expect(silence!.paused).toBe(false);
@@ -101,7 +112,36 @@ describe('audio session', () => {
     expect(silence!.paused).toBe(false);
     stop(true);
     expect(silence!.paused).toBe(true);
-    vi.useRealTimers();
+  });
+
+  it("doesn't pause the silent track mid-word, or keep it for good while cards keep changing", async () => {
+    vi.useFakeTimers();
+    stubAudio();
+    const speech = stubSpeech();
+    await play({ tl: 'Salamat' });
+    speech.speaking = true;
+    vi.advanceTimersByTime(20_000);
+    expect(silentTrack()!.paused).toBe(false);
+    speech.speaking = false;
+    for (let i = 0; i < 4; i++) {
+      stop();
+      vi.advanceTimersByTime(5_000);
+    }
+    expect(silentTrack()!.paused).toBe(true);
+  });
+
+  it('only cancels speech when something is playing or stuck, as Safari can drop the next word', async () => {
+    stubAudio();
+    const speech = stubSpeech();
+    await play({ tl: 'Salamat' });
+    expect(speech.cancels).toBe(0);
+    speech.speaking = true;
+    stop();
+    expect(speech.cancels).toBe(1);
+    speech.speaking = false;
+    speech.paused = true;
+    stop();
+    expect(speech.cancels).toBe(2);
   });
 
   it('does nothing where the browser has no audio session', async () => {
