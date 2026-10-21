@@ -85,6 +85,17 @@ describe('the mix of English and Tagalog', () => {
     expect(text).not.toMatch(/greet(ing)? them in Tagalog/);
   });
 
+  it('helps when the learner is stuck, with Tagalog they know', () => {
+    const text = talkInstructions(talkPlan(progressWith(['kape', 'magandang-hapon']), null));
+    expect(text).toContain('When they are stuck, help before moving on.');
+    expect(text).toMatch(/"You could say Magandang hapon, good afternoon\."/);
+    expect(text).toContain('Never brush a stuck moment off');
+  });
+
+  it("asks for Tagalog only where it fits, not tacked on", () => {
+    expect(talkInstructions(talkPlan(progressWith(['salamat']), null))).toContain('Never tack one onto the end');
+  });
+
   it('mixes in more Tagalog as more words are known', () => {
     expect(mixLevel(19)).toMatch(/^at most one/);
     expect(mixLevel(20)).toMatch(/^up to two or three/);

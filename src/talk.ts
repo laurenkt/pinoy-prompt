@@ -54,6 +54,13 @@ function example(plan: TalkPlan): string {
   return card ? `"${card.tl}" (${card.en})` : 'a word';
 }
 
+/** What a stuck learner might be offered: a known greeting if there is one, so the example reads naturally. */
+function stuckExample(plan: TalkPlan): string {
+  const known = plan.known.map((k) => k.card);
+  const card = known.find((c) => /^(magandang|kumusta)/i.test(c.tl)) ?? known[0] ?? plan.newWord;
+  return card ? `${card.tl.replace(/[.!?]+$/, '')}, ${card.en.toLowerCase().replace(/[.!?]+$/, '')}` : 'Salamat, thank you';
+}
+
 /** How much Tagalog to mix in: more as the learner knows more. */
 export function mixLevel(known: number): string {
   if (known < 20) return 'at most one Tagalog word or phrase in a sentence, where one fits; plain English sentences are fine';
@@ -78,6 +85,7 @@ export function talkInstructions(plan: TalkPlan): string {
     `Use ${mixLevel(plan.known.length)}.`,
     'A listed phrase counts as one swap. Apart from short listed greetings and replies, never say a whole sentence in Tagalog. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
     `For example, with ${example(plan)} on the list, say an English sentence with it in place of its English meaning.`,
+    'Only use a Tagalog word where it means exactly what that spot in the sentence needs. Never tack one onto the end of a sentence or question just to fit it in; a plain English sentence is better than a misplaced word.',
     '',
   ];
   if (firm.length) lines.push(`Tagalog they know well, use it freely: ${list(firm)}.`);
@@ -95,7 +103,9 @@ export function talkInstructions(plan: TalkPlan): string {
       ? `Talk about everyday situations around this topic: ${plan.topic.title}.`
       : 'Talk about everyday things, like how their day is going, food, family or plans.',
     'Keep each turn to one to three short sentences, and end with a question or something easy to answer, so they can reply using their Tagalog.',
-    'They may answer in English, Tagalog or a mix. If their Tagalog has a mistake, do not point it out; use the right form in your reply if it is on the list, otherwise reply in English.',
+    'They may answer in English, Tagalog or a mix. If their Tagalog has a small mistake, do not dwell on it; use the right form in your reply if it is on the list, otherwise reply in English.',
+    '',
+    `When they are stuck, help before moving on. They are stuck if they hesitate or trail off, say "um" or "something" in place of a word, start a Tagalog phrase and can't finish it, use an English word where a listed Tagalog one fits, or ask how to say something. Then briefly offer the Tagalog from the list for what they were trying to say, with its meaning (for example: "You could say ${stuckExample(plan)}."), invite them to try it, and wait. If they try it, carry on warmly. If nothing on the list fits, give the simple English and carry on. Never brush a stuck moment off with "that works" or similar.`,
     'No scores, praise for every reply, or talk of streaks or progress.',
     '',
     'Backchannel policy: Use light backchannels. Acknowledge naturally without competing with the main response.',
