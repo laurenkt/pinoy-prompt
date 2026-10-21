@@ -18,6 +18,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// speech.ts keeps one silent track for good, so every test sees the tracks made so far.
+const tracks: { src: string; loop: boolean; paused: boolean }[] = [];
+const silentTrack = () => tracks.find((t) => t.src.startsWith('data:audio/wav'));
+
+function stubAudio() {
+  vi.stubGlobal(
+    'Audio',
+    class {
+      loop = false;
+      paused = true;
+      constructor(public src: string) {
+        tracks.push(this);
+      }
+      play() {
+        this.paused = false;
+        return Promise.resolve();
+      }
+      pause() {
+        this.paused = true;
+      }
+    },
+  );
+}
+
 describe('audio session', () => {
   it('asks for playback, which ignores the silent switch, when a card plays', () => {
     void play({ tl: 'Salamat' });
@@ -36,28 +60,32 @@ describe('audio session', () => {
     expect(audioSession.type).toBe('playback');
   });
 
-  it('plays a looping silent track with the voice, so the silent switch lets it through, and stops it after', () => {
-    const tracks: { src: string; loop: boolean; paused: boolean }[] = [];
-    vi.stubGlobal(
-      'Audio',
-      class {
-        loop = false;
-        paused = true;
-        constructor(public src: string) {
-          tracks.push(this);
-        }
-        play() {
-          this.paused = false;
-          return Promise.resolve();
-        }
-        pause() {
-          this.paused = true;
-        }
-      },
-    );
+  it('does not leave the silent track looping where there is no voice to play', () => {
+    stubAudio();
     void play({ tl: 'Salamat' });
-    const silence = tracks.find((t) => t.src.startsWith('data:audio/wav'));
+    expect(silentTrack()).toMatchObject({ loop: true, paused: true });
+  });
+
+  it('plays a looping silent track with the voice, so the silent switch lets it through, and stops it after', async () => {
+    stubAudio();
+    const spoken: { onend: (() => void) | null }[] = [];
+    const speechSynthesis = {
+      getVoices: () => [{ lang: 'fil-PH', name: 'Test' }],
+      speak: (u: { onend: (() => void) | null }) => spoken.push(u),
+      cancel() {},
+      addEventListener() {},
+    };
+    vi.stubGlobal('speechSynthesis', speechSynthesis);
+    vi.stubGlobal('window', { speechSynthesis });
+    vi.stubGlobal('SpeechSynthesisUtterance', class { onend = null; constructor(public text: string) {} });
+    const playing = play({ tl: 'Salamat' });
+    const silence = silentTrack();
     expect(silence).toMatchObject({ loop: true, paused: false });
+    await playing;
+    spoken[0].onend!();
+    expect(silence!.paused).toBe(true);
+    void play({ tl: 'Salamat' });
+    expect(silence!.paused).toBe(false);
     stop();
     expect(silence!.paused).toBe(true);
   });
