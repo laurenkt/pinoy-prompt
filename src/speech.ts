@@ -58,7 +58,7 @@ let currentClip: HTMLAudioElement | null = null;
 let generation = 0;
 
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
-export async function play(card: Pick<Card, 'tl' | 'audio'>, slow = false): Promise<void> {
+export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
   stop();
   const mine = generation;
   if (card.audio) {
@@ -74,7 +74,7 @@ export async function play(card: Pick<Card, 'tl' | 'audio'>, slow = false): Prom
   if (!speechSupported() || mine !== generation) return;
   await initVoices();
   if (mine !== generation) return;
-  const utterance = new SpeechSynthesisUtterance(card.tl);
+  const utterance = new SpeechSynthesisUtterance(card.say ?? card.tl);
   if (voice) {
     utterance.voice = voice;
     utterance.lang = voice.lang;

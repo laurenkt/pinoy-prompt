@@ -1,7 +1,7 @@
 // Builds a study session and tracks it as the learner works through it.
 // Kept free of DOM code so it can be unit tested.
 
-import { LEARN_ORDER, VOCAB, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
+import { LEARN_ORDER, VOCAB, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
 import { recallChance } from './memory';
 import { isDue, type CardState } from './srs';
 import type { Progress } from './store';
@@ -233,7 +233,8 @@ export function requeue(queue: Step[], step: Step): Step[] {
 /**
  * Pick wrong answers for a multiple-choice question on a word or phrase.
  * Prefers cards of the same kind (word vs phrase) so the right answer can't be
- * spotted by its length. Guides are never used.
+ * spotted by its length, and never one that could also be right (CLOSE_MEANINGS).
+ * Guides are never used.
  */
 export function distractors(
   card: Card,
@@ -244,7 +245,7 @@ export function distractors(
 ): Card[] {
   const seen = new Set([card[field].toLowerCase()]);
   const candidates = shuffle(
-    pool.filter((c) => c.id !== card.id && isVocab(c)),
+    pool.filter((c) => c.id !== card.id && isVocab(c) && !closeInMeaning(c.id, card.id)),
     random,
   ).sort((a, b) => Number(b.kind === card.kind) - Number(a.kind === card.kind));
   const picked: Card[] = [];

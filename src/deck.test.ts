@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, CORE_WORDS, LEARN_ORDER, UNITS, VOCAB, getCard, isVocab } from './deck';
+import { ALL_CARDS, CORE_WORDS, LEARN_ORDER, UNITS, getCard, isVocab } from './deck';
 import { GUIDES } from './guides';
 import { canBuild, upcomingNewCards } from './session';
 import { emptyProgress, recordAnswer } from './store';
@@ -39,10 +39,13 @@ describe('deck', () => {
     for (const id of CORE_WORDS) expect(getCard(id)?.tl.toLowerCase(), id).toBe(id);
   });
 
-  it('introduces the core words a phrase is built from before the phrase', () => {
-    for (const card of VOCAB) {
-      const words = card.tl.toLowerCase().split(/[^a-z-]+/);
-      for (const word of words.filter((w) => w !== card.id && CORE_WORDS.includes(w))) {
+  it('introduces the core words a card is built from before the card', () => {
+    // "Bang" is "ba" joined to the next word, "pong" is "po", and "nito" is "of this".
+    const core = (word: string) =>
+      [word, word.replace(/ng$/, ''), word === 'nito' ? 'ito' : ''].find((w) => CORE_WORDS.includes(w));
+    for (const card of ALL_CARDS) {
+      const words = card.tl.toLowerCase().split(/[^a-z-]+/).map(core);
+      for (const word of words.filter((w): w is string => !!w && w !== card.id)) {
         expect(LEARN_ORDER.indexOf(word), `${card.id} uses ${word}`).toBeLessThan(LEARN_ORDER.indexOf(card.id));
       }
     }

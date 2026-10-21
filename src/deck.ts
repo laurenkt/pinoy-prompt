@@ -36,6 +36,8 @@ export interface Card {
   hook: string;
   /** Optional recorded clip in public/audio/. */
   audio?: string;
+  /** What the speech voice reads instead of `tl`, when the spelling would mislead it. */
+  say?: string;
   /** Other accepted pronunciations, as spelled, for when the learner says the card out loud. */
   accept?: string[];
   /** Guides only: examples, each tappable to hear, built from cards met earlier where possible. */
@@ -192,12 +194,12 @@ export const UNITS: Unit[] = [
     id: 'basics',
     title: 'Building blocks',
     tlTitle: 'Pundasyon',
-    intro: 'A handful of words that build hundreds of sentences: I, you, my, your, this, the, already, just. They turn up in almost every phrase, so knowing them makes each new phrase one new word instead of four.',
+    intro: 'A handful of words that build hundreds of sentences: I, you, my, your, this, the, already, just. They turn up in almost every phrase, so knowing them makes each new phrase one new word instead of four. Then: there is, there isn\'t, I need, can I.',
     cards: [
       { id: 'ako', tl: 'ako', en: 'I / me', kind: 'word', hint: 'ah-KOH', hook: 'Introduce yourself with "Ako si ___", I am ___. In a sentence it often comes last: "Gutom na ako", hungry already, me.' },
       { id: 'ikaw', tl: 'ikaw', en: 'you', kind: 'word', hint: 'ee-KAOW', note: 'After another word it usually shrinks to "ka": "Taga-saan ka?".', hook: '"Ikaw?" on its own is the bounce-back: "Mabuti naman. Ikaw?", "Fine. And you?"' },
       { id: 'ka', tl: 'ka', en: 'you (after a word)', kind: 'word', hint: 'kah', note: 'The short "ikaw". It never starts a sentence.', hook: '"Ikaw" shrunk to fit after another word: "Taga-saan ka?", from where, you?' },
-      { id: 'ko', tl: 'ko', en: 'my', kind: 'word', hint: 'koh', note: 'After a doing word it means "I": "Hindi ko alam", I don\'t know.', hook: 'It comes after what it owns: "bag ko", my bag. Its partner is "mo", your: k for me, m for you.' },
+      { id: 'ko', tl: 'ko', en: 'my', kind: 'word', hint: 'koh', note: 'After a doing word it means "I": "Gusto ko ito", I want this.', hook: 'It comes after what it owns: "bag ko", my bag. Its partner is "mo", your: k for me, m for you.' },
       { id: 'mo', tl: 'mo', en: 'your', kind: 'word', hint: 'moh', note: 'After a doing word it means "you": "Hintayin mo ako", wait for me.', hook: '"Ano ang pangalan mo?" is "what is the name, yours?". Swap in "ko" and it is "my name".' },
       { id: 'ang', tl: 'ang', en: 'the', kind: 'word', hint: 'ahng', note: 'It points at what the sentence is about, so you will hear it everywhere.', hook: '"Nasaan ang banyo?", where is the bathroom? Where English says "the", Tagalog usually says "ang".' },
       { id: 'ito', tl: 'ito', en: 'this', kind: 'word', hint: 'ee-TOH', hook: 'Point and ask: "Ano ito?", what is this? "Magkano ito?", how much is this?' },
@@ -205,7 +207,7 @@ export const UNITS: Unit[] = [
       { id: 'lang', tl: 'lang', en: 'just / only', kind: 'word', hint: 'lahng', hook: '"Sandali lang", just a moment. Adding "lang" makes anything sound smaller and easier, so it softens a lot of requests.' },
       { id: 'sa', tl: 'sa', en: 'to / at / in', kind: 'word', hint: 'sah', hook: 'One little word for to, at and in: "sa bahay", at home; "sa Tagalog", in Tagalog.' },
       { id: 'ba', tl: 'ba', en: '(makes a yes/no question)', kind: 'word', hint: 'bah', hook: 'A spoken question mark: "Puwede?" (it\'s allowed) becomes "Puwede ba?" (is it allowed?).' },
-      { id: 'ng', tl: 'ng', en: 'of / some', kind: 'word', hint: 'nahng', accept: ['nang'], hook: 'Spelled n-g but said "nahng". "Pahingi po ng tubig", some water please; "alas-siyete ng umaga", seven in the morning.' },
+      { id: 'ng', tl: 'ng', en: 'of / some', kind: 'word', hint: 'nahng', say: 'nang', accept: ['nang'], hook: 'Spelled n-g but said "nahng". "Pahingi po ng tubig", some water please; "alas-siyete ng umaga", seven in the morning.' },
       { id: 'siya', tl: 'siya', en: 'he / she', kind: 'word', hint: 'shah', hook: 'One word for he and she: Tagalog doesn\'t mark gender. Said as one quick syllable, "shah", like "siyam".' },
       { id: 'tayo', tl: 'tayo', en: 'we (including you)', kind: 'word', hint: 'tah-YOH', hook: 'The "we" that includes the person you are talking to. "Kain tayo!", let\'s eat, invites everyone at the table.' },
       { id: 'kami', tl: 'kami', en: 'we (not including you)', kind: 'word', hint: 'kah-MEE', hook: '"Kami" leaves the listener out. Tell a waiter "Dalawa kami", "we are two", because the waiter isn\'t eating with you.' },
@@ -530,7 +532,7 @@ export const VOCAB: Card[] = UNITS.flatMap((u) => u.cards);
 export const ALL_CARDS: Card[] = [...VOCAB, ...GUIDES];
 
 /**
- * The little words that hold phrases together: I, you, my, your, the, this,
+ * The little words that hold phrases together: I, you, we, my, your, the, this,
  * already, just, to, of, the question "ba", polite "po" and "not". Each has its
  * own card, met before any phrase that uses it, so a new phrase is never several
  * unknowns at once. Other words in a phrase are learned in context.
@@ -538,6 +540,12 @@ export const ALL_CARDS: Card[] = [...VOCAB, ...GUIDES];
 export const CORE_WORDS: readonly string[] = [
   'ako', 'ikaw', 'ka', 'ko', 'mo', 'tayo', 'ang', 'ito', 'na', 'lang', 'sa', 'ba', 'ng', 'po', 'hindi',
 ];
+
+/**
+ * Cards close enough in meaning that one is never offered as a wrong answer
+ * for another: "ko" can mean "I", "mo" can mean "you", and "na" can mean "now".
+ */
+export const CLOSE_MEANINGS: readonly (readonly string[])[] = [['ako', 'ko'], ['ikaw', 'ka', 'mo'], ['na', 'ngayon']];
 
 /**
  * The order new cards are introduced in, most useful first, across topics. Topics
@@ -552,12 +560,12 @@ export const LEARN_ORDER: readonly string[] = [
   'kumusta', 'mabuti', 'salamat', 'oo', 'hindi', 'po', 'opo', 'salamat-po', 'walang-anuman', 'ano', 'sige',
   'ako', 'ikaw', 'ako-si', 'taga-ako', 'ka', 'taga-saan', 'mo', 'ang', 'ano-pangalan', 'paalam', 'ingat',
   'na', 'pasensya-na', 'ko', 'hindi-ko-alam', 'hindi-maintindihan', 'pakiulit', 'ito', 'sa', 'paano-sabihin',
-  'ano-ibig-sabihin', 'lang', 'dahan-dahan', 'kaunti-lang', 'ingles',
+  'ano-ibig-sabihin', 'lang', 'dahan-dahan', 'kaunti-lang', 'ba', 'ingles',
   // Guides (guides.ts) wait for the cards they build on and come in slowly (session.ts), so they sit
   // roughly where they would first be useful.
   'k-psst', 's-letters', 'p-po', 't-ha',
   // Asking for things: where, what, how much, I want, I need, can I.
-  'saan', 'nasaan-banyo', 'ano-ito', 'magkano', 'gusto-ko-ito', 'ayoko', 'ba', 'may-kape-ba', 'wala',
+  'saan', 'nasaan-banyo', 'ano-ito', 'magkano', 'gusto-ko-ito', 'ayoko', 'may-kape-ba', 'wala',
   'meron', 'puwede-ba', 'kailangan-ko', 'dito', 'isa', 'dalawa', 'tatlo', 'apat', 'lima', 'anim', 'pito',
   'walo', 'siyam', 'sampu', 'tara-na', 'sandali-lang',
   'p-ba', 'p-hindi', 'p-may', 'k-eyebrows',
@@ -618,6 +626,11 @@ const byId = new Map(ALL_CARDS.map((c) => [c.id, c]));
 
 export function getCard(id: string): Card | undefined {
   return byId.get(id);
+}
+
+/** Whether two cards are close enough in meaning to both be right answers (see CLOSE_MEANINGS). */
+export function closeInMeaning(a: string, b: string): boolean {
+  return CLOSE_MEANINGS.some((group) => group.includes(a) && group.includes(b));
 }
 
 export function unitOf(cardId: string): Unit | undefined {
