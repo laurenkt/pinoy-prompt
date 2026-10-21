@@ -44,9 +44,9 @@ export function forgetApiKey(): void {
 }
 
 /** Talk always speaks as Beacon, the one GPT-Live voice with a Filipino accent. */
-export const TALK_VOICE = 'beacon';
+const TALK_VOICE = 'beacon';
 
-/** Clear the voice choice Settings used to offer, now that there's only Beacon. */
+/** Clear the voice choice Settings used to offer, now that there's only Beacon. Safe to delete once old installs have all launched since. */
 export function forgetRetiredVoiceChoice(): void {
   try {
     localStorage.removeItem(RETIRED_VOICE_STORAGE);

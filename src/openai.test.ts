@@ -128,7 +128,7 @@ describe('the retired voice choice', () => {
 describe('startCall', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('starts a GPT-Live session with the browser offer and applies the answer', async () => {
+  it('starts a GPT-Live session in the Beacon voice with the browser offer and applies the answer', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'v=0 answer' } }));
     await startCall(KEY, { instructions: 'Talk Taglish.', greeting: 'Say hi.' }, f.events, f.deps);
     const [url, init] = f.fetchFn.mock.calls[0];
