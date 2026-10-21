@@ -73,7 +73,7 @@ export interface MemorySummary {
   estimatedRecall: number | null;
   /** Reviews of learned words in the last RECALL_WINDOW_DAYS days. */
   recent: { reviews: number; missed: number };
-  /** Reviews falling due later today or tomorrow, and in the rest of the coming week. */
+  /** Reviews not yet due but falling due by the end of tomorrow (later today included), and in the rest of the coming week. */
   due: { tomorrow: number; week: number };
 }
 
