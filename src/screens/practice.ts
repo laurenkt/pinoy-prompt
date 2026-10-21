@@ -4,6 +4,7 @@ import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { play, speechSupported, stop } from '../speech';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
+import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
@@ -66,6 +67,13 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   let lastMode: MenuMode = 'mix';
   let speak: SpeakPanel | null = null;
   let spokenRight = false;
+  /** Counting down to the next question after a right answer. */
+  let auto: Countdown | null = null;
+  /** What was picked on the question before, when it moved on by itself; null when there's nothing to look back at. */
+  let previousPick: string | null = null;
+  let lookingBack = false;
+
+  holdOnTap(root, () => auto !== null, hold);
 
   function start(menuMode: MenuMode): void {
     lastMode = menuMode;
@@ -83,6 +91,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     index = 0;
     score = 0;
     picked = null;
+    previousPick = null;
     ask();
   }
 
@@ -102,7 +111,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
           const title = root.querySelector('.session-title');
           if (title) title.textContent = `${score} right`;
         },
-        onNext: advance,
+        onNext: () => advance(),
         onReady: () => (speakReady = true),
         deps,
       });
@@ -122,21 +131,40 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     const q = questions[index];
     if (!q || picked) return;
     picked = choice.id;
-    if (choice.id === q.card.id) score++;
     if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
+    if (choice.id === q.card.id) {
+      score++;
+      auto = countdown(root, () => advance(choice.id));
+    }
     draw();
   }
 
-  function advance(): void {
+  /** Next question; `back` is this one's pick, when it moved on by itself, so it can be looked back at. */
+  function advance(back: string | null = null): void {
+    hold();
+    previousPick = back;
     index++;
     picked = null;
     ask();
   }
 
+  /** Stop counting down: the learner wants another look. */
+  function hold(): void {
+    auto?.cancel();
+    auto = null;
+  }
+
+  function setLookingBack(on: boolean): void {
+    stop();
+    lookingBack = on;
+    draw();
+  }
+
   function draw(): void {
     if (questions.length === 0) root.replaceChildren(menu());
     else if (index >= questions.length) root.replaceChildren(results());
-    else root.replaceChildren(questionView(questions[index]));
+    else if (lookingBack && previousPick) root.replaceChildren(questionView(questions[index - 1], previousPick));
+    else root.replaceChildren(questionView(questions[index], picked));
     root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
   }
 
@@ -177,7 +205,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     );
   }
 
-  function questionView(q: Question): HTMLElement {
+  /** A question with what was picked on it; the one before, while looking back. */
+  function questionView(q: Question, picked: string | null): HTMLElement {
+    const reviewing = q !== questions[index];
     const answered = picked !== null;
     const right = picked === q.card.id;
     const field = q.mode === 'recall' ? 'tl' : 'en';
@@ -221,6 +251,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         progressBar(index, questions.length, 'Round progress'),
         h('span', { class: 'session-title' }, `${score} right`),
       ),
+      previousPick && !answered && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
       h(
         'div',
         { class: 'panel' },
@@ -252,9 +283,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
             ' ',
             `${q.card.tl} = ${q.card.en}`,
           ),
-        q.mode !== 'speak' && answered && !right &&
+        q.mode !== 'speak' && answered && (!right || reviewing) &&
           hookView(q.card),
-        q.mode !== 'speak' && answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: advance }, 'Next'),
+        q.mode !== 'speak' && answered &&
+          (reviewing ? continueButton(() => setLookingBack(false), false, 'Back to the current card') : continueButton(() => advance(), auto !== null, 'Next')),
       ),
     );
   }
@@ -276,10 +308,14 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   }
 
   app.onKey((e) => {
-    const q = questions[index];
+    const q = lookingBack ? questions[index - 1] : questions[index];
     if (!q) return;
-    if (e.key === 'r' || e.key === 'R') return sayCard(q.card);
-    if (q.mode === 'speak') return;
+    if (e.key === 'r' || e.key === 'R') {
+      hold();
+      root.querySelector('.counting')?.classList.remove('counting');
+      return sayCard(q.card);
+    }
+    if (q.mode === 'speak' || lookingBack) return;
     const n = Number(e.key);
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });

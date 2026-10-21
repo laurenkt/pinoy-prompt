@@ -20,6 +20,7 @@ import { formatInterval, nextInterval, newCardState, type Rating } from '../srs'
 import { play, speechSupported, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
+import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'caught-up' | 'done';
@@ -32,6 +33,9 @@ const RATINGS: { rating: Rating; label: string }[] = [
 ];
 
 const PRAISE = ['Magaling!', 'Galing!', 'Tama!', 'Ayos!'];
+
+/** Phases where the current card hasn't been answered yet, so the one before it can still be looked back at. */
+const UNANSWERED: Phase[] = ['topic-intro', 'intro', 'quiz', 'build', 'front', 'caught-up', 'done'];
 
 /**
  * A study session. With a list of steps it works through them and finishes;
@@ -66,6 +70,26 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   const misses = new Map<string, number>();
   const topicsIntroduced = new Set<string>();
   const stats = { learned: 0, reviewed: 0, practised: 0, correct: 0, answered: 0 };
+  /** Cards missed at least once this session: getting one right later keeps its hook up instead of moving on. */
+  const struggled = new Set<string>();
+  let praise = PRAISE[0];
+  /** Counting down to the next card after a right answer. */
+  let auto: Countdown | null = null;
+  /** The card that moved on by itself, as it was left, so the learner can look back at it. */
+  let previous: Shown | null = null;
+  /** While looking back, the card to return to. */
+  let reviewing: Shown | null = null;
+
+  /** Everything that makes up the card on screen. */
+  type Shown = ReturnType<typeof snapshot>;
+  function snapshot() {
+    return { step, card, phase, format, choices, picked, hookShown, drill, drillChoices, tiles, placed, tilesNeeded, praise };
+  }
+  function restore(s: Shown): void {
+    ({ step, card, phase, format, choices, picked, hookShown, drill, drillChoices, tiles, placed, tilesNeeded, praise } = s);
+  }
+
+  holdOnTap(root, () => auto !== null, hold);
 
   const canListen = speechSupported();
   // Speaking joins the mix only once the model is on the device, so study never stops for a download.
@@ -97,6 +121,13 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   function next(): void {
+    moveOn(null);
+  }
+
+  /** Go to the next step, keeping `back` as the card to look back at, if it moved on by itself. */
+  function moveOn(back: Shown | null): void {
+    hold();
+    previous = back;
     speak?.dispose();
     speak = null;
     stop();
@@ -168,6 +199,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
 
   function finish(rating: Rating): void {
     if (!card || !step) return;
+    if (rating === 'again') struggled.add(card.id);
     if (step.kind === 'extra') {
       // Practice beyond the schedule: noted for this session only.
       stats.practised++;
@@ -217,10 +249,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function pickAnswer(text: string): void {
     if (!drill || picked) return;
     picked = text;
-    finish(text === drill.answer ? 'good' : 'again');
-    phase = 'feedback';
-    say();
-    draw();
+    answered(text === drill.answer);
   }
 
   function place(i: number): void {
@@ -238,10 +267,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function checkBuild(): void {
     if (!drill || phase !== 'build') return;
     picked = placed.map((i) => tiles[i]).join(' ');
-    finish(picked === buildTiles(drill).words.join(' ') ? 'good' : 'again');
-    phase = 'feedback';
-    say();
-    draw();
+    answered(picked === buildTiles(drill).words.join(' '));
   }
 
   function startQuiz(): void {
@@ -261,10 +287,51 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function pick(choice: Card): void {
     if (!card || picked) return;
     picked = choice.id;
-    finish(choice.id === card.id ? 'good' : 'again');
+    answered(choice.id === card.id);
+  }
+
+  /** Show how a multiple-choice or build answer went. A right one moves on by itself, unless the card has been missed this session. */
+  function answered(right: boolean): void {
+    if (!card) return;
+    const firstGo = !struggled.has(card.id);
+    finish(right ? 'good' : 'again');
     phase = 'feedback';
+    praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
     say();
+    if (right && firstGo) auto = countdown(root, () => moveOn(snapshot()));
     draw();
+  }
+
+  /** Stop counting down: the learner wants another look. */
+  function hold(): void {
+    auto?.cancel();
+    auto = null;
+  }
+
+  /** Whether the card on screen gets its hook even though it was answered right. */
+  function lookAgain(c: Card): boolean {
+    return reviewing !== null || struggled.has(c.id);
+  }
+
+  function lookBack(): void {
+    if (!previous) return;
+    stop();
+    reviewing = snapshot();
+    restore(previous);
+    draw();
+  }
+
+  function returnToCurrent(): void {
+    if (!reviewing) return;
+    stop();
+    restore(reviewing);
+    reviewing = null;
+    draw();
+  }
+
+  /** Continue, or while looking back, the way back to the card being asked. */
+  function proceed(): HTMLElement {
+    return reviewing ? continueButton(returnToCurrent, false, 'Back to the current card') : continueButton(next, auto !== null);
   }
 
   function reveal(): void {
@@ -291,6 +358,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
 
   /** Stopping open-ended study shows what was done, if anything was. */
   function close(): void {
+    hold();
+    if (reviewing) returnToCurrent();
     if (open && stats.answered + stats.practised > 0 && phase !== 'done') {
       speak?.dispose();
       speak = null;
@@ -327,7 +396,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function draw(): void {
     root.replaceChildren(
       header(),
-      h('div', { class: 'session-body' }, body()),
+      h('div', { class: 'session-body' }, previous && !reviewing && UNANSWERED.includes(phase) && previousButton(lookBack), body()),
     );
     root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
   }
@@ -480,7 +549,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         h(
           'div',
           { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
-          h('strong', null, right ? PRAISE[Math.floor(Math.random() * PRAISE.length)] : 'Not quite.'),
+          h('strong', null, right ? praise : 'Not quite.'),
           ' ',
           right
             ? step?.kind === 'new'
@@ -488,8 +557,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
               : `${c.tl} = ${c.en}`
             : `"${c.tl}" means "${c.en}".${extra ? '' : ' It will come back shortly.'}`,
         ),
-      answered && !right && hookView(c),
-      answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
+      answered && (!right || lookAgain(c)) && hookView(c),
+      answered && proceed(),
     );
   }
 
@@ -646,7 +715,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     return h(
       'div',
       { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
-      h('strong', null, right ? PRAISE[Math.floor(Math.random() * PRAISE.length)] : 'Not quite.'),
+      h('strong', null, right ? praise : 'Not quite.'),
       ' ',
       right ? (step?.kind === 'new' ? 'That one is yours now.' : '') : `The answer is ${answerText()}${extra ? '' : ' It will come back shortly.'}`,
       !right && c.note && h('p', { class: 'feedback-note' }, c.note),
@@ -680,7 +749,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         ),
       ),
       answered && drillFeedback(c, right),
-      answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
+      answered && right && lookAgain(c) && hookView(c),
+      answered && proceed(),
     );
   }
 
@@ -713,7 +783,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         ),
       answered && gapLine(d, true),
       answered && drillFeedback(c, right),
-      answered && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
+      answered && right && lookAgain(c) && hookView(c),
+      answered && proceed(),
     );
   }
 
@@ -775,7 +846,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   app.onKey((e) => {
-    if (e.key === 'r' || e.key === 'R') return say();
+    if (e.key === 'r' || e.key === 'R') {
+      hold();
+      root.querySelector('.counting')?.classList.remove('counting');
+      return say();
+    }
     if (phase === 'speak') return;
     // Enter and Space activate the focused primary button natively.
     const n = Number(e.key);
