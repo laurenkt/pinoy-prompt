@@ -14,13 +14,12 @@ function attempt(text: string, heard: string[]): Attempt {
 }
 
 let player: FakePlayer;
-const say = () => {};
 const q = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T & HTMLElement>(sel)!;
 const all = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)];
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 function show(a: Attempt) {
-  const view = resultView(a, { player, say });
+  const view = resultView(a, { player });
   document.body.replaceChildren(view.el);
   return view;
 }
@@ -43,31 +42,48 @@ describe('spanOf', () => {
 });
 
 describe('the breakdown', () => {
-  it('pairs each sound with what was heard, and starts on the one to work on', () => {
+  const button = (name: string) => all('.detail-actions button').find((b) => b.textContent === name)!;
+
+  it('marks each sound on the recording with what was heard, and starts on the one to work on', () => {
     show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
-    expect(all('.pair .tile-target .tile-ipa').map((e) => e.textContent)).toEqual(['ŋ', 'a', 'j', 'o', 'n']);
-    expect(all('.pair .tile-heard').map((e) => e.textContent)).toEqual(['n', 'a', 'j', 'o', 'n']);
-    expect(q('.pair.selected .tile-target .tile-ipa').textContent).toBe('ŋ');
+    expect(all('.ribbon-mark .mark-target').map((e) => e.textContent)).toEqual(['ŋ', 'a', 'j', 'o', 'n']);
+    expect(all('.ribbon-mark .mark-heard').map((e) => e.textContent)).toEqual(['n', 'a', 'j', 'o', 'n']);
+    expect(q('.ribbon-mark.selected .mark-target').textContent).toBe('ŋ');
+    expect(q('.ribbon-mark.selected').getAttribute('aria-pressed')).toBe('true');
     expect(q('.sound-detail').textContent).toContain('ng as in "sing"');
     expect(q('.sound-detail').textContent).toContain('You said');
   });
 
-  it('plays a native speaker for the target and your own recording for what you said', () => {
+  it('has no second row of sound buttons to keep in step with the recording', () => {
     show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
-    q<HTMLButtonElement>('.pair-off .tile-target').click();
-    expect(player.calls.at(-1)).toEqual({ kind: 'url', url: referenceFor('ŋ')!.url });
-    q<HTMLButtonElement>('.pair-off .tile-heard').click();
+    expect(document.querySelector('.sound-strip, .pair, .tile')).toBeNull();
+  });
+
+  it('plays your part when a sound is tapped, and the native speaker for the target', () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    q<HTMLButtonElement>('.mark-off').click();
     expect(player.calls.at(-1)).toMatchObject({ kind: 'slice' });
     const slice = player.calls.at(-1) as { from: number; to: number };
     // The first sound was heard at 0.2–0.24 s.
     expect(slice.from).toBeLessThanOrEqual(0.2);
     expect(slice.to).toBeGreaterThanOrEqual(0.24);
+    button('▶ Target').click();
+    expect(player.calls.at(-1)).toEqual({ kind: 'url', url: referenceFor('ŋ')!.url });
+    button('▶ Yours').click();
+    expect(player.calls.at(-1)).toEqual(slice);
+  });
+
+  it('opens the sound that was tapped', () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    all('.ribbon-mark')[1].click();
+    expect(q('.ribbon-mark.selected .mark-target').textContent).toBe('a');
+    expect(all('.ribbon-mark.selected')).toHaveLength(1);
+    expect(q('.sound-detail .detail-letters').textContent).toBe('“a”');
   });
 
   it('plays yours then the target, moving your mark onto the target', async () => {
     show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
-    const both = all('.detail-actions button').find((b) => b.textContent === '▶ Yours, then the target')!;
-    both.click();
+    button('▶ Both').click();
     await flush();
     await flush();
     expect(player.calls.map((c) => c.kind)).toEqual(['slice', 'url']);
@@ -76,9 +92,8 @@ describe('the breakdown', () => {
 
   it('stops the sequence when something else is played during it', async () => {
     show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
-    const both = all('.detail-actions button').find((b) => b.textContent === '▶ Yours, then the target')!;
-    both.click();
-    q<HTMLButtonElement>('.pair-off .tile-heard').click();
+    button('▶ Both').click();
+    q<HTMLButtonElement>('.mark-off').click();
     await flush();
     await flush();
     expect(player.calls.map((c) => c.kind)).toEqual(['slice', 'slice']);
@@ -86,26 +101,35 @@ describe('the breakdown', () => {
 
   it('draws vowels on the vowel map and consonants on the consonant map', () => {
     show(attempt('po', ['p', 'u']));
-    q<HTMLButtonElement>('.pair-close .tile-heard').click();
+    q<HTMLButtonElement>('.mark-close').click();
     expect(q('.sound-chart').classList).toContain('chart-vowel');
-    q<HTMLButtonElement>('.pair-good .tile-target').click();
+    q<HTMLButtonElement>('.mark-good').click();
     expect(q('.sound-chart').classList).toContain('chart-consonant');
   });
 
-  it('shows a missing sound and an added one', () => {
-    show(attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 'p', 'o']));
-    expect(all('.pair-extra').length).toBeGreaterThan(0);
-    q<HTMLButtonElement>('.pair-extra .tile-heard').click();
+  it('shows an added sound, with the tip for the sound before it', () => {
+    const a = attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'o']);
+    show(a);
+    q<HTMLButtonElement>('.mark-extra').click();
+    expect(q('.mark-extra .mark-target').textContent).toBe('+');
     expect(q('.sound-detail').textContent).toMatch(/Added|extra/i);
+    const tip = a.tips.find((t) => t.letters.toLowerCase() === 't');
+    if (tip) expect(q('.sound-detail').textContent).toContain(tip.text);
+  });
+
+  it('marks a missing sound where it should have been, and plays that part', () => {
     show(attempt('tatlo', ['t', 'a', 'l', 'o']));
-    expect(q('.pair-missing .tile-missing')).toBeTruthy();
-    q<HTMLButtonElement>('.pair-missing .tile-missing').click();
+    const gap = q<HTMLButtonElement>('.mark-missing.mark-gap');
+    expect(gap.querySelector('.mark-target')!.textContent).toBe('t');
+    expect(gap.querySelector('.mark-heard')!.textContent).toBe('–');
+    gap.click();
+    expect(q('.sound-detail').textContent).toContain('nothing here');
     expect(player.calls.at(-1)).toMatchObject({ kind: 'slice' });
   });
 
   it('plays the whole recording and stops audio when it goes away', () => {
     const view = show(attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't']));
-    all('.ribbon-actions button')[0].click();
+    view.playWhole();
     expect(player.calls.at(-1)).toMatchObject({ kind: 'slice' });
     q<HTMLButtonElement>('.ribbon-mark').click();
     expect(player.calls.length).toBe(2);

@@ -6,7 +6,7 @@ import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonetics';
 import { record, RecordError, recordingSupported, type RecordProblem, type Recording } from '../recorder';
-import { h, icon } from '../ui';
+import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
 import { resultView as soundResults, type ResultView } from './speak-result';
 
@@ -283,51 +283,52 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           : 'Letters in pink need work; yellow ones were nearly there.';
     breakdown =
       heard.length > 0 && recognition && samples
-        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: deps.player(), say: options.say })
+        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: deps.player() })
         : null;
+    const lettersEl = heard.length > 0 && h('p', { class: `letters${text.length > 16 ? ' long' : ''}`, lang: 'fil' }, markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)));
+    if (breakdown) {
+      // The breakdown takes the card's place: the word, coloured by how each sound came
+      // out, with the whole word to play back. Each sound's tip is in the breakdown.
+      const whole = breakdown;
+      return [
+        h(
+          'div',
+          { class: `feedback result-card ${right ? 'good' : 'bad'}`, role: 'status' },
+          h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title)), lettersEl), dial(comparison.score, `${pct}% of the way there`)),
+          h(
+            'div',
+            { class: 'word-actions' },
+            h('span', { class: 'word-actions-label' }, 'Whole word'),
+            h('button', { class: 'btn secondary small', onclick: () => whole.playWhole() }, '▶ Yours'),
+            h('button', { class: 'btn secondary small', onclick: () => options.say() }, '▶ Target'),
+            audioButton(() => options.say(true), 'Target, slowly', 'slow small'),
+          ),
+        ),
+        breakdown.el,
+        actions(right),
+      ];
+    }
     return [
       h(
         'div',
         { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
-        h(
-          'div',
-          { class: 'feedback-head' },
-          h('div', null, h('strong', null, title), ' ', detail),
-          heard.length > 0 && dial(comparison.score, `${pct}% of the way there`),
-        ),
-        heard.length > 0 &&
-          h(
-            'p',
-            { class: 'letters', lang: 'fil' },
-            markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)),
-          ),
-        tips.length > 0 &&
-          h(
-            'ul',
-            { class: 'tips' },
-            tips.map((t) =>
-              h(
-                'li',
-                null,
-                // With the breakdown below, a tip's letters open that sound in it.
-                breakdown
-                  ? h('button', { class: 'tip-link', lang: 'fil', onclick: () => breakdown?.focusLetters(t.letters) }, t.letters)
-                  : h('strong', { lang: 'fil' }, t.letters),
-                ': ',
-                t.text,
-              ),
-            ),
-          ),
+        h('div', { class: 'feedback-head' }, h('div', null, h('strong', null, title), ' ', detail), heard.length > 0 && dial(comparison.score, `${pct}% of the way there`)),
+        lettersEl,
+        tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
       ),
-      breakdown?.el,
-      h(
-        'div',
-        { class: 'row' },
-        !breakdown && h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly'),
-        right ? h('button', { class: 'btn primary', 'data-autofocus': true, onclick: options.onNext }, 'Next') : micButton('Try again', 'btn mic'),
-      ),
-      !right && h('button', { class: 'btn secondary skip-link', onclick: options.onNext }, 'Next word'),
+      h('div', { class: 'row' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
+      actions(right),
     ].filter(Boolean) as HTMLElement[];
+  }
+
+  function actions(right: boolean): HTMLElement {
+    return h(
+      'div',
+      { class: 'row result-actions' },
+      right
+        ? h('button', { class: 'btn primary', 'data-autofocus': true, onclick: options.onNext }, 'Next')
+        : [h('button', { class: 'btn secondary', onclick: options.onNext }, 'Next word'), micButton('Try again', 'btn mic')],
+    );
   }
 
   /** A ring that fills with how close the attempt was. */
@@ -343,8 +344,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     breakdown?.dispose();
     breakdown = null;
     const phase = state.name === 'recording' ? (state.speech ? 'phase-sound' : 'phase-mic-on') : '';
-    el.className = `speak ${state.name} ${phase}`.trim();
-    el.replaceChildren(...view());
+    const children = view();
+    // With a breakdown on screen, the card above gives way to it (see .result-card).
+    el.className = `speak ${state.name} ${phase}${breakdown ? ' has-breakdown' : ''}`.trim();
+    el.replaceChildren(...children);
     el.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
   }
 

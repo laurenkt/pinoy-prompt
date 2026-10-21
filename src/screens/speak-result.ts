@@ -1,7 +1,7 @@
 // The results of a spoken attempt, sound by sound: the recording drawn as a
-// ribbon, each expected sound paired with what was heard (tap either to hear
-// it), and for the chosen sound a map of where it's made in the mouth, with
-// the learner's version and the target side by side.
+// ribbon with each sound marked on it (the sound aimed for above, what was
+// heard below; tap one to open it and hear it), and for the chosen sound a map
+// of where it's made in the mouth, with the learner's version and the target.
 
 import type { Tip } from '../coach';
 import type { Comparison, SoundResult, SoundVerdict } from '../phonetics';
@@ -56,7 +56,7 @@ export function spanOf(timing: Attempt['timing'], i: number, duration: number): 
   return { start, end };
 }
 
-/** One column of the strip: an expected sound and what came out, or a sound that was added. */
+/** One mark on the ribbon: an expected sound and what came out, or a sound that was added. */
 interface Pair {
   result?: SoundResult;
   /** Index into heard, if something was heard here. */
@@ -81,14 +81,12 @@ const verdictOf = (p: Pair): SoundVerdict | 'extra' => p.result?.verdict ?? 'ext
 
 export interface ResultOptions {
   player: Player;
-  /** The device voice saying the whole card, slowly if asked. */
-  say(slow?: boolean): void;
 }
 
 export interface ResultView {
   el: HTMLElement;
-  /** Open the sound written with these letters (the first one that needs work), e.g. from a tip. */
-  focusLetters(letters: string): void;
+  /** Play the learner's whole attempt, without the silence either side. */
+  playWhole(): void;
   dispose(): void;
 }
 
@@ -112,6 +110,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   };
 
   // --- The ribbon -----------------------------------------------------------
+  // The recording, with each sound marked along it: the sound aimed for above,
+  // what was heard below. Tapping a mark opens that sound and plays your part.
   const segments: Segment[] = list
     .filter((p) => p.heardAt !== undefined)
     .map((p) => ({ ...span(p.heardAt!), color: p.extraCounts === false ? '#4a4290' : COLORS[verdictOf(p)] }));
@@ -121,12 +121,12 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   });
   // Show just the speech, not the silence either side.
   const view = whole();
-  const at = (t: number) => ((t - view.start) / (view.end - view.start)) * 100;
+  const at = (t: number) => Math.min(100, Math.max(0, ((t - view.start) / (view.end - view.start)) * 100));
   let ribbon: Spectrogram | null = null;
   try {
-    ribbon = createSpectrogram(attempt.features, segments, { height: 112, view });
+    ribbon = createSpectrogram(attempt.features, segments, { height: 60, view });
   } catch {
-    // No canvas at all: the strip below still works.
+    // No canvas at all: the marks still work.
   }
   const playhead = (t: number | null) => ribbon?.setPlayhead(t);
 
@@ -138,34 +138,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     void playback.done.then(() => playhead(null));
     return playback;
   };
-  const ribbonEl = h(
-    'div',
-    { class: 'ribbon' },
-    ribbon?.el,
-    h(
-      'div',
-      { class: 'ribbon-marks' },
-      list.map((p, index) => {
-        if (p.heardAt === undefined) return null;
-        const s = span(p.heardAt);
-        return h(
-          'button',
-          {
-            class: `ribbon-mark mark-${verdictOf(p)}`,
-            style: { left: `${at(s.start)}%`, width: `${at(s.end) - at(s.start)}%` },
-            'aria-label': `Hear what you said: ${soundName(attempt.heard[p.heardAt])}`,
-            onclick: () => {
-              select(index);
-              playMine(s);
-            },
-          },
-          h('span', { lang: 'und-fonipa' }, attempt.heard[p.heardAt]),
-        );
-      }),
-    ),
-  );
 
-  // --- The strip of sounds ---------------------------------------------------
   const target = (p: Pair) => p.result?.phone.ipa;
   const letters = (p: Pair) => (p.result ? attempt.text.slice(p.result.phone.from, p.result.phone.to).toLowerCase() : '');
   let selected = -1;
@@ -178,65 +151,43 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     return player.playUrl(ref.url).done;
   };
 
-  const columns = list.map((p, index) => {
+  const marks = list.map((p, index) => {
     const ipa = target(p);
     const heard = p.heardAt !== undefined ? attempt.heard[p.heardAt] : null;
     const verdict = verdictOf(p);
+    // A sound nobody said gets a slim mark where it should have been.
+    let style: Record<string, string>;
+    if (p.heardAt !== undefined) {
+      const s = span(p.heardAt);
+      style = { left: `${at(s.start)}%`, width: `${at(s.end) - at(s.start)}%` };
+    } else {
+      const before = list.slice(0, index).reverse().find((q) => q.heardAt !== undefined);
+      const after = list.slice(index + 1).find((q) => q.heardAt !== undefined);
+      const middle = before ? span(before.heardAt!).end : after ? span(after.heardAt!).start : (view.start + view.end) / 2;
+      style = { left: `calc(${at(middle)}% - 13px)`, width: '26px' };
+    }
+    const label = [
+      ipa ? `Aim for ${soundName(ipa)}` : 'Added sound',
+      heard ? `you said ${soundName(heard)}` : 'nothing heard',
+    ].join(', ');
     return h(
-      'div',
+      'button',
       {
-        class: `pair pair-${verdict}${p.extraCounts === false ? ' pair-harmless' : ''}`,
-        style: { '--closeness': String(p.result?.closeness ?? 0) },
+        class: `ribbon-mark mark-${verdict}${p.heardAt === undefined ? ' mark-gap' : ''}${p.extraCounts === false ? ' mark-harmless' : ''}`,
+        style,
+        'aria-label': label,
+        'aria-pressed': 'false',
+        onclick: () => {
+          select(index);
+          playMine(yoursFor(index));
+        },
       },
-      ipa
-        ? h(
-            'button',
-            {
-              class: 'tile tile-target',
-              'aria-label': `Hear the target sound: ${soundName(ipa)}`,
-              onclick: () => {
-                select(index);
-                void playTarget(index);
-              },
-            },
-            h('span', { class: 'tile-ipa', lang: 'und-fonipa' }, ipa),
-            h('span', { class: 'tile-letters', lang: 'fil' }, letters(p)),
-          )
-        : h('span', { class: 'tile tile-empty', 'aria-hidden': 'true' }, '+'),
-      h('span', { class: 'link', 'aria-hidden': 'true' }),
-      heard
-        ? h(
-            'button',
-            {
-              class: 'tile tile-heard',
-              'aria-label': `Hear what you said: ${soundName(heard)}`,
-              onclick: () => {
-                select(index);
-                playMine(yoursFor(index));
-              },
-            },
-            h('span', { class: 'tile-ipa', lang: 'und-fonipa' }, heard),
-          )
-        : h(
-            'button',
-            { class: 'tile tile-heard tile-missing', 'aria-label': 'Nothing heard here. Hear this part of your recording', onclick: () => (select(index), playMine(yoursFor(index))) },
-            '–',
-          ),
+      h('span', { class: 'mark-target', lang: 'und-fonipa' }, ipa ?? '+'),
+      h('span', { class: 'mark-heard', lang: 'und-fonipa' }, heard ?? '–'),
     );
   });
-  // Grouped by word, so a phrase reads as words; added sounds join the word before them.
-  const wordAt = (from: number) => (attempt.text.slice(0, from).match(/[^\p{L}'’-]+(?=\p{L})/gu) ?? []).length;
-  const groups: HTMLElement[][] = [];
-  let word = 0;
-  list.forEach((p, i) => {
-    if (p.result) word = wordAt(p.result.phone.from);
-    (groups[word] ??= []).push(columns[i]);
-  });
-  const strip = h(
-    'div',
-    { class: 'sound-strip' },
-    groups.filter(Boolean).map((g) => h('div', { class: 'word-group', role: 'list' }, g.map((c) => h('div', { role: 'listitem' }, c)))),
-  );
+
+  const ribbonEl = h('div', { class: 'ribbon' }, h('div', { class: 'ribbon-lane lane-target', 'aria-hidden': 'true' }), ribbon?.el, h('div', { class: 'ribbon-lane lane-heard', 'aria-hidden': 'true' }), h('div', { class: 'ribbon-marks', role: 'group', 'aria-label': 'Your sounds' }, marks));
 
   // --- Detail for one sound --------------------------------------------------
   const detail = h('div', { class: 'sound-detail', 'aria-live': 'polite' });
@@ -245,12 +196,22 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   function select(index: number): void {
     if (index === selected) return;
     selected = index;
-    columns.forEach((c, i) => c.classList.toggle('selected', i === index));
-    columns[index].scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    marks.forEach((m, i) => {
+      m.classList.toggle('selected', i === index);
+      m.setAttribute('aria-pressed', String(i === index));
+    });
     const p = list[index];
     if (p.heardAt !== undefined) ribbon?.setFocus(span(p.heardAt));
     else ribbon?.setFocus(gapFor(index));
     renderDetail(p, index);
+  }
+
+  /** The coaching tip for a sound; an added sound borrows the tip for the sound before it. */
+  function tipFor(index: number): string | undefined {
+    const p = list[index];
+    const owner = p.result ? p : list.slice(0, index).reverse().find((q) => q.result);
+    const want = owner ? letters(owner) : '';
+    return want ? attempt.tips.find((t) => t.letters.toLowerCase() === want)?.text : undefined;
   }
 
   function renderDetail(p: Pair, index: number): void {
@@ -259,19 +220,20 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const verdict = verdictOf(p);
     const ref = ipa ? referenceFor(ipa) : null;
     const closeness = p.result?.closeness ?? 0;
-    const tip = p.result && attempt.tips.find((t) => t.letters.toLowerCase() === letters(p))?.text;
+    const tip = tipFor(index) ?? (!ipa ? (p.extraCounts ? 'This sound isn’t in the word. Try leaving it out.' : 'A small extra sound like this is a natural part of speech. No need to change it.') : undefined);
     const drawn = drawChart(ipa ?? null, heard);
     chart = drawn;
 
-    const yours = h('button', { class: 'btn secondary', onclick: () => playMine(yoursFor(index)) }, 'Yours');
-    const theirs = ref && h('button', { class: 'btn secondary', onclick: () => void playTarget(index) }, 'Target');
+    const yours = h('button', { class: 'btn secondary small', onclick: () => playMine(yoursFor(index)) }, '▶ Yours');
+    const theirs = ref && h('button', { class: 'btn secondary small', onclick: () => void playTarget(index) }, '▶ Target');
     const both =
       ref &&
       heard &&
       h(
         'button',
         {
-          class: 'btn primary',
+          class: 'btn primary small',
+          'aria-label': 'Yours, then the target',
           onclick: async () => {
             drawn.reset();
             drawn.heard?.classList.add('speaking');
@@ -287,41 +249,39 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
             setTimeout(() => chart === drawn && drawn.reset(), 1600);
           },
         },
-        '▶ Yours, then the target',
+        '▶ Both',
       );
 
     detail.replaceChildren(
       ...([
-      h(
-        'div',
-        { class: `detail-head detail-${verdict}` },
-        ipa
-          ? h(
-              'p',
-              { class: 'detail-title' },
-              h('span', { class: 'detail-letters', lang: 'fil' }, `“${letters(p)}”`),
-              ' ',
-              h('span', { class: 'verdict-chip' }, p.result ? VERDICT_LABEL[p.result.verdict] : 'Added'),
-            )
-          : h('p', { class: 'detail-title' }, h('span', { class: 'verdict-chip' }, p.extraCounts ? 'Added sound' : 'Natural extra')),
-        p.result &&
-          h(
-            'div',
-            { class: 'closeness', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(closeness * 100)), 'aria-label': 'How close' },
-            h('span', { style: { width: `${Math.round(closeness * 100)}%` } }),
-          ),
-      ),
-      h(
-        'dl',
-        { class: 'detail-sounds' },
-        ipa && [h('dt', null, 'Aim for'), h('dd', null, h('strong', { lang: 'und-fonipa' }, ipa), ' ', soundName(ipa), ref && h('span', { class: 'muted' }, ` (from “${ref.word}”)`))],
-        [h('dt', null, 'You said'), h('dd', null, heard ? [h('strong', { lang: 'und-fonipa' }, heard), ' ', soundName(heard)] : 'nothing here')],
-      ),
-      drawn.el,
-      tip && h('p', { class: 'detail-tip' }, tip),
-      !ipa && h('p', { class: 'detail-tip' }, p.extraCounts ? 'This sound isn’t in the word. Try leaving it out.' : 'A small extra sound like this is a natural part of speech. No need to change it.'),
-      h('div', { class: 'row detail-actions' }, yours, theirs),
-      both && h('div', { class: 'row detail-actions' }, both),
+        h(
+          'div',
+          { class: `detail-head detail-${verdict}` },
+          ipa
+            ? h(
+                'p',
+                { class: 'detail-title' },
+                h('span', { class: 'detail-letters', lang: 'fil' }, `“${letters(p)}”`),
+                ' ',
+                h('span', { class: 'verdict-chip' }, p.result ? VERDICT_LABEL[p.result.verdict] : 'Added'),
+              )
+            : h('p', { class: 'detail-title' }, h('span', { class: 'verdict-chip' }, p.extraCounts ? 'Added sound' : 'Natural extra')),
+          p.result &&
+            h(
+              'div',
+              { class: 'closeness', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(closeness * 100)), 'aria-label': 'How close' },
+              h('span', { style: { width: `${Math.round(closeness * 100)}%` } }),
+            ),
+        ),
+        h(
+          'dl',
+          { class: 'detail-sounds' },
+          ipa && [h('dt', null, 'Aim for'), h('dd', null, h('strong', { lang: 'und-fonipa' }, ipa), ' ', soundName(ipa), ref && h('span', { class: 'muted' }, ` (from “${ref.word}”)`))],
+          [h('dt', null, 'You said'), h('dd', null, heard ? [h('strong', { lang: 'und-fonipa' }, heard), ' ', soundName(heard)] : 'nothing here')],
+        ),
+        drawn.el,
+        tip && h('p', { class: 'detail-tip' }, tip),
+        h('div', { class: 'row detail-actions' }, yours, theirs, both),
       ].filter(Boolean) as Node[]),
     );
   }
@@ -332,28 +292,13 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     'div',
     { class: 'sound-results' },
     ribbonEl,
-    h(
-      'div',
-      { class: 'row ribbon-actions' },
-      h('button', { class: 'btn secondary', onclick: () => playMine(whole()) }, '▶ Play mine'),
-      h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly'),
-    ),
-    h('p', { class: 'strip-label small muted' }, 'Top: the sound to aim for. Bottom: what we heard. Tap either to hear it.'),
-    strip,
     detail,
   );
   if (list.length > 0) select(firstProblem >= 0 ? firstProblem : 0);
 
   return {
     el,
-    focusLetters(text) {
-      const want = text.toLowerCase();
-      const matches = list.map((p, i) => (letters(p) === want ? i : -1)).filter((i) => i >= 0);
-      const index = matches.find((i) => list[i].result?.verdict !== 'good') ?? matches[0];
-      if (index === undefined) return;
-      select(index);
-      detail.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
-    },
+    playWhole: () => void playMine(whole()),
     dispose: () => {
       plays++;
       player.stop();
@@ -365,8 +310,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 // --- Charts -------------------------------------------------------------------
 
 const W = 300;
-const H = 190;
-const PAD = { left: 56, right: 14, top: 22, bottom: 26 };
+const H = 126;
+const PAD = { left: 56, right: 14, top: 20, bottom: 8 };
 /** How far the vowel chart's front edge leans in at the bottom, as a share of its width. */
 const SLANT = 0.45;
 
