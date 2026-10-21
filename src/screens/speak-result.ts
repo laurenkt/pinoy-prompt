@@ -121,7 +121,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   });
   // Show just the speech, not the silence either side.
   const view = whole();
-  const at = (t: number) => Math.min(100, Math.max(0, ((t - view.start) / (view.end - view.start)) * 100));
+  const at = (t: number) => Math.min(100, Math.max(0, ((t - view.start) / Math.max(view.end - view.start, 1e-3)) * 100));
   let ribbon: Spectrogram | null = null;
   try {
     ribbon = createSpectrogram(attempt.features, segments, { height: 60, view });
@@ -156,7 +156,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const heard = p.heardAt !== undefined ? attempt.heard[p.heardAt] : null;
     const verdict = verdictOf(p);
     // A sound nobody said gets a slim mark where it should have been.
-    let style: Record<string, string>;
+    let style: Record<string, string> = {};
+    let gap: { at: number; shift: number } | null = null;
     if (p.heardAt !== undefined) {
       const s = span(p.heardAt);
       style = { left: `${at(s.start)}%`, width: `${at(s.end) - at(s.start)}%` };
@@ -164,13 +165,19 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       const before = list.slice(0, index).reverse().find((q) => q.heardAt !== undefined);
       const after = list.slice(index + 1).find((q) => q.heardAt !== undefined);
       const middle = before ? span(before.heardAt!).end : after ? span(after.heardAt!).start : (view.start + view.end) / 2;
-      style = { left: `calc(${at(middle)}% - 13px)`, width: '26px' };
+      // Several missing in a row sit side by side, centred on the gap, and stay inside the ribbon.
+      const run = (from: number, step: number) => {
+        let n = 0;
+        for (let i = from + step; list[i] && list[i].heardAt === undefined; i += step) n++;
+        return n;
+      };
+      gap = { at: at(middle), shift: (run(index, -1) - run(index, 1)) * 13 - 13 };
     }
     const label = [
       ipa ? `Aim for ${soundName(ipa)}` : 'Added sound',
       heard ? `you said ${soundName(heard)}` : 'nothing heard',
     ].join(', ');
-    return h(
+    const mark = h(
       'button',
       {
         class: `ribbon-mark mark-${verdict}${p.heardAt === undefined ? ' mark-gap' : ''}${p.extraCounts === false ? ' mark-harmless' : ''}`,
@@ -185,6 +192,11 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       h('span', { class: 'mark-target', lang: 'und-fonipa' }, ipa ?? '+'),
       h('span', { class: 'mark-heard', lang: 'und-fonipa' }, heard ?? '–'),
     );
+    if (gap) {
+      mark.style.setProperty('--at', `${gap.at}%`);
+      mark.style.setProperty('--shift', `${gap.shift}px`);
+    }
+    return mark;
   });
 
   const ribbonEl = h('div', { class: 'ribbon' }, h('div', { class: 'ribbon-lane lane-target', 'aria-hidden': 'true' }), ribbon?.el, h('div', { class: 'ribbon-lane lane-heard', 'aria-hidden': 'true' }), h('div', { class: 'ribbon-marks', role: 'group', 'aria-label': 'Your sounds' }, marks));
@@ -206,10 +218,15 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     renderDetail(p, index);
   }
 
-  /** The coaching tip for a sound; an added sound borrows the tip for the sound before it. */
+  /**
+   * The coaching tip for a sound that needs work. An added sound that counts takes the
+   * tip for the sound before it, which is where the coach puts "leave it out".
+   */
   function tipFor(index: number): string | undefined {
     const p = list[index];
-    const owner = p.result ? p : list.slice(0, index).reverse().find((q) => q.result);
+    let owner: Pair | undefined;
+    if (p.result) owner = p.result.verdict === 'good' ? undefined : p;
+    else if (p.extraCounts) owner = list.slice(0, index).reverse().find((q) => q.result);
     const want = owner ? letters(owner) : '';
     return want ? attempt.tips.find((t) => t.letters.toLowerCase() === want)?.text : undefined;
   }
@@ -286,8 +303,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     );
   }
 
-  // Start on the first sound that needs work, or the first sound.
-  const firstProblem = list.findIndex((p) => p.result && p.result.verdict !== 'good');
+  // Start on the first sound that needs work (an added sound counts), or the first sound.
+  const firstProblem = list.findIndex((p) => (p.result ? p.result.verdict !== 'good' : p.extraCounts));
   const el = h(
     'div',
     { class: 'sound-results' },

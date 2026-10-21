@@ -107,14 +107,35 @@ describe('the breakdown', () => {
     expect(q('.sound-chart').classList).toContain('chart-consonant');
   });
 
-  it('shows an added sound, with the tip for the sound before it', () => {
+  it('opens on an added sound that counts, with the tip the coach gave for it', () => {
     const a = attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'o']);
+    const tip = a.tips.find((t) => t.letters.toLowerCase() === 't')!;
+    expect(tip).toBeTruthy();
     show(a);
-    q<HTMLButtonElement>('.mark-extra').click();
+    expect(q('.ribbon-mark.selected').classList).toContain('mark-extra');
     expect(q('.mark-extra .mark-target').textContent).toBe('+');
-    expect(q('.sound-detail').textContent).toMatch(/Added|extra/i);
-    const tip = a.tips.find((t) => t.letters.toLowerCase() === 't');
-    if (tip) expect(q('.sound-detail').textContent).toContain(tip.text);
+    expect(q('.sound-detail').textContent).toMatch(/Added/);
+    expect(q('.sound-detail').textContent).toContain(tip.text);
+    // The t itself was spot on, so it carries no correction.
+    all('.ribbon-mark')[6].click();
+    expect(q('.sound-detail').textContent).toContain('Spot on');
+    expect(q('.sound-detail .detail-tip')).toBeNull();
+  });
+
+  it('only shows a tip on the sound that needs it, not on every sound spelled the same', () => {
+    const a = attempt('Salamat', ['s', 'ɐ', 'l', 'a', 'm', 'a', 't']);
+    show(a);
+    expect(q('.sound-detail .detail-tip')).toBeTruthy();
+    all('.ribbon-mark')[3].click();
+    expect(q('.sound-detail').textContent).toContain('Spot on');
+    expect(q('.sound-detail .detail-tip')).toBeNull();
+  });
+
+  it('puts missing sounds in a row side by side instead of on top of each other', () => {
+    show(attempt('tatlo', ['t', 'a', 'o']));
+    const gaps = all('.mark-gap');
+    expect(gaps.map((g) => g.querySelector('.mark-target')!.textContent)).toEqual(['t', 'l']);
+    expect(gaps.map((g) => g.style.getPropertyValue('--shift'))).toEqual(['-26px', '0px']);
   });
 
   it('marks a missing sound where it should have been, and plays that part', () => {

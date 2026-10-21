@@ -294,7 +294,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         h(
           'div',
           { class: `feedback result-card ${right ? 'good' : 'bad'}`, role: 'status' },
-          h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title)), lettersEl), dial(comparison.score, `${pct}% of the way there`)),
+          h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title), ' ', h('span', { class: 'result-meaning' }, card.en)), lettersEl), dial(comparison.score, `${pct}% of the way there`)),
           h(
             'div',
             { class: 'word-actions' },

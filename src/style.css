@@ -1103,8 +1103,9 @@ p {
   color: var(--on-accent);
 }
 
-.result-card .prompt-meaning {
-  margin: 0;
+.result-meaning {
+  font-weight: 700;
+  opacity: 0.8;
 }
 
 .result-card .dial {
@@ -1232,6 +1233,10 @@ p {
 
 /* A sound that wasn't said: a dashed slot where it should have been. */
 .ribbon-mark.mark-gap {
+  /* Centred on where the sound should have been (--at), shifted along when
+     several are missing in a row (--shift), and kept inside the ribbon. */
+  left: clamp(0px, calc(var(--at) + var(--shift)), calc(100% - 26px));
+  width: 26px;
   z-index: 1;
   border: 2px dashed var(--mark);
   border-radius: 8px;
