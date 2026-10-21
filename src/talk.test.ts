@@ -122,7 +122,7 @@ describe('the mix of English and Tagalog', () => {
     const text = talkInstructions(talkPlan(progressWith(['salamat', 'kumusta', 'oo', 'kape']), null), new Date(NOW));
     expect(text).toContain('Language: speak English.');
     expect(text).toContain('never say a whole sentence in Tagalog');
-    expect(text).toContain('Use no other Tagalog.');
+    expect(text).toContain('Use no other Tagalog, except');
     expect(text).not.toMatch(/greet(ing)? them in Tagalog/);
   });
 
@@ -132,8 +132,17 @@ describe('the mix of English and Tagalog', () => {
     const text = talkInstructions(talkPlan(progress, null), new Date(NOW));
     expect(text).toContain('When they are stuck, help before moving on.');
     expect(text).toContain('"You could say: kape, coffee."');
-    expect(text).toContain('say that one is not in their words yet');
     expect(text).toContain('do not point it out');
+  });
+
+  it('answers a direct "how do I say" with the Tagalog, even for a word they have not learned', () => {
+    const text = talkInstructions(talkPlan(progressWith(['kumusta']), null), new Date(NOW));
+    expect(text).toContain('When they ask how to say something');
+    expect(text).toContain('only the Tagalog listed below (the one exception is when they ask how to say something)');
+    expect(text).toContain('if it is on the list, give that; otherwise give the everyday Tagalog');
+    expect(text).toContain('Never refuse, deflect, or say it is not in their words.');
+    expect(text).toContain('this overrides the limits on how much Tagalog to use');
+    expect(text).not.toMatch(/not (in|on) (their|your) (words|list) yet/);
   });
 
   it('gives a stuck example a voice can read: one meaning, no slashes or question marks, "I" kept', () => {
