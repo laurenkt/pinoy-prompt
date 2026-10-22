@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MILESTONES, curveAt, curveReaches, fitPower, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
-import { LEARN_ORDER } from './deck';
+import { MILESTONES, cardsPerWord, curveAt, curveReaches, fitPower, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
+import { ALL_CARDS, LEARN_ORDER, isVocab } from './deck';
 import { DAY_MS, newCardState, review, startOfDayAfter, type CardState } from './srs';
 import { dayKey, emptyProgress, recordAnswer } from './store';
 
@@ -225,9 +225,9 @@ describe('forecast', () => {
     const f = forecast(p, NOW);
     expect(f.curve!.power).toBeCloseTo(1, 1);
     expect(curveAt(f.curve!, NOW)).toBe(f.known);
-    expect(f.milestones[0].at).toBe(curveReaches(f.curve!, 500));
+    expect(f.milestones[0].at).toBe(curveReaches(f.curve!, f.milestones[0].cards));
     // Steady: the date is close to the straight line at today's pace.
-    expect(f.milestones[0].at as number).toBeCloseTo(NOW + ((500 - f.known) / f.perDay!) * DAY_MS, -10);
+    expect(f.milestones[0].at as number).toBeCloseTo(NOW + ((f.milestones[0].cards - f.known) / f.perDay!) * DAY_MS, -10);
   });
 
   it('follows the recent pace for a learner who has come back', () => {
@@ -236,7 +236,7 @@ describe('forecast', () => {
     LEARN_ORDER.slice(0, 20).forEach((id) => stuck(p, id, 380));
     LEARN_ORDER.slice(20, 110).forEach((id, i) => stuck(p, id, 37 - Math.floor(i / 3)));
     const f = forecast(p, NOW);
-    const linear = NOW + ((500 - f.known) / f.perDay!) * DAY_MS;
+    const linear = NOW + ((f.milestones[0].cards - f.known) / f.perDay!) * DAY_MS;
     expect(f.milestones[0].at as number).toBeLessThan(NOW + 2 * (linear - NOW));
   });
 
@@ -246,7 +246,7 @@ describe('forecast', () => {
     LEARN_ORDER.slice(0, 100).forEach((id, i) => stuck(p, id, 100 - Math.round((i / 10) ** 2)));
     const f = forecast(p, NOW);
     expect(f.curve!.power).toBeLessThan(0.9);
-    expect(f.milestones[0].at as number).toBeGreaterThan(NOW + ((500 - f.known) / f.perDay!) * DAY_MS);
+    expect(f.milestones[0].at as number).toBeGreaterThan(NOW + ((f.milestones[0].cards - f.known) / f.perDay!) * DAY_MS);
   });
 
   it('counts only words that have stuck, not words met', () => {
@@ -282,8 +282,31 @@ describe('forecast', () => {
 
   it('marks milestones already reached', () => {
     const levels = [{ words: 3, label: 'a' }, ...MILESTONES];
-    const f = forecast(learner(3, [35, 10, 10]), NOW, levels);
+    const f = forecast(learner(3, [35, 10, 10]), NOW, levels, 1);
     expect(f.milestones.map((m) => m.at === 'reached')).toEqual([true, false, false, false, false]);
+  });
+
+  it('counts in cards, like the chart: guides too, and each milestone turned from words into cards', () => {
+    const p = learner(2, [10, 10]);
+    const guide = ALL_CARDS.find((c) => !isVocab(c))!;
+    p.cards[guide.id] = card(7, 10, { introduced: NOW - 40 * DAY_MS, log: [[NOW - 13 * DAY_MS, 1], [NOW - 10 * DAY_MS, 7]] });
+    const f = forecast(p, NOW, MILESTONES, 1.1);
+    expect(f.known).toBe(3);
+    expect(f.milestones.map((m) => m.cards)).toEqual([550, 1100, 2750, 4400]);
+  });
+});
+
+describe('cardsPerWord', () => {
+  const vocab = (tl: string, kind: 'word' | 'phrase' = 'phrase') => ({ id: tl, tl, en: '', kind, hook: '' });
+  it('divides the cards by the different words their Tagalog uses', () => {
+    // "Salamat po" repeats both words; the guide teaches none.
+    const cards = [vocab('Salamat', 'word'), vocab('po', 'word'), vocab('Salamat po.'), vocab('Taga-saan ka?'), { ...vocab('___ ka'), kind: 'pattern' as const }];
+    expect(cardsPerWord(cards)).toBeCloseTo(5 / 4);
+  });
+
+  it('comes to about one card a word for the deck', () => {
+    expect(cardsPerWord()).toBeGreaterThan(0.8);
+    expect(cardsPerWord()).toBeLessThan(1.5);
   });
 });
 

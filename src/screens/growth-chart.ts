@@ -97,7 +97,7 @@ export function projected(forecast: Forecast, at: number, now: number, u: number
 }
 
 /** The milestone the projection runs to: the next one with a date, if any. */
-export function nextMilestone(forecast: Forecast | undefined): { words: number; label: string; at: number } | null {
+export function nextMilestone(forecast: Forecast | undefined): { cards: number; label: string; at: number } | null {
   const next = forecast?.milestones.find((m) => m.at !== 'reached');
   return next && typeof next.at === 'number' ? { ...next, at: next.at } : null;
 }
@@ -114,7 +114,7 @@ export function forecastView(forecast: Forecast): HTMLElement {
         h(
           'li',
           null,
-          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.words.toLocaleString()} words`)),
+          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.cards.toLocaleString()} cards`)),
           h('strong', null, m.at === 'reached' ? 'Reached' : m.at === null ? '–' : `~${monthYear(m.at)}`),
         ),
       ),
@@ -250,9 +250,9 @@ export function growthChart(
     if (!next) return;
     // From where the drawn projection starts, today's top of the stream.
     const from = total(last);
-    value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.words - from))}`;
+    value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.cards - from))}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][last]);
-    when.textContent = ` words by ${monthYear(times[last] + u * (next.at - times[last]))}`;
+    when.textContent = ` cards by ${monthYear(times[last] + u * (next.at - times[last]))}`;
     lookAt(false, past + u * (1 - past));
   }
 

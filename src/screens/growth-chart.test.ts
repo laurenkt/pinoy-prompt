@@ -87,8 +87,8 @@ describe('forecast', () => {
     days: 28,
     curve: null,
     milestones: [
-      { words: 5, label: 'First', at: 'reached' },
-      { words: 500, label: 'Second', at },
+      { cards: 5, label: 'First', at: 'reached' },
+      { cards: 500, label: 'Second', at },
     ],
   });
 
@@ -115,7 +115,7 @@ describe('forecast', () => {
     // Halfway from today (at 70%) to the milestone: halfway from 10 words to 500.
     tap(frame, 20);
     tap(frame, 255);
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 words by \w+ \d{4}/);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 cards by \w+ \d{4}/);
     // The legend is back on today, not the day looked at before.
     expect(counts.weeks.textContent).toBe('10');
     expect(el.querySelector<HTMLElement>('.growth-marker')!.style.left).toBe('85%');
