@@ -39,7 +39,7 @@ Home is the hub and has its own header. A screen never shows both a back arrow a
 
 **Height.** Every screen is at least as tall as the phone's screen (`.screen` in `style.css`, under "Layout"). A screen that fits passes its spare height down a column of containers (`.home`, `.practice`, `.talk`, `.session`, `.session-body`, `.panel`) to what can use it, so a taller phone gets bigger targets rather than an empty bottom:
 
-- In a session's `.panel`, the prompt grows to about a third of the screen, answer choices share the rest (up to a size a thumb can't miss), and otherwise the panel's last piece (its button, the answer and ratings, the microphone) sits at the bottom, under the thumb. A `.panel.center` card (a summary, a topic's introduction) sits in the middle instead.
+- In a session's `.panel`, the prompt grows on phones taller than about 700px, answer choices share the rest (up to a size a thumb can't miss, leaving room below for the feedback an answer brings so a right answer doesn't move them), and otherwise the panel's last piece (its button, the answer and ratings, the microphone) sits at the bottom, under the thumb. A `.panel.center` card (a summary, a topic's introduction) sits in the middle instead.
 - On Home the hub takes it; in a call, the transcript.
 - Pages (Library, Settings) are as long as their content and scroll.
 
@@ -67,7 +67,7 @@ Progress is the one thing the app can't lose; the README's "Saved progress" sect
 - **Shared test pieces live in `src/test/`.** `screen.ts` has the stand-in `App` (`fakeApp`), `button`, `noMic` and `flush` for screen tests; `fake-speech.ts` stands in for the recogniser and player; `fake-storage.ts` for storage; `fixtures/` holds saved progress from every schema. When `App` or `Settings` changes, change `fakeApp` once.
 - **Stand-ins go through deps, not module mocks,** where a screen offers them (`SpeakDeps`, `TalkDeps`, `CallDeps`, `Player`). Prefer adding a dep over `vi.mock` of a shared module, which can hide a change in that module from every screen test.
 - **Files that can't import each other are checked by a test.** `public/sw.js` can't import from `src/`, so `src/sw.test.ts` checks the cache names and file path it shares with the app. `src/spoken.test.ts` checks every spoken text has its clip. Add a check like these whenever two systems agree on a name by hand.
-- **Screenshots** for UI changes (CLAUDE.md) are taken with `npm run screenshots -- <out-dir> [screen ...]` (`scripts/screenshots.mjs`): Playwright on the dev server, at 360×640, 390×844, an iPhone SE (375×667) and a Pro Max (430×932), on a seeded learner so before and after match. It prints Home's scroll height and any screen wider than the phone. Add a screen to its list when a change needs one it doesn't reach.
+- **Screenshots** for UI changes (CLAUDE.md) are taken with `npm run screenshots -- <out-dir> [screen ...]` (`scripts/screenshots.mjs`): Playwright on the dev server, at 360×640, 390×844, an iPhone SE (375×667) and a Pro Max (430×932), on a seeded learner so before and after match. It always includes Home, and prints Home's scroll height and any screen wider than the phone. It uses Playwright's Chromium (`npx playwright install chromium` once). Add a screen to its list when a change needs one it doesn't reach.
 
 ## Findings, October 2026
 

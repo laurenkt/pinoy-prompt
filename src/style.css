@@ -550,7 +550,7 @@ p {
 }
 
 /*
- * In a panel, the prompt grows with the phone to about a third of the screen, with what's on it centred.
+ * In a panel, the prompt grows on phones taller than about 700px (up to 300px), with what's on it centred.
  * Answer choices take the rest of the spare height; otherwise what the learner does next (a button, the
  * answer and its ratings, the microphone) sits at the bottom, under the thumb.
  */
@@ -558,11 +558,21 @@ p {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: calc(50dvh - 160px);
+  min-height: clamp(0px, (100dvh - 700px) * 1.8, 300px);
 }
 
 .panel > .choices {
   flex-grow: 1;
+  /* The gap to the feedback is the feedback's own, as when the two margins merged. */
+  margin-bottom: 0;
+}
+
+/*
+ * Until one is picked, the choices leave room at the bottom for the feedback and Next that come with an
+ * answer, so a right answer doesn't move them. Only where there's height to spare.
+ */
+.panel > .choices:last-child {
+  margin-bottom: clamp(0px, 100dvh - 700px, 124px);
 }
 
 .panel > :last-child:not(:first-child, .choices) {
@@ -570,7 +580,7 @@ p {
 }
 
 /* The gap above it when there's no spare height, as the button's own top margin gave before. */
-.panel > :nth-last-child(2):not(.prompt) {
+.panel > :nth-last-child(2):is(.choices, .feedback, .tl-row) {
   margin-bottom: 12px;
 }
 
@@ -683,7 +693,8 @@ p {
 .audio-group.big {
   justify-content: center;
   align-items: center;
-  margin: 12px 0 8px;
+  /* 12px under the eyebrow, whose own 6px no longer merges with this in the prompt's column. */
+  margin: 6px 0 8px;
 }
 
 .audio-btn {
@@ -711,6 +722,8 @@ p {
 }
 
 .audio-btn.huge {
+  width: 96px;
+  height: 96px;
   width: clamp(96px, 14dvh, 132px);
   height: clamp(96px, 14dvh, 132px);
   border-radius: 24px;
@@ -820,7 +833,7 @@ p {
   flex: 1 0 auto;
   min-height: 56px;
   max-height: 120px;
-  font-size: clamp(1rem, 0.6rem + 1.2dvh, 1.2rem);
+  font-size: clamp(1rem, 0.4rem + 1.5dvh, 1.2rem);
   font-weight: 700;
 }
 

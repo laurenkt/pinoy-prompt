@@ -50,14 +50,16 @@ if (!outDir) {
   console.error(`Usage: npm run screenshots -- <out-dir> [${Object.keys(SCREENS).join(' | ')} ...]`);
   process.exit(1);
 }
-const names = wanted.length ? wanted : Object.keys(SCREENS);
+// Home always, for REVIEW.md's check that it fits one screen.
+const names = wanted.length ? [...new Set(['home', ...wanted])] : Object.keys(SCREENS);
 for (const name of names) if (!SCREENS[name]) throw new Error(`No screen called "${name}"`);
 await mkdir(outDir, { recursive: true });
 
 const server = await createServer({ logLevel: 'error', server: { port: 0 } });
 await server.listen();
 const url = server.resolvedUrls.local[0];
-const browser = await chromium.launch(process.env.PLAYWRIGHT_BROWSERS_PATH ? {} : { executablePath: '/opt/pw-browsers/chromium' });
+// Playwright's own Chromium: `npx playwright install chromium` once, if it isn't installed.
+const browser = await chromium.launch();
 
 try {
   for (const size of SIZES) {
