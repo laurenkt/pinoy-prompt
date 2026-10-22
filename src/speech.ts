@@ -7,9 +7,10 @@
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
 // Malay, then Spanish) and let the UI say so.
 
-import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
+import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, runningContext, type Sound } from './audio-engine';
 import clips from './clips.json';
 import thockFile from './sounds/tap-thock.mp3?inline';
+import { hapticTick } from './haptics';
 import { microphoneInUse } from './microphone';
 import type { Card } from './deck';
 
@@ -276,12 +277,47 @@ export function tick(kind: TapKind = 'thock'): void {
   playBuffer(clickBuffer, { fades: false, incidental: true });
 }
 
+let detentBuffer: AudioBuffer | null = null;
+
+/** How close together detent ticks may come, so a fast scrub stays a ratchet rather than a buzz. */
+export const DETENT_GAP_MS = 45;
+
+/**
+ * Ticks for a finger dragged across something with steps in it (the memory
+ * chart's days), like a picker wheel: the click at half its level, and a light
+ * haptic tick where the phone allows one. Call the returned function with the
+ * step under the finger as it moves, and with null when the drag ends.
+ * Follows the Tap sounds switch; silent mode leaves only the haptic.
+ */
+export function detents(): (step: string | null) => void {
+  let at: string | null = null;
+  let last = -Infinity;
+  return (step) => {
+    // The first step of a drag is where it starts, not a step taken.
+    const moved = at !== null && step !== null && step !== at;
+    at = step;
+    if (!moved || !tapSounds || performance.now() - last < DETENT_GAP_MS) return;
+    last = performance.now();
+    hapticTick();
+    if (muted || !clipsSupported() || microphoneInUse() || speaking()) return;
+    // A drag isn't a tap, so iOS won't start audio from it: tick only if it's already going, never late.
+    const ctx = runningContext();
+    if (!ctx) return;
+    if (detentBuffer?.sampleRate !== ctx.sampleRate) {
+      const samples = clickSamples(ctx.sampleRate, 0.05);
+      detentBuffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+      detentBuffer.getChannelData(0).set(samples);
+    }
+    playBuffer(detentBuffer, { fades: false, incidental: true });
+  };
+}
+
 /**
  * The click for pills and small controls, made in code: a very short burst of
  * dull noise (the contact) ringing two heavily damped resonances, with no
  * pitch to it, so it reads as a light switch rather than a bell.
  */
-export function clickSamples(rate: number): Float32Array {
+export function clickSamples(rate: number, level = 0.1): Float32Array {
   const length = 0.04;
   const contact = 0.0012;
   const lowpass = 0.6;
@@ -290,7 +326,6 @@ export function clickSamples(rate: number): Float32Array {
     [1400, 0.004, 1],
     [2900, 0.0025, 0.5],
   ];
-  const level = 0.1;
   const n = Math.round(rate * length);
   // The same noise every time, so every press sounds alike.
   let seed = 1;

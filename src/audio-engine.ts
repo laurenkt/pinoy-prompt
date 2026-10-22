@@ -83,6 +83,14 @@ if (typeof document !== 'undefined') {
   });
 }
 
+/**
+ * The shared context only if it's already running, for a sound from outside a tap (a drag): it doesn't
+ * make, resume or keep awake the context, or touch the audio session.
+ */
+export function runningContext(): AudioContext | null {
+  return context?.state === 'running' ? context : null;
+}
+
 /** Whether something is playing through the shared context, or it was asked for within the last `withinMs` (a sound still loading). */
 export function audioBusy(withinMs: number): boolean {
   return sounding.size > 0 || performance.now() - lastUsed < withinMs;
