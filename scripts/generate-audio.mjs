@@ -21,7 +21,6 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -154,15 +153,17 @@ async function makeClip(text, work, unsure, keepOld) {
     const draft = `take-${createHash('sha1').update(take).digest('hex')}`;
     await encode(take, draft, work);
     let heard;
+    let checked = true;
     try {
       heard = await transcribe(take);
     } catch (error) {
       // Not worth paying for more takes when the check itself failed.
+      checked = false;
       heard = `(couldn't transcribe: ${error.message.split('\n')[0]})`;
     }
-    const right = heard.startsWith('(') || heardRight(text, heard);
+    const right = !checked || heardRight(text, heard);
     if (!right && attempt < ATTEMPTS) continue;
-    if (!right || heard.startsWith('(')) unsure.push({ text, heard, kept: !right && keepOld });
+    if (!right || !checked) unsure.push({ text, heard, kept: !right && keepOld });
     if (!right && keepOld) return null;
     const name = clipName(text, await readFile(join(work, `${draft}.mp3`)));
     for (const suffix of ['', '-slow']) await rename(join(work, `${draft}${suffix}.mp3`), join(AUDIO_DIR, `${name}${suffix}.mp3`));
@@ -173,7 +174,8 @@ async function makeClip(text, work, unsure, keepOld) {
 const texts = await spokenTexts();
 const manifest = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
 await mkdir(AUDIO_DIR, { recursive: true });
-const work = await mkdtemp(join(tmpdir(), 'pinoy-audio-'));
+// Inside the repo, not the system temp folder, so takes can be moved into public/audio (a move can't cross disks).
+const work = await mkdtemp(join(ROOT, 'node_modules', '.pinoy-audio-'));
 const todo = (redo.length ? redo : texts.filter((t) => all || !manifest[t])).slice(0, limit);
 const unknown = redo.filter((t) => !texts.includes(t));
 if (unknown.length) throw new Error(`Not a text the app says: ${unknown.join(', ')}`);

@@ -86,7 +86,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Word clips are named by their sound, so a kept copy is always right; one not kept yet joins the others.
-  if (new URL(request.url).pathname.endsWith('.mp3')) {
+  if (/\/audio\/[^/]+\.mp3$/.test(new URL(request.url).pathname)) {
     event.respondWith(
       caches.match(request, { ignoreVary: true }).then(
         (hit) =>
