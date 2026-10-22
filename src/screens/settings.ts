@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { getCard } from '../deck';
-import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai';
+import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, getSpend, setApiKey } from '../openai';
 import { lastStartDelay, play, voiceQuality } from '../speech';
 import { applyAudioMode, isSilent } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
@@ -150,16 +150,30 @@ export function settingsScreen(app: App): HTMLElement {
   return root;
 }
 
+/** An amount in US dollars, to the cent; a little spent never shows as nothing. */
+export function dollars(amount: number): string {
+  if (amount > 0 && amount < 0.005) return 'under 1¢';
+  return `$${amount.toFixed(2)}`;
+}
+
 /**
- * The OpenAI key Talk uses: a box to paste one in, or, once saved, a way to
- * forget it. Calls onChange after either.
+ * The OpenAI key Talk uses: a box to paste one in, or, once saved, what it
+ * has cost and a way to forget it. Calls onChange after either.
  */
 export function keyForm(onChange: () => void): HTMLElement {
   if (getApiKey()) {
+    const spend = getSpend();
     return h(
       'div',
       { class: 'key-form' },
-      h('p', { class: 'muted small' }, 'Your OpenAI API key is saved on this device. Chat uses it to talk with you; OpenAI bills that account.'),
+      h('p', { class: 'muted small' }, 'Your OpenAI API key is saved on this device. Chat uses it to talk with you, and Drills to check a meaning you type; OpenAI bills that account.'),
+      h(
+        'div',
+        { class: 'stats key-spend' },
+        h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, dollars(spend.month)), h('span', { class: 'stat-label' }, 'this month')),
+        h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, dollars(spend.total)), h('span', { class: 'stat-label' }, 'all time')),
+      ),
+      h('p', { class: 'muted small' }, "An estimate of what this app has used on this device, from OpenAI's prices. Your OpenAI account shows the real bill."),
       h(
         'button',
         {

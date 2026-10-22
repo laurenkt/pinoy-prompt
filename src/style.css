@@ -1173,10 +1173,14 @@ p {
   background: var(--cream);
 }
 
-.panel .stats {
+.stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 10px;
+}
+
+.panel .stats {
   margin: 16px 0;
 }
 
@@ -2163,6 +2167,10 @@ p {
   border-radius: 14px;
   padding: 10px 12px;
   width: 100%;
+  margin-bottom: 10px;
+}
+
+.key-spend {
   margin-bottom: 10px;
 }
 
