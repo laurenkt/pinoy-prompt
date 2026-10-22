@@ -242,6 +242,9 @@ export function cardsPerWord(cards: readonly Card[] = ALL_CARDS): number {
   return words.size ? cards.length / words.size : 1;
 }
 
+/** Worked out once: the deck only changes with the app. */
+const CARDS_PER_WORD = cardsPerWord();
+
 /** A milestone's words as cards, rounded so it doesn't read as exact. */
 function inCards(words: number, perWord: number): number {
   const step = words >= 100 ? 50 : 1;
@@ -329,7 +332,7 @@ export function fitPower(points: [number, number][]): number | null {
  * actually been learned, and a card that slips back counts against it. In the first two weeks it is an early guess (see
  * `early`). With no growth over the last few weeks, there are no dates.
  */
-export function forecast(progress: Progress, now: number, milestones = MILESTONES, perWord = cardsPerWord()): Forecast {
+export function forecast(progress: Progress, now: number, milestones = MILESTONES, perWord = CARDS_PER_WORD): Forecast {
   const steps = Object.entries(progress.cards)
     .filter(([id]) => getCard(id))
     .map(([, card]) => strengthSteps(card, now));

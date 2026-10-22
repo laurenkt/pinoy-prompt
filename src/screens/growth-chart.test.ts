@@ -127,6 +127,16 @@ describe('forecast', () => {
     expect(el.querySelector<HTMLElement>('.growth-back')!.hidden).toBe(false);
   });
 
+  it('starts the projection from the cards that have stuck, the count the forecast runs on', () => {
+    // 10 cards today, 4 of them only days old: 6 have stuck.
+    const met = { ...history, counts: { new: [0, 0], days: [0, 4], weeks: [0, 6], long: [0, 0] } };
+    const el = growthChart(met, legend(), { ...ahead(0.5, now + 400 * DAY_MS), known: 6 });
+    const frame = el.querySelector<HTMLElement>('.growth-frame')!;
+    frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
+    tap(frame, 210.3);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~[6-8] cards by /);
+  });
+
   it("opens the list from the level's label without looking along the chart", () => {
     const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
     el.querySelector<HTMLElement>('.growth-frame')!.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
