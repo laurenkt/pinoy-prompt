@@ -106,6 +106,11 @@ describe('holding the microphone for a screen', () => {
     expect(await asking).toBe(false);
   });
 
+  it('still says refused while the screen that asked is showing', async () => {
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => Promise.reject(new DOMException('no', 'NotAllowedError')) } });
+    await expect(holdMicrophone()).rejects.toThrow();
+  });
+
   it("isn't taken up by a screen left while the phone was asking", async () => {
     const asking = holdMicrophone();
     endMicrophoneHold();

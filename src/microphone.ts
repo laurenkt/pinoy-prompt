@@ -108,7 +108,7 @@ export async function holdMicrophone(): Promise<boolean> {
   try {
     s = await getMicrophone();
   } catch (error) {
-    // Refused after the screen went: nothing is waiting to hear it.
+    // Refused (or no microphone) after the screen went: nothing is waiting to hear it.
     if (mine !== holds) return false;
     throw error;
   }
