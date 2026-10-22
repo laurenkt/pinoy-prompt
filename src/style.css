@@ -365,9 +365,9 @@ p {
 }
 
 .growth-goal {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  /* A full-size target that doesn't make the caption row taller. */
+  margin: -9px 0 -9px auto;
+  align-self: center;
   min-height: 44px;
   padding: 4px 10px;
   display: flex;
@@ -507,6 +507,7 @@ p {
 }
 
 .growth-back[hidden],
+.growth-goal[hidden],
 .growth-forecast[hidden],
 .growth-marker[hidden] {
   display: none;

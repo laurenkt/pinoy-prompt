@@ -77,6 +77,7 @@ describe('forecast', () => {
   const ahead = (perDay: number | null, at: Forecast['milestones'][number]['at'] = null): Forecast => ({
     known: 10,
     perDay,
+    early: false,
     days: 28,
     milestones: [
       { words: 5, label: 'First', at: 'reached' },
@@ -106,6 +107,9 @@ describe('forecast', () => {
     expect(el.querySelector('.growth-caption')!.textContent).toContain('today');
     frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 20, pointerType: 'touch' }));
     expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^0 cards on /);
+    // The way back takes the tag's corner while looking at an earlier day.
+    expect(el.querySelector<HTMLElement>('.growth-goal')!.hidden).toBe(true);
+    expect(el.querySelector<HTMLElement>('.growth-back')!.hidden).toBe(false);
   });
 
   it('draws no projection without a date ahead', () => {
@@ -123,6 +127,12 @@ describe('forecast', () => {
     expect(text).toMatch(/~\w+ \d{4}/);
     expect(text).toContain('rough');
     expect(forecastView(ahead(0.05, now + 400 * DAY_MS)).textContent).toContain('less than a word a week');
+  });
+
+  it('marks an early guess as one', () => {
+    const f = { ...ahead(0.5, now + 400 * DAY_MS), early: true, days: 4 };
+    expect(growthChart(history, legend(), f).querySelector('.growth-goal')!.textContent).toContain('500 words · early');
+    expect(forecastView(f).textContent).toContain('An early guess, from about 4 words a week met so far');
   });
 
   it('keeps the tag a button to a screen reader, outside the picture', () => {

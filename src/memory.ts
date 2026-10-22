@@ -232,16 +232,22 @@ export const MILESTONES: { words: number; label: string }[] = [
 
 /** How far back the pace looks. */
 export const PACE_DAYS = 28;
-/** Less learning than this to look back on, and there is no pace to go on yet. */
+/** Less learning than this to look back on, and the pace is only an early guess. */
 export const MIN_PACE_DAYS = 14;
 /** Further out than this, a date means nothing. */
 const MAX_FORECAST_YEARS = 20;
 
 export interface Forecast {
-  /** Words and phrases that have stuck: they hold for a week or more. */
+  /** Words and phrases that have stuck: they hold for a week or more (early on, every word met). */
   known: number;
   /** Net words stuck per day over the days looked back on; null with too little to go on. */
   perDay: number | null;
+  /**
+   * Under MIN_PACE_DAYS of learning, too few words have had a week to stick,
+   * so an early guess counts every word met instead. It runs ahead of the real
+   * pace, as some of those words will slip.
+   */
+  early: boolean;
   /** Days the pace was measured over. */
   days: number;
   /** When each milestone might be reached: 'reached', a time, null if not at this pace. */
@@ -252,7 +258,7 @@ export interface Forecast {
  * When the learner might reach each milestone, if they keep up the pace of
  * the last few weeks. The pace counts words that have stuck, not words met,
  * so it follows what has actually been learned, and a word that slips back
- * counts against it.
+ * counts against it. In the first two weeks it is an early guess (see `early`).
  */
 export function forecast(progress: Progress, now: number, milestones = MILESTONES): Forecast {
   const steps = Object.entries(progress.cards)
@@ -261,21 +267,26 @@ export function forecast(progress: Progress, now: number, milestones = MILESTONE
       return card && isVocab(card);
     })
     .map(([, card]) => strengthSteps(card, now));
+  const since = Math.max(EARLIEST, Math.min(now, ...steps.map((s) => s[0][0])));
+  const days = Math.min(PACE_DAYS, (now - since) / DAY_MS);
+  const early = days < MIN_PACE_DAYS;
+  const held: Strength[] = early ? ['new', 'days', 'weeks', 'long'] : ['weeks', 'long'];
   const stuckAt = (t: number) =>
     steps.filter((s) => {
       let strength: Strength | null = null;
       for (const [when, id] of s) if (when <= t) strength = id;
-      return strength === 'weeks' || strength === 'long';
+      return strength !== null && held.includes(strength);
     }).length;
   const known = stuckAt(now);
-  const since = Math.max(EARLIEST, Math.min(now, ...steps.map((s) => s[0][0])));
-  const days = Math.min(PACE_DAYS, (now - since) / DAY_MS);
-  const perDay = days >= MIN_PACE_DAYS ? (known - stuckAt(now - days * DAY_MS)) / days : null;
+  // A window reaching back to the first word starts from none. At least a day,
+  // so a first session's words aren't read as a pace per minute.
+  const before = days < PACE_DAYS ? 0 : stuckAt(now - days * DAY_MS);
+  const perDay = steps.length ? (known - before) / Math.max(1, days) : null;
   const ahead = milestones.map(({ words, label }) => {
     if (known >= words) return { words, label, at: 'reached' as const };
     if (!perDay || perDay <= 0) return { words, label, at: null };
     const wait = ((words - known) / perDay) * DAY_MS;
     return { words, label, at: wait > MAX_FORECAST_YEARS * 365 * DAY_MS ? null : now + wait };
   });
-  return { known, perDay, days, milestones: ahead };
+  return { known, perDay, early, days, milestones: ahead };
 }

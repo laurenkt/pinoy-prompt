@@ -218,12 +218,22 @@ describe('forecast', () => {
     expect(forecast(p, NOW).known).toBe(4);
   });
 
-  it('gives no pace with under two weeks to go on', () => {
+  it('gives an early guess from words met, under two weeks in', () => {
     const p = emptyProgress(NOW);
-    p.cards[LEARN_ORDER[0]] = card(7, 0, { introduced: NOW - 10 * DAY_MS });
+    p.cards[LEARN_ORDER[0]] = card(1, 1, { introduced: NOW - 4 * DAY_MS });
+    p.cards[LEARN_ORDER[1]] = card(0, 0, { introduced: NOW - DAY_MS });
     const f = forecast(p, NOW);
-    expect(f.perDay).toBeNull();
-    expect(f.milestones.every((m) => m.at === null)).toBe(true);
+    expect(f.early).toBe(true);
+    expect(f.known).toBe(2);
+    expect(f.perDay).toBeCloseTo(0.5);
+    expect(typeof f.milestones[0].at).toBe('number');
+  });
+
+  it('gives a guess from the first session, as if over a day', () => {
+    const p = emptyProgress(NOW);
+    p.cards[LEARN_ORDER[0]] = card(0, 0, { introduced: NOW - 60_000 });
+    p.cards[LEARN_ORDER[1]] = card(0, 0, { introduced: NOW - 60_000 });
+    expect(forecast(p, NOW).perDay).toBe(2);
     expect(forecast(emptyProgress(NOW), NOW).perDay).toBeNull();
   });
 

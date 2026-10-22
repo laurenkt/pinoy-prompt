@@ -88,7 +88,13 @@ export function forecastView(forecast: Forecast): HTMLElement {
   return h(
     'div',
     { class: 'growth-forecast small', id: 'growth-forecast' },
-    h('p', null, `At your recent pace, ${pace(forecast.perDay ?? 0)} sticking:`),
+    h(
+      'p',
+      null,
+      forecast.early
+        ? `An early guess, from ${pace(forecast.perDay ?? 0)} met so far. It runs ahead, as some will slip, and firms up after two weeks:`
+        : `At your recent pace, ${pace(forecast.perDay ?? 0)} sticking:`,
+    ),
     h(
       'ul',
       null,
@@ -129,11 +135,11 @@ export function growthChart(
   const peak = Math.max(1, ...tops[tops.length - 1]);
   // Headroom above the tallest point, so the top outline isn't clipped; with a
   // projection, room for it to rise towards its milestone above the stream.
-  const yOf = (v: number) => H - (v / (peak * (next ? 2 : 1.12))) * H;
+  const yOf = (v: number) => H - (v / (peak * (next ? 1.8 : 1.12))) * H;
   const xs = times.map((_, i) => (i / last) * W * past);
 
   const total = (i: number) => LAYERS.reduce((sum, id) => sum + raw[id][i], 0);
-  // The picture is the svg, not the frame, so the milestone tag beside it stays a button to a screen reader.
+  // The svg is the picture, labelled for screen readers; the controls around it stay controls.
   const plot = svg('svg', {
     viewBox: `0 0 ${W} ${H}`,
     preserveAspectRatio: 'none',
@@ -162,12 +168,12 @@ export function growthChart(
   });
   if (next) {
     // From today's words that have stuck (within the bottom two layers, which
-    // also hold guides) up to the milestone in the corner. The milestone is
+    // also hold guides) up to the corner, under the milestone's tag. The milestone is
     // off this scale, so the line shows the direction and the tag the numbers.
     const stuck = yOf(forecast!.known);
     plot.append(
       svg('path', {
-        d: `M${f(xs[last])},${f(stuck)} L${f(W - 56)},${f(62)}`,
+        d: `M${f(xs[last])},${f(stuck)} L${f(W)},${f(0)}`,
         class: 'projection',
         'vector-effect': 'non-scaling-stroke',
       }),
@@ -190,8 +196,6 @@ export function growthChart(
         'aria-expanded': 'false',
         'aria-controls': 'growth-forecast',
         'aria-label': `About ${next.words.toLocaleString()} words around ${monthYear(next.at)} at your recent pace. Show all milestones.`,
-        // Its own tap, not a look at an earlier day.
-        onpointerdown: (e: PointerEvent) => e.stopPropagation(),
         onclick: () => {
           ahead.hidden = !ahead.hidden;
           goal!.setAttribute('aria-expanded', String(!ahead.hidden));
@@ -200,7 +204,7 @@ export function growthChart(
         },
       },
       h('strong', null, `~${monthYear(next.at)}`),
-      h('span', null, `${next.words.toLocaleString()} words`),
+      h('span', null, `${next.words.toLocaleString()} words${forecast!.early ? ' · early' : ''}`),
     );
 
   function show(i: number): void {
@@ -212,6 +216,8 @@ export function growthChart(
     marker.hidden = today;
     marker.style.left = `${(i / last) * 100 * past}%`;
     back.hidden = today;
+    // One control in the caption's corner at a time.
+    if (goal) goal.hidden = !today;
   }
 
   const frame = h(
@@ -219,7 +225,6 @@ export function growthChart(
     { class: 'growth-frame' },
     plot,
     marker,
-    goal,
     // In the first days the stream is a sliver at the edge; say what is coming.
     times[last] - history.since < 2 * DAY_MS &&
       h('p', { class: 'growth-hint small' }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
@@ -242,7 +247,7 @@ export function growthChart(
   const el = h(
     'div',
     { class: 'growth' },
-    h('p', { class: 'growth-caption' }, value, when, back),
+    h('div', { class: 'growth-caption' }, value, when, back, goal),
     frame,
     h(
       'div',
