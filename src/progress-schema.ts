@@ -59,7 +59,7 @@ export interface Envelope {
 }
 
 /** The schema this build writes. */
-export const SCHEMA = 4;
+export const SCHEMA = 3;
 
 type Data = Record<string, unknown>;
 
@@ -70,21 +70,7 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   1: ({ streak: _streak, ...rest }) => rest,
   // 2 → 3: review results are tallied by day. Nothing earlier was recorded, so it starts empty.
   2: (data) => ({ history: {}, ...data }),
-  // 3 → 4: reviews come due a whole interval after the card was answered.
-  // Earlier builds made them due at local midnight of the day the interval
-  // landed on, so a batch fell due together just after midnight.
-  3: (data) =>
-    isObject(data.cards)
-      ? { ...data, cards: Object.fromEntries(Object.entries(data.cards).map(([id, card]) => [id, fromMidnightDue(card)])) }
-      : data,
 };
-
-/** A card scheduled by the old midnight rule, rescheduled a whole interval after its review. */
-function fromMidnightDue(card: unknown): unknown {
-  if (!isObject(card) || !isNumber(card.reviewed) || !isNumber(card.interval) || !isNumber(card.due)) return card;
-  if (card.interval < 1 || card.due !== startOfDayAfter(card.reviewed, card.interval)) return card;
-  return { ...card, due: card.reviewed + card.interval * DAY_MS };
-}
 
 export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true };
 
@@ -225,6 +211,14 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
   const reviewed = time(value.reviewed);
   if (reviewed === undefined) delete card.reviewed;
   else card.reviewed = reviewed;
+  // Builds before reviews ran on elapsed time made a card due at local midnight
+  // of the day its interval landed on, so a batch fell due together just after
+  // midnight. Such a card comes due a whole interval after its review instead.
+  // Done on every read, as an older build still open elsewhere can write those
+  // due times back; where the two rules agree this changes nothing.
+  if (reviewed !== undefined && card.interval >= 1 && card.due === startOfDayAfter(reviewed, card.interval)) {
+    card.due = reviewed + card.interval * DAY_MS;
+  }
   // Keep only well-formed steps, in time order; the log is a nicety, never worth failing over.
   const log = Array.isArray(value.log)
     ? value.log

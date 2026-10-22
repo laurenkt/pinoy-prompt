@@ -68,28 +68,27 @@ describe('reviews scheduled by the old midnight rule', () => {
     reviewed: evening,
     due: startOfDayAfter(evening, interval),
   });
-  const load = (schema: number, cards: Record<string, unknown>) =>
-    decodeOk(encode({ schema, rev: 1, savedAt: NOW, resetAt: 0, progress: { ...emptyProgress(NOW), cards } as Progress })).progress.cards;
 
   it('come due a whole interval after the review instead', () => {
-    const cards = load(3, { isa: midnightCard(1), dalawa: midnightCard(7.5) });
-    expect(cards.isa.due).toBe(evening + DAY_MS);
-    expect(cards.dalawa.due).toBe(evening + 7.5 * DAY_MS);
+    expect(sanitizeCard(midnightCard(1), NOW)!.due).toBe(evening + DAY_MS);
+    expect(sanitizeCard(midnightCard(7.5), NOW)!.due).toBe(evening + 7.5 * DAY_MS);
   });
 
   it('leave cards that were not scheduled that way alone', () => {
     const relearning = { ...midnightCard(0), due: evening + 60_000 };
     const elapsed = { ...midnightCard(3), due: evening + 3 * DAY_MS };
     const { reviewed: _reviewed, ...unknownReview } = midnightCard(2);
-    const cards = load(3, { isa: relearning, dalawa: elapsed, tatlo: unknownReview });
-    expect(cards.isa).toEqual(relearning);
-    expect(cards.dalawa).toEqual(elapsed);
-    expect(cards.tatlo).toEqual(unknownReview);
+    expect(sanitizeCard(relearning, NOW)).toEqual(relearning);
+    expect(sanitizeCard(elapsed, NOW)).toEqual(elapsed);
+    expect(sanitizeCard(unknownReview, NOW)).toEqual(unknownReview);
   });
 
-  it('are only moved once, when a copy from before the change is first read', () => {
-    const card = midnightCard(1);
-    expect(load(SCHEMA, { isa: card }).isa).toEqual(card);
+  it('do not change again once moved, even for a review at midnight', () => {
+    const moved = sanitizeCard(midnightCard(1), NOW)!;
+    expect(sanitizeCard(moved, NOW)).toEqual(moved);
+    const atMidnight = new Date(2026, 9, 18).getTime();
+    const card = { ...midnightCard(2), reviewed: atMidnight, due: atMidnight + 2 * DAY_MS };
+    expect(sanitizeCard(card, NOW)).toEqual(card);
   });
 });
 
