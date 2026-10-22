@@ -224,10 +224,10 @@ export function memoryHistory(progress: Progress, now: number, samples = 64): Me
  * Sources differ by twice or more, so the app only ever calls them rough.
  */
 export const MILESTONES: { words: number; label: string }[] = [
-  { words: 500, label: 'Simple everyday exchanges' },
-  { words: 1000, label: 'Get by on a trip, talk about your day' },
-  { words: 2500, label: 'Hold a casual conversation' },
-  { words: 4000, label: 'Talk easily about most everyday things' },
+  { words: 500, label: 'Everyday basics' },
+  { words: 1000, label: 'Get by on a trip' },
+  { words: 2500, label: 'Casual conversation' },
+  { words: 4000, label: 'Most everyday topics' },
 ];
 
 /** How far back the pace looks. */

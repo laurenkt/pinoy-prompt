@@ -84,40 +84,43 @@ describe('forecast', () => {
     ],
   });
 
-  it('opens from the caption, and makes way for the way back while looking at an earlier day', () => {
+  it('projects a dotted line to the next milestone, which opens the rest', () => {
     const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
-    const toggle = el.querySelector<HTMLButtonElement>('.growth-ahead')!;
+    expect(el.querySelector('.projection')).not.toBeNull();
+    const goal = el.querySelector<HTMLButtonElement>('.growth-goal')!;
+    expect(goal.textContent).toMatch(/^~\w+ \d{4}500 words$/);
     const panel = el.querySelector<HTMLElement>('.growth-forecast')!;
     expect(panel.hidden).toBe(true);
-    toggle.click();
+    goal.click();
     expect(panel.hidden).toBe(false);
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(goal.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('keeps looking back through time on the past side of the chart', () => {
+    const counts = legend();
+    const el = growthChart(history, counts, ahead(0.5, now + 400 * DAY_MS));
     const frame = el.querySelector<HTMLElement>('.growth-frame')!;
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
-    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 0, pointerType: 'touch' }));
-    expect(toggle.hidden).toBe(true);
-    expect(el.querySelector<HTMLElement>('.growth-back')!.hidden).toBe(false);
+    // Past the 70% where today sits is still today.
+    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 250, pointerType: 'touch' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('today');
+    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 20, pointerType: 'touch' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^0 cards on /);
   });
 
-  it('is left out without one', () => {
-    expect(growthChart(history, legend()).querySelector('.growth-ahead')).toBeNull();
+  it('draws no projection without a date ahead', () => {
+    for (const f of [undefined, ahead(null), ahead(0)]) {
+      const el = growthChart(history, legend(), f);
+      expect(el.querySelector('.projection')).toBeNull();
+      expect(el.querySelector('.growth-goal')).toBeNull();
+    }
   });
 
-  it('gives the pace and a date for each milestone, and says it is rough', () => {
+  it('lists each milestone with a date, and says the counts are rough', () => {
     const text = forecastView(ahead(0.5, now + 400 * DAY_MS)).textContent!;
     expect(text).toContain('about 4 words a week sticking');
     expect(text).toContain('Reached');
     expect(text).toMatch(/~\w+ \d{4}/);
-    expect(text).toContain('rough estimate');
-  });
-
-  it('gives no dates without a pace, and says why', () => {
-    expect(forecastView(ahead(null)).textContent).toContain('After two weeks of learning');
-    expect(forecastView(ahead(0)).textContent).toContain("haven't grown over the last 4 weeks");
-    expect(forecastView(ahead(0)).textContent).not.toMatch(/~\w+ \d{4}/);
-  });
-
-  it('names the span the pace was measured over', () => {
-    expect(forecastView({ ...ahead(0.5, now + DAY_MS), days: 16.5 }).textContent).toContain('over the last 16 days');
+    expect(text).toContain('rough');
   });
 });

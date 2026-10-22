@@ -24,7 +24,6 @@ const SIZES = [
 /** How to reach each screen from Home. */
 const SCREENS = {
   home: async () => {},
-  forecast: (page) => page.click('.growth-ahead'),
   drills: (page) => page.click('.drills-btn'),
   'drills-answered': async (page) => {
     await page.click('.drills-btn');

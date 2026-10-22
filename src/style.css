@@ -337,13 +337,50 @@ p {
   margin-right: 6px;
 }
 
-.growth-back,
-.growth-ahead {
+.growth-back {
   margin-left: auto;
 }
 
+.growth-svg .projection {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 3px;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+}
+
+.growth-goal {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 44px;
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--saffron);
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: 12px;
+  box-shadow: 2px 2px 0 var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.growth-goal strong {
+  font-size: 0.9rem;
+}
+
+.growth-goal[aria-expanded='true'] {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
 .growth-forecast {
-  margin: 0 0 14px;
+  margin: 14px 0 0;
 }
 
 .growth-forecast p {
@@ -363,10 +400,6 @@ p {
   justify-content: space-between;
   align-items: baseline;
   gap: 12px;
-}
-
-.forecast-words {
-  display: block;
 }
 
 .growth-forecast li strong {
@@ -458,17 +491,19 @@ p {
 }
 
 .growth-back[hidden],
-.growth-ahead[hidden],
 .growth-forecast[hidden],
 .growth-marker[hidden] {
   display: none;
 }
 
 .growth-axis {
-  display: flex;
-  justify-content: space-between;
   margin-top: 10px;
   font-weight: 700;
+}
+
+.growth-axis-past {
+  display: flex;
+  justify-content: space-between;
 }
 
 .s-new {

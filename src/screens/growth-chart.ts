@@ -1,8 +1,9 @@
 // A stacked stream of how many words are held at each strength over time:
 // the height shows how many words you know, the colors how firmly. Drag across
-// it to see any earlier day.
+// it to see any earlier day. With a forecast, a dotted line runs on from today
+// towards the next milestone, with roughly when it might be reached.
 
-import { PACE_DAYS, STRENGTHS, type Forecast, type MemoryHistory, type Strength } from '../memory';
+import { STRENGTHS, type Forecast, type MemoryHistory, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
 import { h, svg } from '../ui';
 
@@ -72,23 +73,21 @@ function pace(perDay: number): string {
   return `about ${week} ${week === 1 ? 'word' : 'words'} a week`;
 }
 
-/**
- * When the learner might reach each milestone at their recent pace, with what
- * that pace is and how rough the numbers are, so it reads as an estimate.
- */
+/** Share of the chart's width for the past when a projection follows it. */
+const PAST = 0.7;
+
+/** The milestone the projection runs to: the next one with a date, if any. */
+export function nextMilestone(forecast: Forecast | undefined): { words: number; label: string; at: number } | null {
+  const next = forecast?.milestones.find((m) => m.at !== 'reached');
+  return next && typeof next.at === 'number' ? { ...next, at: next.at } : null;
+}
+
+/** Each milestone and roughly when it might be reached, kept short. */
 export function forecastView(forecast: Forecast): HTMLElement {
-  const { known, perDay } = forecast;
-  const span = forecast.days >= PACE_DAYS ? `${Math.round(PACE_DAYS / 7)} weeks` : `${Math.floor(forecast.days)} days`;
-  const lead =
-    perDay === null
-      ? 'After two weeks of learning, this shows roughly when you might reach each level at your pace.'
-      : perDay <= 0
-        ? `The words that have stuck haven't grown over the last ${span}, so there are no dates for now.`
-        : `At your pace over the last ${span}, ${pace(perDay)} sticking, you might reach:`;
   return h(
     'div',
     { class: 'growth-forecast small', id: 'growth-forecast' },
-    h('p', null, `${known} ${known === 1 ? 'word or phrase has' : 'words and phrases have'} stuck so far. ${lead}`),
+    h('p', null, `At your recent pace, ${pace(forecast.perDay ?? 0)} sticking:`),
     h(
       'ul',
       null,
@@ -96,23 +95,20 @@ export function forecastView(forecast: Forecast): HTMLElement {
         h(
           'li',
           null,
-          h('span', null, m.label, h('span', { class: 'muted forecast-words' }, `about ${m.words.toLocaleString()} words`)),
+          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.words.toLocaleString()}`)),
           h('strong', null, m.at === 'reached' ? 'Reached' : m.at === null ? '–' : `~${monthYear(m.at)}`),
         ),
       ),
     ),
-    h(
-      'p',
-      { class: 'muted' },
-      'A rough estimate: word counts come from studies of other languages, as there are none for Tagalog. A word counts once it holds for a week.',
-    ),
+    h('p', { class: 'muted' }, 'Word counts are rough, from studies of other languages.'),
   );
 }
 
 /**
  * The chart, with a caption and legend that follow the point being looked at.
  * `legendCounts` holds the legend's count element for each strength. With a
- * forecast, the caption offers it, opening below.
+ * forecast that has a date ahead, the past takes the left of the chart and a
+ * dotted projection the rest; tapping its milestone opens the others below.
  */
 export function growthChart(
   history: MemoryHistory,
@@ -123,14 +119,17 @@ export function growthChart(
   const last = times.length - 1;
   const raw = history.counts;
   const smoothed = Object.fromEntries(LAYERS.map((id) => [id, smooth(raw[id])])) as Record<Strength, number[]>;
+  const next = nextMilestone(forecast);
+  const past = next ? PAST : 1;
 
   // Running totals: tops[k] is the top edge of layer k.
   const tops: number[][] = [];
   LAYERS.forEach((id, k) => tops.push(smoothed[id].map((v, i) => v + (k ? tops[k - 1][i] : 0))));
   const peak = Math.max(1, ...tops[tops.length - 1]);
-  // Headroom above the tallest point, so the top outline isn't clipped.
-  const yOf = (v: number) => H - (v / (peak * 1.12)) * H;
-  const xs = times.map((_, i) => (i / last) * W);
+  // Headroom above the tallest point, so the top outline isn't clipped; with a
+  // projection, room for it to rise towards its milestone above the stream.
+  const yOf = (v: number) => H - (v / (peak * (next ? 2 : 1.12))) * H;
+  const xs = times.map((_, i) => (i / last) * W * past);
 
   const plot = svg('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', class: 'growth-svg', 'aria-hidden': 'true' });
   const backXs = [...xs].reverse();
@@ -138,7 +137,7 @@ export function growthChart(
     // Along the layer's top edge, then back along the edge of the one below.
     const top = tops[k].map(yOf);
     const below = (k ? tops[k - 1].map(yOf) : xs.map(() => H)).reverse();
-    const d = `M${f(xs[0])},${f(top[0])}${curve(xs, top)} L${f(W)},${f(below[0])}${curve(backXs, below)} Z`;
+    const d = `M${f(xs[0])},${f(top[0])}${curve(xs, top)} L${f(xs[last])},${f(below[0])}${curve(backXs, below)} Z`;
     plot.append(svg('path', { d, class: `layer s-${id}` }));
   });
   // Outlines on top of every fill, so each edge is drawn whole.
@@ -152,29 +151,46 @@ export function growthChart(
       }),
     );
   });
+  if (next) {
+    // From today's words that have stuck (the bottom two layers) up to the
+    // milestone in the corner. The milestone is off this scale, so the line
+    // shows the direction and the label the numbers.
+    const stuck = yOf(tops[LAYERS.indexOf('weeks')][last]);
+    plot.append(
+      svg('path', {
+        d: `M${f(xs[last])},${f(stuck)} L${f(W - 56)},${f(62)}`,
+        class: 'projection',
+        'vector-effect': 'non-scaling-stroke',
+      }),
+    );
+  }
 
   const total = (i: number) => LAYERS.reduce((sum, id) => sum + raw[id][i], 0);
   const value = h('strong', { class: 'growth-total' });
   const when = h('span', { class: 'muted' });
   const back = h('button', { class: 'link-btn growth-back', hidden: true, onclick: () => show(last) }, 'Back to today');
   const marker = h('div', { class: 'growth-marker', hidden: true, 'aria-hidden': 'true' });
-  const ahead = forecast && forecastView(forecast);
+  const ahead = next && forecast && forecastView(forecast);
   if (ahead) ahead.hidden = true;
-  const toggle =
+  const goal =
+    next &&
     ahead &&
     h(
       'button',
       {
-        class: 'link-btn growth-ahead',
+        class: 'growth-goal',
         'aria-expanded': 'false',
         'aria-controls': 'growth-forecast',
+        'aria-label': `About ${next.words.toLocaleString()} words around ${monthYear(next.at)} at your recent pace. Show all milestones.`,
+        // Its own tap, not a look at an earlier day.
+        onpointerdown: (e: PointerEvent) => e.stopPropagation(),
         onclick: () => {
           ahead.hidden = !ahead.hidden;
-          toggle!.setAttribute('aria-expanded', String(!ahead.hidden));
-          toggle!.textContent = ahead.hidden ? 'Forecast' : 'Hide forecast';
+          goal!.setAttribute('aria-expanded', String(!ahead.hidden));
         },
       },
-      'Forecast',
+      h('strong', null, `~${monthYear(next.at)}`),
+      h('span', null, `${next.words.toLocaleString()} words`),
     );
 
   function show(i: number): void {
@@ -184,10 +200,8 @@ export function growthChart(
     when.textContent = ` ${n === 1 ? 'card' : 'cards'} ${today ? 'today' : `on ${shortDate(times[i])}`}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][i]);
     marker.hidden = today;
-    marker.style.left = `${(i / last) * 100}%`;
+    marker.style.left = `${(i / last) * 100 * past}%`;
     back.hidden = today;
-    // One control in the caption's corner at a time.
-    if (toggle) toggle.hidden = !today;
   }
 
   const frame = h(
@@ -199,6 +213,7 @@ export function growthChart(
     },
     plot,
     marker,
+    goal,
     // In the first days the stream is a sliver at the edge; say what is coming.
     times[last] - history.since < 2 * DAY_MS &&
       h('p', { class: 'growth-hint small' }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
@@ -206,7 +221,7 @@ export function growthChart(
   const pick = (e: PointerEvent) => {
     const box = frame.getBoundingClientRect();
     if (!box.width) return;
-    show(Math.round(Math.min(1, Math.max(0, (e.clientX - box.left) / box.width)) * last));
+    show(Math.round(Math.min(1, Math.max(0, (e.clientX - box.left) / (box.width * past))) * last));
   };
   frame.addEventListener('pointerdown', pick);
   frame.addEventListener('pointermove', (e) => {
@@ -221,16 +236,20 @@ export function growthChart(
   const el = h(
     'div',
     { class: 'growth' },
-    h('p', { class: 'growth-caption' }, value, when, back, toggle),
-    ahead,
+    h('p', { class: 'growth-caption' }, value, when, back),
     frame,
     h(
       'div',
       { class: 'growth-axis muted small', 'aria-hidden': 'true' },
-      h('span', null, shortDate(times[0])),
-      h('span', null, shortDate(times[mid])),
-      h('span', null, 'Today'),
+      h(
+        'span',
+        { class: 'growth-axis-past', style: { width: `${past * 100}%` } },
+        h('span', null, shortDate(times[0])),
+        h('span', null, shortDate(times[mid])),
+        h('span', null, 'Today'),
+      ),
     ),
+    ahead,
   );
   show(last);
   return el;
