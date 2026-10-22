@@ -4,43 +4,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VOCAB } from '../deck';
 import { setMuted } from '../speech';
-import { drillScope, fakeApp, noMic } from '../test/screen';
+import { FakeAudioContext, chimes } from '../test/fake-audio';
+import { drillScope, fakeApp, flush, noMic } from '../test/screen';
 import { practiceScreen } from './practice';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
-
-/** Sounds made in code (the chime), as against clips decoded from a file. */
-let chimes: number;
-
-class FakeContext {
-  state = 'running';
-  currentTime = 0;
-  sampleRate = 48000;
-  destination = {};
-  resume = async () => {};
-  suspend = async () => {};
-  close = async () => {};
-  decodeAudioData = async () => ({ duration: 1 });
-  createBuffer(_channels: number, length: number, sampleRate: number) {
-    const data = new Float32Array(length);
-    return { made: true, sampleRate, duration: length / sampleRate, getChannelData: () => data };
-  }
-  createGain() {
-    const param = { setValueAtTime() {}, linearRampToValueAtTime() {} };
-    return { gain: param, connect: (to: unknown) => to };
-  }
-  createBufferSource() {
-    const source = {
-      buffer: null as { made?: boolean } | null,
-      playbackRate: { value: 1 },
-      onended: null,
-      connect: (to: unknown) => to,
-      start: () => source.buffer?.made && chimes++,
-      stop: () => {},
-    };
-    return source;
-  }
-}
 
 /** The right choice for the read question showing, or a wrong one. */
 function choice(root: HTMLElement, right: boolean): HTMLButtonElement {
@@ -51,8 +19,8 @@ function choice(root: HTMLElement, right: boolean): HTMLButtonElement {
 
 let root: HTMLElement;
 beforeEach(() => {
-  chimes = 0;
-  vi.stubGlobal('AudioContext', FakeContext);
+  chimes.count = 0;
+  vi.stubGlobal('AudioContext', FakeAudioContext);
   vi.stubGlobal('fetch', async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
   root = practiceScreen(fakeApp(KNOWN), noMic);
   document.body.replaceChildren(root);
@@ -65,19 +33,22 @@ afterEach(() => {
 });
 
 describe('the sound of a right answer in a drill', () => {
-  it('chimes once for a right answer', () => {
+  it('chimes once for a right answer', async () => {
     choice(root, true).click();
-    expect(chimes).toBe(1);
+    await flush();
+    expect(chimes.count).toBe(1);
   });
 
-  it("doesn't chime for a wrong one", () => {
+  it("doesn't chime for a wrong one", async () => {
     choice(root, false).click();
-    expect(chimes).toBe(0);
+    await flush();
+    expect(chimes.count).toBe(0);
   });
 
-  it('is silent in silent mode', () => {
+  it('is silent in silent mode', async () => {
     setMuted(true);
     choice(root, true).click();
-    expect(chimes).toBe(0);
+    await flush();
+    expect(chimes.count).toBe(0);
   });
 });

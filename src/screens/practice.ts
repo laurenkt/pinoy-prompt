@@ -157,7 +157,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         onAttempt: (right) => {
           if (!right || spokenRight) return;
           spokenRight = true;
-          chime();
+          void chime();
           // Pick what's next now, so its word loads while the coaching is up.
           settle(true);
           auto = countdown(root, () => {
@@ -188,7 +188,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     picked = choice.id;
     const right = choice.id === q.card.id;
     // The chime first, so the word said back is heard after it.
-    if (right) chime();
+    if (right) void chime();
     if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
     settle(right);
     if (right)

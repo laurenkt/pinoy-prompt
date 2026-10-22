@@ -103,7 +103,9 @@ let muted = false;
 
 export function setMuted(on: boolean): void {
   muted = on;
-  if (on) stop();
+  if (!on) return;
+  stop();
+  currentChime?.stop();
 }
 /** Bumped by stop(), so a play() still loading a clip or voices doesn't start afterwards. */
 let generation = 0;
@@ -169,15 +171,19 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
  * should stay small, and goes quiet with the words in silent mode. A word
  * played with it (the answer, said back) starts once it's done, not over it.
  */
-export function chime(): void {
+export async function chime(): Promise<void> {
   if (muted || !clipsSupported()) return;
   const ctx = audioContext();
+  // Outside a tap (a spoken answer judged) iOS may not start the context; better no chime than one on the next tap.
+  if (!(await audioRunning(ctx)) || muted) return;
   if (chimeBuffer?.sampleRate !== ctx.sampleRate) chimeBuffer = chimeSound(ctx);
-  const sound = playBuffer(chimeBuffer);
+  const sound = (currentChime = playBuffer(chimeBuffer));
   lastChime = { ctx, ends: sound.startsAt + chimeBuffer.duration };
 }
 
 let chimeBuffer: AudioBuffer | null = null;
+/** Stopped by silent mode, but not by a word starting, which waits for it instead. */
+let currentChime: Sound | null = null;
 /** When the last chime ends, in its context's time. */
 let lastChime: { ctx: AudioContext; ends: number } | null = null;
 

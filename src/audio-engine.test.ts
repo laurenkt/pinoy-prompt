@@ -343,8 +343,8 @@ describe('clips', () => {
 });
 
 describe('the right-answer chime', () => {
-  it('plays a short, quiet sound through the shared context', () => {
-    chime();
+  it('plays a short, quiet sound through the shared context', async () => {
+    await chime();
     expect(contexts.filter((c) => !c.closed)).toHaveLength(1);
     expect(sources).toHaveLength(1);
     const buffer = sources[0].buffer as unknown as { duration: number; getChannelData(): Float32Array };
@@ -355,7 +355,7 @@ describe('the right-answer chime', () => {
   });
 
   it('holds back a word played with it until it has finished', async () => {
-    chime();
+    void chime();
     await play({ tl: 'Salamat' });
     expect(sources[1].started).toBeGreaterThanOrEqual(sources[0].started! + sources[0].buffer!.duration);
   });
@@ -364,16 +364,27 @@ describe('the right-answer chime', () => {
     // A call interrupted it, so the next use makes a new one, counting from 0 again.
     const old = contexts.at(-1)!;
     old.currentTime = 500;
-    chime();
+    await chime();
     old.state = 'interrupted';
     await play({ tl: 'Salamat' });
     expect(sources.at(-1)!.started).toBeLessThan(0.1);
   });
 
-  it('is silent in silent mode', () => {
+  it('is silent in silent mode, and stops when it comes on', async () => {
     setMuted(true);
-    chime();
+    await chime();
     setMuted(false);
+    expect(sources).toHaveLength(0);
+    await chime();
+    setMuted(true);
+    setMuted(false);
+    expect(sources[0].stopped).toBe(true);
+  });
+
+  it("isn't left waiting to play on the next tap when iOS won't start the context", async () => {
+    startState = 'suspended';
+    for (const c of contexts) c.state = 'suspended';
+    await chime();
     expect(sources).toHaveLength(0);
   });
 });
