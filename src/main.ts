@@ -12,6 +12,7 @@ import { forgetRetiredVoiceChoice } from './openai';
 import { applyAudioMode } from './screens/quiet';
 import { cancelRecording } from './recorder';
 import { keepClipsOffline } from './clip-cache';
+import { keepSpeakingReady } from './model-cache';
 import { watchFit } from './fit';
 import { allClipUrls, initVoices, stop, tickOnPress } from './speech';
 import { replaceContents } from './progress-schema';
@@ -177,6 +178,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       // Offline support is a bonus; the app works without it.
     });
     // A few seconds in, so the first screen isn't waiting behind 4 MB of clips.
-    setTimeout(() => void keepClipsOffline(allClipUrls()).catch(() => {}), 5000);
+    setTimeout(() => {
+      void keepClipsOffline(allClipUrls()).catch(() => {});
+      void keepSpeakingReady().catch(() => {});
+    }, 5000);
   });
 }

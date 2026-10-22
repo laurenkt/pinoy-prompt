@@ -123,6 +123,19 @@ async function inMemory(body: ReadableStream<Uint8Array>, onProgress?: (fraction
   return bytes.buffer;
 }
 
+/**
+ * Bring in the runtime's own files: its JS glue into this page, and its wasm into the service worker's cache
+ * (src/model-cache.ts says why). Without a service worker the wasm would only be fetched again later, so it waits.
+ */
+export async function loadRuntime(): Promise<void> {
+  await import(/* @vite-ignore */ mjsUrl);
+  if (!navigator.serviceWorker?.controller || (await caches.match(wasmUrl))) return;
+  const response = await fetch(wasmUrl);
+  if (!response.ok) throw new Error(`Model runtime: ${response.status}`);
+  // Read to the end so the worker's copy is complete.
+  await response.arrayBuffer();
+}
+
 let loading: Promise<PhoneModel> | null = null;
 /** Everyone waiting on the load hears its download progress, not only whoever started it. */
 const listeners = new Set<(fraction: number) => void>();
