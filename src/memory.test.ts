@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
+import { MILESTONES, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
+import { LEARN_ORDER } from './deck';
 import { DAY_MS, newCardState, review, startOfDayAfter, type CardState } from './srs';
 import { dayKey, emptyProgress, recordAnswer } from './store';
 
@@ -188,5 +189,53 @@ describe('memoryHistory', () => {
     const { times, counts } = memoryHistory(p, NOW, 8);
     expect(times[0]).toBe(NOW - 7 * DAY_MS);
     expect(counts.new).toEqual([0, 0, 0, 0, 0, 0, 0, 1]);
+  });
+});
+
+describe('forecast', () => {
+  /** `n` words met 40 days ago, each moving to "weeks" (a 7-day interval) `stuckDaysAgo` days ago. */
+  function learner(n: number, stuckDaysAgo: number[]) {
+    const p = emptyProgress(NOW - 40 * DAY_MS);
+    LEARN_ORDER.slice(0, n).forEach((id, i) => {
+      const at = NOW - stuckDaysAgo[i] * DAY_MS;
+      p.cards[id] = card(7, stuckDaysAgo[i], { introduced: NOW - 40 * DAY_MS, log: [[at - 3 * DAY_MS, 1], [at, 7]] });
+    });
+    return p;
+  }
+
+  it('projects the pace of words that stuck over the last four weeks', () => {
+    // 14 words stuck in the last 28 days, 6 before: half a word a day.
+    const p = learner(20, [...Array(6).fill(35), ...Array(14).fill(10)]);
+    const f = forecast(p, NOW);
+    expect(f.known).toBe(20);
+    expect(f.perDay).toBeCloseTo(0.5);
+    expect(f.milestones[0].at).toBeCloseTo(NOW + (480 / 0.5) * DAY_MS, -3);
+  });
+
+  it('counts only words that have stuck, not words met', () => {
+    const p = learner(4, [10, 10, 10, 10]);
+    p.cards[LEARN_ORDER[10]] = card(1, 0, { introduced: NOW - 2 * DAY_MS });
+    expect(forecast(p, NOW).known).toBe(4);
+  });
+
+  it('gives no pace with under two weeks to go on', () => {
+    const p = emptyProgress(NOW);
+    p.cards[LEARN_ORDER[0]] = card(7, 0, { introduced: NOW - 10 * DAY_MS });
+    const f = forecast(p, NOW);
+    expect(f.perDay).toBeNull();
+    expect(f.milestones.every((m) => m.at === null)).toBe(true);
+    expect(forecast(emptyProgress(NOW), NOW).perDay).toBeNull();
+  });
+
+  it('gives no dates when nothing new has stuck lately', () => {
+    const f = forecast(learner(5, [35, 35, 35, 35, 35]), NOW);
+    expect(f.perDay).toBe(0);
+    expect(f.milestones.every((m) => m.at === null)).toBe(true);
+  });
+
+  it('marks milestones already reached', () => {
+    const levels = [{ words: 3, label: 'a' }, ...MILESTONES];
+    const f = forecast(learner(3, [35, 10, 10]), NOW, levels);
+    expect(f.milestones.map((m) => m.at === 'reached')).toEqual([true, false, false, false, false]);
   });
 });

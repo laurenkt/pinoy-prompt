@@ -2,7 +2,7 @@
 // the height shows how many words you know, the colors how firmly. Drag across
 // it to see any earlier day.
 
-import { STRENGTHS, type MemoryHistory, type Strength } from '../memory';
+import { PACE_DAYS, STRENGTHS, type Forecast, type MemoryHistory, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
 import { h, svg } from '../ui';
 
@@ -62,13 +62,62 @@ function shortDate(time: number): string {
   return new Date(time).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
+function monthYear(time: number): string {
+  return new Date(time).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+function pace(perDay: number): string {
+  if (perDay >= 1) return `about ${Math.round(perDay)} ${Math.round(perDay) === 1 ? 'word' : 'words'} a day`;
+  const week = Math.max(1, Math.round(perDay * 7));
+  return `about ${week} ${week === 1 ? 'word' : 'words'} a week`;
+}
+
+/**
+ * When the learner might reach each milestone at their recent pace, with what
+ * that pace is and how rough the numbers are, so it reads as an estimate.
+ */
+export function forecastView(forecast: Forecast): HTMLElement {
+  const { known, perDay } = forecast;
+  const weeks = Math.round(PACE_DAYS / 7);
+  const lead =
+    perDay === null
+      ? 'After two weeks of learning, this shows roughly when you might reach each level at your pace.'
+      : perDay <= 0
+        ? `The words that have stuck haven't grown over the last ${weeks} weeks, so there are no dates for now.`
+        : `At your pace over the last ${weeks} weeks, ${pace(perDay)} sticking, you might reach:`;
+  return h(
+    'div',
+    { class: 'growth-forecast small', id: 'growth-forecast' },
+    h('p', null, `${known} ${known === 1 ? 'word has' : 'words have'} stuck so far. ${lead}`),
+    h(
+      'ul',
+      null,
+      forecast.milestones.map((m) =>
+        h(
+          'li',
+          null,
+          h('span', null, m.label, h('span', { class: 'muted forecast-words' }, `about ${m.words.toLocaleString()} words`)),
+          h('strong', null, m.at === 'reached' ? 'Reached' : m.at === null ? '–' : `~${monthYear(m.at)}`),
+        ),
+      ),
+    ),
+    h(
+      'p',
+      { class: 'muted' },
+      'A rough estimate: word counts come from studies of other languages, as there are none for Tagalog. A word counts once it holds for a week.',
+    ),
+  );
+}
+
 /**
  * The chart, with a caption and legend that follow the point being looked at.
- * `legendCounts` holds the legend's count element for each strength.
+ * `legendCounts` holds the legend's count element for each strength. With a
+ * forecast, the caption offers it, opening below.
  */
 export function growthChart(
   history: MemoryHistory,
   legendCounts: Record<Strength, HTMLElement>,
+  forecast?: Forecast,
 ): HTMLElement {
   const { times } = history;
   const last = times.length - 1;
@@ -109,6 +158,24 @@ export function growthChart(
   const when = h('span', { class: 'muted' });
   const back = h('button', { class: 'link-btn growth-back', hidden: true, onclick: () => show(last) }, 'Back to today');
   const marker = h('div', { class: 'growth-marker', hidden: true, 'aria-hidden': 'true' });
+  const ahead = forecast && forecastView(forecast);
+  if (ahead) ahead.hidden = true;
+  const toggle =
+    ahead &&
+    h(
+      'button',
+      {
+        class: 'link-btn growth-ahead',
+        'aria-expanded': 'false',
+        'aria-controls': 'growth-forecast',
+        onclick: () => {
+          ahead.hidden = !ahead.hidden;
+          toggle!.setAttribute('aria-expanded', String(!ahead.hidden));
+          toggle!.textContent = ahead.hidden ? 'Forecast' : 'Hide forecast';
+        },
+      },
+      'Forecast',
+    );
 
   function show(i: number): void {
     const today = i === last;
@@ -119,6 +186,8 @@ export function growthChart(
     marker.hidden = today;
     marker.style.left = `${(i / last) * 100}%`;
     back.hidden = today;
+    // One control in the caption's corner at a time.
+    if (toggle) toggle.hidden = !today;
   }
 
   const frame = h(
@@ -152,7 +221,8 @@ export function growthChart(
   const el = h(
     'div',
     { class: 'growth' },
-    h('p', { class: 'growth-caption' }, value, when, back),
+    h('p', { class: 'growth-caption' }, value, when, back, toggle),
+    ahead,
     frame,
     h(
       'div',

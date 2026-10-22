@@ -2,7 +2,7 @@
 // Nothing here is stored: it is all derived from saved progress, so it is
 // right for progress saved by any earlier version of the app too.
 
-import { getCard } from './deck';
+import { getCard, isVocab } from './deck';
 import { DAY_MS, startOfDayAfter, type CardState } from './srs';
 import { dayKey, type Progress } from './progress-schema';
 
@@ -214,4 +214,68 @@ export function memoryHistory(progress: Progress, now: number, samples = 64): Me
     });
   }
   return { since, times, counts };
+}
+
+/**
+ * Rough vocabulary sizes for what a learner can do, in plain words. There are
+ * no published figures for Tagalog, so these are rounded from the usual
+ * estimates for English and other European languages: about 500 words at CEFR
+ * A1, 1,000 at A2, 2,000 to 3,000 at B1 and 4,000 at B2 (Nation; Milton).
+ * Sources differ by twice or more, so the app only ever calls them rough.
+ */
+export const MILESTONES: { words: number; label: string }[] = [
+  { words: 500, label: 'Simple everyday exchanges' },
+  { words: 1000, label: 'Get by on a trip, talk about your day' },
+  { words: 2500, label: 'Hold a casual conversation' },
+  { words: 4000, label: 'Talk easily about most everyday things' },
+];
+
+/** How far back the pace looks. */
+export const PACE_DAYS = 28;
+/** Less learning than this to look back on, and there is no pace to go on yet. */
+export const MIN_PACE_DAYS = 14;
+/** Further out than this, a date means nothing. */
+const MAX_FORECAST_YEARS = 20;
+
+export interface Forecast {
+  /** Words and phrases that have stuck: they hold for a week or more. */
+  known: number;
+  /** Net words stuck per day over the days looked back on; null with too little to go on. */
+  perDay: number | null;
+  /** Days the pace was measured over. */
+  days: number;
+  /** When each milestone might be reached: 'reached', a time, null if not at this pace. */
+  milestones: { words: number; label: string; at: 'reached' | number | null }[];
+}
+
+/**
+ * When the learner might reach each milestone, if they keep up the pace of
+ * the last few weeks. The pace counts words that have stuck, not words met,
+ * so it follows what has actually been learned, and a word that slips back
+ * counts against it.
+ */
+export function forecast(progress: Progress, now: number, milestones = MILESTONES): Forecast {
+  const steps = Object.entries(progress.cards)
+    .filter(([id]) => {
+      const card = getCard(id);
+      return card && isVocab(card);
+    })
+    .map(([, card]) => strengthSteps(card, now));
+  const stuckAt = (t: number) =>
+    steps.filter((s) => {
+      let strength: Strength | null = null;
+      for (const [when, id] of s) if (when <= t) strength = id;
+      return strength === 'weeks' || strength === 'long';
+    }).length;
+  const known = stuckAt(now);
+  const since = Math.max(EARLIEST, Math.min(now, ...steps.map((s) => s[0][0])));
+  const days = Math.min(PACE_DAYS, (now - since) / DAY_MS);
+  const perDay = days >= MIN_PACE_DAYS ? (known - stuckAt(now - days * DAY_MS)) / days : null;
+  const ahead = milestones.map(({ words, label }) => {
+    if (known >= words) return { words, label, at: 'reached' as const };
+    if (!perDay || perDay <= 0) return { words, label, at: null };
+    const wait = ((words - known) / perDay) * DAY_MS;
+    return { words, label, at: wait > MAX_FORECAST_YEARS * 365 * DAY_MS ? null : now + wait };
+  });
+  return { known, perDay, days, milestones: ahead };
 }
