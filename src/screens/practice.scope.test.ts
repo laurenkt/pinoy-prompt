@@ -90,6 +90,7 @@ describe('the kinds of question in a drill round', () => {
     root.querySelector<HTMLButtonElement>('#drill-scope [data-mode="read"]')!.click();
     expect(root.querySelector('#drill-scope [data-mode="read"]')!.getAttribute('aria-pressed')).toBe('true');
     expect(kind(root)).toBe('read');
+    expect(root.querySelector('#drill-scope [data-mode="read"]')!.getAttribute('aria-disabled')).toBe('true');
   });
 
   it('is kept for the next round', () => {

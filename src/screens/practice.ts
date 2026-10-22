@@ -315,6 +315,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
               'aria-pressed': String(on),
               // One that can't be asked right now keeps its place, for when quiet mode goes off.
               disabled: unavailable(m.id) !== null,
+              // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
+              'aria-disabled': String(on && picks.length === 1 && picks[0] === m.id),
               onclick: () => toggleScope(m.id),
             },
             m.title,
