@@ -1,5 +1,6 @@
 import type { App } from '../app';
 import type { Settings } from '../store';
+import { endMicrophoneHold } from '../microphone';
 import { setMuted, setTapSounds } from '../speech';
 import { h, icon, type IconName } from '../ui';
 
@@ -55,6 +56,8 @@ export function quietToggle(app: App, onChange: () => void, { iconOnly = false }
         settings.headphones = next === 'headphones';
         app.commit();
         applyAudioMode(settings);
+        // Nothing asks to be said in quiet mode, so a microphone held for speaking can go.
+        if (settings.quiet) endMicrophoneHold();
         onChange();
       },
     },

@@ -29,6 +29,16 @@ const SIZES = [
 const SCREENS = {
   home: async () => {},
   drills: (page) => page.click('.drills-btn'),
+  // With the speech model on the device (a stand-in for it), Drills asks for the microphone first.
+  'drills-mic': async (page) => {
+    await page.evaluate(async () => {
+      const { CACHE, MODEL_URL } = await import('/src/model-cache.ts');
+      await (await caches.open(CACHE)).put(MODEL_URL, new Response('stand-in'));
+    });
+    await page.reload();
+    await page.waitForSelector('.home');
+    await page.click('.drills-btn');
+  },
   'drills-answered': async (page) => {
     await page.click('.drills-btn');
     await page.click('.choice');
@@ -109,6 +119,9 @@ try {
 async function seed(page, words) {
   await page.goto(url);
   await page.evaluate(async (words) => {
+    // Only drills-mic has the speech model; the others are drawn without it.
+    const { CACHE } = await import('/src/model-cache.ts');
+    await caches.delete(CACHE);
     const { emptyProgress, recordAnswer, save } = await import('/src/store.ts');
     const { LEARN_ORDER } = await import('/src/deck.ts');
     const now = Date.now();

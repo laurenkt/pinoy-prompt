@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeMicrophone, getMicrophone, IDLE_CLOSE_MS, releaseMicrophone } from './microphone';
+import { ALLOW_KEPT_MS, closeMicrophone, endMicrophoneHold, getMicrophone, holdMicrophone, IDLE_CLOSE_MS, microphoneAllowed, releaseMicrophone } from './microphone';
 
 function fakeStream() {
   const track = {
@@ -26,6 +26,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  endMicrophoneHold();
   closeMicrophone();
   vi.useRealTimers();
   vi.unstubAllGlobals();
@@ -79,5 +80,34 @@ describe('shared microphone after an interruption', () => {
     (opened[0].track as { muted?: boolean }).muted = true;
     expect(await getMicrophone()).not.toBe(mic);
     expect(opened).toHaveLength(2);
+  });
+});
+
+describe('holding the microphone for a screen', () => {
+  it('keeps it open, switched off, until the hold ends, then closes it once idle', async () => {
+    await holdMicrophone();
+    expect(opened[0].track.enabled).toBe(false);
+    vi.advanceTimersByTime(IDLE_CLOSE_MS * 5);
+    expect(opened[0].track.readyState).toBe('live');
+    const mic = await getMicrophone();
+    expect(mic).toBe(opened[0].stream);
+    releaseMicrophone(mic);
+    vi.advanceTimersByTime(IDLE_CLOSE_MS * 5);
+    expect(opened[0].track.readyState).toBe('live');
+    endMicrophoneHold();
+    vi.advanceTimersByTime(IDLE_CLOSE_MS);
+    expect(opened[0].track.readyState).toBe('ended');
+  });
+});
+
+describe('whether the browser would ask', () => {
+  it('counts the Allow as kept while a stream is open and for a while after, as WebKit does', async () => {
+    releaseMicrophone(await getMicrophone());
+    expect(microphoneAllowed()).toBe(true);
+    closeMicrophone();
+    vi.advanceTimersByTime(ALLOW_KEPT_MS - 1000);
+    expect(microphoneAllowed()).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(microphoneAllowed()).toBe(false);
   });
 });

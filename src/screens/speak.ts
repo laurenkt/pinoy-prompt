@@ -2,7 +2,8 @@
 // on the device, and coach them sound by sound.
 
 import { coach, type Tip } from '../coach';
-import { DownloadError, modelDownloaded } from '../model-cache';
+import { holdMicrophone, microphoneAllowed } from '../microphone';
+import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonetics';
@@ -33,6 +34,12 @@ export interface SpeakDeps {
   loadPhoneModel(onProgress?: (fraction: number) => void): Promise<PhoneModel>;
   /** Plays back pieces of the recording and reference sounds. */
   player(): Player;
+  /** Whether the model was on the device when last checked, for a screen deciding as it's drawn. */
+  modelKnownDownloaded?(): boolean;
+  /** Whether the microphone would open without the browser asking (see micGate). A stand-in without it always would. */
+  microphoneAllowed?(): boolean;
+  /** Open the microphone and keep it until the screen is left. */
+  holdMicrophone?(): Promise<void>;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -42,6 +49,9 @@ export const defaultDeps: SpeakDeps = {
   // Loaded on demand so the model runtime isn't part of the app's first download.
   loadPhoneModel: async (onProgress) => (await import('../phone-model')).loadPhoneModel(onProgress),
   player: () => (sharedPlayer ??= webAudioPlayer()),
+  modelKnownDownloaded,
+  microphoneAllowed,
+  holdMicrophone,
 };
 let sharedPlayer: Player | null = null;
 
@@ -98,6 +108,70 @@ export interface SpeakPanel {
    */
   mayPlay(): boolean;
   dispose(): void;
+}
+
+/** Whether a speaking question now would have the browser ask for the microphone, so micGate should come first. */
+export function needsMicGate(deps: SpeakDeps): boolean {
+  return !(deps.microphoneAllowed?.() ?? true);
+}
+
+export interface MicGateOptions {
+  /** The microphone is on, and held until the screen is left. */
+  onOn(): void;
+  /** Leave speaking out until the screen is left. */
+  onSkip(): void;
+  deps?: SpeakDeps;
+}
+
+/**
+ * Before a round asks the learner to speak, while the browser would still ask for the microphone: says why, and
+ * opens it from a tap of its own, so the phone's question comes here rather than over a speaking question.
+ */
+export function micGate({ onOn, onSkip, deps = defaultDeps }: MicGateOptions): HTMLElement {
+  const el = h('div', { class: 'panel center mic-gate' });
+  let problem: RecordProblem | null = null;
+  let asking = false;
+
+  async function turnOn(): Promise<void> {
+    if (asking) return;
+    asking = true;
+    draw();
+    try {
+      await deps.holdMicrophone?.();
+      onOn();
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : '';
+      problem = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic';
+      asking = false;
+      draw();
+    }
+  }
+
+  function draw(): void {
+    const children = [
+      h('p', { class: 'eyebrow' }, 'Speaking'),
+      h('h2', null, 'Turn on the microphone?'),
+      h(
+        'p',
+        null,
+        'Some questions ask you to say a word out loud. Turn the microphone on now, so your phone asks here rather than in the middle of one. It stays on until you leave, and your voice stays on this phone.',
+      ),
+    ];
+    if (problem) children.push(h('div', { class: 'feedback bad', role: 'status' }, h('strong', null, 'Hmm.'), ' ', PROBLEMS[problem]));
+    children.push(
+      h(
+        'div',
+        { class: 'stack' },
+        // It opens the microphone, so its tap sounds first (docs/ARCHITECTURE.md, "Audio").
+        h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', disabled: asking, onclick: () => void turnOn() }, icon('mic'), ' ', problem ? 'Try again' : 'Turn on'),
+        h('button', { class: 'btn secondary', onclick: onSkip }, 'Skip speaking'),
+      ),
+    );
+    el.replaceChildren(...children);
+  }
+
+  draw();
+  return el;
 }
 
 /** How each sound verdict ranks when several sounds share letters: the worst one shows. */

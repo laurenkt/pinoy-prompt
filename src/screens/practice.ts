@@ -6,7 +6,7 @@ import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, h, hookView, icon, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
-import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { defaultDeps, micGate, needsMicGate, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
 
@@ -58,7 +58,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   const canListen = canPlay();
   const canSpeak = deps.recordingSupported();
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
-  let speakReady = false;
+  let speakReady = deps.modelKnownDownloaded?.() ?? false;
   if (canSpeak) {
     deps.modelDownloaded().then(
       (ready) => (speakReady ||= ready),
@@ -91,6 +91,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   let autoMoved = false;
   /** The kinds of question are tucked away until asked for. */
   let scopeOpen = false;
+  /** Asking for the microphone before the question showing (see micGate). */
+  let gate = false;
+  /** The learner chose to skip speaking at the microphone question, for the rest of this visit. */
+  let speakSkipped = false;
 
   holdOnTap(root, hold);
 
@@ -114,9 +118,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
    * When nothing in scope can be asked (only Listen, then silent mode), it falls back to everything that can.
    */
   function modes(): Mode[] {
+    const ready = (m: Mode) => m !== 'speak' || (speakReady && !speakSkipped);
     const picks = chosen();
-    if (picks.length === 1 && picks[0] === 'speak') return picks;
-    const ready = (m: Mode) => m !== 'speak' || speakReady;
+    if (picks.length === 1 && picks[0] === 'speak' && !speakSkipped) return picks;
     const ways = picks.filter(ready);
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
@@ -150,6 +154,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     speak = null;
     spokenRight = false;
     const q = current;
+    // The microphone is asked for before the round's first question when speaking may come up, and before any
+    // speaking question if the browser would ask again (after a long while in the background), never during one.
+    gate = !!q && !picked && needsMicGate(deps) && (q.mode === 'speak' || (done === 0 && modes().includes('speak')));
+    if (gate) return draw();
     if (q?.mode === 'speak') {
       speak = speakPanel(q.card, {
         say: (slow) => sayCard(q.card, slow),
@@ -230,6 +238,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       if (current) preload(current.card);
       return ask();
     }
+    // Quiet mode, the scope or skipping speaking may mean the microphone question isn't needed any more.
+    if (gate) return ask();
     draw();
   }
 
@@ -258,6 +268,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   function draw(): void {
     if (!current) root.replaceChildren(tooFew());
+    else if (gate) root.replaceChildren(gateView());
     else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
@@ -331,6 +342,38 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     return [toggle, chips];
   }
 
+  function header(): HTMLElement[] {
+    const [scopeToggle, scopeChips] = scopeControls();
+    return [
+      h(
+        'header',
+        { class: 'session-header' },
+        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: home }, icon('close')),
+        h('span', { class: 'session-count' }, `${done} done`),
+        scopeToggle,
+        // Icon only, as on Home: the header also holds the count and the filter, and must fit at 360px.
+        quietToggle(app, rescope, { iconOnly: true }),
+      ),
+      scopeChips,
+    ];
+  }
+
+  function gateView(): HTMLElement {
+    return h(
+      'div',
+      { class: 'session' },
+      ...header(),
+      micGate({
+        onOn: () => ask(),
+        onSkip: () => {
+          speakSkipped = true;
+          rescope();
+        },
+        deps,
+      }),
+    );
+  }
+
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
@@ -368,20 +411,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       prompt = h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
     }
 
-    const [scopeToggle, scopeChips] = scopeControls();
     return h(
       'div',
       { class: 'session' },
-      h(
-        'header',
-        { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: home }, icon('close')),
-        h('span', { class: 'session-count' }, `${done} done`),
-        scopeToggle,
-        // Icon only, as on Home: the header also holds the count and the filter, and must fit at 360px.
-        quietToggle(app, rescope, { iconOnly: true }),
-      ),
-      scopeChips,
+      ...header(),
       previousPick && !answered && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
       h(
         'div',

@@ -57,7 +57,9 @@ Every recorded sound the app plays goes through `audio-engine.ts`'s shared conte
 - `recorder.ts` keeps its own context, made inside the tap, because iOS changes the hardware rate when the mic opens.
 - Chat's AI voice is a WebRTC stream, played by an `<audio>` element from `openai.ts`, and `visualizer.ts` makes a context for its analysers. If Chat's audio is reworked, move the analysers onto the shared context or note here why they can't.
 
-`app.navigate` stops card audio, recording and any call, so a screen doesn't have to clean those up when it's left.
+`app.navigate` stops card audio, recording and any call, and ends a screen's hold on the microphone, so a screen doesn't have to clean those up when it's left.
+
+**Asking for the microphone.** A speaking question never opens with the phone's own permission question over it. While the browser would still ask (`microphoneAllowed` in `microphone.ts`, which follows what WebKit remembers), a drill round that may ask to speak, and Study as its practice starts, first show `micGate` from `speak.ts`: a panel saying why, whose button opens the microphone and holds it until the screen is left or quiet mode comes on (`holdMicrophone`). The same panel comes before any later speaking question if the Allow has lapsed (a long while in the background). Skipping it leaves speaking out until the screen is left. Chat opened from Home starts its call straight away only when the browser wouldn't ask; otherwise it waits on its menu for Start talking. A new screen that records goes through the same panel.
 
 ### Saved progress and settings
 
