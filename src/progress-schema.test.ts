@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, MIGRATIONS, SCHEMA, decode, decodeValue, emptyProgress, encode, mergeInto, sanitizeCard, type Progress } from './progress-schema';
-import { newCardState, review } from './srs';
+import { DAY_MS, newCardState, review, startOfDayAfter } from './srs';
 
 const NOW = new Date(2026, 9, 19, 12).getTime();
 
@@ -56,6 +56,40 @@ describe('saved progress from every schema version', () => {
   it('keeps the revision of an envelope and starts a bare schema 1 copy at 0', () => {
     expect(decodeOk(fixtures['./test/fixtures/progress-schema-2.json']).rev).toBe(41);
     expect(decodeOk(fixtures['./test/fixtures/progress-schema-1.json']).rev).toBe(0);
+  });
+});
+
+describe('reviews scheduled by the old midnight rule', () => {
+  const evening = new Date(2026, 9, 18, 21).getTime();
+  const midnightCard = (interval: number) => ({
+    ...newCardState(evening - DAY_MS),
+    interval,
+    reps: 2,
+    reviewed: evening,
+    due: startOfDayAfter(evening, interval),
+  });
+  const load = (schema: number, cards: Record<string, unknown>) =>
+    decodeOk(encode({ schema, rev: 1, savedAt: NOW, resetAt: 0, progress: { ...emptyProgress(NOW), cards } as Progress })).progress.cards;
+
+  it('come due a whole interval after the review instead', () => {
+    const cards = load(3, { isa: midnightCard(1), dalawa: midnightCard(7.5) });
+    expect(cards.isa.due).toBe(evening + DAY_MS);
+    expect(cards.dalawa.due).toBe(evening + 7.5 * DAY_MS);
+  });
+
+  it('leave cards that were not scheduled that way alone', () => {
+    const relearning = { ...midnightCard(0), due: evening + 60_000 };
+    const elapsed = { ...midnightCard(3), due: evening + 3 * DAY_MS };
+    const { reviewed: _reviewed, ...unknownReview } = midnightCard(2);
+    const cards = load(3, { isa: relearning, dalawa: elapsed, tatlo: unknownReview });
+    expect(cards.isa).toEqual(relearning);
+    expect(cards.dalawa).toEqual(elapsed);
+    expect(cards.tatlo).toEqual(unknownReview);
+  });
+
+  it('are only moved once, when a copy from before the change is first read', () => {
+    const card = midnightCard(1);
+    expect(load(SCHEMA, { isa: card }).isa).toEqual(card);
   });
 });
 
