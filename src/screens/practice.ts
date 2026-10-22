@@ -153,15 +153,21 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (q?.mode === 'speak') {
       speak = speakPanel(q.card, {
         say: (slow) => sayCard(q.card, slow),
-        silence: () => stop(true),
+        silence: () => stop(),
         onAttempt: (right) => {
           if (!right || spokenRight) return;
           spokenRight = true;
           // Pick what's next now, so its word loads while the coaching is up.
           settle(true);
+          auto = countdown(root, () => {
+            autoMoved = true;
+            advance();
+          });
         },
+        counting: () => auto !== null,
         onNext: () => advance(),
         onReady: () => (speakReady = true),
+        autofocus: !autoMoved,
         deps,
       });
     }

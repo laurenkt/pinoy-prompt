@@ -189,7 +189,8 @@ describe('quiet mode in drills', () => {
       if (root.querySelector('.feedback')) button(root, 'Next').click();
       root.querySelector<HTMLButtonElement>('.choice')!.click();
     }
-    vi.advanceTimersByTime(ADVANCE_MS);
+    // Long enough to give up waiting for the answer's audio, which never finishes here.
+    vi.advanceTimersByTime(ADVANCE_MS * 4);
     expect(hearing(root)).toBe(true);
     button(root, 'Previous card').click();
     quiet(root).click();

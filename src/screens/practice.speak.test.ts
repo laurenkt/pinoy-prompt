@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 // Speak mode inside a practice round, with a stand-in microphone and model.
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
 import { toPhones } from '../phonetics';
 import type { Take } from '../recorder';
+import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
+import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
 import { drillScope, fakeApp, flush } from '../test/screen';
@@ -80,5 +82,74 @@ describe('Speak mode', () => {
     document.body.append(practiceScreen(fakeApp(KNOWN), deps({ recordingSupported: () => false })));
     expect(document.querySelector<HTMLButtonElement>('#drill-scope [data-mode="speak"]')!.disabled).toBe(true);
     expect(document.body.textContent).toContain("this browser can't record");
+  });
+});
+
+describe('moving on after a right attempt', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** Say the word on screen, right or (by saying nothing like it) wrong. */
+  async function attempt(): Promise<void> {
+    button('Tap and speak').click();
+    button("I'm done").click();
+    await vi.advanceTimersByTimeAsync(0);
+  }
+  const shown = () => document.querySelector('.prompt .tl')?.textContent;
+  const mumble = deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition(['ʃ']) }) });
+
+  it('goes to the next word by itself in a drill', async () => {
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps()));
+    await vi.advanceTimersByTimeAsync(0);
+    drillScope(document.body, ['speak']);
+    await vi.advanceTimersByTimeAsync(0);
+    await attempt();
+    expect(document.querySelector('.continue.counting')).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.querySelector('.session-count')?.textContent).toBe('1 done');
+    // The next word doesn't take focus, so a late Enter meant for Next can't start a recording.
+    expect(document.activeElement).not.toBe(button('Tap and speak'));
+  });
+
+  it('waits after a miss', async () => {
+    document.body.append(practiceScreen(fakeApp(KNOWN), mumble));
+    await vi.advanceTimersByTimeAsync(0);
+    drillScope(document.body, ['speak']);
+    await vi.advanceTimersByTimeAsync(0);
+    await attempt();
+    expect(document.querySelector('.counting')).toBeNull();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS * 5);
+    expect(button('Try again')).toBeTruthy();
+  });
+
+  it('stops counting down when the learner plays their attempt back', async () => {
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps()));
+    await vi.advanceTimersByTimeAsync(0);
+    drillScope(document.body, ['speak']);
+    await vi.advanceTimersByTimeAsync(0);
+    await attempt();
+    const word = shown();
+    button('▶ Yours').click();
+    expect(document.querySelector('.counting')).toBeNull();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS * 5);
+    expect(shown()).toBe(word);
+    expect(document.querySelector('.session-count')?.textContent).toBe('0 done');
+  });
+
+  it('goes to the next card by itself in Study', async () => {
+    const root = sessionScreen(fakeApp(KNOWN), [
+      { kind: 'extra', cardId: 'salamat', format: 'speak' },
+      { kind: 'extra', cardId: 'kape', format: 'speak' },
+    ], undefined, deps());
+    document.body.append(root);
+    await vi.advanceTimersByTimeAsync(0);
+    button('Keep practising').click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shown()).toBe(getCard('salamat')!.tl);
+    await attempt();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shown()).toBe(getCard('kape')!.tl);
   });
 });
