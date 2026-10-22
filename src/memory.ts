@@ -227,7 +227,7 @@ export const MILESTONES: { words: number; label: string }[] = [
   { words: 500, label: 'Everyday basics' },
   { words: 1000, label: 'Get by on a trip' },
   { words: 2500, label: 'Casual conversation' },
-  { words: 4000, label: 'Most everyday topics' },
+  { words: 4000, label: 'Talk about most things' },
 ];
 
 /** How far back the pace looks. */

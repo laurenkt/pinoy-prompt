@@ -381,26 +381,40 @@ p {
   stroke-dasharray: 8 6;
 }
 
+/* The next milestone, a note in the chart's empty top-left corner, clear of the projection. */
 .growth-goal {
-  /* A full-size target that doesn't make the caption row taller. */
-  margin: -9px 0 -9px auto;
-  align-self: center;
+  position: absolute;
+  z-index: 1;
+  top: 6px;
+  left: 6px;
   min-height: 44px;
-  padding: 4px 10px;
-  background: var(--saffron);
-  color: var(--on-accent);
-  border: var(--outline);
-  border-radius: 12px;
-  box-shadow: 2px 2px 0 var(--ink);
+  padding: 4px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  background: var(--surface-dim);
+  color: var(--text);
+  border: none;
+  border-radius: 10px;
   font: inherit;
-  font-size: 0.85rem;
-  font-weight: 800;
+  font-size: 0.75rem;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
-.growth-goal[aria-expanded='true'] {
-  transform: translate(2px, 2px);
-  box-shadow: none;
+.growth-goal strong {
+  font-size: 0.85rem;
+}
+
+.growth-goal span {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.growth-goal[aria-expanded='true'] strong {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .growth-forecast {
@@ -484,6 +498,8 @@ p {
 
 .growth-marker {
   position: absolute;
+  /* Over the milestone's note, so the dot never hides under it. */
+  z-index: 2;
   top: 0;
   bottom: 0;
   width: 0;
@@ -513,6 +529,10 @@ p {
   color: var(--muted);
   font-weight: 600;
   pointer-events: none;
+}
+
+.growth-hint.under-goal {
+  top: 52px;
 }
 
 .growth-back[hidden],
