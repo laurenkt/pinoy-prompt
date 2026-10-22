@@ -2261,3 +2261,8 @@ p {
 .back-bar {
   margin-bottom: 20px;
 }
+
+/* Settings: how long the test word took to be heard, under the Test voice button. */
+.voice-lag {
+  margin: 12px 0 0;
+}
