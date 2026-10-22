@@ -74,30 +74,27 @@ button:disabled {
 button,
 label,
 summary,
-select,
-header,
 nav,
 svg,
-[role='button'],
 [role='radio'],
 [role='img'],
 [role='progressbar'],
 [role='meter'],
 .session-header,
-.home-header,
+.page-header,
 .chips,
 .segmented,
-.eyebrow,
-.stat,
 .strength-card {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
 
-/* iOS won't let you type or paste into a field inside unselectable chrome unless the field opts back in. */
-input,
-textarea {
+/* Back in: text fields, since iOS won't let you type or paste into one inside unselectable chrome, and the
+   word buttons in a Chat message, which are part of the message you'd copy. */
+input:not([type='checkbox'], [type='radio'], [type='file']),
+textarea,
+.bubble button {
   -webkit-user-select: text;
   user-select: text;
   -webkit-touch-callout: default;

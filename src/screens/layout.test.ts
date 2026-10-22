@@ -12,6 +12,7 @@ import css from '../style.css?raw';
 import { settingsScreen } from './settings';
 import { wordsScreen } from './words';
 import { fakeApp } from '../test/screen';
+import { h } from '../ui';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
 
@@ -99,7 +100,8 @@ describe('filling the screen', () => {
 describe('two kinds of text', () => {
   // The controls and chrome style.css keeps from selecting on a long press ("Text you can copy").
   const chrome = /New chrome joins this list, not a rule of its own\. \*\/\n([^{]+)\{/.exec(css)?.[1].trim();
-  const isChrome = (el: Element) => el.closest(chrome!) !== null;
+  const copyable = /\/\* Back in:[^*]*\*\/\n([^{]+)\{/.exec(css)?.[1].trim();
+  const isChrome = (el: Element) => el.closest(chrome!) !== null && !el.matches(copyable!);
 
   const screens: [string, () => HTMLElement][] = [
     ['Home', () => homeScreen(fakeApp(KNOWN))],
@@ -109,22 +111,23 @@ describe('two kinds of text', () => {
     ['Settings', () => settingsScreen(fakeApp(KNOWN))],
   ];
 
-  it('names the chrome in style.css', () => {
+  it('names the chrome and what opts back in in style.css', () => {
     expect(chrome).toBeTruthy();
+    expect(copyable).toBeTruthy();
   });
 
   it.each(screens)('keeps every control and chart on %s from selecting', (_, screen) => {
     const root = screen();
-    const controls = [...root.querySelectorAll('button, label, summary, [role="radio"], .chip, svg, .session-header, .home-header, .page-header')];
+    const controls = [...root.querySelectorAll('button, label, summary, [role="radio"], .chip, svg, .session-header, .page-header')];
     expect(controls.length).toBeGreaterThan(0);
     expect(controls.filter((el) => !isChrome(el)).map((el) => el.outerHTML)).toEqual([]);
   });
 
   it.each(screens)('leaves the words and messages on %s copyable', (_, screen) => {
     const root = screen();
-    // Tagalog shown as content (not on a button, nor Home's greeting) and the English beside it.
-    const content = [...root.querySelectorAll('[lang="fil"], .prompt-en, .prompt-meaning, .word-tl, .word-en, .feedback, .key-problem, .bubble')].filter(
-      (el) => !el.closest('button, summary, .greeting'),
+    // Tagalog shown as content (not on a button or topic heading) and the English beside it.
+    const content = [...root.querySelectorAll('[lang="fil"], .greeting + p, .eyebrow, .prompt-en, .prompt-meaning, .word-tl, .word-en, .feedback, .key-problem')].filter(
+      (el) => !el.closest('button, summary'),
     );
     expect(content.filter(isChrome).map((el) => el.outerHTML)).toEqual([]);
   });
@@ -137,7 +140,15 @@ describe('two kinds of text', () => {
     }
   });
 
-  it('lets text fields select, so typing and pasting work inside chrome on iOS', () => {
-    expect(/\ninput,\ntextarea \{[^}]*-webkit-user-select: text;/.exec(css)).not.toBeNull();
+  it('keeps the known words in a Chat message copyable with the rest of it', () => {
+    const message = h('p', { class: 'bubble ai' }, 'Ay, ', h('span', { class: 'tl-word' }, h('button', { lang: 'fil' }, 'salamat')), '!');
+    expect(isChrome(message.querySelector('button')!)).toBe(false);
+  });
+
+  it('lets text fields select, so typing and pasting work inside chrome on iOS, but not checkboxes', () => {
+    const field = h('label', null, h('input', { type: 'password' }));
+    const box = h('label', null, h('input', { type: 'checkbox' }));
+    expect(isChrome(field.querySelector('input')!)).toBe(false);
+    expect(isChrome(box.querySelector('input')!)).toBe(true);
   });
 });
