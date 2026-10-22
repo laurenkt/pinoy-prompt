@@ -68,6 +68,41 @@ button:disabled {
   cursor: default;
 }
 
+/* Two kinds of text (see "Text you can copy" in docs/ARCHITECTURE.md). Controls and chrome don't select or open
+   iOS's callout on a long press; everything else (words, translations, examples, messages) stays copyable.
+   New chrome joins this list, not a rule of its own. */
+button,
+label,
+summary,
+select,
+header,
+nav,
+svg,
+[role='button'],
+[role='radio'],
+[role='img'],
+[role='progressbar'],
+[role='meter'],
+.session-header,
+.home-header,
+.chips,
+.segmented,
+.eyebrow,
+.stat,
+.strength-card {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* iOS won't let you type or paste into a field inside unselectable chrome unless the field opts back in. */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 :focus-visible {
   outline: 3px solid var(--saffron);
   outline-offset: 3px;

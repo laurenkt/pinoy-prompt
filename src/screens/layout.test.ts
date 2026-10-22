@@ -95,3 +95,49 @@ describe('filling the screen', () => {
     expect(filled(root, root.querySelector(grows))).toBe(true);
   });
 });
+
+describe('two kinds of text', () => {
+  // The controls and chrome style.css keeps from selecting on a long press ("Text you can copy").
+  const chrome = /New chrome joins this list, not a rule of its own\. \*\/\n([^{]+)\{/.exec(css)?.[1].trim();
+  const isChrome = (el: Element) => el.closest(chrome!) !== null;
+
+  const screens: [string, () => HTMLElement][] = [
+    ['Home', () => homeScreen(fakeApp(KNOWN))],
+    ['a drill round', () => practiceScreen(fakeApp(KNOWN))],
+    ['a study question', () => sessionScreen(fakeApp(KNOWN), [{ kind: 'review', cardId: 'salamat', format: 'remember' }])],
+    ['Library', () => wordsScreen(fakeApp(KNOWN))],
+    ['Settings', () => settingsScreen(fakeApp(KNOWN))],
+  ];
+
+  it('names the chrome in style.css', () => {
+    expect(chrome).toBeTruthy();
+  });
+
+  it.each(screens)('keeps every control and chart on %s from selecting', (_, screen) => {
+    const root = screen();
+    const controls = [...root.querySelectorAll('button, label, summary, [role="radio"], .chip, svg, .session-header, .home-header, .page-header')];
+    expect(controls.length).toBeGreaterThan(0);
+    expect(controls.filter((el) => !isChrome(el)).map((el) => el.outerHTML)).toEqual([]);
+  });
+
+  it.each(screens)('leaves the words and messages on %s copyable', (_, screen) => {
+    const root = screen();
+    // Tagalog shown as content (not on a button, nor Home's greeting) and the English beside it.
+    const content = [...root.querySelectorAll('[lang="fil"], .prompt-en, .prompt-meaning, .word-tl, .word-en, .feedback, .key-problem, .bubble')].filter(
+      (el) => !el.closest('button, summary, .greeting'),
+    );
+    expect(content.filter(isChrome).map((el) => el.outerHTML)).toEqual([]);
+  });
+
+  it('finds Tagalog to copy on a study question and in Library', () => {
+    const study = sessionScreen(fakeApp(KNOWN), [{ kind: 'review', cardId: 'salamat', format: 'remember' }]);
+    const library = wordsScreen(fakeApp(KNOWN));
+    for (const root of [study, library]) {
+      expect([...root.querySelectorAll('[lang="fil"]')].some((el) => !isChrome(el))).toBe(true);
+    }
+  });
+
+  it('lets text fields select, so typing and pasting work inside chrome on iOS', () => {
+    expect(/\ninput,\ntextarea \{[^}]*-webkit-user-select: text;/.exec(css)).not.toBeNull();
+  });
+});
