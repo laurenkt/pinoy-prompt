@@ -61,7 +61,7 @@ export function homeScreen(app: App): HTMLElement {
       studyButton(app, isFirstRun),
       h(
         'button',
-        { class: 'hub-btn big chat-btn', onclick: () => app.navigate({ name: 'talk', start: true }) },
+        { class: 'hub-btn big chat-btn', 'data-tap': 'before', onclick: () => app.navigate({ name: 'talk', start: true }) },
         icon('mic'),
         h('span', { class: 'hub-title' }, 'Chat'),
       ),

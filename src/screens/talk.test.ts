@@ -366,6 +366,22 @@ describe('Talk', () => {
     expect(next.visual.phase).toBe('live');
   });
 
+  it('says once why a call dropped while it was still connecting', async () => {
+    setApiKey(KEY);
+    let answer: (r: Response) => void = () => {};
+    const f = fakeCall();
+    f.deps.call.fetch = (() => new Promise<Response>((resolve) => (answer = resolve))) as typeof fetch;
+    const root = talkScreen(fakeApp(), f.deps, true);
+    await flush();
+    f.peer.connectionState = 'failed';
+    f.peer.onconnectionstatechange!();
+    answer(new Response(JSON.stringify({ transport: { type: 'webrtc', sdp: 'answer' } }), { status: 201 }));
+    await flush();
+    expect(f.visual.phase).toBe('dead');
+    expect(root.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(root.querySelector('[role="alert"]')!.textContent).toContain("Couldn't reach OpenAI");
+  });
+
   it("explains when the browser can't make calls", () => {
     setApiKey(KEY);
     const root = talkScreen(fakeApp(), { ...fakeCall().deps, callSupported: () => false });

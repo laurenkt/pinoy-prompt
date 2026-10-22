@@ -126,7 +126,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
       if (current()) activeCall = call;
       else call.hangUp();
     } catch (e) {
-      if (current()) over(e);
+      // A call that dropped while connecting has already been shown as over.
+      if (current() && (state as State).name !== 'ended') over(e);
     } finally {
       if (connecting === abort) connecting = null;
     }
@@ -241,7 +242,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
         ),
       ),
       plan.newWord && h('p', { class: 'muted small' }, 'New word this time: ', h('strong', { lang: 'fil' }, plan.newWord.tl), ` (${plan.newWord.en})`),
-      h('button', { class: 'btn primary big', disabled: !canCall, 'data-no-tap': true, onclick: () => void begin() }, icon('mic'), ' Start talking'),
+      h('button', { class: 'btn primary big', disabled: !canCall, 'data-tap': 'before', onclick: () => void begin() }, icon('mic'), ' Start talking'),
       h(
         'p',
         { class: 'muted small center' },
@@ -294,7 +295,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
           'div',
           { class: 'row' },
           h('button', { class: 'btn secondary', onclick: () => { hangUpTalk(); state = { name: 'menu' }; draw(); } }, 'Change topic'),
-          h('button', { class: 'btn primary', 'data-no-tap': true, onclick: () => void begin() }, 'Chat again'),
+          h('button', { class: 'btn primary', 'data-tap': 'before', onclick: () => void begin() }, 'Chat again'),
         ),
     );
   }

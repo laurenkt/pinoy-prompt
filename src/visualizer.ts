@@ -189,7 +189,7 @@ const vec3 TEAL = vec3(0.180, 0.769, 0.714);
 const vec3 SAFFRON = vec3(1.0, 0.714, 0.153);
 const vec3 MAGENTA = vec3(0.910, 0.247, 0.435);
 const vec3 INK = vec3(0.051, 0.039, 0.141);
-const vec3 ASH = vec3(0.420, 0.400, 0.580);
+const vec3 FAINT = vec3(0.643, 0.612, 0.788);
 /** The burst's three bands, each this deep, with an ink outline at each edge. */
 const float BAND = 0.09;
 const float OUTLINE = 0.016;
@@ -248,10 +248,10 @@ void main() {
   float turns = angle / TAU + 0.5;
   float outer = scope(r, turns, 0.75, 0.42 * swell, (0.08 + u_level.y * 0.3) * on, u_turn.y);
   float inner = scope(r, turns, 0.25, 0.3 * swell, (0.06 + u_level.x * 0.3) * on, u_turn.x);
-  col += mix(ASH * 0.1, SAFFRON * (0.25 + u_level.y), on) * outer;
-  col += mix(ASH * 0.1, TEAL * (0.25 + u_level.x), on) * inner;
+  col += mix(FAINT * 0.065, SAFFRON * (0.25 + u_level.y), on) * outer;
+  col += mix(FAINT * 0.065, TEAL * (0.25 + u_level.x), on) * inner;
   // While connecting, one spark circles the outer ring with a tail behind it.
-  col += ASH * u_seek * outer * exp(-fract(u_seek_turn - turns) * 10.0);
+  col += FAINT * 0.65 * u_seek * outer * exp(-fract(u_seek_turn - turns) * 10.0);
   // Scanlines and a vignette, then dimmed so the transcript stays readable.
   col *= 0.88 + 0.12 * sin(gl_FragCoord.y * 3.14159);
   col *= 1.0 - 0.25 * dot(p, p);
@@ -350,6 +350,14 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
   const uSeekTurn = u('u_seek_turn');
 
   const audio = new Context();
+  let deaf = false;
+  /** Once dark nothing more is heard, so the analysers and their context go straight away. */
+  function closeAudio(): void {
+    if (deaf) return;
+    deaf = true;
+    for (const a of Object.values(analysers)) a?.source.disconnect();
+    void audio.close?.()?.catch(() => {});
+  }
   // Older WebKit has no promise-returning resume or close.
   const resume = () => void audio.resume?.()?.catch(() => {});
   resume();
@@ -376,10 +384,19 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     canvas.hidden = true;
   }
   canvas.addEventListener('webglcontextlost', lost);
+  let resting = false;
+  // A resting picture is drawn again when the screen changes size (the phone turned), rather than stretched.
+  function wake(): void {
+    if (!resting || canvas.hidden) return;
+    resting = false;
+    last = performance.now();
+    frame = requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', wake);
 
   function draw(now: number): void {
     // Once dark after a call, the last frame stays on screen and nothing more is drawn.
-    const resting = stage.phase === 'dead' && stage.since > COLLAPSE_SECONDS && stage.alive === 0;
+    resting = stage.phase === 'dead' && stage.since > COLLAPSE_SECONDS && stage.alive === 0;
     if (!resting) frame = requestAnimationFrame(draw);
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
@@ -446,7 +463,7 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
 
   return {
     listen(who, stream) {
-      if (audio.state === 'closed' || !stream.getAudioTracks().length) return;
+      if (deaf || audio.state === 'closed' || !stream.getAudioTracks().length) return;
       analysers[who]?.source.disconnect();
       const node = audio.createAnalyser();
       node.fftSize = FFT_SIZE;
@@ -462,6 +479,7 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     },
     ended() {
       enter(stage, 'dead', still);
+      closeAudio();
     },
     setMuted(m) {
       muted = m;
@@ -469,8 +487,8 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     stop() {
       cancelAnimationFrame(frame);
       canvas.removeEventListener('webglcontextlost', lost);
-      for (const a of Object.values(analysers)) a?.source.disconnect();
-      void audio.close?.()?.catch(() => {});
+      window.removeEventListener('resize', wake);
+      closeAudio();
       // The canvas is reused by the next call, which sets up its own.
       release();
     },

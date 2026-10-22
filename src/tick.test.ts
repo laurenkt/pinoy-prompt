@@ -92,6 +92,18 @@ describe('the tap sound', () => {
     expect(ticks.count).toBe(0);
   });
 
+  it('taps for a button that starts a call, before the call opens the microphone', async () => {
+    const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } });
+    let mic: Promise<MediaStream> | null = null;
+    const chat = h('button', { class: 'hub-btn big', 'data-tap': 'before', onclick: () => (mic = getMicrophone()) }, 'Chat');
+    root.append(chat);
+    press(chat);
+    releaseMicrophone(await mic!);
+    await vi.waitFor(() => expect(recorded.count).toBe(1));
+  });
+
   it("doesn't tick for a button that opens the microphone, or while it's in use", async () => {
     const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
     const stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;

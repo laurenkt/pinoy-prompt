@@ -211,6 +211,8 @@ export async function startCall(
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
 
+  /** Why the call finished, if it did while still connecting. */
+  let failure: AiError | undefined;
   let released = false;
   function release(): void {
     // Can be reached twice (the call fails while it's still being set up), but the microphone is handed back once.
@@ -227,6 +229,7 @@ export async function startCall(
   function finish(error?: AiError): void {
     if (ended) return;
     ended = true;
+    failure = error ?? new AiError('network', 'The call dropped.');
     try {
       if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'session.close' }));
     } catch {
@@ -241,9 +244,11 @@ export async function startCall(
     release();
   };
   signal?.addEventListener('abort', abandon);
-  /** Between the steps of connecting: stop if the call was given up meanwhile. */
+  /** Between the steps of connecting: stop if the call was given up, or dropped, meanwhile. */
   const still = () => {
-    if (ended || signal?.aborted) throw new AiError('other', ABANDONED);
+    if (signal?.aborted) throw new AiError('other', ABANDONED);
+    // Dropped while connecting: onEnded has already said why.
+    if (failure) throw failure;
   };
 
   try {
@@ -293,6 +298,7 @@ export async function startCall(
     ended = true;
     release();
     if (signal?.aborted) throw new AiError('other', ABANDONED);
+    if (failure) throw failure;
     throw e instanceof AiError ? e : new AiError('other', e instanceof Error ? e.message : String(e));
   } finally {
     signal?.removeEventListener('abort', abandon);
