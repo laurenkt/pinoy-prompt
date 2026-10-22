@@ -42,6 +42,7 @@ Home is the hub and has its own header. A screen never shows both a back arrow a
 - In a session's `.panel`, the prompt grows on phones taller than about 700px, answer choices share the rest (up to a size a thumb can't miss, leaving room below for the feedback an answer brings so a right answer doesn't move them), and otherwise the panel's last piece (its button, the answer and ratings, the microphone) sits at the bottom, under the thumb. A `.panel.center` card (a summary, a topic's introduction) sits in the middle instead.
 - On Home the hub takes it; in a call, the transcript.
 - Pages (Library, Settings) are as long as their content and scroll.
+- Nothing bounces (`overscroll-behavior: none` on the page): a screen that fits can't be dragged, and a long one stops at its ends. `npm run screenshots` reports any screen that scrolls, so one that should fit but is a few pixels over shows up.
 
 A new screen or panel gets this by using those containers; a wrapper element between them breaks the column, which `src/screens/layout.test.ts` checks. Sizes that should grow with the phone use `dvh` in a `clamp()`, so on a short phone (375×667) nothing is taller than it was; only answer choices use what little room is left, until one is picked.
 

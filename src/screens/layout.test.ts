@@ -71,6 +71,10 @@ describe('filling the screen', () => {
     return true;
   }
 
+  it("doesn't let the page bounce, so a screen that fits can't be dragged", () => {
+    expect(/html,\nbody \{[^}]*overscroll-behavior: none;/.exec(css)).not.toBeNull();
+  });
+
   it('names the column in style.css', () => {
     expect(column).toBeTruthy();
   });

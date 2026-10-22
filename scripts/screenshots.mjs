@@ -6,7 +6,8 @@
 // Screens: the keys of SCREENS below (all of them by default). Each is taken at
 // every size, on a learner who knows a dozen words (or, for the first-* ones,
 // none yet), with randomness seeded so before and after match.
-// Prints Home's scroll height at each size and any screen wider than the phone.
+// Prints Home's scroll height at each size, how far any other screen scrolls,
+// and any screen wider than the phone.
 
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -87,6 +88,8 @@ try {
         wide: document.documentElement.scrollWidth > innerWidth,
       }));
       if (name === 'home') console.log(`Home at ${size.name}: scroll height ${scroll} (screen ${size.height})`);
+      // A few pixels over means a screen that should fit but can be dragged.
+      else if (scroll > size.height) console.log(`${name} at ${size.name} scrolls by ${scroll - size.height}px`);
       if (wide) console.log(`SIDEWAYS SCROLL: ${name} at ${size.name}`);
       await page.close();
     }
