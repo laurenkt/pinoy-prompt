@@ -2,7 +2,8 @@
 // Every screen is a page or a session (docs/ARCHITECTURE.md): a page has the
 // back arrow to Home, a session the close button, and never both.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { App } from '../app';
 import { practiceScreen } from './practice';
 import { settingsScreen } from './settings';
 import { wordsScreen } from './words';
@@ -41,5 +42,14 @@ describe('page and session layouts', () => {
     expect(backArrows(root)).toBe(0);
     root.querySelector<HTMLButtonElement>('.session-header .icon-btn')!.click();
     expect(app.navigate).toHaveBeenCalledWith({ name: 'home' });
+  });
+
+  it('leaves the back gesture going Home from a drill round', () => {
+    const app = fakeApp(KNOWN);
+    const onBack = vi.fn<App['onBack']>();
+    app.onBack = onBack;
+    practiceScreen(app);
+    // Without a handler of its own, the system back gesture goes Home.
+    expect(onBack.mock.calls.every(([handler]) => handler === null)).toBe(true);
   });
 });

@@ -94,43 +94,31 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   holdOnTap(root, hold);
 
-  function start(): void {
-    if (learned < MIN_CARDS) return draw();
-    const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
-    distractorPool = known.length >= 6 ? known : VOCAB;
-    recent = [];
-    missed = new Map();
-    done = 0;
-    picked = null;
-    previous = null;
-    previousPick = null;
-    upcoming = null;
-    current = nextQuestion();
-    if (current) preload(current.card);
-    ask();
+  /** Why a kind of question can't be asked right now, if it can't: quiet or silent mode may have come on mid-round, here or in another tab. */
+  function unavailable(mode: Mode): string | null {
+    if (mode === 'listen' && !canListen) return 'Listen needs a voice, and this device has none.';
+    if (mode === 'listen' && isSilent(app.progress.settings)) return 'Listen is off in silent mode.';
+    if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
+    if (mode === 'speak' && app.progress.settings.quiet) return 'Speak is off in quiet mode.';
+    return null;
   }
 
-  /** Whether a question can be asked this way right now: quiet or silent mode may have come on mid-round, here or in another tab. */
-  function askable(mode: Mode): boolean {
-    if (mode === 'listen') return canListen && !isSilent(app.progress.settings);
-    if (mode === 'speak') return canSpeak && !app.progress.settings.quiet;
-    return true;
-  }
-
-  /** Every kind of question is in scope: the round is the plain mix. */
-  function mixed(): boolean {
-    return scope.size === MODES.length;
+  /** The kinds in scope that can be asked right now, before the speaking model is taken into account. */
+  function chosen(): Mode[] {
+    return MODES.map((m) => m.id).filter((m) => scope.has(m) && unavailable(m) === null);
   }
 
   /**
-   * The kinds of question the next one can be: those in scope that can be asked right now. The plain mix only speaks
-   * once the model is on the device, so it never stops for a download; narrowing the scope to include Speak asks for it.
+   * The kinds of question the next one can be: those in scope that can be asked right now. Speaking waits for the model
+   * to be on the device, so a round never stops for a download, unless Speak is all that's chosen: then it asks for it.
    * When nothing in scope can be asked (only Listen, then silent mode), it falls back to everything that can.
    */
   function modes(): Mode[] {
-    const can = (['read', 'recall', 'listen', 'speak'] as const).filter((m) => askable(m) && (m !== 'speak' || speakReady || !mixed()));
-    const chosen = can.filter((m) => scope.has(m));
-    return chosen.length ? chosen : can.filter((m) => m !== 'speak' || speakReady);
+    const picks = chosen();
+    if (picks.length === 1 && picks[0] === 'speak') return picks;
+    const ready = (m: Mode) => m !== 'speak' || speakReady;
+    const ways = picks.filter(ready);
+    return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
 
   /** A question on the next word, asked any way the scope allows right now. Null only with no words to ask. */
@@ -227,6 +215,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (upcoming && !ways.includes(upcoming.mode)) upcoming = null;
     if (current && !picked && !lookingBack && !ways.includes(current.mode)) {
       hold();
+      // Anything settled on the old question (a right spoken attempt picks what's next) goes with it.
+      upcoming = null;
       current = nextQuestion();
       if (current) preload(current.card);
       return ask();
@@ -235,6 +225,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   }
 
   function toggleScope(mode: Mode): void {
+    // The last kind left in that can be asked stays on, so the round asks what was chosen.
+    const picks = chosen();
+    if (picks.length === 1 && picks[0] === mode) return;
     if (!scope.delete(mode)) scope.add(mode);
     rescope();
     root.querySelector<HTMLButtonElement>(`[data-mode="${mode}"]`)?.focus();
@@ -249,7 +242,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   function setLookingBack(on: boolean): void {
     stop();
     lookingBack = on;
-    draw();
+    // Quiet mode or the scope may have changed while looking back.
+    if (!on) rescope();
+    else draw();
   }
 
   function draw(): void {
@@ -275,23 +270,16 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     );
   }
 
-  /** Why a kind of question can't be asked on this device right now, if it can't. */
-  function unavailable(mode: Mode): string | null {
-    if (mode === 'listen' && !canListen) return 'Listen needs a voice, and this device has none.';
-    if (mode === 'listen' && isSilent(app.progress.settings)) return 'Listen is off in silent mode.';
-    if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
-    if (mode === 'speak' && app.progress.settings.quiet) return 'Speak is off in quiet mode.';
-    return null;
-  }
-
   /** The control for which kinds of question a round asks, and its chips, shown when it's opened. */
   function scopeControls(): [HTMLElement, HTMLElement] {
-    const ways = modes();
-    const label = mixed() ? 'Mix' : ways.length === 1 ? MODES.find((m) => m.id === ways[0])!.title : `${ways.length} kinds`;
+    // Kinds that can't be asked right now don't count either way: with all the rest chosen, or none, it's the mix.
+    const picks = chosen();
+    const mix = picks.length === 0 || picks.length === MODES.filter((m) => unavailable(m.id) === null).length;
+    const label = mix ? 'Mix' : picks.length === 1 ? MODES.find((m) => m.id === picks[0])!.title : `${picks.length} kinds`;
     const toggle = h(
       'button',
       {
-        class: `chip filter-toggle ${mixed() ? '' : 'selected'}`,
+        class: `chip filter-toggle ${mix ? '' : 'selected'}`,
         'aria-expanded': String(scopeOpen),
         'aria-controls': 'drill-scope',
         'aria-label': `Questions: ${label}`,
@@ -305,7 +293,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       label,
     );
     const reasons = MODES.map((m) => unavailable(m.id)).filter(Boolean);
-    const onAndAskable = MODES.filter((m) => scope.has(m.id) && unavailable(m.id) === null);
     const chips = h(
       'div',
       { id: 'drill-scope', hidden: !scopeOpen },
@@ -320,9 +307,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
               class: `chip ${on ? 'selected' : ''}`,
               'data-mode': m.id,
               'aria-pressed': String(on),
-              // The last kind left in that can be asked stays on, so the round asks what was chosen. One that can't be
-              // asked right now keeps its place, for when quiet mode goes off.
-              disabled: unavailable(m.id) !== null || (on && onAndAskable.length === 1 && onAndAskable[0].id === m.id),
+              // One that can't be asked right now keeps its place, for when quiet mode goes off.
+              disabled: unavailable(m.id) !== null,
               onclick: () => toggleScope(m.id),
             },
             m.title,
@@ -380,7 +366,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: home }, icon('close')),
         h('span', { class: 'session-count' }, `${done} done`),
         scopeToggle,
-        quietToggle(app, rescope),
+        // Icon only, as on Home: the header also holds the count and the filter, and must fit at 360px.
+        quietToggle(app, rescope, { iconOnly: true }),
       ),
       scopeChips,
       previousPick && !answered && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
@@ -426,6 +413,12 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });
   // Drills open straight into a round; closing it, or going back, goes Home.
-  start();
+  const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
+  distractorPool = known.length >= 6 ? known : VOCAB;
+  if (learned >= MIN_CARDS) {
+    current = nextQuestion();
+    if (current) preload(current.card);
+  }
+  ask();
   return root;
 }

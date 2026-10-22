@@ -492,6 +492,7 @@ p {
 .session-count {
   flex: 1;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .stack {
@@ -928,7 +929,14 @@ p {
 
 /* The kinds of question in a round, under the session header when opened. */
 #drill-scope .chips:not(:last-child) {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+#drill-scope .chip:disabled {
+  background: var(--surface);
+  color: var(--faint);
+  border: 3px dashed var(--line);
+  box-shadow: none;
 }
 
 .scope-note {
