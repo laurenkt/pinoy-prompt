@@ -3,7 +3,7 @@ import { UNITS, type Card, type CardKind } from '../deck';
 import { GUIDES, KIND_INFO } from '../guides';
 import { STRENGTHS, strengthOf } from '../memory';
 import { play } from '../speech';
-import { audioButton, h, icon, pageHeader } from '../ui';
+import { audioButton, chip, h, icon, pageHeader } from '../ui';
 
 const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
 
@@ -86,27 +86,21 @@ export function wordsScreen(app: App): HTMLElement {
       'div',
       { class: 'chips', id: 'library-filters', role: 'group', 'aria-label': 'Show', hidden: !filtersOpen },
       FILTERS.map((f) =>
-        h(
-          'button',
-          {
-            class: `chip ${filter === f.id ? 'selected' : ''}`,
-            'aria-pressed': String(filter === f.id),
-            onclick: () => {
-              filter = f.id;
-              filtersOpen = false;
-              draw();
-              root.querySelector<HTMLButtonElement>('.filter-toggle')!.focus();
-            },
+        chip(f.label, filter === f.id, {
+          onclick: () => {
+            filter = f.id;
+            filtersOpen = false;
+            draw();
+            root.querySelector<HTMLButtonElement>('.filter-toggle')!.focus();
           },
-          f.label,
-        ),
+        }),
       ),
     );
     // Opening and closing only shows the chips, so open topics and the scroll position stay put.
     const toggle = h(
       'button',
       {
-        class: `chip filter-toggle ${filter !== 'all' ? 'selected' : ''}`,
+        class: 'chip filter-toggle',
         'aria-expanded': String(filtersOpen),
         'aria-controls': 'library-filters',
         onclick: () => {

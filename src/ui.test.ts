@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 let playing = false;
 vi.mock('./speech', () => ({ speaking: () => playing }));
 
-const { audioButton } = await import('./ui');
+const { audioButton, chip } = await import('./ui');
 
 afterEach(() => {
   playing = false;
@@ -50,4 +50,14 @@ it('keeps a button lit when it is tapped again while its word restarts', () => {
   button.click();
   vi.advanceTimersByTime(100);
   expect(button.classList.contains('playing')).toBe(true);
+});
+
+it('marks a chosen chip the same way in any row, pressed or, in a radio group, checked', () => {
+  const pressed = chip('Sounds', true, { 'data-mode': 'sound' });
+  expect(pressed.className).toBe('chip selected');
+  expect(pressed.getAttribute('aria-pressed')).toBe('true');
+  const radio = chip('Anything', false, { role: 'radio' });
+  expect(radio.className).toBe('chip');
+  expect(radio.getAttribute('aria-checked')).toBe('false');
+  expect(radio.hasAttribute('aria-pressed')).toBe(false);
 });

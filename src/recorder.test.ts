@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resample } from './recorder';
+import { resample, toWav } from './recorder';
 
 const sine = (hz: number, rate: number, seconds = 0.5) =>
   Float32Array.from({ length: rate * seconds }, (_, i) => Math.sin((2 * Math.PI * hz * i) / rate));
@@ -26,5 +26,18 @@ describe('resample', () => {
     const up = resample(sine(500, 8000), 8000);
     expect(up.length).toBe(8000);
     expect(rms(up)).toBeCloseTo(Math.SQRT1_2, 1);
+  });
+});
+
+describe('a take as a WAV file', () => {
+  it('is 16-bit mono at 16 kHz, with the samples clipped to range', async () => {
+    const wav = toWav(new Float32Array([0, 1, -1, 2]));
+    expect(wav.type).toBe('audio/wav');
+    const data = new DataView(await wav.arrayBuffer());
+    expect(String.fromCharCode(...new Uint8Array(await wav.slice(0, 4).arrayBuffer()))).toBe('RIFF');
+    expect(data.getUint16(22, true)).toBe(1);
+    expect(data.getUint32(24, true)).toBe(16000);
+    expect(data.getUint32(40, true)).toBe(8);
+    expect([0, 1, 2, 3].map((i) => data.getInt16(44 + i * 2, true))).toEqual([0, 32767, -32767, 32767]);
   });
 });

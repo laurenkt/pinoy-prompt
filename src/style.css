@@ -294,6 +294,44 @@ p {
   transition: width 0.3s ease;
 }
 
+/* Chips: a row of choices (ui.ts's chip). A chosen chip looks the same in every row. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.chips[hidden] {
+  display: none;
+}
+
+.chip {
+  border: 3px solid var(--line);
+  background: var(--surface);
+  border-radius: 99px;
+  padding: 6px 14px;
+  min-height: 40px;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.chip.selected {
+  background: var(--saffron);
+  color: var(--on-accent);
+  border-color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+/* The chip that opens a row of chips names what's chosen, and looks the same whatever that is. */
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  flex: none;
+}
+
 /* Home */
 
 .home-header {
@@ -1242,6 +1280,45 @@ p {
   background: var(--magenta);
 }
 
+/* The box, with the microphone beside it when speaking an answer is on offer. */
+.meaning-row {
+  display: flex;
+  gap: 10px;
+}
+
+.meaning-row .meaning-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.icon-btn.meaning-mic {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.icon-btn.meaning-mic.listening {
+  background: var(--magenta);
+}
+
+.meaning-status {
+  margin: 0;
+}
+
+/*
+ * The box sits right under the prompt, which doesn't grow, so both stay in sight above the keyboard that comes
+ * up with it. Until it's answered, the spare height goes below them, where the keyboard is; after, above Next.
+ * The prompt stays the same size either way, so the box doesn't move when it's answered.
+ */
+.panel:has(> .meaning-form) > .prompt {
+  min-height: 0;
+}
+
+.panel:not(:has(> .choices)) > .meaning-form:last-child {
+  order: 0;
+}
+
 /* Check takes the room; Show choices keeps to one line. */
 .meaning-form .row .btn.secondary {
   flex: 0 0 auto;
@@ -1981,21 +2058,6 @@ p {
   margin-bottom: 14px;
 }
 
-.chip {
-  border: var(--outline);
-  border-radius: 999px;
-  background: var(--surface);
-  padding: 6px 14px;
-  min-height: 40px;
-  font-weight: 700;
-}
-
-.chip.selected {
-  background: var(--teal);
-  color: var(--on-accent);
-  box-shadow: 2px 2px 0 var(--ink);
-}
-
 /* A call fills the screen: the transcript scrolls between the header and the controls, which stay put. */
 .talk-chat {
   display: flex;
@@ -2381,41 +2443,6 @@ p {
 }
 
 /* Library */
-
-.filter-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  flex: none;
-}
-
-.chips[hidden] {
-  display: none;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 16px;
-}
-
-.chip {
-  border: 3px solid var(--line);
-  background: var(--surface);
-  border-radius: 99px;
-  padding: 6px 14px;
-  min-height: 40px;
-  font-weight: 800;
-  font-size: 0.9rem;
-}
-
-.chip.selected {
-  background: var(--saffron);
-  color: var(--on-accent);
-  border-color: var(--ink);
-}
 
 .word.guide .word-en {
   margin-bottom: 4px;

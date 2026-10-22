@@ -21,6 +21,7 @@ describe('the Library', () => {
     const root = wordsScreen(fakeApp());
     expect(chips(root).hidden).toBe(true);
     expect(toggle(root).textContent).toBe('All');
+    expect(toggle(root).className).toBe('chip filter-toggle');
     expect(toggle(root).getAttribute('aria-expanded')).toBe('false');
     expect(root.querySelectorAll('.unit-list').length).toBeGreaterThan(UNITS.length);
 
@@ -32,7 +33,10 @@ describe('the Library', () => {
     // Picking one closes the filters and narrows the list to it.
     expect(chips(root).hidden).toBe(true);
     expect(toggle(root).textContent).toBe('Sounds');
-    expect(toggle(root).classList.contains('selected')).toBe(true);
+    // The button looks the same whichever filter it names; only the chosen chip is marked.
+    expect(toggle(root).className).toBe('chip filter-toggle');
+    toggle(root).click();
+    expect([...chips(root).querySelectorAll('.chip.selected')].map((c) => c.textContent)).toEqual(['Sounds']);
     expect(root.querySelectorAll('.unit-list').length).toBe(1);
     expect(wordsScreen(fakeApp()).querySelector('.filter-toggle')!.textContent).toBe('Sounds');
   });
