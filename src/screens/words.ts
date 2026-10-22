@@ -3,7 +3,7 @@ import { UNITS, type Card, type CardKind } from '../deck';
 import { GUIDES, KIND_INFO } from '../guides';
 import { STRENGTHS, strengthOf } from '../memory';
 import { play } from '../speech';
-import { audioButton, h } from '../ui';
+import { audioButton, h, icon } from '../ui';
 
 const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
 
@@ -24,6 +24,8 @@ let filter: Filter = 'all';
 /** Everything there is to learn: words and phrases by topic, then the guides by kind. Tap any card to hear it, learned or not. */
 export function wordsScreen(app: App): HTMLElement {
   const root = h('div', { class: 'words' });
+  // The filters stay tucked away until asked for, so the list starts near the top.
+  let filtersOpen = false;
 
   function badge(card: Card): HTMLElement | null {
     const state = app.progress.cards[card.id];
@@ -76,30 +78,54 @@ export function wordsScreen(app: App): HTMLElement {
     );
   }
 
+  function filterChips(): HTMLElement {
+    return h(
+      'div',
+      { class: 'chips', role: 'group', 'aria-label': 'Show' },
+      FILTERS.map((f) =>
+        h(
+          'button',
+          {
+            class: `chip ${filter === f.id ? 'selected' : ''}`,
+            'aria-pressed': String(filter === f.id),
+            onclick: () => {
+              filter = f.id;
+              filtersOpen = false;
+              draw();
+            },
+          },
+          f.label,
+        ),
+      ),
+    );
+  }
+
   function draw(): void {
     const showVocab = filter === 'all' || filter === 'vocab';
     const kinds = (['pattern', 'sound', 'tune', 'knowhow'] as const).filter((k) => filter === 'all' || filter === k);
+    const current = FILTERS.find((f) => f.id === filter)!;
     root.replaceChildren(
-      h('h1', null, 'Library'),
-      h('p', { class: 'muted' }, 'Everything there is to learn. Tap the speaker to hear anything, even words you have not met yet. Each card you know shows how firmly it is stored.'),
       h(
         'div',
-        { class: 'chips', role: 'group', 'aria-label': 'Show' },
-        FILTERS.map((f) =>
-          h(
-            'button',
-            {
-              class: `chip ${filter === f.id ? 'selected' : ''}`,
-              'aria-pressed': String(filter === f.id),
-              onclick: () => {
-                filter = f.id;
-                draw();
-              },
+        { class: 'words-header' },
+        h('h1', null, 'Library'),
+        h(
+          'button',
+          {
+            class: `chip filter-toggle ${filter !== 'all' ? 'selected' : ''}`,
+            'aria-expanded': String(filtersOpen),
+            'aria-label': `Show: ${current.label}`,
+            onclick: () => {
+              filtersOpen = !filtersOpen;
+              draw();
             },
-            f.label,
-          ),
+          },
+          icon('filter'),
+          current.label,
         ),
       ),
+      h('p', { class: 'muted' }, 'Tap the speaker to hear any word.'),
+      ...(filtersOpen ? [filterChips()] : []),
       ...(showVocab ? UNITS.map((unit) => group(unit.title, unit.tlTitle, unit.cards.map(wordItem))) : []),
       ...kinds.map((k) => group(KIND_INFO[k].label, null, GUIDES.filter((g) => g.kind === k).map(guideItem))),
     );

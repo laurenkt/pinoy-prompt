@@ -2117,6 +2117,26 @@ p {
 
 /* Library */
 
+.words-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.words-header h1 {
+  margin: 0;
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  flex: none;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
