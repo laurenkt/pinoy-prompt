@@ -369,13 +369,13 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
   function tooFew(): HTMLElement {
     return h(
       'div',
-      null,
+      { class: 'fill' },
       ...pageHeader('Drills', home),
       h(
         'section',
-        { class: 'card center' },
+        { class: 'panel center' },
         h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to drill them.`),
-        h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
+        h('button', { class: 'btn primary big', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
       ),
     );
   }

@@ -200,13 +200,13 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     if (plan.known.length < MIN_WORDS) {
       return h(
         'div',
-        null,
+        { class: 'fill' },
         header('Chat'),
         h(
           'section',
-          { class: 'card center' },
+          { class: 'panel center' },
           h('p', null, `Learn at least ${MIN_WORDS} words first. Chat mixes the words you know into the conversation.`),
-          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
+          h('button', { class: 'btn primary big', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
         ),
       );
     }

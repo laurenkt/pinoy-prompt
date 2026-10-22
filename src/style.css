@@ -186,7 +186,9 @@ p {
 .talk,
 .session,
 .session-body,
+.fill,
 .panel {
+  /* .fill is any other wrapper on the way, so the height reaches what is inside it. */
   display: flex;
   flex-direction: column;
   flex: 1 0 auto;
@@ -750,7 +752,7 @@ p {
   margin-top: 0;
 }
 
-/* A summary or a topic's introduction is a card, so it sits in the middle rather than stretching. */
+/* A message with a way forward (a summary, a topic's introduction, "learn some words first") is a card, so it sits in the middle rather than stretching. */
 .panel.center {
   flex-grow: 0;
   margin: auto 0;
