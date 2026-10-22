@@ -179,7 +179,7 @@ describe('projected', () => {
     early: false,
     days: 10,
     milestones: [],
-    curve: { since: now - 10 * DAY_MS, scale: 10 / 10 ** power, power },
+    curve: { now, days: 10, known: 10, perDay: 1, power },
   });
 
   it('rises early and flattens for a pace that eases off, and runs straight for a steady one', () => {

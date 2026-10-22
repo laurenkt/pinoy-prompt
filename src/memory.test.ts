@@ -212,13 +212,41 @@ describe('forecast', () => {
     expect(f.milestones[0].at).toBeGreaterThan(NOW);
   });
 
-  it('dates milestones along a curve through today, steady for a steady learner', () => {
-    // One word a day sticking for 30 days.
-    const p = learner(30, Array.from({ length: 30 }, (_, i) => i));
+  /** A word met `metDaysAgo` days ago that stuck a week later. */
+  function stuck(p: ReturnType<typeof emptyProgress>, id: string, metDaysAgo: number) {
+    const at = NOW - (metDaysAgo - 7) * DAY_MS;
+    p.cards[id] = card(7, metDaysAgo - 7, { introduced: NOW - metDaysAgo * DAY_MS, log: [[at - 3 * DAY_MS, 1], [at, 7]] });
+  }
+
+  it('runs on from today at the recent pace, steady for a steady learner', () => {
+    // A word met each day for 60 days, each stuck a week later.
+    const p = emptyProgress(NOW - 60 * DAY_MS);
+    LEARN_ORDER.slice(0, 60).forEach((id, i) => stuck(p, id, 60 - i));
     const f = forecast(p, NOW);
     expect(f.curve!.power).toBeCloseTo(1, 1);
-    expect(curveAt(f.curve!, NOW)).toBeCloseTo(30, 0);
+    expect(curveAt(f.curve!, NOW)).toBe(f.known);
     expect(f.milestones[0].at).toBe(curveReaches(f.curve!, 500));
+    // Steady: the date is close to the straight line at today's pace.
+    expect(f.milestones[0].at as number).toBeCloseTo(NOW + ((500 - f.known) / f.perDay!) * DAY_MS, -10);
+  });
+
+  it('follows the recent pace for a learner who has come back', () => {
+    // 20 words a year ago, then 3 a day for the last 30 days.
+    const p = emptyProgress(NOW - 400 * DAY_MS);
+    LEARN_ORDER.slice(0, 20).forEach((id) => stuck(p, id, 380));
+    LEARN_ORDER.slice(20, 110).forEach((id, i) => stuck(p, id, 37 - Math.floor(i / 3)));
+    const f = forecast(p, NOW);
+    const linear = NOW + ((500 - f.known) / f.perDay!) * DAY_MS;
+    expect(f.milestones[0].at as number).toBeLessThan(NOW + 2 * (linear - NOW));
+  });
+
+  it('eases off for a learner whose intake has slowed', () => {
+    // Words met ever more slowly: about 10 × the square root of the day.
+    const p = emptyProgress(NOW - 100 * DAY_MS);
+    LEARN_ORDER.slice(0, 100).forEach((id, i) => stuck(p, id, 100 - Math.round((i / 10) ** 2)));
+    const f = forecast(p, NOW);
+    expect(f.curve!.power).toBeLessThan(0.9);
+    expect(f.milestones[0].at as number).toBeGreaterThan(NOW + ((500 - f.known) / f.perDay!) * DAY_MS);
   });
 
   it('counts only words that have stuck, not words met', () => {
