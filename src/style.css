@@ -2032,12 +2032,18 @@ p {
 .talk-backdrop {
   /* The whole screen behind the call, beneath the transcript and controls. */
   position: fixed;
-  top: 0;
   left: 0;
   width: 100vw;
-  /* The largest viewport, not the current one: iOS otherwise leaves a gap under the toolbar until the page is scrolled. */
-  height: 100vh;
-  height: 100lvh;
+  /*
+   * Overscanned past the top and bottom, so no sliver of the page shows at an edge: iOS's viewport can come
+   * up a few pixels short (more so in the home-screen app as it opens, and under Safari's toolbar), and it
+   * is at least the largest viewport, so it doesn't shrink as the toolbar comes and goes. Its middle stays
+   * the screen's middle. The picture is drawn at whatever size this ends up, every frame.
+   */
+  top: calc(-1 * var(--overscan));
+  height: calc(100vh + 2 * var(--overscan));
+  height: calc(100lvh + 2 * var(--overscan));
+  --overscan: 48px;
   z-index: 0;
   pointer-events: none;
 }
