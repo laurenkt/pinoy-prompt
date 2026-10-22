@@ -9,6 +9,10 @@ import {
   CENTS_PER_MINUTE,
   CHECK_MODEL,
   checkMeaning,
+  transcribe,
+  transcriptionCost,
+  TRANSCRIBE_PRICES,
+  TRANSCRIBE_MODEL,
   errorText,
   forgetApiKey,
   getApiKey,
@@ -427,5 +431,33 @@ describe('the spend estimate', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('hearing a spoken answer', () => {
+  it('sends only the recording, in English, and reads back the text', async () => {
+    const fetchFn = vi.fn(async () => json(200, { text: ' Thanks a lot. ' }));
+    expect(await transcribe(KEY, new Blob(['x'], { type: 'audio/wav' }), fetchFn as unknown as typeof fetch)).toBe('Thanks a lot.');
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.openai.com/v1/audio/transcriptions');
+    const form = init.body as FormData;
+    expect(form.get('model')).toBe(TRANSCRIBE_MODEL);
+    expect(form.get('language')).toBe('en');
+    expect(form.get('file')).toBeInstanceOf(Blob);
+  });
+
+  it('counts what it cost, audio and text at their own rates', async () => {
+    localStorage.clear();
+    const usage = { input_tokens: 1e6, input_token_details: { audio_tokens: 0.8e6, text_tokens: 0.2e6 }, output_tokens: 1e6 };
+    const cost = 0.8 * TRANSCRIBE_PRICES.audioInput + 0.2 * TRANSCRIBE_PRICES.textInput + TRANSCRIBE_PRICES.output;
+    expect(transcriptionCost(usage)).toBeCloseTo(cost);
+    expect(transcriptionCost(undefined)).toBe(0);
+    await transcribe(KEY, new Blob(), (async () => json(200, { text: 'hi', usage })) as unknown as typeof fetch);
+    expect(getSpend().total).toBeCloseTo(cost);
+  });
+
+  it('fails on a bad key or a lost connection', async () => {
+    await expect(transcribe(KEY, new Blob(), (async () => json(401, { error: { message: 'bad key' } })) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'key' });
+    await expect(transcribe(KEY, new Blob(), (async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
   });
 });

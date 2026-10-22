@@ -1242,6 +1242,44 @@ p {
   background: var(--magenta);
 }
 
+/* The box, with the microphone beside it when speaking an answer is on offer. */
+.meaning-row {
+  display: flex;
+  gap: 10px;
+}
+
+.meaning-row .meaning-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.icon-btn.meaning-mic {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+
+.icon-btn.meaning-mic.listening {
+  background: var(--magenta);
+}
+
+.meaning-status {
+  margin: 0;
+}
+
+/*
+ * Until it's answered, the box sits right under the prompt, which doesn't grow, so both stay in sight above
+ * the keyboard that comes up with it. The spare height goes below them, where the keyboard is.
+ */
+.panel:has(> .meaning-form:last-child) > .prompt {
+  min-height: 0;
+}
+
+.panel:not(:has(> .choices)) > .meaning-form:last-child {
+  order: 0;
+}
+
 /* Check takes the room; Show choices keeps to one line. */
 .meaning-form .row .btn.secondary {
   flex: 0 0 auto;

@@ -9,7 +9,9 @@ import type { MeaningJudge } from '../meaning';
 import { recordAnswer } from '../store';
 import { button, fakeApp, flush, noMic } from '../test/screen';
 import { ADVANCE_MS } from './auto-advance';
-import { practiceScreen } from './practice';
+import { practiceScreen, type MeaningHearer } from './practice';
+import type { Take } from '../recorder';
+import type { SpeakDeps } from './speak';
 import { AiError } from '../openai';
 
 /** Asked in this order, since every pick rolls 0. */
@@ -175,5 +177,87 @@ describe('listening to words that have settled', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('accepting a typed meaning as it is typed', () => {
+  function typing(root: HTMLElement, text: string): void {
+    box(root)!.value = text;
+    box(root)!.dispatchEvent(new Event('input'));
+  }
+
+  it('takes a meaning the device can tell is right without Check', async () => {
+    const root = listen(learner(true));
+    typing(root, 'thank');
+    expect(root.querySelector('.feedback')).toBeNull();
+    typing(root, 'thank you');
+    await flush();
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+
+  it('never sends part of a longer meaning, or a wrong one, by itself', async () => {
+    const judge = vi.fn<MeaningJudge>(async () => true);
+    const root = listen(learner(true), judge);
+    for (const text of ['good', 'good night', 'goodbye']) typing(root, text);
+    await flush();
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(judge).not.toHaveBeenCalled();
+  });
+});
+
+describe('saying the meaning out loud', () => {
+  /** A microphone that hears `speech` once stopped, or by itself after a moment. */
+  function mic(speech = true) {
+    const record = vi.fn(() => {
+      let finish: (t: Take) => void = () => {};
+      const audio = new Promise<Take>((r) => (finish = r));
+      setTimeout(() => finish({ samples: new Float32Array(160), speech }), 0);
+      return { audio, stop: () => finish({ samples: new Float32Array(160), speech }), cancel: () => finish({ samples: new Float32Array(0), speech: false }) };
+    });
+    const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record } as unknown as SpeakDeps;
+    return { deps, record };
+  }
+
+  function speaking(app: App, hearer: MeaningHearer | null, deps: SpeakDeps): HTMLElement {
+    const root = practiceScreen(app, deps, null, () => hearer);
+    document.body.replaceChildren(root);
+    return root;
+  }
+
+  const micButton = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.meaning-mic');
+
+  it('only listens once the microphone button is tapped, then checks what was heard', async () => {
+    const { deps, record } = mic();
+    const hearer = vi.fn<MeaningHearer>(async () => 'Thank you.');
+    const root = speaking(learner(true), hearer, deps);
+    expect(record).not.toHaveBeenCalled();
+    micButton(root)!.click();
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(root.querySelector('.meaning-status')?.textContent).toContain('Listening');
+    await flush();
+    await flush();
+    expect(hearer).toHaveBeenCalledWith(expect.any(Blob));
+    expect(box(root)!.value).toBe('Thank you.');
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+
+  it('says so when nothing was heard, and leaves the box to type in', async () => {
+    const { deps } = mic(false);
+    const hearer = vi.fn<MeaningHearer>(async () => '');
+    const root = speaking(learner(true), hearer, deps);
+    micButton(root)!.click();
+    await flush();
+    expect(hearer).not.toHaveBeenCalled();
+    expect(root.querySelector('.meaning-status')?.textContent).toContain("Didn't hear anything");
+    expect(box(root)!.disabled).toBe(false);
+  });
+
+  it('has no microphone without a way to hear it, or in quiet mode', () => {
+    expect(micButton(speaking(learner(true), null, mic().deps))).toBeNull();
+    const quiet = learner(true);
+    quiet.progress.settings.quiet = true;
+    quiet.progress.settings.headphones = true;
+    expect(micButton(speaking(quiet, async () => '', mic().deps))).toBeNull();
+    expect(micButton(speaking(learner(true), async () => '', mic().deps))).not.toBeNull();
   });
 });

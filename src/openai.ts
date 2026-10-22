@@ -89,6 +89,26 @@ export function tokenCost(model: string, usage: TokenUsage | undefined): number 
   return ((input - cached) * price.input + cached * price.cachedInput + count(usage.output_tokens) * price.output) / 1e6;
 }
 
+/** Speech-to-text's list prices, in US dollars per million tokens: it bills audio and text in differently. */
+export const TRANSCRIBE_PRICES = { audioInput: 3, textInput: 1.25, output: 5 };
+
+/** The token counts a transcription reports, which split its input into audio and text (the prompt). */
+export interface TranscriptionUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  input_token_details?: { audio_tokens?: number; text_tokens?: number };
+}
+
+/** What a transcription cost, in US dollars, from the usage OpenAI reported. Input not split out is priced as audio. */
+export function transcriptionCost(usage: TranscriptionUsage | undefined): number {
+  if (!usage) return 0;
+  const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
+  const text = Math.min(count(usage.input_token_details?.text_tokens), count(usage.input_tokens));
+  const audio = count(usage.input_tokens) - text;
+  const p = TRANSCRIBE_PRICES;
+  return (audio * p.audioInput + text * p.textInput + count(usage.output_tokens) * p.output) / 1e6;
+}
+
 /** What `seconds` of a GPT-Live call cost, in US dollars. */
 export function callCost(seconds: number): number {
   return seconds > 0 ? ((seconds / 60) * CENTS_PER_MINUTE) / 100 : 0;
@@ -251,6 +271,33 @@ export async function checkMeaning(
     // Fall through.
   }
   throw new AiError('other', 'OpenAI answered without a verdict.');
+}
+
+/** Turns a spoken answer in Drills into text. */
+export const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
+
+/** What the learner said, as English text. Sends only the recording. */
+export async function transcribe(key: string, audio: Blob, fetchFn: typeof fetch = (...args) => fetch(...args)): Promise<string> {
+  const form = new FormData();
+  form.append('model', TRANSCRIBE_MODEL);
+  form.append('language', 'en');
+  form.append('prompt', 'Someone saying in English what a Tagalog word or phrase means.');
+  form.append('file', audio, 'answer.wav');
+  let response: Response;
+  try {
+    response = await fetchFn(`${API}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    });
+  } catch (e) {
+    throw new AiError('network', e instanceof Error ? e.message : String(e));
+  }
+  if (!response.ok) throw await failure(response);
+  const body = (await response.json()) as { text?: unknown; usage?: TranscriptionUsage };
+  addSpend(transcriptionCost(body.usage));
+  return typeof body.text === 'string' ? body.text.trim() : '';
 }
 
 export interface ChatTurn {
