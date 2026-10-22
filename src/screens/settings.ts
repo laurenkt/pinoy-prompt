@@ -41,7 +41,7 @@ export function settingsScreen(app: App): HTMLElement {
       void play(getCard('kumusta')!);
       void lastStartDelay().then((ms) => {
         if (ms === null) return;
-        lag.textContent = `Started ${Math.round(ms)} ms after your tap.`;
+        lag.textContent = `The word started ${(ms / 1000).toFixed(2)} seconds after your tap.`;
         lag.hidden = false;
       });
     };

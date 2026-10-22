@@ -6,26 +6,44 @@
 // a tap has to do, which is why clips play straight away where the built-in
 // voice can lag: that voice runs outside the page and can't be loaded ahead.
 //
-// The recorder keeps its own context: iOS changes the hardware rate when the
-// microphone opens, and a context made before that can play distorted.
+// iOS changes the hardware rate when the microphone opens or closes, and a
+// context made before that can play distorted, so the context is replaced
+// whenever the audio session changes. The recorder keeps its own for the same reason.
 
-import { setAudioSession } from './audio-session';
+import { onAudioSessionChange, setAudioSession } from './audio-session';
 import { microphoneOpen } from './microphone';
 
 let context: AudioContext | null = null;
+
+function contextClass(): typeof AudioContext | undefined {
+  const scope = globalThis as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
+  return scope.AudioContext ?? scope.webkitAudioContext;
+}
 
 /** The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then. */
 export function audioContext(): AudioContext {
   // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback.
   if (!microphoneOpen()) setAudioSession('playback');
-  context ??= new AudioContext({ latencyHint: 'interactive' });
+  context ??= new (contextClass()!)({ latencyHint: 'interactive' });
   if (context.state !== 'running') void context.resume().catch(() => {});
   return context;
 }
 
+/** Whether the shared context can play now, waiting a moment for it to resume. */
+export async function audioRunning(ctx: AudioContext, waitMs = 300): Promise<boolean> {
+  if (ctx.state === 'running') return true;
+  await Promise.race([ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, waitMs))]);
+  return (ctx.state as AudioContextState) === 'running';
+}
+
+onAudioSessionChange(() => {
+  void context?.close().catch(() => {});
+  context = null;
+});
+
 /** Whether this browser can play clips at all. */
 export function clipsSupported(): boolean {
-  return typeof AudioContext !== 'undefined';
+  return contextClass() !== undefined;
 }
 
 /**

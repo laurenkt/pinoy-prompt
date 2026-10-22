@@ -7,7 +7,7 @@
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
 // Malay, then Spanish) and let the UI say so.
 
-import { audioContext, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
+import { audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
 import { setAudioSession } from './audio-session';
 import clips from './clips.json';
 import type { Card } from './deck';
@@ -71,6 +71,8 @@ export function clipUrl(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false):
 }
 
 let currentClip: Sound | null = null;
+/** The play() still loading its clip, by generation, so a screen waiting for the word knows it's coming. */
+let loading: number | null = null;
 /** Settles with how long the last play() took to be heard, in ms, or null if nothing played. */
 let started: Promise<number | null> = Promise.resolve(null);
 let reportStart: (ms: number | null) => void = () => {};
@@ -109,7 +111,7 @@ function releaseSoon(): void {
 
 /** Pausing the track mid-word would let iOS mute the rest of it, so wait for the word to end. */
 function releaseWhenQuiet(): void {
-  if (speechSupported() && speechSynthesis.speaking) releaseSoon();
+  if (speaking()) releaseSoon();
   else releaseMediaSession();
 }
 
@@ -154,32 +156,43 @@ function holdMediaSession(): void {
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
 export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
   stop();
-  if (muted) return;
-  const tapped = performance.now();
-  reportStart(null);
   started = new Promise((resolve) => (reportStart = resolve));
   const report = reportStart;
+  if (muted) return report(null);
+  const tapped = performance.now();
   const mine = generation;
+  // Play through the iPhone's silent switch, unless the microphone needs the session. Before
+  // iOS 17 only media gets through, and so does a voice or Web Audio playing alongside it.
+  // Started now, inside the tap, as the voice may only be needed once a clip fails to load.
+  if (!microphoneOpen()) setAudioSession('playback');
+  holdMediaSession();
   const url = clipsSupported() ? clipUrl(card, slow) : null;
   if (url) {
     // Made or resumed now, inside the tap, as the clip may only be ready after it.
     audioContext();
+    loading = mine;
     try {
       const buffer = await loadClip(url);
       if (mine !== generation) return;
+      // A context iOS won't start (outside a tap) plays nothing, so the voice reads it instead.
+      if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
+      if (mine !== generation) return;
       // A slow clip is said slowly already; a card's own clip is slowed down instead.
       const sound = (currentClip = playBuffer(buffer, slow && card.audio ? 0.75 : 1));
-      void sound.done.then(() => currentClip === sound && (currentClip = null));
+      void sound.done.then(() => {
+        if (currentClip !== sound) return;
+        currentClip = null;
+        releaseSoon();
+      });
       report(performance.now() - tapped + msUntilHeard(sound.startsAt));
       return;
     } catch {
       // Fall through to speech if the clip can't play.
       if (mine !== generation) return;
+    } finally {
+      if (loading === mine) loading = null;
     }
   }
-  // Play through the iPhone's silent switch, unless the microphone needs the session.
-  if (!microphoneOpen()) setAudioSession('playback');
-  holdMediaSession();
   if (!speechSupported()) {
     releaseMediaSession();
     report(null);
@@ -229,6 +242,6 @@ export function stop(release = false): void {
 
 /** Whether a card is still being heard, so a screen moving on by itself can wait for it. */
 export function speaking(): boolean {
-  if (currentClip) return true;
+  if (currentClip || loading === generation) return true;
   return speechSupported() && speechSynthesis.speaking;
 }
