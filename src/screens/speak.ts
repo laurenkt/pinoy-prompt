@@ -2,7 +2,8 @@
 // on the device, and coach them sound by sound.
 
 import { coach, type Tip } from '../coach';
-import { DownloadError, modelDownloaded } from '../model-cache';
+import { holdMicrophone, microphoneAllowed } from '../microphone';
+import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonetics';
@@ -33,6 +34,12 @@ export interface SpeakDeps {
   loadPhoneModel(onProgress?: (fraction: number) => void): Promise<PhoneModel>;
   /** Plays back pieces of the recording and reference sounds. */
   player(): Player;
+  /** Whether the model was on the device when last checked, for a screen deciding as it's drawn. */
+  modelKnownDownloaded?(): boolean;
+  /** Whether the microphone would open without the browser asking (see askForMicrophone). A stand-in without it always would. */
+  microphoneAllowed?(): boolean;
+  /** Open the microphone and keep it until the screen is left; false if it was left meanwhile. */
+  holdMicrophone?(): Promise<boolean>;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -42,6 +49,9 @@ export const defaultDeps: SpeakDeps = {
   // Loaded on demand so the model runtime isn't part of the app's first download.
   loadPhoneModel: async (onProgress) => (await import('../phone-model')).loadPhoneModel(onProgress),
   player: () => (sharedPlayer ??= webAudioPlayer()),
+  modelKnownDownloaded,
+  microphoneAllowed,
+  holdMicrophone,
 };
 let sharedPlayer: Player | null = null;
 
@@ -98,6 +108,35 @@ export interface SpeakPanel {
    */
   mayPlay(): boolean;
   dispose(): void;
+}
+
+/** Whether the browser would ask the learner before the microphone opens. */
+export function needsMicrophone(deps: SpeakDeps): boolean {
+  return !(deps.microphoneAllowed?.() ?? true);
+}
+
+/**
+ * Open the microphone and hold it until the screen is left. Called from the tap that starts a round that may ask the
+ * learner to speak, so the phone asks then, over micWaiting(), rather than over a speaking question. 'refused' if
+ * it was refused or there's no microphone (the round then leaves speaking out), 'left' if the screen went meanwhile.
+ */
+export async function askForMicrophone(deps: SpeakDeps): Promise<'on' | 'refused' | 'left'> {
+  try {
+    return (await (deps.holdMicrophone?.() ?? true)) ? 'on' : 'left';
+  } catch {
+    return 'refused';
+  }
+}
+
+/** What shows while the phone asks for the microphone. */
+export function micWaiting(): HTMLElement {
+  return h(
+    'div',
+    { class: 'panel center mic-waiting', role: 'status' },
+    h('p', { class: 'eyebrow' }, 'Speaking'),
+    h('h2', null, 'Allow the microphone'),
+    h('p', null, 'Some questions ask you to say a word out loud, so your phone asks now rather than in the middle of one. Your voice stays on this phone.'),
+  );
 }
 
 /** How each sound verdict ranks when several sounds share letters: the worst one shows. */
@@ -176,6 +215,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         state = { name: 'loading', progress };
         updateProgress();
       });
+      // So the next round knows, as it's drawn, that it may ask to speak (modelKnownDownloaded).
+      void deps.modelDownloaded().catch(() => {});
       set({ name: 'ready' });
       options.onReady?.();
     } catch (err) {

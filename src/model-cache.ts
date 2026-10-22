@@ -12,14 +12,22 @@ export class DownloadError extends Error {
   override name = 'DownloadError';
 }
 
+/** What modelDownloaded() last found, for a screen that has to decide as it's drawn. */
+let lastFound = false;
+
+/** Whether the model was on the device when last checked (the app checks as it opens). */
+export function modelKnownDownloaded(): boolean {
+  return lastFound;
+}
+
 /** Whether the model is already on the device. */
 export async function modelDownloaded(): Promise<boolean> {
   try {
     // caches.open would create the cache, which the service worker takes as a sign speaking is in use.
-    if (!(await caches.has(CACHE))) return false;
-    return (await (await caches.open(CACHE)).match(MODEL_URL)) !== undefined;
+    if (!(await caches.has(CACHE))) return (lastFound = false);
+    return (lastFound = (await (await caches.open(CACHE)).match(MODEL_URL)) !== undefined);
   } catch {
-    return false;
+    return (lastFound = false);
   }
 }
 

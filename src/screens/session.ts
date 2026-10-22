@@ -22,9 +22,10 @@ import { recordAnswer, rollDay } from '../store';
 import { audioButton, audioPair, choiceList, h, hookView, icon, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
-import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { endMicrophoneHold } from '../microphone';
+import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
-type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'caught-up' | 'done';
+type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'mic' | 'caught-up' | 'done';
 
 const RATINGS: { rating: Rating; label: string }[] = [
   { rating: 'again', label: 'Again' },
@@ -97,7 +98,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   /** Listening needs a voice, and quiet mode with headphones in, if it's on. */
   const canListen = () => canPlay() && !isSilent(app.progress.settings);
   // Speaking joins the mix only once the model is on the device, so study never stops for a download.
-  let speakReady = false;
+  let speakReady = deps.modelKnownDownloaded?.() ?? false;
+  /** The microphone was refused as practice started, so speaking is left out of this visit. */
+  let speakSkipped = false;
+  /** Whether practice may ask the learner to speak. */
+  const canSpeak = () => speakReady && !app.progress.settings.quiet && !speakSkipped;
   if (deps.recordingSupported()) {
     deps.modelDownloaded().then(
       (ready) => (speakReady ||= ready),
@@ -122,8 +127,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     // Study can run past midnight without leaving the screen, so start the new day's counts here.
     app.progress = rollDay(app.progress, app.now());
     // Quiet mode leaves speaking out; skipped speaking is extra practice, so the schedule doesn't notice.
-    const canSpeak = speakReady && !app.progress.settings.quiet;
-    return nextStudyStep(app.progress, app.now(), recent, { listen: canListen(), speak: canSpeak }, misses) ?? undefined;
+    return nextStudyStep(app.progress, app.now(), recent, { listen: canListen(), speak: canSpeak() }, misses) ?? undefined;
   }
 
   function next(): void {
@@ -176,7 +180,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     format = s.format ?? pickFormat(state, { listen: canListen(), speak: false }, Math.random, c.kind);
     // A step picked before quiet mode was turned on (say, behind the caught-up note) is asked another way:
     // the same check, by reading instead of speaking or hearing.
-    if (format === 'speak' && app.progress.settings.quiet) format = 'read';
+    if (format === 'speak' && (app.progress.settings.quiet || speakSkipped)) format = 'read';
     if (format === 'listen' && !canListen()) format = 'read';
     if (format === 'hear' && !canListen()) format = 'remember';
     if (!isVocab(c)) {
@@ -403,6 +407,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (reviewing) returnToCurrent();
     previous = null;
     if (open && stats.answered + stats.practised > 0 && phase !== 'done') {
+      // The summary asks nothing to be said.
+      endMicrophoneHold();
       speak?.dispose();
       speak = null;
       stop();
@@ -466,9 +472,24 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         return isVocab(card) ? missedView(card) : guideMissedView(card);
       case 'speak':
         return speakView(card);
+      case 'mic':
+        return micWaiting();
       case 'caught-up':
         return caughtUpView();
     }
+  }
+
+  /** Practice may ask the learner to speak, so the phone asks for the microphone from this tap (see askForMicrophone). */
+  function keepPractising(): void {
+    if (!step || !card) return next();
+    if (!canSpeak() || !needsMicrophone(deps)) return ask(card, step);
+    phase = 'mic';
+    draw();
+    void askForMicrophone(deps).then((answer) => {
+      if (answer === 'left') return;
+      speakSkipped = answer === 'refused';
+      if (phase === 'mic' && card && step) ask(card, step);
+    });
   }
 
   function caughtUpView(): HTMLElement {
@@ -487,7 +508,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       h(
         'div',
         { class: 'stack' },
-        h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: () => (step && card ? ask(card, step) : next()) }, 'Keep practising'),
+        h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: keepPractising }, 'Keep practising'),
         unmet &&
           h(
             'button',
@@ -863,6 +884,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   app.onKey((e) => {
+    // Nothing to answer or hear while the phone asks for the microphone; the word is still to be said.
+    if (phase === 'mic') return;
     if (e.key === 'r' || e.key === 'R') {
       hold();
       return say();

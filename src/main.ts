@@ -11,8 +11,9 @@ import { wordsScreen } from './screens/words';
 import { forgetRetiredVoiceChoice } from './openai';
 import { applyAudioMode } from './screens/quiet';
 import { cancelRecording } from './recorder';
+import { endMicrophoneHold } from './microphone';
 import { keepClipsOffline } from './clip-cache';
-import { keepSpeakingReady } from './model-cache';
+import { keepSpeakingReady, modelDownloaded } from './model-cache';
 import { watchFit } from './fit';
 import { allClipUrls, initVoices, stop, tickOnPress } from './speech';
 import { replaceContents } from './progress-schema';
@@ -43,6 +44,7 @@ const app: App = {
     stop();
     cancelRecording();
     hangUpTalk();
+    endMicrophoneHold();
     keyHandler = null;
     backHandler = null;
     screens.go(route);
@@ -170,6 +172,8 @@ function askToPersist(): void {
 }
 
 void initVoices();
+// Known before Drills or Study is opened, so they can ask for the microphone up front (askForMicrophone).
+void modelDownloaded();
 forgetRetiredVoiceChoice();
 void start();
 
