@@ -1,9 +1,16 @@
 // One microphone stream shared by speaking drills and Talk, kept open between
-// uses. Safari (and the app on the iPhone home screen) asks for the microphone
-// again whenever a page opens a new stream after a while with none open, so
-// stopping the stream after every attempt meant a prompt nearly every time.
-// Between uses the tracks are switched off, and the stream is closed for real
-// after a few idle minutes or when the app goes into the background.
+// uses. Between uses the tracks are switched off, and the stream is closed for
+// real after a few idle minutes or when the app goes into the background.
+//
+// What WebKit remembers (UserMediaPermissionRequestManagerProxy): an "Allow"
+// lasts for the page while a stream is open (a switched-off track still
+// counts), and for 10 minutes after the last one closes if the next request
+// comes from a tap (1 minute if not, on iPhone). Reloading forgets it, and so
+// does a fresh launch of the home-screen app, which has no site settings to
+// keep it in (a Safari tab does). So callers ask from a tap. Holding the
+// stream longer would stretch the window, but an open microphone puts
+// playback through voice processing and keeps the orange dot on, so it's
+// only held a few minutes.
 
 import { setAudioSession } from './audio-session';
 
