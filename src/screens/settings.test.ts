@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 // Settings' Test voice says how long the word took to start, for checking audio lag on a phone,
-// its Tap sounds switch turns the button tick off, and the saved key shows what OpenAI has cost.
+// its Tap sounds switch turns the button tick off, the saved key shows what OpenAI has cost, and the icon badge asks for notifications.
 
 import { afterEach, expect, it, vi } from 'vitest';
 import { addSpend, setApiKey } from '../openai';
@@ -8,11 +8,13 @@ import { stop, tickOnPress } from '../speech';
 import { FakeAudioContext, ticks } from '../test/fake-audio';
 import { h } from '../ui';
 import { settingsScreen } from './settings';
-import { fakeApp } from '../test/screen';
+import { fakeApp, flush } from '../test/screen';
 
 afterEach(() => {
   stop();
   vi.unstubAllGlobals();
+  delete (navigator as { setAppBadge?: unknown }).setAppBadge;
+  delete (navigator as { clearAppBadge?: unknown }).clearAppBadge;
 });
 
 it('says how long the test word took to start, once it has', async () => {
@@ -74,4 +76,51 @@ it('shows the estimated OpenAI spend beside the saved key', () => {
   expect(root.textContent).toContain('An estimate');
   expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Forget key')).toBe(true);
   localStorage.clear();
+});
+
+it('offers the icon badge only in an installed app that can show one', () => {
+  expect(settingsScreen(fakeApp()).textContent).not.toContain('App icon');
+  vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(display-mode: standalone)' }));
+  Object.assign(navigator, { setAppBadge: vi.fn(async () => {}), clearAppBadge: vi.fn(async () => {}) });
+  expect(settingsScreen(fakeApp()).textContent).toContain('App icon');
+});
+
+it('asks for notifications when the icon badge is turned on, and stays off if refused', async () => {
+  vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(display-mode: standalone)' }));
+  Object.assign(navigator, { setAppBadge: vi.fn(async () => {}), clearAppBadge: vi.fn(async () => {}) });
+  let answer = 'denied';
+  const requestPermission = vi.fn(async () => answer);
+  vi.stubGlobal('Notification', { permission: 'default', requestPermission });
+  const app = fakeApp();
+  const root = settingsScreen(app);
+  const toggle = () => [...root.querySelectorAll('label.toggle')].find((l) => l.textContent?.includes('on the icon'))!.querySelector('input')!;
+  toggle().checked = true;
+  toggle().dispatchEvent(new Event('change'));
+  await vi.waitFor(() => expect(requestPermission).toHaveBeenCalledOnce());
+  await flush();
+  expect(app.progress.settings.iconBadge).toBe(false);
+  expect(toggle().checked).toBe(false);
+
+  answer = 'granted';
+  toggle().checked = true;
+  toggle().dispatchEvent(new Event('change'));
+  await vi.waitFor(() => expect(app.progress.settings.iconBadge).toBe(true));
+  expect(toggle().checked).toBe(true);
+});
+
+it("leaves the icon badge off when it's switched off while the phone is still asking", async () => {
+  vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(display-mode: standalone)' }));
+  Object.assign(navigator, { setAppBadge: vi.fn(async () => {}), clearAppBadge: vi.fn(async () => {}) });
+  let answer!: (value: string) => void;
+  vi.stubGlobal('Notification', { permission: 'default', requestPermission: () => new Promise((r) => (answer = r)) });
+  const app = fakeApp();
+  const root = settingsScreen(app);
+  const toggle = [...root.querySelectorAll('label.toggle')].find((l) => l.textContent?.includes('on the icon'))!.querySelector('input')!;
+  toggle.checked = true;
+  toggle.dispatchEvent(new Event('change'));
+  toggle.checked = false;
+  toggle.dispatchEvent(new Event('change'));
+  answer('granted');
+  await flush();
+  expect(app.progress.settings.iconBadge).toBe(false);
 });

@@ -1,6 +1,7 @@
 import '@fontsource-variable/bricolage-grotesque';
 import './style.css';
-import { typingInBox, type App, type Route } from './app';
+import { installed, typingInBox, type App, type Route } from './app';
+import { keepBadgeCurrent, showDueBadge } from './badge';
 import { backHistory } from './back-history';
 import { homeScreen } from './screens/home';
 import { practiceScreen } from './screens/practice';
@@ -34,10 +35,12 @@ const app: App = {
   now: () => Date.now(),
   commit() {
     saved(save(app.progress));
+    showDueBadge(app.progress, Date.now());
   },
   replaceProgress(progress: Progress) {
     app.progress = progress;
     saved(save(progress));
+    showDueBadge(progress, Date.now());
   },
   navigate(route: Route) {
     // Done at once: going Home waits a moment for history, and the old screen mustn't act meanwhile.
@@ -65,6 +68,7 @@ const screens = backHistory<Route>({
   isHome: (route) => route.name === 'home',
   draw(route) {
     app.progress = rollDay(app.progress, Date.now());
+    showDueBadge(app.progress, Date.now());
     // Another tab may have changed quiet mode.
     applyAudioMode(app.progress.settings);
     render(route);
@@ -116,7 +120,7 @@ document.addEventListener(
 );
 
 // Installed, it should feel like an app, so turn off zoom. In a browser tab, zoom still works.
-if (matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone) {
+if (installed()) {
   document.documentElement.classList.add('standalone');
   const viewport = document.querySelector('meta[name="viewport"]');
   viewport?.setAttribute('content', `${viewport.getAttribute('content')}, maximum-scale=1, user-scalable=no`);
@@ -147,11 +151,15 @@ function saved(ok: boolean): void {
   document.body.append(banner);
 }
 
+// The number on the app's icon, set again as the learner opens or leaves the app.
+keepBadgeCurrent(() => app.progress);
+
 async function start(): Promise<void> {
   // Another tab saved: pick up its progress in place, so screens holding it see the change.
   onExternalChange((progress) => {
     replaceContents(app.progress, progress);
     applyAudioMode(app.progress.settings);
+    showDueBadge(app.progress, Date.now());
   });
   try {
     replaceContents(app.progress, await loadDurable(Date.now()));

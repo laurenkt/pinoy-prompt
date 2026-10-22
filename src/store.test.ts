@@ -153,7 +153,7 @@ describe('upgrading from the first storage format', () => {
     storage.setItem(LEGACY_KEY, LEGACY_V1);
     const p = load(NOW);
     expect(Object.keys(p.cards).sort()).toEqual(['kumusta', 'oo', 'salamat']);
-    expect(p.settings).toEqual({ dailyNew: 12, autoplay: false, quiet: false, headphones: false, tapSounds: true });
+    expect(p.settings).toEqual({ dailyNew: 12, autoplay: false, quiet: false, headphones: false, tapSounds: true, iconBadge: false });
     expect('streak' in p).toBe(false);
 
     recordAnswer(p, 'isa', 'good', NOW);

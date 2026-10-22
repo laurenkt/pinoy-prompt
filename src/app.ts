@@ -34,3 +34,8 @@ export function typingInBox(e: KeyboardEvent): boolean {
   if (t instanceof HTMLInputElement) return !['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'color', 'file'].includes(t.type);
   return t instanceof HTMLTextAreaElement || (t instanceof HTMLElement && t.isContentEditable);
 }
+
+/** Whether the app runs from the Home Screen rather than in a browser tab. */
+export function installed(): boolean {
+  return matchMedia('(display-mode: standalone)').matches || !!(navigator as { standalone?: boolean }).standalone;
+}

@@ -27,6 +27,8 @@ export interface Settings {
   headphones: boolean;
   /** A soft tick when a button is pressed. */
   tapSounds: boolean;
+  /** Show how many cards are due on the Home Screen icon (badge.ts). */
+  iconBadge: boolean;
 }
 
 /** How a day's reviews of already-learned cards went. */
@@ -72,7 +74,7 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   2: (data) => ({ history: {}, ...data }),
 };
 
-export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true };
+export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true, iconBadge: false };
 
 /** Local calendar day as YYYY-MM-DD. */
 export function dayKey(time: number): string {
@@ -185,6 +187,7 @@ export function sanitize(data: Data, now: number): Progress {
     // Quiet mode used to keep audio playing, so a quiet copy saved before this setting keeps it.
     headphones: typeof s.headphones === 'boolean' ? s.headphones : s.quiet === true,
     tapSounds: typeof s.tapSounds === 'boolean' ? s.tapSounds : DEFAULT_SETTINGS.tapSounds,
+    iconBadge: typeof s.iconBadge === 'boolean' ? s.iconBadge : DEFAULT_SETTINGS.iconBadge,
   };
 
   return { ...data, cards, today, history, settings };
