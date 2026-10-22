@@ -93,10 +93,35 @@ describe('first use', () => {
     await open('salamat');
     expect(panel.el.textContent).toContain('71 MB');
     expect(loadModel).not.toHaveBeenCalled();
+    loadModel.mockImplementationOnce(() => new Promise(() => {}));
+    button('Download').click();
+    expect(text('.listen-status')).toBe('Downloading… 0%');
+    panel.dispose();
+    await open('salamat');
     button('Download').click();
     await flush();
     expect(loadModel).toHaveBeenCalled();
     expect(button('Tap and speak')).toBeTruthy();
+  });
+
+  it("doesn't say it's downloading while loading a model already on the device", async () => {
+    let loaded: (model: PhoneModel) => void = () => {};
+    await open('salamat', { loadPhoneModel: () => new Promise((resolve) => (loaded = resolve)) });
+    expect(text('.listen-status')).toBe('Getting ready…');
+    expect(panel.el.querySelector('.download-bar')).toBeNull();
+    loaded({ recognise: async () => fakeRecognition(heard) });
+    await flush();
+    expect(button('Tap and speak')).toBeTruthy();
+  });
+
+  it('shows the download once one starts, even for a model it thought was kept', async () => {
+    let progress: (fraction: number) => void = () => {};
+    await open('salamat', { loadPhoneModel: (onProgress) => ((progress = onProgress!), new Promise(() => {})) });
+    progress(0.25);
+    expect(text('.listen-status')).toBe('Downloading… 25%');
+    progress(0.5);
+    expect(text('.listen-status')).toBe('Downloading… 50%');
+    expect(panel.el.querySelector<HTMLElement>('.bar-fill')!.style.width).toBe('50%');
   });
 
   it('lets the learner skip the download', async () => {
