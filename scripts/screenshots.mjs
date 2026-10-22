@@ -14,12 +14,15 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
-/** 360 and 390 wide (CLAUDE.md), and the shortest and tallest phones the app should suit. */
+/**
+ * 360 and 390 wide (CLAUDE.md), and the shortest and tallest phones the app should suit. The iPhones
+ * carry their safe-area insets as installed (status bar, home bar), which the app's padding adds to.
+ */
 const SIZES = [
-  { name: '360x640', width: 360, height: 640 },
-  { name: '390x844', width: 390, height: 844 },
-  { name: 'se-375x667', width: 375, height: 667 },
-  { name: 'max-430x932', width: 430, height: 932 },
+  { name: '360x640', width: 360, height: 640, top: 0, bottom: 0 },
+  { name: '390x844', width: 390, height: 844, top: 47, bottom: 34 },
+  { name: 'se-375x667', width: 375, height: 667, top: 20, bottom: 0 },
+  { name: 'max-430x932', width: 430, height: 932, top: 59, bottom: 34 },
 ];
 
 /** How to reach each screen from Home. */
@@ -78,6 +81,8 @@ try {
     });
     for (const name of names) {
       const page = await context.newPage();
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: size.top, bottom: size.bottom, left: 0, right: 0 } });
       await seed(page, name.startsWith('first-') ? 0 : 12);
       await SCREENS[name](page);
       await page.evaluate(() => document.fonts.ready);

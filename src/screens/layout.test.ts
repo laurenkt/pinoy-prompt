@@ -75,6 +75,12 @@ describe('filling the screen', () => {
     expect(/html,\nbody \{[^}]*overscroll-behavior: none;/.exec(css)).not.toBeNull();
   });
 
+  it('sizes things from the height less the status bar and home bar, not the raw screen height', () => {
+    // Besides the screen's own min-height and --fill itself, a dvh would let an iPhone's insets push a fitting screen over.
+    const raw = css.split('\n').filter((line) => line.includes('dvh') && !/^\s*(min-height: 100dvh;|--fill:|@supports)/.test(line));
+    expect(raw).toEqual([]);
+  });
+
   it('names the column in style.css', () => {
     expect(column).toBeTruthy();
   });

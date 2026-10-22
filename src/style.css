@@ -20,7 +20,15 @@
   --shadow-big: 6px 6px 0 var(--ink);
   --radius: 20px;
   --font-sans: 'Bricolage Grotesque Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* The height a screen has to lay out in: the phone's, less the status bar and home bar (see Layout). */
+  --fill: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   color-scheme: dark;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --fill: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
 }
 
 * {
@@ -112,13 +120,14 @@ p {
  * height down a column to what can use it, so a taller phone gets bigger targets instead of an empty bottom.
  * Home's hub, a session's panel (its prompt, and most of all its answer choices) and a call's transcript
  * take it; see "Height" in docs/ARCHITECTURE.md. Pages (Library, Settings) stay as long
- * as their content and scroll. Sizes that grow with the screen use dvh in a clamp(), so nothing on a short
- * phone is taller than it was.
+ * as their content and scroll. Sizes that grow with the screen use --fill (the height less the status bar
+ * and home bar) in a clamp(), so nothing on a short phone is taller than it was and a screen that fits on
+ * an iPhone, insets and all, doesn't scroll.
  */
 .screen {
   max-width: 560px;
   margin: 0 auto;
-  padding: max(20px, env(safe-area-inset-top)) 18px calc(40px + env(safe-area-inset-bottom));
+  padding: max(20px, env(safe-area-inset-top)) 18px max(40px, env(safe-area-inset-bottom) + 16px);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -346,6 +355,8 @@ p {
 .growth-frame {
   position: relative;
   height: 160px;
+  /* A little shorter where the phone's insets would otherwise push Home past one screen. */
+  height: clamp(120px, var(--fill) - 632px, 160px);
   border: var(--outline);
   border-radius: 14px;
   overflow: hidden;
@@ -560,7 +571,7 @@ p {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  min-height: clamp(0px, (100dvh - 700px) * 1.8, 300px);
+  min-height: clamp(0px, (var(--fill) - 700px) * 1.8, 300px);
 }
 
 .panel > .choices {
@@ -574,7 +585,7 @@ p {
  * answer, so a right answer doesn't move them. Only where there's height to spare.
  */
 .panel > .choices:last-child {
-  margin-bottom: clamp(0px, 100dvh - 700px, 124px);
+  margin-bottom: clamp(0px, var(--fill) - 700px, 124px);
 }
 
 /* A spacer takes the spare height before the panel's last piece, which keeps its own margins as before. */
@@ -738,8 +749,8 @@ p {
 .audio-btn.huge {
   width: 96px;
   height: 96px;
-  width: clamp(96px, 14dvh, 132px);
-  height: clamp(96px, 14dvh, 132px);
+  width: clamp(96px, var(--fill) * 0.14, 132px);
+  height: clamp(96px, var(--fill) * 0.14, 132px);
   border-radius: 24px;
   font-size: 2.4rem;
   box-shadow: var(--shadow);
@@ -847,7 +858,7 @@ p {
   flex: 1 0 auto;
   min-height: 56px;
   max-height: 120px;
-  font-size: clamp(1rem, 0.4rem + 1.5dvh, 1.2rem);
+  font-size: clamp(1rem, 0.4rem + var(--fill) * 0.015, 1.2rem);
   font-weight: 700;
 }
 
@@ -986,7 +997,7 @@ p {
   border-radius: 16px;
   padding: 10px 4px;
   min-height: 68px;
-  min-height: clamp(68px, 10dvh, 96px);
+  min-height: clamp(68px, var(--fill) * 0.1, 96px);
   font-weight: 800;
   color: var(--on-accent);
   box-shadow: var(--shadow);
