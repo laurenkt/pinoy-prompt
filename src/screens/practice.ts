@@ -6,7 +6,7 @@ import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, h, hookView, icon, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
-import { defaultDeps, micGate, needsMicGate, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
 
@@ -91,9 +91,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   let autoMoved = false;
   /** The kinds of question are tucked away until asked for. */
   let scopeOpen = false;
-  /** Asking for the microphone before the question showing (see micGate). */
-  let gate = false;
-  /** The learner chose to skip speaking at the microphone question, for the rest of this visit. */
+  /** The phone is asking for the microphone, as the round starts (see askForMicrophone). */
+  let waiting = false;
+  /** The microphone was refused as the round started, so speaking is left out of this visit. */
   let speakSkipped = false;
 
   holdOnTap(root, hold);
@@ -104,6 +104,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (mode === 'listen' && isSilent(app.progress.settings)) return 'Listen is off in silent mode.';
     if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
     if (mode === 'speak' && app.progress.settings.quiet) return 'Speak is off in quiet mode.';
+    if (mode === 'speak' && speakSkipped) return 'Speak needs the microphone. Allow it, then open Drills again.';
     return null;
   }
 
@@ -118,9 +119,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
    * When nothing in scope can be asked (only Listen, then silent mode), it falls back to everything that can.
    */
   function modes(): Mode[] {
-    const ready = (m: Mode) => m !== 'speak' || (speakReady && !speakSkipped);
     const picks = chosen();
-    if (picks.length === 1 && picks[0] === 'speak' && !speakSkipped) return picks;
+    if (picks.length === 1 && picks[0] === 'speak') return picks;
+    const ready = (m: Mode) => m !== 'speak' || speakReady;
     const ways = picks.filter(ready);
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
@@ -154,10 +155,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     speak = null;
     spokenRight = false;
     const q = current;
-    // The microphone is asked for before the round's first question when speaking may come up, and before any
-    // speaking question if the browser would ask again (after a long while in the background), never during one.
-    gate = !!q && !picked && needsMicGate(deps) && (q.mode === 'speak' || (done === 0 && modes().includes('speak')));
-    if (gate) return draw();
+    if (waiting) return draw();
     if (q?.mode === 'speak') {
       speak = speakPanel(q.card, {
         say: (slow) => sayCard(q.card, slow),
@@ -238,8 +236,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       if (current) preload(current.card);
       return ask();
     }
-    // Quiet mode, the scope or skipping speaking may mean the microphone question isn't needed any more.
-    if (gate) return ask();
     draw();
   }
 
@@ -268,7 +264,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   function draw(): void {
     if (!current) root.replaceChildren(tooFew());
-    else if (gate) root.replaceChildren(gateView());
+    else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting()));
     else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
@@ -358,22 +354,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     ];
   }
 
-  function gateView(): HTMLElement {
-    return h(
-      'div',
-      { class: 'session' },
-      ...header(),
-      micGate({
-        onOn: () => ask(),
-        onSkip: () => {
-          speakSkipped = true;
-          rescope();
-        },
-        deps,
-      }),
-    );
-  }
-
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
@@ -448,7 +428,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   app.onKey((e) => {
     const q = lookingBack ? previous : current;
-    if (!q) return;
+    if (!q || waiting) return;
     if (e.key === 'r' || e.key === 'R') {
       hold();
       return sayCard(q.card);
@@ -463,6 +443,18 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   if (learned >= MIN_CARDS) {
     current = nextQuestion();
     if (current) preload(current.card);
+    // Still inside the tap that opened Drills: if the round may ask to speak, the phone asks for the microphone now.
+    if (canSpeak && modes().includes('speak') && needsMicrophone(deps)) {
+      waiting = true;
+      void askForMicrophone(deps).then((ok) => {
+        // Left while the phone was asking.
+        if (!root.isConnected) return;
+        waiting = false;
+        speakSkipped = !ok;
+        if (current && !modes().includes(current.mode)) current = nextQuestion();
+        ask();
+      });
+    }
   }
   ask();
   return root;

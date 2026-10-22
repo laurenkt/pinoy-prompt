@@ -117,16 +117,6 @@ describe('Talk', () => {
     expect(button(root, 'Start talking')).toBeTruthy();
   });
 
-  it("waits for Start talking when opened from Home while the phone would ask for the microphone", async () => {
-    setApiKey(KEY);
-    const f = fakeCall();
-    const root = talkScreen(fakeApp(), { ...f.deps, microphoneAllowed: () => false }, true);
-    expect(root.textContent).not.toContain('Connecting');
-    expect(root.textContent).toContain('Your phone asks for the microphone when you start.');
-    button(root, 'Start talking').click();
-    expect(root.textContent).toContain('Connecting');
-  });
-
   it('still asks for a key first when opened from Home', () => {
     const root = talkScreen(fakeApp(), fakeCall().deps, true);
     expect(root.textContent).toContain('own OpenAI API key');

@@ -98,6 +98,14 @@ describe('holding the microphone for a screen', () => {
     vi.advanceTimersByTime(IDLE_CLOSE_MS);
     expect(opened[0].track.readyState).toBe('ended');
   });
+
+  it("isn't taken up by a screen left while the phone was asking", async () => {
+    const asking = holdMicrophone();
+    endMicrophoneHold();
+    await asking;
+    vi.advanceTimersByTime(IDLE_CLOSE_MS);
+    expect(opened[0].track.readyState).toBe('ended');
+  });
 });
 
 describe('whether the browser would ask', () => {

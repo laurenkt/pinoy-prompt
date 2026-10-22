@@ -30,6 +30,8 @@ let users = 0;
 let idle: ReturnType<typeof setTimeout> | undefined;
 /** Whether a screen wants the stream kept until it's left (holdMicrophone). */
 let held = false;
+/** Bumped as each hold ends, so a hold asked for by a screen already left isn't taken up. */
+let holds = 0;
 /** When the last stream closed, by Date.now(); WebKit keeps the learner's Allow for 10 minutes after. */
 let closedAt = -Infinity;
 /** Under WebKit's 10 minutes, so a request just inside it doesn't race the watchdog. */
@@ -100,13 +102,15 @@ function closeWhenIdle(): void {
  * screen that asks for it up front isn't asked again partway through. Call from a tap: it may ask the learner.
  */
 export async function holdMicrophone(): Promise<void> {
+  const mine = holds;
   const s = await getMicrophone();
-  held = true;
+  held = mine === holds;
   releaseMicrophone(s);
 }
 
 /** Let the stream close once it's been idle a while, as usual. */
 export function endMicrophoneHold(): void {
+  holds++;
   if (!held) return;
   held = false;
   closeWhenIdle();

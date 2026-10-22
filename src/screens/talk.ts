@@ -1,5 +1,4 @@
 import type { App } from '../app';
-import { microphoneAllowed } from '../microphone';
 import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey, MAX_CALL_SECONDS, startCall, type Call, type CallDeps } from '../openai';
 import { play, stop } from '../speech';
 import { addPiece, findWords, talkGreeting, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
@@ -11,11 +10,9 @@ export interface TalkDeps {
   call: CallDeps;
   callSupported(): boolean;
   visualizer(canvas: HTMLCanvasElement): Visualizer;
-  /** Whether the microphone would open without the browser asking. A stand-in without it always would. */
-  microphoneAllowed?(): boolean;
 }
 
-export const defaultTalkDeps: TalkDeps = { call: browserCallDeps, callSupported, visualizer: createVisualizer, microphoneAllowed };
+export const defaultTalkDeps: TalkDeps = { call: browserCallDeps, callSupported, visualizer: createVisualizer };
 
 const MIN_WORDS = 4;
 
@@ -147,10 +144,6 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     app.navigate({ name: 'home' });
   }
 
-  function micAllowed(): boolean {
-    return deps.microphoneAllowed?.() ?? true;
-  }
-
   function meterText(): string {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
@@ -254,7 +247,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
         'p',
         { class: 'muted small center' },
         canCall
-          ? `${micAllowed() ? '' : 'Your phone asks for the microphone when you start. '}Spoken with GPT-Live, about ${CENTS_PER_MINUTE}¢ a minute on your OpenAI key. Calls end after ${MAX_CALL_SECONDS / 60} minutes.`
+          ? `Spoken with GPT-Live, about ${CENTS_PER_MINUTE}¢ a minute on your OpenAI key. Calls end after ${MAX_CALL_SECONDS / 60} minutes.`
           : "This browser can't use the microphone for calls. Try Safari or Chrome.",
       ),
     );
@@ -342,8 +335,6 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
 
   draw();
   // Still inside the tap that opened the screen, so the browser lets the call's audio and microphone start.
-  // Unless the phone would ask for the microphone first: then the menu waits for Start talking, so its question
-  // comes from that tap rather than over a call that seems to be starting by itself.
-  if (start && micAllowed() && getApiKey() && plan.known.length >= MIN_WORDS && deps.callSupported()) void begin();
+  if (start && getApiKey() && plan.known.length >= MIN_WORDS && deps.callSupported()) void begin();
   return root;
 }

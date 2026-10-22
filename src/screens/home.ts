@@ -65,7 +65,8 @@ export function homeScreen(app: App): HTMLElement {
         icon('mic'),
         h('span', { class: 'hub-title' }, 'Chat'),
       ),
-      h('button', { class: 'hub-btn drills-btn', onclick: () => app.navigate({ name: 'practice' }) }, h('span', { class: 'hub-title' }, 'Drills')),
+      // It may open the microphone, so its tap sounds first (docs/ARCHITECTURE.md, "Audio").
+      h('button', { class: 'hub-btn drills-btn', 'data-tap': 'before', onclick: () => app.navigate({ name: 'practice' }) }, h('span', { class: 'hub-title' }, 'Drills')),
       h('button', { class: 'hub-btn library-btn', onclick: () => app.navigate({ name: 'words' }) }, h('span', { class: 'hub-title' }, 'Library')),
     ),
     isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now), forecast(progress, now)),

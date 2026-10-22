@@ -171,7 +171,7 @@ function askToPersist(): void {
 }
 
 void initVoices();
-// Known before Drills or Study is opened, so they can ask for the microphone up front (micGate).
+// Known before Drills or Study is opened, so they can ask for the microphone up front (askForMicrophone).
 void modelDownloaded();
 forgetRetiredVoiceChoice();
 void start();

@@ -36,7 +36,7 @@ export interface SpeakDeps {
   player(): Player;
   /** Whether the model was on the device when last checked, for a screen deciding as it's drawn. */
   modelKnownDownloaded?(): boolean;
-  /** Whether the microphone would open without the browser asking (see micGate). A stand-in without it always would. */
+  /** Whether the microphone would open without the browser asking (see askForMicrophone). A stand-in without it always would. */
   microphoneAllowed?(): boolean;
   /** Open the microphone and keep it until the screen is left. */
   holdMicrophone?(): Promise<void>;
@@ -110,68 +110,34 @@ export interface SpeakPanel {
   dispose(): void;
 }
 
-/** Whether a speaking question now would have the browser ask for the microphone, so micGate should come first. */
-export function needsMicGate(deps: SpeakDeps): boolean {
+/** Whether the browser would ask the learner before the microphone opens. */
+export function needsMicrophone(deps: SpeakDeps): boolean {
   return !(deps.microphoneAllowed?.() ?? true);
 }
 
-export interface MicGateOptions {
-  /** The microphone is on, and held until the screen is left. */
-  onOn(): void;
-  /** Leave speaking out until the screen is left. */
-  onSkip(): void;
-  deps?: SpeakDeps;
+/**
+ * Open the microphone and hold it until the screen is left. Called from the tap that starts a round that may ask the
+ * learner to speak, so the phone asks then, over micWaiting(), rather than over a speaking question. False if it
+ * was refused or there's no microphone; the round then leaves speaking out.
+ */
+export async function askForMicrophone(deps: SpeakDeps): Promise<boolean> {
+  try {
+    await deps.holdMicrophone?.();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-/**
- * Before a round asks the learner to speak, while the browser would still ask for the microphone: says why, and
- * opens it from a tap of its own, so the phone's question comes here rather than over a speaking question.
- */
-export function micGate({ onOn, onSkip, deps = defaultDeps }: MicGateOptions): HTMLElement {
-  const el = h('div', { class: 'panel center mic-gate' });
-  let problem: RecordProblem | null = null;
-  let asking = false;
-
-  async function turnOn(): Promise<void> {
-    if (asking) return;
-    asking = true;
-    draw();
-    try {
-      await deps.holdMicrophone?.();
-      onOn();
-    } catch (err) {
-      const name = err instanceof DOMException ? err.name : '';
-      problem = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic';
-      asking = false;
-      draw();
-    }
-  }
-
-  function draw(): void {
-    const children = [
-      h('p', { class: 'eyebrow' }, 'Speaking'),
-      h('h2', null, 'Turn on the microphone?'),
-      h(
-        'p',
-        null,
-        'Some questions ask you to say a word out loud. Turn the microphone on now, so your phone asks here rather than in the middle of one. It stays on until you leave, and your voice stays on this phone.',
-      ),
-    ];
-    if (problem) children.push(h('div', { class: 'feedback bad', role: 'status' }, h('strong', null, 'Hmm.'), ' ', PROBLEMS[problem]));
-    children.push(
-      h(
-        'div',
-        { class: 'stack' },
-        // It opens the microphone, so its tap sounds first (docs/ARCHITECTURE.md, "Audio").
-        h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', disabled: asking, onclick: () => void turnOn() }, icon('mic'), ' ', problem ? 'Try again' : 'Turn on'),
-        h('button', { class: 'btn secondary', onclick: onSkip }, 'Skip speaking'),
-      ),
-    );
-    el.replaceChildren(...children);
-  }
-
-  draw();
-  return el;
+/** What shows while the phone asks for the microphone. */
+export function micWaiting(): HTMLElement {
+  return h(
+    'div',
+    { class: 'panel center mic-waiting', role: 'status' },
+    h('p', { class: 'eyebrow' }, 'Speaking'),
+    h('h2', null, 'Allow the microphone'),
+    h('p', null, 'Some questions ask you to say a word out loud, so your phone asks now rather than in the middle of one. Your voice stays on this phone.'),
+  );
 }
 
 /** How each sound verdict ranks when several sounds share letters: the worst one shows. */
@@ -250,6 +216,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         state = { name: 'loading', progress };
         updateProgress();
       });
+      // So the next round knows, as it's drawn, that it may ask to speak (modelKnownDownloaded).
+      void deps.modelDownloaded().catch(() => {});
       set({ name: 'ready' });
       options.onReady?.();
     } catch (err) {

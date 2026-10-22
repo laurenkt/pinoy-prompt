@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-// Asking for the microphone up front, on a screen of its own, before a drill round or Study's practice
-// might ask the learner to speak, so the phone's question never comes over a speaking question.
+// Asking for the microphone as a drill round or Study's practice starts, from the tap that starts it, with a
+// holding screen while the phone asks, so its question never comes over a speaking question.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { practiceScreen } from './practice';
@@ -10,10 +10,16 @@ import { button, drillScope, fakeApp as knowing, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'paalam', 'tatlo', 'kape'];
 
-/** A model already on the device, and a microphone the browser would ask for until it's turned on. */
+/** A model already on the device, and a microphone the browser would ask for; `answer` is the learner's reply. */
 function micNotYet(overrides: Partial<SpeakDeps> = {}) {
   let allowed = false;
-  const holdMicrophone = vi.fn(async () => void (allowed = true));
+  let answer: (allow: boolean) => void = () => {};
+  const holdMicrophone = vi.fn(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        answer = (allow) => (allow ? ((allowed = true), resolve()) : reject(new DOMException('no', 'NotAllowedError')));
+      }),
+  );
   const deps = {
     recordingSupported: () => true,
     modelDownloaded: async () => true,
@@ -23,90 +29,96 @@ function micNotYet(overrides: Partial<SpeakDeps> = {}) {
     holdMicrophone,
     ...overrides,
   } as unknown as SpeakDeps;
-  return { deps, holdMicrophone };
+  return { deps, holdMicrophone, answer: (allow: boolean) => answer(allow) };
 }
 
 const fakeApp = (quiet = false) => knowing(KNOWN, { dailyNew: KNOWN.length, quiet, headphones: true });
-const gated = (root: HTMLElement) => root.querySelector('.mic-gate') !== null;
+const waiting = (root: HTMLElement) => root.querySelector('.mic-waiting') !== null;
 const speaking = (root: HTMLElement) => root.textContent?.includes('Say this out loud') ?? false;
 
 beforeEach(() => document.body.replaceChildren());
 
-describe('the microphone question in Drills', () => {
-  it('comes before the first question when speaking may come up, and turning it on holds the microphone', async () => {
-    const { deps, holdMicrophone } = micNotYet();
-    const root = practiceScreen(fakeApp(), deps);
-    expect(gated(root)).toBe(true);
-    expect(root.querySelector('.choice')).toBeNull();
-    button(root, 'Turn on').click();
+describe('asking for the microphone in Drills', () => {
+  it('asks as the round opens, with a holding screen until the learner answers', async () => {
+    const mic = micNotYet();
+    const root = practiceScreen(fakeApp(), mic.deps);
+    document.body.append(root);
+    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(waiting(root)).toBe(true);
+    expect(root.querySelector('.choice, .speak')).toBeNull();
+    mic.answer(true);
     await flush();
-    expect(holdMicrophone).toHaveBeenCalledOnce();
-    expect(gated(root)).toBe(false);
-    expect(root.querySelector('.panel')).not.toBeNull();
+    expect(waiting(root)).toBe(false);
+    expect(root.querySelector('.choice, .speak')).not.toBeNull();
   });
 
-  it('leaves speaking out for the visit when skipped', async () => {
-    const { deps, holdMicrophone } = micNotYet();
-    const root = practiceScreen(fakeApp(), deps);
+  it('leaves speaking out for the visit when refused', async () => {
+    const mic = micNotYet();
+    const root = practiceScreen(fakeApp(), mic.deps);
     document.body.append(root);
-    button(root, 'Skip speaking').click();
-    expect(gated(root)).toBe(false);
+    mic.answer(false);
+    await flush();
+    expect(waiting(root)).toBe(false);
     for (let i = 0; i < 20; i++) {
       expect(speaking(root)).toBe(false);
       root.querySelector<HTMLButtonElement>('.choice')!.click();
       button(root, 'Next').click();
     }
-    expect(holdMicrophone).not.toHaveBeenCalled();
+    expect(root.querySelector<HTMLButtonElement>('[data-mode="speak"]')!.disabled).toBe(true);
   });
 
-  it("isn't asked in quiet mode, or when the round can't ask to speak", () => {
-    expect(gated(practiceScreen(fakeApp(true), micNotYet().deps))).toBe(false);
-    const root = practiceScreen(fakeApp(), micNotYet().deps);
+  it("doesn't answer the hidden question from the keyboard while the phone asks", () => {
+    const app = fakeApp();
+    let onKey: ((e: KeyboardEvent) => void) | null = null;
+    app.onKey = (handler) => void (onKey = handler);
+    const root = practiceScreen(app, micNotYet().deps);
+    onKey!(new KeyboardEvent('keydown', { key: '1' }));
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(waiting(root)).toBe(true);
+  });
+
+  it("doesn't ask in quiet mode, when the round can't ask to speak, or when the browser wouldn't ask", () => {
+    const quiet = micNotYet();
+    practiceScreen(fakeApp(true), quiet.deps);
+    expect(quiet.holdMicrophone).not.toHaveBeenCalled();
+    const allowed = micNotYet({ microphoneAllowed: () => true });
+    practiceScreen(fakeApp(), allowed.deps);
+    expect(allowed.holdMicrophone).not.toHaveBeenCalled();
+    const first = micNotYet();
+    const root = practiceScreen(fakeApp(), first.deps);
+    first.answer(true);
     drillScope(root, ['read']);
-    expect(gated(root)).toBe(false);
+    const readOnly = micNotYet();
+    practiceScreen(fakeApp(), readOnly.deps);
+    expect(readOnly.holdMicrophone).not.toHaveBeenCalled();
     // The scope is kept across visits, so the rest get the whole mix back.
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
   });
-
-  it("isn't asked when the browser wouldn't ask", () => {
-    expect(gated(practiceScreen(fakeApp(), micNotYet({ microphoneAllowed: () => true }).deps))).toBe(false);
-  });
-
-  it('goes when quiet mode comes on', () => {
-    const root = practiceScreen(fakeApp(), micNotYet().deps);
-    root.querySelector<HTMLButtonElement>('.quiet-icon')!.click();
-    expect(gated(root)).toBe(false);
-  });
-
-  it('says so when the microphone is blocked, and the round can carry on without it', async () => {
-    const blocked = vi.fn(async () => Promise.reject(new DOMException('no', 'NotAllowedError')));
-    const root = practiceScreen(fakeApp(), micNotYet({ holdMicrophone: blocked }).deps);
-    button(root, 'Turn on').click();
-    await flush();
-    expect(root.textContent).toContain('microphone is blocked');
-    button(root, 'Skip speaking').click();
-    expect(gated(root)).toBe(false);
-  });
 });
 
-describe('the microphone question in Study', () => {
-  it('comes as practice starts, before a speaking step', async () => {
-    const { deps, holdMicrophone } = micNotYet();
-    const root = sessionScreen(fakeApp(), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, deps);
+describe('asking for the microphone in Study', () => {
+  it('asks as practice starts, before a speaking step', async () => {
+    const mic = micNotYet();
+    const root = sessionScreen(fakeApp(), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, mic.deps);
+    document.body.append(root);
+    expect(mic.holdMicrophone).not.toHaveBeenCalled();
     button(root, 'Keep practising').click();
-    expect(gated(root)).toBe(true);
+    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(waiting(root)).toBe(true);
     expect(speaking(root)).toBe(false);
-    button(root, 'Turn on').click();
+    mic.answer(true);
     await flush();
-    expect(holdMicrophone).toHaveBeenCalledOnce();
     expect(speaking(root)).toBe(true);
   });
 
-  it('asks the step another way when skipped', () => {
-    const root = sessionScreen(fakeApp(), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, micNotYet().deps);
+  it('asks the step another way when refused', async () => {
+    const mic = micNotYet();
+    const root = sessionScreen(fakeApp(), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, mic.deps);
+    document.body.append(root);
     button(root, 'Keep practising').click();
-    button(root, 'Skip speaking').click();
-    expect(gated(root)).toBe(false);
+    mic.answer(false);
+    await flush();
+    expect(waiting(root)).toBe(false);
     expect(speaking(root)).toBe(false);
     expect(root.querySelector('.panel')).not.toBeNull();
   });

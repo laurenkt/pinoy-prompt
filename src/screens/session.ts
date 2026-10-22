@@ -22,7 +22,7 @@ import { recordAnswer, rollDay } from '../store';
 import { audioButton, audioPair, choiceList, h, hookView, icon, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
-import { defaultDeps, micGate, needsMicGate, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'mic' | 'caught-up' | 'done';
 
@@ -98,7 +98,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   const canListen = () => canPlay() && !isSilent(app.progress.settings);
   // Speaking joins the mix only once the model is on the device, so study never stops for a download.
   let speakReady = deps.modelKnownDownloaded?.() ?? false;
-  /** The learner chose to skip speaking at the microphone question, for the rest of this visit. */
+  /** The microphone was refused as practice started, so speaking is left out of this visit. */
   let speakSkipped = false;
   /** Whether practice may ask the learner to speak. */
   const canSpeak = () => speakReady && !app.progress.settings.quiet && !speakSkipped;
@@ -186,10 +186,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       askGuide(c);
       return;
     }
-    if (format === 'speak' && needsMicGate(deps)) {
-      // Asked for on a screen of its own, so the phone's question doesn't come over the word to say.
-      phase = 'mic';
-    } else if (format === 'speak') {
+    if (format === 'speak') {
       phase = 'speak';
       speak = speakPanel(c, {
         say: (slow) => say(slow),
@@ -399,7 +396,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function quietChanged(): void {
     const listening = format === 'listen' || format === 'hear';
     if (phase === 'speak' && app.progress.settings.quiet) next();
-    else if (phase === 'mic' && app.progress.settings.quiet && card && step) ask(card, step);
     else if (listening && !canListen() && card && step && (phase === 'front' || (phase === 'quiz' && !picked))) ask(card, step);
     else draw();
   }
@@ -474,31 +470,23 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       case 'speak':
         return speakView(card);
       case 'mic':
-        return micView();
+        return micWaiting();
       case 'caught-up':
         return caughtUpView();
     }
   }
 
-  /** Practice may ask the learner to speak, so the microphone is asked for as it starts (see micGate). */
+  /** Practice may ask the learner to speak, so the phone asks for the microphone from this tap (see askForMicrophone). */
   function keepPractising(): void {
     if (!step || !card) return next();
-    if (canSpeak() && needsMicGate(deps)) {
-      phase = 'mic';
-      return draw();
-    }
-    ask(card, step);
-  }
-
-  function micView(): HTMLElement {
-    const go = () => card && step && ask(card, step);
-    return micGate({
-      onOn: go,
-      onSkip: () => {
-        speakSkipped = true;
-        go();
-      },
-      deps,
+    if (!canSpeak() || !needsMicrophone(deps)) return ask(card, step);
+    phase = 'mic';
+    draw();
+    void askForMicrophone(deps).then((ok) => {
+      // Left while the phone was asking.
+      if (!root.isConnected) return;
+      speakSkipped = !ok;
+      if (phase === 'mic' && card && step) ask(card, step);
     });
   }
 
@@ -518,7 +506,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       h(
         'div',
         { class: 'stack' },
-        h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: keepPractising }, 'Keep practising'),
+        h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: keepPractising }, 'Keep practising'),
         unmet &&
           h(
             'button',
@@ -894,6 +882,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   app.onKey((e) => {
+    // Nothing to answer or hear while the phone asks for the microphone; the word is still to be said.
+    if (phase === 'mic') return;
     if (e.key === 'r' || e.key === 'R') {
       hold();
       return say();

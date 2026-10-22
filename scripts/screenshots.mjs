@@ -29,8 +29,12 @@ const SIZES = [
 const SCREENS = {
   home: async () => {},
   drills: (page) => page.click('.drills-btn'),
-  // With the speech model on the device (a stand-in for it), Drills asks for the microphone first.
+  // With the speech model on the device (a stand-in for it), Drills asks for the microphone as it opens,
+  // here a question never answered, so the holding screen stays up.
   'drills-mic': async (page) => {
+    await page.addInitScript(() => {
+      navigator.mediaDevices.getUserMedia = () => new Promise(() => {});
+    });
     await page.evaluate(async () => {
       const { CACHE, MODEL_URL } = await import('/src/model-cache.ts');
       await (await caches.open(CACHE)).put(MODEL_URL, new Response('stand-in'));
