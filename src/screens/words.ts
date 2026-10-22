@@ -78,10 +78,13 @@ export function wordsScreen(app: App): HTMLElement {
     );
   }
 
-  function filterChips(): HTMLElement {
-    return h(
+  function draw(): void {
+    const showVocab = filter === 'all' || filter === 'vocab';
+    const kinds = (['pattern', 'sound', 'tune', 'knowhow'] as const).filter((k) => filter === 'all' || filter === k);
+    const current = FILTERS.find((f) => f.id === filter)!;
+    const chips = h(
       'div',
-      { class: 'chips', role: 'group', 'aria-label': 'Show' },
+      { class: 'chips', id: 'library-filters', role: 'group', 'aria-label': 'Show', hidden: !filtersOpen },
       FILTERS.map((f) =>
         h(
           'button',
@@ -92,40 +95,33 @@ export function wordsScreen(app: App): HTMLElement {
               filter = f.id;
               filtersOpen = false;
               draw();
+              root.querySelector<HTMLButtonElement>('.filter-toggle')!.focus();
             },
           },
           f.label,
         ),
       ),
     );
-  }
-
-  function draw(): void {
-    const showVocab = filter === 'all' || filter === 'vocab';
-    const kinds = (['pattern', 'sound', 'tune', 'knowhow'] as const).filter((k) => filter === 'all' || filter === k);
-    const current = FILTERS.find((f) => f.id === filter)!;
+    // Opening and closing only shows the chips, so open topics and the scroll position stay put.
+    const toggle = h(
+      'button',
+      {
+        class: `chip filter-toggle ${filter !== 'all' ? 'selected' : ''}`,
+        'aria-expanded': String(filtersOpen),
+        'aria-controls': 'library-filters',
+        onclick: () => {
+          filtersOpen = !filtersOpen;
+          chips.hidden = !filtersOpen;
+          toggle.setAttribute('aria-expanded', String(filtersOpen));
+        },
+      },
+      icon('filter'),
+      current.label,
+    );
     root.replaceChildren(
-      h(
-        'div',
-        { class: 'words-header' },
-        h('h1', null, 'Library'),
-        h(
-          'button',
-          {
-            class: `chip filter-toggle ${filter !== 'all' ? 'selected' : ''}`,
-            'aria-expanded': String(filtersOpen),
-            'aria-label': `Show: ${current.label}`,
-            onclick: () => {
-              filtersOpen = !filtersOpen;
-              draw();
-            },
-          },
-          icon('filter'),
-          current.label,
-        ),
-      ),
+      h('header', { class: 'home-header' }, h('h1', null, 'Library'), toggle),
+      chips,
       h('p', { class: 'muted' }, 'Tap the speaker to hear any word.'),
-      ...(filtersOpen ? [filterChips()] : []),
       ...(showVocab ? UNITS.map((unit) => group(unit.title, unit.tlTitle, unit.cards.map(wordItem))) : []),
       ...kinds.map((k) => group(KIND_INFO[k].label, null, GUIDES.filter((g) => g.kind === k).map(guideItem))),
     );

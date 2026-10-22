@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The Library: filters stay out of the way until asked for.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { App } from '../app';
 import { UNITS } from '../deck';
 import { emptyProgress } from '../store';
@@ -18,28 +18,46 @@ function button(root: HTMLElement, text: string): HTMLButtonElement {
   return found;
 }
 
+const toggle = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.filter-toggle')!;
+const chips = (root: HTMLElement) => root.querySelector<HTMLElement>('.chips')!;
+
 describe('the Library', () => {
+  // The filter is kept across visits, so put it back for the next test.
+  afterEach(() => {
+    const root = wordsScreen(fakeApp());
+    toggle(root).click();
+    button(chips(root), 'All').click();
+  });
+
   it('hides the filters behind one button that names the current filter', () => {
     const root = wordsScreen(fakeApp());
-    const toggle = root.querySelector<HTMLButtonElement>('.filter-toggle')!;
-    expect(root.querySelector('.chips')).toBeNull();
-    expect(toggle.textContent).toBe('All');
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(chips(root).hidden).toBe(true);
+    expect(toggle(root).textContent).toBe('All');
+    expect(toggle(root).getAttribute('aria-expanded')).toBe('false');
     expect(root.querySelectorAll('.unit-list').length).toBeGreaterThan(UNITS.length);
 
-    toggle.click();
-    expect(root.querySelector('.filter-toggle')!.getAttribute('aria-expanded')).toBe('true');
-    button(root.querySelector('.chips')!, 'Sounds').click();
+    toggle(root).click();
+    expect(chips(root).hidden).toBe(false);
+    expect(toggle(root).getAttribute('aria-expanded')).toBe('true');
+    button(chips(root), 'Sounds').click();
 
     // Picking one closes the filters and narrows the list to it.
-    expect(root.querySelector('.chips')).toBeNull();
-    expect(root.querySelector('.filter-toggle')!.textContent).toBe('Sounds');
-    expect(root.querySelector('.filter-toggle')!.classList.contains('selected')).toBe(true);
+    expect(chips(root).hidden).toBe(true);
+    expect(toggle(root).textContent).toBe('Sounds');
+    expect(toggle(root).classList.contains('selected')).toBe(true);
     expect(root.querySelectorAll('.unit-list').length).toBe(1);
-
-    // The choice is kept for the next visit; put it back for other tests.
     expect(wordsScreen(fakeApp()).querySelector('.filter-toggle')!.textContent).toBe('Sounds');
-    root.querySelector<HTMLButtonElement>('.filter-toggle')!.click();
-    button(root.querySelector('.chips')!, 'All').click();
+  });
+
+  it('leaves open topics open when the filters are shown and hidden', () => {
+    const root = wordsScreen(fakeApp());
+    const first = root.querySelector<HTMLDetailsElement>('.unit-list')!;
+    first.open = true;
+    const button = toggle(root);
+    button.click();
+    button.click();
+    expect(root.querySelector('.unit-list')).toBe(first);
+    expect(first.open).toBe(true);
+    expect(toggle(root)).toBe(button);
   });
 });
