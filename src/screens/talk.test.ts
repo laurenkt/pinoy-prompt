@@ -2,24 +2,19 @@
 // The Talk screen, with stand-ins for OpenAI, the microphone and WebRTC.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { App } from '../app';
 import { setApiKey, type CallDeps } from '../openai';
 import { stop } from '../speech';
-import { emptyProgress, recordAnswer } from '../store';
 import { hangUpTalk, talkScreen, type TalkDeps } from './talk';
-import { button, flush } from '../test/screen';
+import { button, fakeApp as knowing, flush } from '../test/screen';
 
 vi.mock('../speech', async (actual) => ({ ...(await actual<typeof import('../speech')>()), stop: vi.fn() }));
 
 const KEY = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123';
 const KNOWN = ['salamat', 'kumusta', 'oo', 'kape'];
 
+/** Talk never plays words by itself, so autoplay is left at its default. */
 function fakeApp(known = KNOWN) {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  for (const id of known) recordAnswer(progress, id, 'good', now);
-  const app = { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: vi.fn<App['navigate']>(), onKey: () => {}, onBack: () => {} };
-  return app satisfies App;
+  return knowing(known, { autoplay: true });
 }
 
 /** A call that connects straight away; `say` sends what OpenAI would on the data channel. */

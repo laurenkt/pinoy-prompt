@@ -14,8 +14,8 @@ Each system has one owner module. Anything else that needs it calls that module.
 | System | Owner | What it owns |
 | --- | --- | --- |
 | Navigation | `src/app.ts`, `src/main.ts`, `src/back-history.ts` | `Route`, the `App` every screen gets, drawing a screen, the system back gesture. Screens only call `app.navigate`, `app.onBack` and `app.onKey`. |
-| Screens | `src/screens/*.ts` | One file per screen, each a function from `App` to an element. |
-| Shared UI | `src/ui.ts` | `h`, `svg`, `icon`, and every piece used on three or more screens. |
+| Screens | `src/screens/*.ts` | One file per screen, each a function from `App` to an element, plus the pieces several screens share that need screen context (`quiet.ts`, `auto-advance.ts`, `speak.ts`, `speak-result.ts`, `growth-chart.ts`). |
+| Shared UI | `src/ui.ts` | `h`, `svg`, `icon`, and the plain pieces used on three or more screens. A shared piece with its own behaviour gets its own file in `src/screens/` (the quiet toggle in `quiet.ts`). |
 | Look | `src/style.css` | Colour, outline, shadow and radius tokens on `:root`; one section per screen. |
 | Saved progress | `src/store.ts`, `src/progress-schema.ts`, `src/progress-mirror.ts` | Everything in `localStorage` under `pinoy-prompt:progress`, and its IndexedDB mirror. Settings live inside progress. |
 | Learning | `src/deck.ts`, `src/guides.ts`, `src/srs.ts`, `src/session.ts`, `src/memory.ts` | Content, the schedule, what Study asks next, memory stats. No DOM. |
@@ -35,13 +35,13 @@ Every screen is one of two kinds, and each kind has one layout:
 - **A page** (Library, Drills' menu, Settings): opened from Home, browsed, left. It has the back arrow (`.back-bar`) at the top left, then its title. System back goes Home.
 - **A session** (Study, a drill round, Chat): something in progress. It has `.session-header` with the close button (×) at the left, then progress and any controls. Close, and system back, end the session the way the screen chooses (Study shows its summary, a drill round returns to the menu).
 
-Home is the hub and has its own header. A screen never shows both a back arrow and a close button. New screens pick one of the two kinds; a new kind of screen is a decision worth writing down here first.
+Home is the hub and has its own header. A screen never shows both a back arrow and a close button. (Until the follow-up to finding 1 lands, Settings still closes with × and a drill round still shows both.) New screens pick one of the two kinds; a new kind of screen is a decision worth writing down here first.
 
 Spacing, gutters, tap targets and colours come from REVIEW.md and the `:root` tokens in `style.css`.
 
 ### Audio
 
-Every sound the app plays goes through `audio-engine.ts`'s shared context: card clips (via `speech.ts`), reference sounds and slices of a recording (via `player.ts`). Screens never make an `AudioContext` or an `Audio` element; they call `play`/`stop` for cards, or a `Player` for the results screen. Two exceptions are deliberate:
+Every recorded sound the app plays goes through `audio-engine.ts`'s shared context: card clips (via `speech.ts`), reference sounds and slices of a recording (via `player.ts`). Screens never make an `AudioContext` or an `Audio` element; they call `play`/`stop` for cards, or a `Player` for the results screen. `speech.ts` also owns two paths outside the engine: the built-in voice (`speechSynthesis`), used only when a clip can't play, and the silent `<audio>` track that gets sound through the iPhone's silent switch. Other exceptions are deliberate:
 
 - `recorder.ts` keeps its own context, made inside the tap, because iOS changes the hardware rate when the mic opens.
 - Chat's AI voice is a WebRTC stream, played by an `<audio>` element from `openai.ts`, and `visualizer.ts` makes a context for its analysers. If Chat's audio is reworked, move the analysers onto the shared context or note here why they can't.
@@ -69,7 +69,7 @@ What a review of the whole app found, most important first, and what has been do
 2. **Deploy didn't wait for tests.** CI and deploy were separate workflows, so a push to `main` was published even if its tests failed. *Fixed: one pipeline that deploys the build it tested.*
 3. **Screen test setup copied eight times.** Each screen test had its own stand-in `App`, and most their own `button` finder, so a change to `App` (as `onBack` was) meant editing every file. *Fixed: `src/test/screen.ts`.*
 4. **Service worker names kept in step by hand.** `public/sw.js` repeats two cache names and a source path from `src/`, with a comment pointing at the wrong file. A rename would have broken offline audio or speaking without a failing test. *Fixed: `src/sw.test.ts`.*
-5. **Copied UI pieces.** The play / play slowly pair was written out eight times across Study and Drills, and the numbered answer choices three times. *Fix: shared pieces in `ui.ts`, in the follow-up.*
+5. **Copied UI pieces.** The play / play slowly pair was written out six times across Study and Drills, and the numbered answer choices three times. *Fix: shared pieces in `ui.ts`, in the follow-up.*
 6. **Study and Drills ask the same questions with separate code.** Read, listen and recall prompts and their feedback are built twice, and the words have drifted: Drills says "Tama!" / "Mali.", Study a rotating "Magaling!" / "Not quite.". Not worth merging yet; the next change to how either asks a question should move the prompts into one place and settle on one wording.
 7. **Audio is now one system.** After the clip rewrite, card audio, reference sounds and slices all go through the shared engine, and the built-in voice is only a fallback. The remaining loose end is the visualizer's own context (see Audio).
 8. **`screens/session.ts` is large** (about 900 lines: introductions, quizzes, flashcards, guide drills, tile building, speaking, the summary). Fine while it changes rarely; split the guide views into their own file the next time they grow.
