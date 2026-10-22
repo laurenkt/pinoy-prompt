@@ -2,7 +2,7 @@
 // on the device, and coach them sound by sound.
 
 import { coach, type Tip } from '../coach';
-import { DownloadError } from '../model-cache';
+import { DownloadError, modelDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonetics';
@@ -38,8 +38,8 @@ export interface SpeakDeps {
 export const defaultDeps: SpeakDeps = {
   recordingSupported,
   record,
+  modelDownloaded,
   // Loaded on demand so the model runtime isn't part of the app's first download.
-  modelDownloaded: async () => (await import('../model-cache')).modelDownloaded(),
   loadPhoneModel: async (onProgress) => (await import('../phone-model')).loadPhoneModel(onProgress),
   player: () => (sharedPlayer ??= webAudioPlayer()),
 };
@@ -52,7 +52,7 @@ const PROBLEMS: Record<Problem, string> = {
   denied: 'The microphone is blocked. Allow it for this site in your browser settings, then try again.',
   'no-mic': "Couldn't use the microphone. Check that the device has one and no other app is using it.",
   download: "Couldn't download the pronunciation model. Check your connection and try again.",
-  start: "Couldn't start the pronunciation model. Close the app completely, open it again, and try again.",
+  start: "Couldn't start the pronunciation model. Try again, or close the app and open it again.",
   failed: 'Something went wrong while checking your pronunciation. Try again.',
 };
 
@@ -179,8 +179,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       set({ name: 'ready' });
       options.onReady?.();
     } catch (err) {
-      // Only a failed fetch is the connection's fault; the runtime failing to load or running out of memory isn't.
-      set({ name: 'problem', problem: err instanceof DownloadError ? 'download' : 'start', detail: String(err) });
+      // A failed fetch, or anything while offline (the runtime's own files can't load either), is the connection's fault;
+      // running out of memory, or an old page whose code has gone after an update, isn't.
+      const offline = err instanceof DownloadError || !navigator.onLine;
+      set({ name: 'problem', problem: offline ? 'download' : 'start', detail: err instanceof Error ? err.message : String(err) });
     }
   }
 

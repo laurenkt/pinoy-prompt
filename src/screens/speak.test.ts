@@ -139,11 +139,18 @@ describe('first use', () => {
     expect(button('Try again')).toBeTruthy();
   });
 
+  it('blames the connection for anything that fails while offline', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await open('salamat', { loadPhoneModel: async () => Promise.reject(new TypeError('Importing a module script failed.')) });
+    expect(text('.feedback')).toContain("Couldn't download");
+    vi.restoreAllMocks();
+  });
+
   it("doesn't blame the connection when the model is there but won't start", async () => {
     await open('salamat', { loadPhoneModel: async () => Promise.reject(new RangeError('Out of memory')) });
     expect(text('.feedback')).toContain("Couldn't start");
     expect(text('.feedback')).not.toContain('connection');
-    expect(text('.problem-detail')).toBe('RangeError: Out of memory');
+    expect(text('.problem-detail')).toBe('Out of memory');
     expect(button('Try again')).toBeTruthy();
   });
 

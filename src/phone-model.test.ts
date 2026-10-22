@@ -89,8 +89,9 @@ describe('loadPhoneModel', () => {
   it("never keeps a download that was cut short, so the next try starts afresh", async () => {
     vi.stubGlobal('fetch', serve(40_000_000));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
-    await expect(loadPhoneModel()).rejects.toThrow(/incomplete/);
-    await expect(loadPhoneModel()).rejects.toBeInstanceOf((await import('./model-cache')).DownloadError);
+    const failure = loadPhoneModel();
+    await expect(failure).rejects.toThrow(/incomplete/);
+    await expect(failure).rejects.toBeInstanceOf((await import('./model-cache')).DownloadError);
     expect(await modelDownloaded()).toBe(false);
     expect(create).not.toHaveBeenCalled();
   });
@@ -137,6 +138,15 @@ describe('when the model can\'t be stored', () => {
     await expect(loadPhoneModel()).resolves.toBeTruthy();
     expect(create).toHaveBeenCalledOnce();
     expect(await modelDownloaded()).toBe(false);
+  });
+
+  it('still loads it when the stored copy is gone as soon as it was kept', async () => {
+    const download = serve(MODEL_BYTES);
+    vi.stubGlobal('fetch', download);
+    cache.match = async () => undefined;
+    const { loadPhoneModel } = await import('./phone-model');
+    await expect(loadPhoneModel()).resolves.toBeTruthy();
+    expect(download).toHaveBeenCalledTimes(2);
   });
 
   it("keeps a good stored model when the phone runs out of memory loading it", async () => {

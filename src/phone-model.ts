@@ -90,6 +90,8 @@ async function fetchModel(onProgress?: (fraction: number) => void): Promise<Arra
       await cache.delete(MODEL_URL).catch(() => false);
       throw err;
     }
+    // Stored, then gone (evicted already): the download has been read, so fetch it again into memory.
+    return fetchIntoMemory(onProgress);
   }
 
   return inMemory(body, onProgress);
