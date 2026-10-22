@@ -138,8 +138,8 @@ export interface Sound {
   stop(): void;
 }
 
-/** Play a buffer now, with short fades. */
-export function playBuffer(buffer: AudioBuffer, rate = 1): Sound {
+/** Play a buffer now, or no earlier than `at` (context time), with short fades. */
+export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0): Sound {
   const ctx = audioContext();
   const source = ctx.createBufferSource();
   const gain = ctx.createGain();
@@ -147,7 +147,7 @@ export function playBuffer(buffer: AudioBuffer, rate = 1): Sound {
   source.playbackRate.value = rate;
   source.connect(gain).connect(ctx.destination);
   // A few ms ahead, so the fade-in is scheduled before the first sample.
-  const t0 = ctx.currentTime + 0.005;
+  const t0 = Math.max(ctx.currentTime + 0.005, at);
   const length = buffer.duration / rate;
   gain.gain.setValueAtTime(0, t0);
   gain.gain.linearRampToValueAtTime(1, t0 + Math.min(FADE, length / 4));
