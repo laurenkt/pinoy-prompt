@@ -206,6 +206,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         counting: () => auto !== null,
         onNext: next,
         onReady: () => (speakReady = true),
+        autofocus: !autoMoved,
         deps,
       });
     } else if (format === 'remember' || format === 'hear' || format === 'produce') {

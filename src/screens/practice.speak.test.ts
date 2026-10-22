@@ -105,7 +105,8 @@ describe('moving on after a right attempt', () => {
     await vi.advanceTimersByTimeAsync(ADVANCE_MS);
     await vi.advanceTimersByTimeAsync(0);
     expect(document.querySelector('.session-count')?.textContent).toBe('1 done');
-    expect(button('Tap and speak')).toBeTruthy();
+    // The next word doesn't take focus, so a late Enter meant for Next can't start a recording.
+    expect(document.activeElement).not.toBe(button('Tap and speak'));
   });
 
   it('waits after a miss', async () => {

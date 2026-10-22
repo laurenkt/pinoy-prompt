@@ -162,6 +162,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         counting: () => auto !== null,
         onNext: () => advance(),
         onReady: () => (speakReady = true),
+        autofocus: !autoMoved,
         deps,
       });
     }

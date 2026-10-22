@@ -16,8 +16,8 @@ const MODEL_MB = 71;
 /**
  * At or above this score the attempt counts as right: clearly understood and
  * fairly natural, not native-perfect. A sound said well scores 1 and a nearly
- * there one half, so a phrase of 10 or more sounds can pass with one sound off
- * (in context a listener still gets it), and any word with one sound in five
+ * there one half, so a phrase can pass with about one sound in ten off (from
+ * 10 sounds one, from 20 two: in context a listener still gets it), and any word with one sound in five
  * nearly there. A short word with a sound off, which can turn it into another
  * word, still needs another go.
  */
@@ -76,6 +76,8 @@ export interface SpeakOptions {
   onNext(): void;
   /** Called once the model is loaded and the learner can speak. */
   onReady?(): void;
+  /** False when the question came up by itself: nothing takes focus until the learner acts, so a late Enter can't start a recording. */
+  autofocus?: boolean;
   deps?: SpeakDeps;
 }
 
@@ -122,6 +124,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let disposed = false;
   /** Bumped for each attempt, so a stale attempt's result is ignored. */
   let attempt = 0;
+  /** Whether a redraw may move focus to its main button. */
+  let takeFocus = options.autofocus ?? true;
   // The card's spelling and any other accepted pronunciations (e.g. Kamusta for Kumusta).
   const variants = [card.tl, ...(card.accept ?? [])].map((text) => ({ text, phones: toPhones(text) }));
   /** Judge what was heard against the closest accepted pronunciation. */
@@ -165,6 +169,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   async function startRecording(): Promise<void> {
     if (!model) return void load();
+    takeFocus = true;
     options.silence();
     const mine = ++attempt;
     const stale = () => disposed || attempt !== mine;
@@ -242,7 +247,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
             'div',
             { class: 'row' },
             skip('Not now'),
-            h('button', { class: 'btn primary', 'data-autofocus': true, onclick: () => void load() }, 'Download'),
+            h('button', { class: 'btn primary', 'data-autofocus': true, onclick: () => {
+                takeFocus = true;
+                void load();
+              } }, 'Download'),
           ),
         ];
       case 'loading':
@@ -269,7 +277,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
             { class: 'row' },
             skip(),
             state.problem !== 'unsupported' &&
-              h('button', { class: 'btn primary', 'data-autofocus': true, onclick: () => void (model ? startRecording() : load()) }, 'Try again'),
+              h('button', { class: 'btn primary', 'data-autofocus': true, onclick: () => {
+                takeFocus = true;
+                void (model ? startRecording() : load());
+              } }, 'Try again'),
           ),
         ];
       case 'result':
@@ -360,7 +371,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     // With a breakdown on screen, the card above gives way to it (see .result-card).
     el.className = `speak ${state.name} ${phase}${breakdown ? ' has-breakdown' : ''}`.trim();
     el.replaceChildren(...children);
-    el.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
+    if (takeFocus) el.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
   }
 
   draw();
