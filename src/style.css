@@ -44,7 +44,11 @@ body {
   font-size: 17px;
   line-height: 1.45;
   -webkit-tap-highlight-color: transparent;
-  /* No rubber-band: a screen that fits stays put, as in an app; a long one scrolls and stops at its ends. */
+}
+
+/* No rubber-band while the screen fits, so it stays put as in an app; once it runs long it scrolls and bounces as usual (fit.ts). */
+.fits,
+.fits body {
   overscroll-behavior: none;
 }
 

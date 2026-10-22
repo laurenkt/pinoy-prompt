@@ -12,12 +12,15 @@ import { forgetRetiredVoiceChoice } from './openai';
 import { applyAudioMode } from './screens/quiet';
 import { cancelRecording } from './recorder';
 import { keepClipsOffline } from './clip-cache';
+import { watchFit } from './fit';
 import { allClipUrls, initVoices, stop } from './speech';
 import { replaceContents } from './progress-schema';
 import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
 import { h } from './ui';
 
 const root = document.getElementById('app')!;
+// A screen that fits doesn't bounce; a long one scrolls as usual (style.css).
+watchFit(root);
 let keyHandler: ((e: KeyboardEvent) => void) | null = null;
 let backHandler: (() => void) | null = null;
 
