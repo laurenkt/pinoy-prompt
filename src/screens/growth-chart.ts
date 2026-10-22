@@ -78,17 +78,17 @@ function pace(perDay: number): string {
  */
 export function forecastView(forecast: Forecast): HTMLElement {
   const { known, perDay } = forecast;
-  const weeks = Math.round(PACE_DAYS / 7);
+  const span = forecast.days >= PACE_DAYS ? `${Math.round(PACE_DAYS / 7)} weeks` : `${Math.floor(forecast.days)} days`;
   const lead =
     perDay === null
       ? 'After two weeks of learning, this shows roughly when you might reach each level at your pace.'
       : perDay <= 0
-        ? `The words that have stuck haven't grown over the last ${weeks} weeks, so there are no dates for now.`
-        : `At your pace over the last ${weeks} weeks, ${pace(perDay)} sticking, you might reach:`;
+        ? `The words that have stuck haven't grown over the last ${span}, so there are no dates for now.`
+        : `At your pace over the last ${span}, ${pace(perDay)} sticking, you might reach:`;
   return h(
     'div',
     { class: 'growth-forecast small', id: 'growth-forecast' },
-    h('p', null, `${known} ${known === 1 ? 'word has' : 'words have'} stuck so far. ${lead}`),
+    h('p', null, `${known} ${known === 1 ? 'word or phrase has' : 'words and phrases have'} stuck so far. ${lead}`),
     h(
       'ul',
       null,

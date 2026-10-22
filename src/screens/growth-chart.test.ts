@@ -116,4 +116,8 @@ describe('forecast', () => {
     expect(forecastView(ahead(0)).textContent).toContain("haven't grown over the last 4 weeks");
     expect(forecastView(ahead(0)).textContent).not.toMatch(/~\w+ \d{4}/);
   });
+
+  it('names the span the pace was measured over', () => {
+    expect(forecastView({ ...ahead(0.5, now + DAY_MS), days: 16.5 }).textContent).toContain('over the last 16 days');
+  });
 });
