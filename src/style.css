@@ -354,7 +354,6 @@ p {
 
 .growth-frame {
   position: relative;
-  height: 160px;
   /* A little shorter where the phone's insets would otherwise push Home past one screen. */
   height: clamp(120px, var(--fill) - 632px, 160px);
   border: var(--outline);
@@ -747,8 +746,6 @@ p {
 }
 
 .audio-btn.huge {
-  width: 96px;
-  height: 96px;
   width: clamp(96px, var(--fill) * 0.14, 132px);
   height: clamp(96px, var(--fill) * 0.14, 132px);
   border-radius: 24px;
