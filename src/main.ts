@@ -13,7 +13,7 @@ import { applyAudioMode } from './screens/quiet';
 import { cancelRecording } from './recorder';
 import { keepClipsOffline } from './clip-cache';
 import { watchFit } from './fit';
-import { allClipUrls, initVoices, stop } from './speech';
+import { allClipUrls, initVoices, stop, tickOnPress } from './speech';
 import { replaceContents } from './progress-schema';
 import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
 import { h } from './ui';
@@ -99,6 +99,9 @@ function render(route: Route): void {
   // Each screen draws its own top: a page its back arrow, a session its close button (docs/ARCHITECTURE.md).
   root.replaceChildren(h('main', { class: 'screen' }, screen));
 }
+
+// A soft tick for every button press, quiet in silent mode (speech.ts).
+tickOnPress(document);
 
 // A held Enter or Space would otherwise click through several screens at once.
 document.addEventListener(

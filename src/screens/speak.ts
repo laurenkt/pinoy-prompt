@@ -233,7 +233,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   // The sounds-like spelling gives the pronunciation away too, so it waits for a first attempt like the audio.
   const hint = () => judged && card.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), card.hint);
   const micButton = (label: string, className = 'btn mic big') =>
-    h('button', { class: className, 'data-autofocus': true, onclick: () => void startRecording() }, icon('mic'), ' ', label);
+    h('button', { class: className, 'data-autofocus': true, 'data-no-tap': true, onclick: () => void startRecording() }, icon('mic'), ' ', label);
   const skip = (label = 'Skip') => h('button', { class: 'btn secondary', onclick: options.onNext }, label);
 
   function view(): HTMLElement[] {
@@ -274,7 +274,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           hint(),
           h('div', { class: 'meter', 'aria-hidden': 'true' }, [1, 2, 3, 4, 5].map(() => h('span', null))),
           h('p', { class: 'listen-status center', role: 'status' }, state.speech ? 'Hearing you…' : 'Mic on. Say it now.'),
-          h('button', { class: 'btn mic big done', 'data-autofocus': true, onclick: () => recording?.stop() }, "I'm done"),
+          h('button', { class: 'btn mic big done', 'data-autofocus': true, 'data-no-tap': true, onclick: () => recording?.stop() }, "I'm done"),
         ].filter(Boolean) as HTMLElement[];
       case 'analysing':
         return [h('p', { class: 'listen-status center', role: 'status' }, 'Checking your sounds…')];

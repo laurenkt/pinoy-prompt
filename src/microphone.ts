@@ -25,6 +25,11 @@ export function microphoneOpen(): boolean {
   return stream !== null || opening !== null;
 }
 
+/** Whether something is recording or on a call now, rather than the stream waiting switched off. */
+export function microphoneInUse(): boolean {
+  return users > 0 || opening !== null;
+}
+
 // A track iOS muted (a phone call, Siri) can stay "live" but silent, so it doesn't count.
 const live = (s: MediaStream) => s.getAudioTracks().some((t) => t.readyState === 'live' && !t.muted);
 

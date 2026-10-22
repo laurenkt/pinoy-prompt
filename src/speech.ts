@@ -9,6 +9,7 @@
 
 import { audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
 import clips from './clips.json';
+import { microphoneInUse } from './microphone';
 import type { Card } from './deck';
 
 /** Language codes to try, best first. "fil" and "tl" are both used for Filipino/Tagalog. */
@@ -112,6 +113,7 @@ let generation = 0;
 
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
 export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promise<void> {
+  soundAsked = performance.now();
   stop();
   started = new Promise((resolve) => (reportStart = resolve));
   const report = reportStart;
@@ -172,12 +174,14 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
  * played with it (the answer, said back) starts once it's done, not over it.
  */
 export async function chime(): Promise<void> {
+  soundAsked = performance.now();
   if (muted || !clipsSupported()) return;
   const ctx = audioContext();
   // Outside a tap (a spoken answer judged) iOS may not start the context; better no chime than one on the next tap.
   if (!(await audioRunning(ctx)) || muted) return;
   if (chimeBuffer?.sampleRate !== ctx.sampleRate) chimeBuffer = chimeSound(ctx);
   const sound = (currentChime = playBuffer(chimeBuffer));
+  void sound.done.then(() => currentChime === sound && (currentChime = null));
   lastChime = { ctx, ends: sound.startsAt + chimeBuffer.duration };
 }
 
@@ -195,22 +199,52 @@ function afterChime(): number {
 
 /** Two short bell-like notes rising a fifth (E5 to B5), each fading out quickly. */
 function chimeSound(ctx: AudioContext): AudioBuffer {
+  return bell(ctx, 0.36, [
+    { at: 0, freq: 659.25, level: 0.12, decay: 0.07 },
+    { at: 0.09, freq: 987.77, level: 0.12, decay: 0.07 },
+  ]);
+}
+
+/** Soft bell-like notes, made in code: each starts at `at` seconds and fades out over about `decay`. */
+function bell(ctx: AudioContext, seconds: number, notes: { at: number; freq: number; level: number; decay: number }[]): AudioBuffer {
   const rate = ctx.sampleRate;
-  const buffer = ctx.createBuffer(1, Math.round(rate * 0.36), rate);
+  const buffer = ctx.createBuffer(1, Math.round(rate * seconds), rate);
   const data = buffer.getChannelData(0);
-  const notes = [
-    { at: 0, freq: 659.25 },
-    { at: 0.09, freq: 987.77 },
-  ];
-  for (const { at, freq } of notes) {
+  for (const { at, freq, level, decay } of notes) {
     for (let i = Math.round(at * rate); i < data.length; i++) {
       const t = i / rate - at;
-      const envelope = Math.min(1, t / 0.004) * Math.exp(-t / 0.07);
+      const envelope = Math.min(1, t / 0.003) * Math.exp(-t / decay);
       // A little of the octave above makes it a bell rather than a beep.
-      data[i] += 0.12 * envelope * (Math.sin(2 * Math.PI * freq * t) + 0.2 * Math.sin(4 * Math.PI * freq * t));
+      data[i] += level * envelope * (Math.sin(2 * Math.PI * freq * t) + 0.2 * Math.sin(4 * Math.PI * freq * t));
     }
   }
   return buffer;
+}
+
+/** When play() or chime() was last called, so a tap that already makes a sound doesn't tick as well. */
+let soundAsked = -Infinity;
+let tickBuffer: AudioBuffer | null = null;
+
+/**
+ * A very soft tick for a button press, quieter and shorter than the chime.
+ * Not when the press already made a sound (a word, the chime) or one is still
+ * playing, nor while the microphone is in use, where it would be recorded.
+ */
+export function tick(): void {
+  if (muted || !clipsSupported() || microphoneInUse()) return;
+  if (performance.now() - soundAsked < 250 || speaking() || currentChime) return;
+  const ctx = audioContext();
+  tickBuffer = tickBuffer?.sampleRate === ctx.sampleRate ? tickBuffer : bell(ctx, 0.06, [{ at: 0, freq: 1320, level: 0.05, decay: 0.012 }]);
+  playBuffer(tickBuffer);
+}
+
+/** Tick for every button pressed under `root`, except those marked `data-no-tap` (ones that open the microphone). */
+export function tickOnPress(root: Node): void {
+  // Bubbling, so it runs after the button's own handler, which may have played a word.
+  root.addEventListener('click', (e) => {
+    const button = (e.target as Element).closest?.('button');
+    if (button && !button.hasAttribute('data-no-tap')) tick();
+  });
 }
 
 if (typeof document !== 'undefined') {
