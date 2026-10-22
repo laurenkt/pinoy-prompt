@@ -43,7 +43,7 @@ Home is the hub and has its own header. A screen never shows both a back arrow a
 - On Home the hub takes it; in a call, the transcript.
 - Pages (Library, Settings) are as long as their content and scroll.
 
-A new screen or panel gets this by using those containers; a wrapper element between them breaks the column, which `src/screens/layout.test.ts` checks. Sizes that should grow with the phone use `dvh` in a `clamp()`, so short phones keep the usual sizes.
+A new screen or panel gets this by using those containers; a wrapper element between them breaks the column, which `src/screens/layout.test.ts` checks. Sizes that should grow with the phone use `dvh` in a `clamp()`, so on a short phone (375×667) nothing is taller than it was; only answer choices use what little room is left, until one is picked.
 
 Spacing, gutters, tap targets and colours come from REVIEW.md and the `:root` tokens in `style.css`.
 

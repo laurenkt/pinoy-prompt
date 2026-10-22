@@ -110,8 +110,8 @@ p {
  * height down a column to what can use it, so a taller phone gets bigger targets instead of an empty bottom.
  * Home's hub, a session's panel (its prompt, and most of all its answer choices) and a call's transcript
  * take it; see "Height" in docs/ARCHITECTURE.md. Pages (Library, Settings) stay as long
- * as their content and scroll. Sizes that grow with the screen use dvh in a clamp(), so short phones keep
- * today's sizes.
+ * as their content and scroll. Sizes that grow with the screen use dvh in a clamp(), so nothing on a short
+ * phone is taller than it was.
  */
 .screen {
   max-width: 560px;
@@ -551,7 +551,7 @@ p {
 
 /*
  * In a panel, the prompt grows on phones taller than about 700px (up to 300px), with what's on it centred.
- * Answer choices take the rest of the spare height; otherwise what the learner does next (a button, the
+ * Answer choices take the rest of the spare height, on short phones too until one is picked; otherwise what the learner does next (a button, the
  * answer and its ratings, the microphone) sits at the bottom, under the thumb.
  */
 .panel > .prompt {
@@ -575,13 +575,25 @@ p {
   margin-bottom: clamp(0px, 100dvh - 700px, 124px);
 }
 
-.panel > :last-child:not(:first-child, .choices) {
-  margin-top: auto;
+/* A spacer takes the spare height before the panel's last piece, which keeps its own margins as before. */
+.panel:not(:has(> .choices))::after {
+  content: '';
+  order: 1;
+  flex-grow: 1;
 }
 
-/* The gap above it when there's no spare height, as the button's own top margin gave before. */
-.panel > :nth-last-child(2):is(.choices, .feedback, .tl-row) {
-  margin-bottom: 12px;
+.panel:not(:has(> .choices)) > :last-child:not(:first-child) {
+  order: 2;
+}
+
+/* The prompt's 18px is the gap above the answer, as when the two margins merged. */
+.panel > .answer {
+  margin-top: 0;
+}
+
+/* After anything but the feedback, the hook's gap is the margin above it, as when the two merged. */
+.panel > :not(.feedback) + .hook {
+  margin-top: 0;
 }
 
 /* A summary or a topic's introduction is a card, so it sits in the middle rather than stretching. */
