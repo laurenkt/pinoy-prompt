@@ -60,6 +60,20 @@ export function clipsSupported(): boolean {
 const decoded = new Map<string, Promise<AudioBuffer>>();
 export const KEEP_DECODED = 48;
 
+let decoder: BaseAudioContext | null = null;
+
+/**
+ * Clips are decoded offline, so loading ahead doesn't take the audio session
+ * (which would pause the learner's music just for showing a card).
+ */
+function decoderContext(): BaseAudioContext {
+  const scope = globalThis as { OfflineAudioContext?: typeof OfflineAudioContext; webkitOfflineAudioContext?: typeof OfflineAudioContext };
+  const Offline = scope.OfflineAudioContext ?? scope.webkitOfflineAudioContext;
+  if (!Offline) return audioContext();
+  decoder ??= new Offline(1, 1, context?.sampleRate ?? 48000);
+  return decoder;
+}
+
 /** A clip decoded and ready to play. Decoding starts on the first call, so calling it early loads ahead. */
 export function loadClip(url: string): Promise<AudioBuffer> {
   let buffer = decoded.get(url);
@@ -71,7 +85,7 @@ export function loadClip(url: string): Promise<AudioBuffer> {
         if (!r.ok) throw new Error(`${url}: ${r.status}`);
         return r.arrayBuffer();
       })
-      .then((bytes) => audioContext().decodeAudioData(bytes));
+      .then((bytes) => decoderContext().decodeAudioData(bytes));
     buffer.catch(() => decoded.get(url) === buffer && decoded.delete(url));
   }
   decoded.set(url, buffer);

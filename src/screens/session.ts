@@ -17,7 +17,7 @@ import {
   type Step,
 } from '../session';
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
-import { play, speechSupported, stop } from '../speech';
+import { canPlay, play, preload, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -95,7 +95,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   holdOnTap(root, hold);
 
   /** Listening needs a voice, and quiet mode with headphones in, if it's on. */
-  const canListen = () => speechSupported() && !isSilent(app.progress.settings);
+  const canListen = () => canPlay() && !isSilent(app.progress.settings);
   // Speaking joins the mix only once the model is on the device, so study never stops for a download.
   let speakReady = false;
   if (deps.recordingSupported()) {
@@ -146,6 +146,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     format = 'read';
     drill = undefined;
     if (card) recent.push(card.id);
+    if (card && isVocab(card)) preload(card);
     if (!step || !card) {
       phase = 'done';
     } else if (step.kind === 'extra' && !caughtUpSeen) {
@@ -243,6 +244,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     // Skip a guide with nothing to ask, still offering the card that moved on before it.
     if (!drill) return moveOn(previous);
     lastDrill.set(c.id, drill);
+    if (drill.tl) preload({ tl: drillSentence(drill) });
     if (format === 'gap') {
       drillChoices = shuffle([drill.answer, ...drill.wrong]);
       phase = 'quiz';

@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
-import { play, speechSupported, stop } from '../speech';
+import { canPlay, play, preload, stop } from '../speech';
 import { audioButton, h, hookView, icon, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
@@ -50,7 +50,7 @@ function pickRound(app: App, size: number): Card[] {
 export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLElement {
   const root = h('div', { class: 'practice' });
   const learned = Object.keys(app.progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length;
-  const canListen = speechSupported();
+  const canListen = canPlay();
   const canSpeak = deps.recordingSupported();
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
   let speakReady = false;
@@ -96,6 +96,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
       return { card, mode, choices };
     });
+    // A round is only ten words, so all of them load now and each plays the moment it's asked.
+    for (const q of questions) preload(q.card);
     index = 0;
     score = 0;
     picked = null;

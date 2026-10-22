@@ -26,6 +26,26 @@ async function cacheShell(cache) {
   await cache.addAll([...new Set(fonts)]);
 }
 
+/**
+ * Recorded word clips, kept in a cache of their own so app updates don't fetch
+ * them all again: their names change whenever their sound does, so only new
+ * ones are fetched, and ones no longer listed are dropped.
+ */
+const AUDIO_CACHE = 'pinoy-prompt-audio-v1';
+
+async function cacheAudio() {
+  try {
+    const files = await (await fetch('./audio/files.json', { cache: 'no-cache' })).json();
+    const urls = files.map((f) => new URL(`./audio/${f}`, self.location.href).href);
+    const cache = await caches.open(AUDIO_CACHE);
+    const have = new Set((await cache.keys()).map((r) => r.url));
+    await Promise.all([...have].filter((u) => !urls.includes(u)).map((u) => cache.delete(u)));
+    await cache.addAll(urls.filter((u) => !have.has(u)));
+  } catch {
+    // Clips are fetched as they're played until the next update tries again.
+  }
+}
+
 /** Must match CACHE in src/phone-model.ts. */
 const MODEL_CACHE = 'pinoy-prompt-models-v1';
 
@@ -49,6 +69,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then(async (cache) => {
     await cacheShell(cache);
     await cacheSpeech(cache);
+    await cacheAudio();
   }));
   self.skipWaiting();
 });
@@ -93,9 +114,10 @@ self.addEventListener('fetch', (event) => {
       }
       return response;
     });
-  // Built assets have content hashes in their names, so a cached copy never goes stale.
+  // Built assets and word clips have content hashes in their names, so a cached copy never goes stale.
   // Skipping the refresh matters for large ones like the speech model runtime.
-  const hashed = new URL(request.url).pathname.includes('/assets/');
+  const path = new URL(request.url).pathname;
+  const hashed = path.includes('/assets/') || path.endsWith('.mp3');
   const result = cached.then((hit) => (hit && hashed ? { hit } : { hit, fresh: refresh() }));
   event.respondWith(result.then(({ hit, fresh }) => hit || fresh).catch(() => Response.error()));
   // Keep the worker alive until the background refresh has been cached.

@@ -19,7 +19,7 @@ const PREFERRED = ['fil', 'tl', 'id', 'ms', 'es'];
 let voice: SpeechSynthesisVoice | null = null;
 let voiceReady: Promise<void> | null = null;
 
-export type VoiceQuality = 'native' | 'approximate' | 'none';
+export type VoiceQuality = 'recorded' | 'native' | 'approximate' | 'none';
 
 export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -53,13 +53,19 @@ export function initVoices(): Promise<void> {
   return voiceReady;
 }
 
+/** Whether words can be heard at all: from recorded clips, or the built-in voice. */
+export function canPlay(): boolean {
+  return clipsSupported() || speechSupported();
+}
+
 export function voiceQuality(): VoiceQuality {
+  if (clipsSupported() && Object.keys(CLIPS).length > 0) return 'recorded';
   if (!speechSupported()) return 'none';
   const lang = voice?.lang.toLowerCase() ?? '';
   return lang.startsWith('fil') || lang.startsWith('tl') ? 'native' : 'approximate';
 }
 
-/** Clip files by the text they say: `<name>.m4a`, and `<name>-slow.m4a` said slowly. */
+/** Clip files by the text they say: `<name>.mp3`, and `<name>-slow.mp3` said slowly. */
 const CLIPS: Record<string, string> = clips;
 
 /** The clip for this text, if there is one. */
@@ -67,7 +73,13 @@ export function clipUrl(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false):
   const base = `${import.meta.env.BASE_URL}audio/`;
   if (card.audio) return base + card.audio;
   const name = CLIPS[card.say ?? card.tl];
-  return name ? `${base}${name}${slow ? '-slow' : ''}.m4a` : null;
+  return name ? `${base}${name}${slow ? '-slow' : ''}.mp3` : null;
+}
+
+/** Load a word's clip ahead, so a tap only has to start it. Plays nothing. */
+export function preload(card: Pick<Card, 'tl' | 'audio' | 'say'>): void {
+  const url = !muted && clipsSupported() ? clipUrl(card) : null;
+  if (url) void loadClip(url).catch(() => {});
 }
 
 let currentClip: Sound | null = null;
