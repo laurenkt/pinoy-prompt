@@ -367,12 +367,18 @@ p {
   margin-left: auto;
 }
 
+/* The forecast: the stream carried on in hard stripes, its outline dashed. */
 .growth-svg .projection {
-  fill: none;
-  stroke: var(--text);
-  stroke-width: 3px;
-  stroke-dasharray: 2 7;
-  stroke-linecap: round;
+  fill: url(#growth-hatch);
+  stroke: none;
+}
+
+.growth-svg .hatch {
+  fill: var(--line);
+}
+
+.growth-svg .projection-edge {
+  stroke-dasharray: 8 6;
 }
 
 .growth-goal {
@@ -380,24 +386,16 @@ p {
   margin: -9px 0 -9px auto;
   align-self: center;
   min-height: 44px;
-  padding: 4px 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
+  padding: 4px 10px;
   background: var(--saffron);
   color: var(--on-accent);
   border: var(--outline);
   border-radius: 12px;
   box-shadow: 2px 2px 0 var(--ink);
   font: inherit;
-  font-size: 0.75rem;
-  line-height: 1.15;
+  font-size: 0.85rem;
+  font-weight: 800;
   white-space: nowrap;
-}
-
-.growth-goal strong {
-  font-size: 0.9rem;
 }
 
 .growth-goal[aria-expanded='true'] {
@@ -525,8 +523,13 @@ p {
 }
 
 .growth-axis {
+  display: flex;
   margin-top: 10px;
   font-weight: 700;
+}
+
+.growth-axis-ahead {
+  margin-left: auto;
 }
 
 .growth-axis-past {
