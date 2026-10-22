@@ -129,7 +129,11 @@ async function inMemory(body: ReadableStream<Uint8Array>, onProgress?: (fraction
  */
 export async function loadRuntime(): Promise<void> {
   await import(/* @vite-ignore */ mjsUrl);
-  if (navigator.serviceWorker?.controller) await (await fetch(wasmUrl)).arrayBuffer();
+  if (!navigator.serviceWorker?.controller || (await caches.match(wasmUrl))) return;
+  const response = await fetch(wasmUrl);
+  if (!response.ok) throw new Error(`Model runtime: ${response.status}`);
+  // Read to the end so the worker's copy is complete.
+  await response.arrayBuffer();
 }
 
 let loading: Promise<PhoneModel> | null = null;

@@ -157,3 +157,32 @@ describe('when the model can\'t be stored', () => {
     expect(await modelDownloaded()).toBe(true);
   });
 });
+
+describe('loadRuntime', () => {
+  function setup(controller: boolean, cached: boolean, status = 200) {
+    const download = vi.fn(async () => new Response('wasm', { status }));
+    vi.stubGlobal('fetch', download);
+    vi.stubGlobal('navigator', { serviceWorker: controller ? { controller: {} } : undefined });
+    vi.stubGlobal('caches', { match: async () => (cached ? new Response('wasm') : undefined) });
+    return download;
+  }
+
+  it("fetches the runtime's wasm so the service worker keeps it", async () => {
+    const download = setup(true, false);
+    await (await import('./phone-model')).loadRuntime();
+    expect(download).toHaveBeenCalledWith(expect.stringMatching(/\.wasm/));
+  });
+
+  it('leaves it when the worker already has it, or there is no worker to keep it', async () => {
+    for (const [controller, cached] of [[true, true], [false, false]]) {
+      const download = setup(controller, cached);
+      await (await import('./phone-model')).loadRuntime();
+      expect(download).not.toHaveBeenCalled();
+    }
+  });
+
+  it("says so when the runtime's wasm isn't there", async () => {
+    setup(true, false, 404);
+    await expect((await import('./phone-model')).loadRuntime()).rejects.toThrow(/404/);
+  });
+});
