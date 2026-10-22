@@ -1,14 +1,15 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card } from '../deck';
-import { canTypeMeaning, judgeMeaning, type MeaningJudge } from '../meaning';
-import { AiError, checkMeaning, errorText, getApiKey } from '../openai';
+import { canTypeMeaning, judgeMeaning, matchesMeaning, type MeaningJudge } from '../meaning';
+import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
+import { RecordError, toWav, type Recording } from '../recorder';
 import { distractors, settled, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, h, hookView, icon, iconButton, pageHeader } from '../ui';
+import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
-import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, PROBLEMS, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
 
@@ -40,7 +41,18 @@ interface Question {
   failure?: unknown;
   /** The box has been offered, and taken focus, once: later redraws leave the keyboard alone. */
   offered?: boolean;
+  /** Why a spoken answer didn't come through, to say under the box. */
+  unheard?: string;
 }
+
+/** Turns a spoken answer into text. */
+export type MeaningHearer = (audio: Blob) => Promise<string>;
+
+/** OpenAI's speech-to-text, when the learner has given a key for Chat; without one, answers are typed. */
+const hearWithOpenAi = (): MeaningHearer | null => {
+  const key = getApiKey();
+  return key ? (audio) => transcribe(key, audio) : null;
+};
 
 /** What `picked` holds for a typed meaning that wasn't right. */
 const MISSED = '';
@@ -73,7 +85,12 @@ export function pickNext(app: App, recent: string[], missed: Map<string, number>
   return (open.find((p) => (r -= p.w) <= 0) ?? open[open.length - 1]).card;
 }
 
-export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeaning: MeaningJudge | null = askOpenAi): HTMLElement {
+export function practiceScreen(
+  app: App,
+  deps: SpeakDeps = defaultDeps,
+  askMeaning: MeaningJudge | null = askOpenAi,
+  hearMeaning: () => MeaningHearer | null = hearWithOpenAi,
+): HTMLElement {
   const root = h('div', { class: 'practice' });
   const learned = Object.keys(app.progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length;
   const canListen = canPlay();
@@ -96,6 +113,12 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
   let picked: string | null = null;
   /** A typed meaning is being checked. */
   let checking = false;
+  /** Recording a spoken meaning, from a tap on the box's microphone button. */
+  let listening: Recording | null = null;
+  /** The recording whose spoken meaning is being turned into text; a reply for any other is dropped. */
+  let hearing: Recording | null = null;
+  /** Waiting for a pause in typing before taking a right meaning without Check. */
+  let typingPause: ReturnType<typeof setTimeout> | undefined;
   /** Questions moved past this round. */
   let done = 0;
   let distractorPool: Card[] = VOCAB;
@@ -167,18 +190,20 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
    * browser would ask for the microphone, the phone asks now, over a holding screen, rather than over a speaking question.
    */
   function askForMicrophoneIfNeeded(): void {
+    // Not over an answer being checked or heard, or one counting down to the next: the holding screen would hide it. A later speaking question asks for itself.
+    if (checking || hearing || listening || auto) return;
     if (waiting || !canSpeak || !current || !modes().includes('speak') || !needsMicrophone(deps)) return;
     waiting = true;
     void askForMicrophone(deps).then((answer) => {
       if (answer === 'left') return;
       waiting = false;
       speakSkipped = answer === 'refused';
-      if (current && !picked && !modes().includes(current.mode)) {
+      if (current && picked === null && !modes().includes(current.mode)) {
         current = nextQuestion();
         if (current) preload(current.card);
       }
       // An answered question (the chip tapped after answering) is shown again as it was.
-      if (picked) draw();
+      if (picked !== null) draw();
       else ask();
     });
   }
@@ -232,7 +257,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
 
   /** Play a card, except on a speaking question before an attempt or while the microphone is open (see `mayPlay`). */
   function sayCard(card: Card, slow = false): void {
-    if (speak && !speak.mayPlay()) return;
+    // Nor while the meaning is being said into the microphone, which would record it.
+    if ((speak && !speak.mayPlay()) || listening) return;
     void play(card, slow);
   }
 
@@ -257,6 +283,63 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
       q.failure = failure;
       answer(q, right ? q.card.id : MISSED);
     });
+  }
+
+  /** The box's microphone button: record the meaning said out loud, turn it into text, and check that. A second tap stops early. */
+  function sayMeaning(q: Question): void {
+    if (listening) return listening.stop();
+    const hearer = hearMeaning();
+    if (!hearer || picked !== null || checking || hearing) return;
+    // The word playing would be recorded too.
+    stop();
+    q.unheard = undefined;
+    const recording = deps.record();
+    listening = recording;
+    draw();
+    const unheard = (why: string) => {
+      if (hearing === recording) hearing = null;
+      if (current !== q || !root.isConnected) return;
+      q.unheard = why;
+      draw();
+    };
+    recording.audio.then(
+      async (take) => {
+        if (listening !== recording) return;
+        listening = null;
+        if (current !== q || !q.typed || !root.isConnected || picked !== null) return draw();
+        if (!take.speech) return unheard("Didn't hear anything. Tap the microphone and say it again, or type it.");
+        hearing = recording;
+        draw();
+        let text: string;
+        try {
+          text = await hearer(toWav(take.samples));
+        } catch (e) {
+          // Dropped (quiet mode came on, or the question went) while it was being heard.
+          if (hearing !== recording) return;
+          return unheard(failedKey(e) ? errorText(e) : "Couldn't hear it through OpenAI. Type it instead.");
+        }
+        if (hearing !== recording) return;
+        hearing = null;
+        if (current !== q || !q.typed || !root.isConnected || picked !== null) return;
+        if (!text) return unheard("Didn't catch that. Tap the microphone and say it again, or type it.");
+        q.draft = text;
+        send(text);
+      },
+      (e) => {
+        if (listening !== recording) return;
+        listening = null;
+        unheard(e instanceof RecordError ? PROBLEMS[e.problem] : PROBLEMS['no-mic']);
+      },
+    );
+  }
+
+  /** Stop recording a spoken meaning and drop it: the question is going. */
+  function stopListening(): void {
+    const recording = listening;
+    listening = null;
+    // A reply still on its way is dropped when it comes.
+    hearing = null;
+    recording?.cancel();
   }
 
   function answer(q: Question, pick: string): void {
@@ -293,12 +376,14 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
     if (!q || picked !== null) return;
     q.typed = false;
     checking = false;
+    stopListening();
     draw();
   }
 
   /** Next question; `back` is this one's pick, when it moved on by itself, so it can be looked back at. */
   function advance(back: string | null = null): void {
     hold();
+    stopListening();
     settle(spokenRight);
     done++;
     previous = current;
@@ -318,12 +403,15 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
    * the one showing, while it's unanswered, so the change shows straight away.
    */
   function rescope(): void {
+    // Quiet mode means nothing listens.
+    if (app.progress.settings.quiet) stopListening();
     askForMicrophoneIfNeeded();
     if (waiting) return draw();
     const ways = modes();
     if (upcoming && !ways.includes(upcoming.mode)) upcoming = null;
     if (current && picked === null && !checking && !lookingBack && !ways.includes(current.mode)) {
       hold();
+      stopListening();
       // Anything settled on the old question (a right spoken attempt picks what's next) goes with it.
       upcoming = null;
       current = nextQuestion();
@@ -389,7 +477,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
     const toggle = h(
       'button',
       {
-        class: `chip filter-toggle ${mix ? '' : 'selected'}`,
+        class: 'chip filter-toggle',
         'aria-expanded': String(scopeOpen),
         'aria-controls': 'drill-scope',
         'aria-label': `Questions: ${label}`,
@@ -411,20 +499,14 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
         { class: 'chips', role: 'group', 'aria-label': 'Ask' },
         MODES.map((m) => {
           const on = scope.has(m.id);
-          return h(
-            'button',
-            {
-              class: `chip ${on ? 'selected' : ''}`,
-              'data-mode': m.id,
-              'aria-pressed': String(on),
-              // One that can't be asked right now keeps its place, for when quiet mode goes off.
-              disabled: unavailable(m.id) !== null,
-              // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
-              'aria-disabled': String(on && picks.length === 1 && picks[0] === m.id),
-              onclick: () => toggleScope(m.id),
-            },
-            m.title,
-          );
+          return chip(m.title, on, {
+            'data-mode': m.id,
+            // One that can't be asked right now keeps its place, for when quiet mode goes off.
+            disabled: unavailable(m.id) !== null,
+            // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
+            'aria-disabled': String(on && picks.length === 1 && picks[0] === m.id),
+            onclick: () => toggleScope(m.id),
+          });
         }),
       ),
       reasons.length > 0 && h('p', { class: 'muted scope-note' }, reasons.join(' ')),
@@ -488,7 +570,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
       'div',
       { class: 'session' },
       ...header(),
-      previousPick && !answered && !checking && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
+      previousPick && !answered && !checking && !listening && !hearing && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
       h(
         'div',
         { class: 'panel' },
@@ -522,22 +604,56 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
     );
   }
 
-  /** A box to type the meaning in, or to say it with the keyboard's microphone; it keeps what was sent, marked right or wrong. */
+  /** Records the meaning said out loud; a second tap stops. Silent itself, since its tap would be recorded. */
+  function micButton(q: Question): HTMLButtonElement {
+    const button = iconButton('mic', listening ? 'Stop recording' : 'Say it out loud', () => sayMeaning(q), { pressed: listening !== null });
+    button.type = 'button';
+    button.classList.add('meaning-mic');
+    button.classList.toggle('listening', listening !== null);
+    button.disabled = checking || hearing !== null;
+    button.setAttribute('data-no-tap', '');
+    return button;
+  }
+
+  /**
+   * A box to type the meaning in; it keeps what was sent, marked right or wrong. A meaning the device can tell is
+   * right is taken as it's typed, without Check. With a key for OpenAI, and outside quiet mode, a microphone button
+   * beside it records the meaning said out loud instead.
+   */
   function typedAnswer(q: Question, picked: string | null): HTMLElement {
     const answered = picked !== null;
+    const busy = checking || hearing !== null || listening !== null;
     const input = h('input', {
       class: `meaning-input ${answered ? (picked === q.card.id ? 'correct' : 'wrong') : ''}`,
       type: 'text',
       'aria-label': 'What it means, in English',
-      placeholder: app.progress.settings.quiet ? 'Type it in English' : 'Type or say it in English',
+      placeholder: 'Type it in English',
       autocomplete: 'off',
       enterkeyhint: 'done',
-      disabled: answered || checking,
+      disabled: answered || busy,
       'data-autofocus': (!answered && !q.offered) || undefined,
-      oninput: () => (q.draft = input.value),
+      oninput: () => {
+        q.draft = input.value;
+        // Only a meaning the device is sure of, once typing pauses: "no" is right for Hindi, but not on the way to "now".
+        // Anything else waits for Check, so a wrong answer is never sent.
+        clearTimeout(typingPause);
+        typingPause = setTimeout(() => {
+          if (input.isConnected && matchesMeaning(input.value, q.card)) send(input.value);
+        }, TYPING_PAUSE_MS);
+      },
+      // The keyboard takes the bottom of the screen; keep the box in sight above it.
+      onfocus: () => setTimeout(() => input.closest('form')?.scrollIntoView({ block: 'nearest' }), 300),
     });
     input.value = q.answer ?? q.draft ?? '';
     q.offered = true;
+    const mic =
+      !answered &&
+      !app.progress.settings.quiet &&
+      canSpeak &&
+      !speakSkipped &&
+      hearMeaning() !== null &&
+      micButton(q);
+    const status = listening ? 'Listening… say what it means.' : hearing ? 'Hearing what you said…' : (!answered && q.unheard) || null;
     return h(
       'form',
       {
@@ -547,13 +663,14 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
           send(input.value);
         },
       },
-      input,
+      h('div', { class: 'meaning-row' }, input, mic),
+      status && h('p', { class: 'muted meaning-status', role: 'status' }, status),
       !answered &&
         h(
           'div',
           { class: 'row' },
           h('button', { class: 'btn secondary', type: 'button', onclick: showChoices }, 'Show choices'),
-          h('button', { class: 'btn primary', type: 'submit', disabled: checking }, checking ? 'Checking…' : 'Check'),
+          h('button', { class: 'btn primary', type: 'submit', disabled: busy }, checking ? 'Checking…' : 'Check'),
         ),
     );
   }
@@ -582,8 +699,16 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
   return root;
 }
 
-/** Why a typed meaning was only checked on the device. A key or billing problem says what to fix; anything else, that OpenAI couldn't be reached. */
+/** How long typing has to pause before a meaning the device can tell is right is taken without Check. */
+const TYPING_PAUSE_MS = 700;
+
+/** A key or billing problem, which says what to fix; anything else is told as OpenAI not being reached. */
+function failedKey(e: unknown): e is AiError {
+  return e instanceof AiError && (e.kind === 'key' || e.kind === 'quota');
+}
+
+/** Why a typed meaning was only checked on the device. */
 function checkProblem(failure: unknown): string {
-  const fix = failure instanceof AiError && (failure.kind === 'key' || failure.kind === 'quota') ? `${errorText(failure)} ` : "Couldn't reach OpenAI to check other wordings. ";
+  const fix = failedKey(failure) ? `${errorText(failure)} ` : "Couldn't reach OpenAI to check other wordings. ";
   return `${fix}If you meant the same thing, tap I had it right.`;
 }

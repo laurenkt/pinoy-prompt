@@ -57,7 +57,8 @@ let sharedPlayer: Player | null = null;
 
 type Problem = RecordProblem | 'download' | 'start' | 'failed';
 
-const PROBLEMS: Record<Problem, string> = {
+/** What went wrong, in words; the recording ones are used by Drills' spoken meanings too. */
+export const PROBLEMS: Record<Problem, string> = {
   unsupported: "This browser can't record from the microphone, so speaking questions are off here.",
   denied: 'The microphone is blocked. Allow it for this site in your browser settings, then try again.',
   'no-mic': "Couldn't use the microphone. Check that the device has one and no other app is using it.",
