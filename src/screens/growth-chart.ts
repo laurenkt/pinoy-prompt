@@ -212,8 +212,10 @@ export function growthChart(
   /** A point `u` of the way from today to the next milestone, read off the projection. */
   function showAhead(u: number): void {
     if (!next) return;
-    const known = forecast!.known;
-    value.textContent = `~${Math.round(known + u * (next.words - known))}`;
+    // From where the drawn projection starts, today's top of the stream.
+    const from = total(last);
+    value.textContent = `~${Math.round(from + u * (next.words - from))}`;
+    for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][last]);
     when.textContent = ` words by ${monthYear(times[last] + u * (next.at - times[last]))}`;
     lookAt(false, past + u * (1 - past));
   }
