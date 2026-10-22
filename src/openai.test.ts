@@ -4,6 +4,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AiError,
+  CHECK_MODEL,
+  checkMeaning,
   errorText,
   forgetApiKey,
   getApiKey,
@@ -305,5 +307,33 @@ describe('startCall', () => {
     };
     await expect(startCall(KEY, PROMPT, f.events, f.deps)).rejects.toThrow(/microphone/);
     expect(f.fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('checking a typed meaning', () => {
+  const CARD = { tl: 'Maraming salamat', en: 'Thank you very much', answer: 'thanks a lot' };
+  const verdict = (right: boolean) => json(200, { output: [{ type: 'reasoning' }, { type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ right }) }] }] });
+
+  it('sends only the card and the answer, and reads back the verdict', async () => {
+    const fetchFn = vi.fn(async () => verdict(true));
+    expect(await checkMeaning(KEY, CARD, fetchFn as unknown as typeof fetch)).toBe(true);
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.openai.com/v1/responses');
+    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${KEY}`);
+    const body = JSON.parse(String(init.body));
+    expect(body.model).toBe(CHECK_MODEL);
+    expect(body.store).toBe(false);
+    expect(body.input).toBe('Tagalog: Maraming salamat\nMeaning: Thank you very much\nAnswer: thanks a lot');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('reads a wrong verdict', async () => {
+    expect(await checkMeaning(KEY, CARD, (async () => verdict(false)) as unknown as typeof fetch)).toBe(false);
+  });
+
+  it('fails on a bad key, a lost connection or no verdict', async () => {
+    await expect(checkMeaning(KEY, CARD, (async () => json(401, { error: { message: 'bad key' } })) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'key' });
+    await expect(checkMeaning(KEY, CARD, (async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+    await expect(checkMeaning(KEY, CARD, (async () => json(200, { output: [] })) as unknown as typeof fetch)).rejects.toBeInstanceOf(AiError);
   });
 });

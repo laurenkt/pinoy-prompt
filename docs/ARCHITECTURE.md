@@ -18,13 +18,13 @@ Each system has one owner module. Anything else that needs it calls that module.
 | Shared UI | `src/ui.ts` | `h`, `svg`, `icon`, and the plain pieces used on three or more screens. A shared piece with its own behaviour gets its own file in `src/screens/` (the quiet toggle in `quiet.ts`). |
 | Look | `src/style.css` | Colour, outline, shadow and radius tokens on `:root`; one section per screen. |
 | Saved progress | `src/store.ts`, `src/progress-schema.ts`, `src/progress-mirror.ts` | Everything in `localStorage` under `pinoy-prompt:progress`, and its IndexedDB mirror. Settings live inside progress. |
-| Learning | `src/deck.ts`, `src/guides.ts`, `src/srs.ts`, `src/session.ts`, `src/memory.ts` | Content, the schedule, what Study asks next, memory stats. No DOM. |
+| Learning | `src/deck.ts`, `src/guides.ts`, `src/srs.ts`, `src/session.ts`, `src/memory.ts`, `src/meaning.ts` | Content, the schedule, what Study asks next, memory stats, judging a typed meaning. No DOM. |
 | Audio out | `src/audio-engine.ts` | The one shared `AudioContext`, decoding and playing buffers. |
 | Card audio | `src/speech.ts`, `src/spoken.ts`, `src/clips.json`, `scripts/generate-audio.mjs` | Playing a card's recorded clip (`play`, `stop`, `preload`), the built-in voice as fallback, the right-answer `chime` and the button `tick`, mute for quiet mode. |
 | Microphone | `src/microphone.ts`, `src/recorder.ts` | The one shared mic stream; recording a take. |
 | iOS audio session | `src/audio-session.ts` | Called by the engine and card audio (`playback`) and the microphone (`play-and-record`) only. |
 | Speaking | `src/fbank.ts`, `src/phone-model.ts`, `src/model-cache.ts`, `src/phonetics.ts`, `src/coach.ts`, `src/player.ts` | Recognising and judging a spoken attempt; playing slices and reference sounds through the engine. |
-| Chat | `src/openai.ts`, `src/talk.ts`, `src/visualizer.ts`, `src/screens/talk.ts` | The OpenAI key and call, what the AI is told, the backdrop. |
+| Chat | `src/openai.ts`, `src/talk.ts`, `src/visualizer.ts`, `src/screens/talk.ts` | The OpenAI key and call, what the AI is told, the backdrop. `openai.ts` is the one place that talks to OpenAI, so Drills' meaning check (`checkMeaning`) lives there too. |
 | Offline | `public/sw.js`, `src/clip-cache.ts`, `src/model-cache.ts` | The app shell, word clips and the speech model in Cache Storage. Code loaded on demand is named by the build, and an installed app can stay open across a deploy that removes it, so it's loaded at start instead (`keepSpeakingReady`); a new dynamic import needs the same. |
 | Tests and CI | `src/**/*.test.ts`, `src/test/`, `.github/workflows/ci.yml` | See below. |
 

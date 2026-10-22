@@ -1218,6 +1218,57 @@ p {
   font-size: 0.85rem;
 }
 
+/* Listening to a settled word: the meaning is typed, and the box keeps it, marked like a choice. */
+.meaning-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.meaning-input {
+  font: inherit;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--cream);
+  border: var(--outline);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  padding: 12px 14px;
+  min-height: 56px;
+  width: 100%;
+  /* Below 16px, iOS zooms in on the box. */
+  font-size: max(1rem, 16px);
+}
+
+.meaning-input::placeholder {
+  color: var(--line);
+}
+
+.meaning-input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: currentColor;
+}
+
+.meaning-input.correct {
+  background: var(--teal);
+}
+
+.meaning-input.wrong {
+  background: var(--magenta);
+}
+
+/* Check takes the room; Show choices keeps to one line. */
+.meaning-form .row .btn.secondary {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.btn.claim {
+  width: 100%;
+  margin-top: 12px;
+}
+
 /* Speaking questions */
 
 .prompt-meaning {

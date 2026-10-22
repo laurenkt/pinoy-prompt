@@ -1,6 +1,6 @@
 import '@fontsource-variable/bricolage-grotesque';
 import './style.css';
-import type { App, Route } from './app';
+import { typingInBox, type App, type Route } from './app';
 import { backHistory } from './back-history';
 import { homeScreen } from './screens/home';
 import { practiceScreen } from './screens/practice';
@@ -126,6 +126,7 @@ if (matchMedia('(display-mode: standalone)').matches || (navigator as { standalo
 
 document.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (typingInBox(e)) return;
   keyHandler?.(e);
 });
 
