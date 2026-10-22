@@ -1062,6 +1062,12 @@ p {
   color: var(--pink);
 }
 
+/* The browser's own words for what went wrong, which can be one long unbroken string. */
+.problem-detail {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .answer {
   border-top: 3px dashed var(--line);
   margin-top: 4px;

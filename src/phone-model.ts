@@ -15,7 +15,7 @@ import { fbank, NUM_MEL_BINS } from './fbank';
 import { groupTimed, type TimedToken } from './phonetics';
 import TOKENS from './phone-tokens.json';
 
-import { CACHE, MODEL_URL } from './model-cache';
+import { CACHE, DownloadError, MODEL_URL } from './model-cache';
 
 export { MODEL_URL, modelDownloaded } from './model-cache';
 
@@ -40,7 +40,9 @@ async function readAll(body: ReadableStream<Uint8Array>, onProgress?: (fraction:
   const chunks: Uint8Array[] = [];
   let received = 0;
   for (;;) {
-    const { done, value } = await reader.read();
+    const { done, value } = await reader.read().catch((err: unknown) => {
+      throw new DownloadError(`Model download dropped: ${String(err)}`);
+    });
     if (done) break;
     if (stop?.now) {
       await reader.cancel().catch(() => {});
@@ -62,12 +64,11 @@ async function fetchModel(onProgress?: (fraction: number) => void): Promise<Arra
   } catch {
     // No Cache API (e.g. private mode), or an unreadable copy: download it.
   }
-  const response = await fetch(MODEL_URL);
-  if (!response.ok || !response.body) throw new Error(`Model download failed: ${response.status}`);
+  const body = await download();
 
   if (cache) {
     // Stream straight into the cache and read it back once, so the phone holds one copy in memory, not three.
-    const [toCache, toCount] = response.body.tee();
+    const [toCache, toCount] = body.tee();
     const stop = { now: false };
     const counting = readAll(toCount, onProgress, false, stop);
     counting.catch(() => {});
@@ -82,28 +83,37 @@ async function fetchModel(onProgress?: (fraction: number) => void): Promise<Arra
     try {
       const { received } = await counting;
       // A download cut short must never be kept: it would fail on every launch.
-      if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
+      if (received !== MODEL_BYTES) throw new DownloadError(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
       const stored = await cache.match(MODEL_URL);
       if (stored) return await stored.arrayBuffer();
     } catch (err) {
       await cache.delete(MODEL_URL).catch(() => false);
       throw err;
     }
+    // Stored, then gone (evicted already): the download has been read, so fetch it again into memory.
+    return fetchIntoMemory(onProgress);
   }
 
-  return inMemory(response.body, onProgress);
+  return inMemory(body, onProgress);
 }
 
 /** Download the model without keeping it, for when it can't be stored. */
 async function fetchIntoMemory(onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
-  const response = await fetch(MODEL_URL);
-  if (!response.ok || !response.body) throw new Error(`Model download failed: ${response.status}`);
-  return inMemory(response.body, onProgress);
+  return inMemory(await download(), onProgress);
+}
+
+/** Start the model's download, failing with a DownloadError if it can't. */
+async function download(): Promise<ReadableStream<Uint8Array>> {
+  const response = await fetch(MODEL_URL).catch((err: unknown) => {
+    throw new DownloadError(`Model download failed: ${String(err)}`);
+  });
+  if (!response.ok || !response.body) throw new DownloadError(`Model download failed: ${response.status}`);
+  return response.body;
 }
 
 async function inMemory(body: ReadableStream<Uint8Array>, onProgress?: (fraction: number) => void): Promise<ArrayBuffer> {
   const { chunks, received } = await readAll(body, onProgress, true);
-  if (received !== MODEL_BYTES) throw new Error(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
+  if (received !== MODEL_BYTES) throw new DownloadError(`Model download incomplete: ${received} of ${MODEL_BYTES} bytes`);
   const bytes = new Uint8Array(received);
   let offset = 0;
   for (const chunk of chunks) {

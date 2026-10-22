@@ -7,6 +7,11 @@ export const MODEL_URL =
 // public/sw.js checks for this cache by name to keep the model's runtime offline too.
 export const CACHE = 'pinoy-prompt-models-v1';
 
+/** The model couldn't be fetched: no connection, a server error, or a download cut short. Anything else that stops it loading is not this. */
+export class DownloadError extends Error {
+  override name = 'DownloadError';
+}
+
 /** Whether the model is already on the device. */
 export async function modelDownloaded(): Promise<boolean> {
   try {
