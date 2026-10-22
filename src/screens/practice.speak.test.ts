@@ -54,7 +54,7 @@ function button(name: string): HTMLButtonElement {
 beforeEach(() => document.body.replaceChildren());
 
 describe('Speak mode', () => {
-  it('runs a round of spoken questions and counts the good ones', async () => {
+  it('runs a round of spoken questions', async () => {
     document.body.append(practiceScreen(fakeApp(), deps()));
     await flush();
     button('Speak').click();
@@ -63,10 +63,24 @@ describe('Speak mode', () => {
     button("I'm done").click();
     await flush();
     expect(document.querySelector('.feedback strong')?.textContent).toBe('Tama!');
-    expect(document.querySelector('.session-title')?.textContent).toBe('1 right');
     button('Next').click();
     await flush();
     expect(button('Tap and speak')).toBeTruthy();
+  });
+
+  it('goes back to the menu when quiet mode comes on mid-round', async () => {
+    const app = fakeApp();
+    document.body.append(practiceScreen(app, deps()));
+    await flush();
+    button('Speak').click();
+    await flush();
+    button('Tap and speak').click();
+    button("I'm done").click();
+    await flush();
+    app.progress.settings.quiet = true;
+    button('Next').click();
+    expect(document.querySelector('.session-header')).toBeNull();
+    expect(document.body.textContent).toContain('Off in quiet mode');
   });
 
   it('is offered but explained when the browser cannot record', async () => {

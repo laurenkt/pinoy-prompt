@@ -42,6 +42,10 @@ describe('picking the next drill word', () => {
     expect(missed).toBeGreaterThan(plain * 1.5);
   });
 
+  it('asks the only word known again and again', () => {
+    expect(pickNext(fakeApp(['oo']), ['oo'], new Map())!.id).toBe('oo');
+  });
+
   it('has nothing to ask with no words', () => {
     const app = fakeApp([]);
     expect(pickNext(app, [], new Map())).toBeNull();

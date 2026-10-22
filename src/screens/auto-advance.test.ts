@@ -147,7 +147,7 @@ describe('moving on after a right answer in a drill', () => {
     expect(root.querySelector('.hook')?.textContent).toContain(first.hook);
     button(root, 'Back to the current card').click();
     expect(root.querySelector('.choice:disabled')).toBeNull();
-    expect(root.querySelector('.session-title')?.textContent).toBe('1 right');
+    expect(root.querySelector('.session-count')?.textContent).toBe('1 done');
   });
 
   it('keeps asking until the learner closes it, with no word straight after itself', () => {
@@ -160,7 +160,7 @@ describe('moving on after a right answer in a drill', () => {
       answer(root, true);
       vi.advanceTimersByTime(ADVANCE_MS);
     }
-    expect(root.querySelector('.session-title')?.textContent).toBe('25 right');
+    expect(root.querySelector('.session-count')?.textContent).toBe('25 done');
   });
 
   it('waits for Next after a miss', () => {
