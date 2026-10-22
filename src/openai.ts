@@ -124,6 +124,56 @@ async function post(key: string, path: string, body: unknown, fetchFn: typeof fe
   return response;
 }
 
+/** Checks a typed meaning in Drills. Small and quick: a yes or no on a short phrase. */
+export const CHECK_MODEL = 'gpt-5.4-mini';
+/** A check slower than this isn't worth the wait; the learner can judge it themselves. */
+const CHECK_TIMEOUT_MS = 8000;
+
+const CHECK_INSTRUCTIONS = `You check a beginner's answer in a Tagalog listening drill. They heard a Tagalog word or phrase and wrote what they think it means in English, possibly with a phone's dictation.
+Judge only whether they understood the meaning. Spelling, grammar, word order and wording don't matter; synonyms, paraphrases and a missing "please" or "very" are still right, and so is any one of the meanings separated by "/".
+It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.`;
+
+/**
+ * Ask OpenAI whether `answer` means the same as the card's English. Sends
+ * only the card and the typed answer.
+ */
+export async function checkMeaning(
+  key: string,
+  { tl, en, answer }: { tl: string; en: string; answer: string },
+  fetchFn: typeof fetch = (...args) => fetch(...args),
+): Promise<boolean> {
+  const response = await post(
+    key,
+    '/responses',
+    {
+      model: CHECK_MODEL,
+      reasoning: { effort: 'none' },
+      instructions: CHECK_INSTRUCTIONS,
+      input: `Tagalog: ${tl}\nMeaning: ${en}\nAnswer: ${answer.slice(0, 200)}`,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'verdict',
+          strict: true,
+          schema: { type: 'object', properties: { right: { type: 'boolean' } }, required: ['right'], additionalProperties: false },
+        },
+      },
+      store: false,
+    },
+    fetchFn,
+    AbortSignal.timeout(CHECK_TIMEOUT_MS),
+  );
+  const body = (await response.json()) as { output?: { type?: string; content?: { type?: string; text?: string }[] }[] };
+  const text = body.output?.find((o) => o.type === 'message')?.content?.find((c) => c.type === 'output_text')?.text;
+  try {
+    const verdict = JSON.parse(text ?? '') as { right?: unknown };
+    if (typeof verdict.right === 'boolean') return verdict.right;
+  } catch {
+    // Fall through.
+  }
+  throw new AiError('other', 'OpenAI answered without a verdict.');
+}
+
 export interface ChatTurn {
   who: 'you' | 'ai';
   text: string;

@@ -1,6 +1,8 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card } from '../deck';
-import { distractors, shuffle } from '../session';
+import { canTypeMeaning, judgeMeaning, type MeaningJudge } from '../meaning';
+import { AiError, checkMeaning, errorText, getApiKey } from '../openai';
+import { distractors, settled, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, h, hookView, icon, pageHeader } from '../ui';
@@ -28,7 +30,26 @@ interface Question {
   card: Card;
   mode: Mode;
   choices: Card[];
+  /** Listening to a word that has settled in Study: the meaning is typed (or dictated), not picked. */
+  typed: boolean;
+  /** What's typed so far, kept while the screen is redrawn. */
+  draft?: string;
+  /** What was typed, once it's sent. */
+  answer?: string;
+  /** Why OpenAI couldn't be asked about the answer, so it was only checked on the device. */
+  failure?: unknown;
+  /** The box has been offered, and taken focus, once: later redraws leave the keyboard alone. */
+  offered?: boolean;
 }
+
+/** What `picked` holds for a typed meaning that wasn't right. */
+const MISSED = '';
+
+/** Asks OpenAI, when the learner has given a key for Chat. */
+const askOpenAi: MeaningJudge = async (answer, card) => {
+  const key = getApiKey();
+  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer }) : null;
+};
 
 /** Weaker cards (missed often, low ease, short interval) come up more. */
 function weight(state: CardState): number {
@@ -52,7 +73,7 @@ export function pickNext(app: App, recent: string[], missed: Map<string, number>
   return (open.find((p) => (r -= p.w) <= 0) ?? open[open.length - 1]).card;
 }
 
-export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLElement {
+export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeaning: MeaningJudge | null = askOpenAi): HTMLElement {
   const root = h('div', { class: 'practice' });
   const learned = Object.keys(app.progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length;
   const canListen = canPlay();
@@ -73,6 +94,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   /** The question after, picked once this one is answered so its word can load. */
   let upcoming: Question | null = null;
   let picked: string | null = null;
+  /** A typed meaning is being checked. */
+  let checking = false;
   /** Questions moved past this round. */
   let done = 0;
   let distractorPool: Card[] = VOCAB;
@@ -130,19 +153,23 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     recent = [...recent.slice(-RECENT), card.id];
     const field = mode === 'recall' ? 'tl' : 'en';
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
-    return { card, mode, choices };
+    const typed = mode === 'listen' && settled(app.progress, card.id) && canTypeMeaning(card);
+    return { card, mode, choices, typed };
   }
 
   /** Note how the current question went, so a miss comes back soon, and pick the one after it. */
   function settle(right: boolean): void {
     if (!current || upcoming) return;
-    const id = current.card.id;
+    tally(current.card.id, right);
+    upcoming = nextQuestion();
+    if (upcoming) preload(upcoming.card);
+  }
+
+  function tally(id: string, right: boolean): void {
     const misses = missed.get(id) ?? 0;
     if (!right) missed.set(id, misses + 1);
     else if (misses > 1) missed.set(id, misses - 1);
     else missed.delete(id);
-    upcoming = nextQuestion();
-    if (upcoming) preload(upcoming.card);
   }
 
   function ask(): void {
@@ -184,9 +211,30 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   function choose(choice: Card): void {
     const q = current;
-    if (!q || picked) return;
-    picked = choice.id;
-    const right = choice.id === q.card.id;
+    if (!q || picked !== null) return;
+    answer(q, choice.id);
+  }
+
+  /** Check a typed meaning: on the device, then with OpenAI when there's a key. */
+  function send(text: string): void {
+    const q = current;
+    // Nothing typed (an Enter meant for Next, say) isn't an answer; "Show choices" is there for not knowing.
+    if (!q || picked !== null || checking || !text.trim()) return;
+    q.answer = text.trim();
+    checking = true;
+    draw();
+    void judgeMeaning(q.answer, q.card, askMeaning).then(({ right, failure }) => {
+      // Left the question (or the drill), or went to the choices, while it was being checked.
+      if (current !== q || !q.typed || !root.isConnected) return;
+      checking = false;
+      q.failure = failure;
+      answer(q, right ? q.card.id : MISSED);
+    });
+  }
+
+  function answer(q: Question, pick: string): void {
+    picked = pick;
+    const right = pick === q.card.id;
     // The chime first, so the word said back is heard after it.
     if (right) void chime();
     if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
@@ -194,8 +242,30 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (right)
       auto = countdown(root, () => {
         autoMoved = true;
-        advance(choice.id);
+        advance(pick);
       });
+    draw();
+  }
+
+  /** The learner says a typed meaning marked wrong was right after all: the check only goes by the card's wording. */
+  function claim(): void {
+    const q = current;
+    if (!q || picked !== MISSED) return;
+    picked = q.card.id;
+    // Count it as the right answer it was: take back the miss, then tally it right.
+    const misses = missed.get(q.card.id) ?? 0;
+    if (misses > 1) missed.set(q.card.id, misses - 1);
+    else missed.delete(q.card.id);
+    tally(q.card.id, true);
+    draw();
+  }
+
+  /** Not sure enough to type it, or tired of waiting for the check: pick from choices instead. */
+  function showChoices(): void {
+    const q = current;
+    if (!q || picked !== null) return;
+    q.typed = false;
+    checking = false;
     draw();
   }
 
@@ -210,6 +280,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     current = upcoming && modes().includes(upcoming.mode) ? upcoming : nextQuestion();
     upcoming = null;
     picked = null;
+    checking = false;
     ask();
   }
 
@@ -222,7 +293,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   function rescope(): void {
     const ways = modes();
     if (upcoming && !ways.includes(upcoming.mode)) upcoming = null;
-    if (current && !picked && !lookingBack && !ways.includes(current.mode)) {
+    if (current && picked === null && !checking && !lookingBack && !ways.includes(current.mode)) {
       hold();
       // Anything settled on the old question (a right spoken attempt picks what's next) goes with it.
       upcoming = null;
@@ -353,7 +424,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       prompt = h(
         'div',
         { class: 'prompt center' },
-        h('p', { class: 'eyebrow' }, 'What did you hear?'),
+        h('p', { class: 'eyebrow' }, q.typed ? 'What does it mean?' : 'What did you hear?'),
         audioPair(say, true),
         answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
       );
@@ -382,13 +453,14 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         quietToggle(app, rescope, { iconOnly: true }),
       ),
       scopeChips,
-      previousPick && !answered && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
+      previousPick && !answered && !checking && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
       h(
         'div',
         { class: 'panel' },
         prompt,
         q.mode === 'speak' ? speak?.el : null,
-        q.mode !== 'speak' &&
+        q.typed && typedAnswer(q, picked),
+        q.mode !== 'speak' && !q.typed &&
           choiceList(q.choices, {
             key: (c) => c.id,
             label: (c) => c[field],
@@ -404,12 +476,50 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
             h('strong', null, right ? 'Tama!' : 'Mali.'),
             ' ',
             `${q.card.tl} = ${q.card.en}`,
+            !right && q.failure !== undefined && h('p', { class: 'feedback-note' }, checkProblem(q.failure)),
           ),
         q.mode !== 'speak' && answered && (!right || reviewing) &&
           hookView(q.card),
+        picked === MISSED && !reviewing && h('button', { class: 'btn secondary claim', onclick: claim }, 'I had it right'),
         q.mode !== 'speak' && answered &&
           (reviewing ? continueButton(() => setLookingBack(false), false, 'Back to the current card') : continueButton(() => advance(), auto !== null, 'Next')),
       ),
+    );
+  }
+
+  /** A box to type the meaning in, or to say it with the keyboard's microphone; it keeps what was sent, marked right or wrong. */
+  function typedAnswer(q: Question, picked: string | null): HTMLElement {
+    const answered = picked !== null;
+    const input = h('input', {
+      class: `meaning-input ${answered ? (picked === q.card.id ? 'correct' : 'wrong') : ''}`,
+      type: 'text',
+      'aria-label': 'What it means, in English',
+      placeholder: app.progress.settings.quiet ? 'Type it in English' : 'Type or say it in English',
+      autocomplete: 'off',
+      enterkeyhint: 'done',
+      disabled: answered || checking,
+      'data-autofocus': (!answered && !q.offered) || undefined,
+      oninput: () => (q.draft = input.value),
+    });
+    input.value = q.answer ?? q.draft ?? '';
+    q.offered = true;
+    return h(
+      'form',
+      {
+        class: 'meaning-form',
+        onsubmit: (e: Event) => {
+          e.preventDefault();
+          send(input.value);
+        },
+      },
+      input,
+      !answered &&
+        h(
+          'div',
+          { class: 'row' },
+          h('button', { class: 'btn secondary', type: 'button', onclick: showChoices }, 'Show choices'),
+          h('button', { class: 'btn primary', type: 'submit', disabled: checking }, checking ? 'Checking…' : 'Check'),
+        ),
     );
   }
 
@@ -422,7 +532,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     }
     if (q.mode === 'speak' || lookingBack) return;
     const n = Number(e.key);
-    if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
+    if (picked === null && !q.typed && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });
   // Drills open straight into a round; closing it, or going back, goes Home.
   const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
@@ -433,4 +543,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   }
   ask();
   return root;
+}
+
+/** Why a typed meaning was only checked on the device. A key or billing problem says what to fix; anything else, that OpenAI couldn't be reached. */
+function checkProblem(failure: unknown): string {
+  const fix = failure instanceof AiError && (failure.kind === 'key' || failure.kind === 'quota') ? `${errorText(failure)} ` : "Couldn't reach OpenAI to check other wordings. ";
+  return `${fix}If you meant the same thing, tap I had it right.`;
 }

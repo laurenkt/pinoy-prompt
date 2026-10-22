@@ -49,7 +49,7 @@ export function guideEvery(met: number): number {
  * A card has settled once it has been remembered at least a day after it was
  * met. A card forgotten later and relearned still counts: it was remembered once.
  */
-function settled(progress: Progress, id: string): boolean {
+export function settled(progress: Progress, id: string): boolean {
   const state = progress.cards[id];
   return !!state && state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
 }
