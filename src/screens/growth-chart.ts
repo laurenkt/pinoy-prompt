@@ -70,12 +70,14 @@ function monthYear(time: number): string {
 /** Roughly how long from `now` until `at`, in plain words: weeks, then months, then years. */
 export function timeUntil(at: number, now: number): string {
   const days = (at - now) / DAY_MS;
-  if (days < 10) return 'in about a week';
+  if (days < 4) return 'in a few days';
+  if (days < 11) return 'in about a week';
   if (days < 60) return `in about ${Math.round(days / 7)} weeks`;
   const months = Math.round(days / 30.4);
+  if (months === 12) return 'in about a year';
   if (months < 24) return `in about ${months} months`;
   const years = Math.round(days / 365 * 2) / 2;
-  return `in about ${years} years`;
+  return `in about ${years.toLocaleString()} years`;
 }
 
 /** Share of the chart's width for the past when a projection follows it. */
@@ -220,6 +222,9 @@ export function growthChart(
         // Its own tap, not a look along the chart; a mouse over it doesn't look either.
         onpointerdown: (e: PointerEvent) => e.stopPropagation(),
         onpointermove: (e: PointerEvent) => e.stopPropagation(),
+        onpointerenter: (e: PointerEvent) => {
+          if (e.pointerType === 'mouse') show(last);
+        },
         onclick: () => {
           ahead.hidden = !ahead.hidden;
           goal!.setAttribute('aria-expanded', String(!ahead.hidden));
@@ -266,7 +271,7 @@ export function growthChart(
     goal,
     // In the first days the stream is a sliver at the edge; say what is coming.
     times[last] - history.since < 2 * DAY_MS &&
-      h('p', { class: 'growth-hint small', style: next ? { right: `${(1 - PAST) * 100 + 4}%` } : null }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
+      h('p', { class: next ? 'growth-hint small under-goal' : 'growth-hint small', style: next ? { right: `${(1 - PAST) * 100 + 4}%` } : null }, 'This fills in day by day as your cards settle.'),
   );
   const pick = (e: PointerEvent) => {
     const box = frame.getBoundingClientRect();

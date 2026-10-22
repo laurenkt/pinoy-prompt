@@ -381,17 +381,17 @@ p {
   stroke-dasharray: 8 6;
 }
 
-/* The next milestone, labelled in the forecast's corner like a note on the chart. */
+/* The next milestone, a note in the chart's empty top-left corner, clear of the projection. */
 .growth-goal {
   position: absolute;
   z-index: 1;
   top: 6px;
-  right: 6px;
+  left: 6px;
   min-height: 44px;
   padding: 4px 6px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
   background: var(--surface-dim);
   color: var(--text);
@@ -498,6 +498,8 @@ p {
 
 .growth-marker {
   position: absolute;
+  /* Over the milestone's note, so the dot never hides under it. */
+  z-index: 2;
   top: 0;
   bottom: 0;
   width: 0;
@@ -527,6 +529,10 @@ p {
   color: var(--muted);
   font-weight: 600;
   pointer-events: none;
+}
+
+.growth-hint.under-goal {
+  top: 52px;
 }
 
 .growth-back[hidden],

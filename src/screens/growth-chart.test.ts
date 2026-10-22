@@ -129,10 +129,16 @@ describe('forecast', () => {
 
   it("opens the list from the level's label without looking along the chart", () => {
     const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
+    el.querySelector<HTMLElement>('.growth-frame')!.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     const goal = el.querySelector<HTMLElement>('.growth-goal')!;
-    goal.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 290, pointerType: 'mouse' }));
-    goal.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 290, pointerType: 'mouse' }));
-    expect(el.querySelector('.growth-caption')!.textContent).toContain('today');
+    goal.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 20, pointerType: 'mouse' }));
+    goal.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 20, pointerType: 'mouse' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('cards today');
+    // A mouse moving onto it from the chart puts the chart back on today.
+    el.querySelector('.growth-frame')!.dispatchEvent(new PointerEvent('pointermove', { clientX: 20, pointerType: 'mouse' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^0 cards on /);
+    goal.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('cards today');
   });
 
   it('leaves a drag up or down to scroll the page, and follows one sideways', () => {
@@ -141,11 +147,11 @@ describe('forecast', () => {
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     const caption = () => el.querySelector('.growth-caption')!.textContent;
     frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 20, clientY: 50, pointerType: 'touch' }));
-    expect(caption()).toContain('today');
+    expect(caption()).toContain('cards today');
     frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 22, clientY: 90, pointerType: 'touch' }));
     frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 60, clientY: 90, pointerType: 'touch' }));
     frame.dispatchEvent(new PointerEvent('pointerup', { clientX: 60, clientY: 90, pointerType: 'touch' }));
-    expect(caption()).toContain('today');
+    expect(caption()).toContain('cards today');
     frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 50, pointerType: 'touch' }));
     frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 20, clientY: 52, pointerType: 'touch' }));
     expect(caption()).toMatch(/^0 cards on /);
@@ -204,9 +210,13 @@ describe('projected', () => {
 describe('timeUntil', () => {
   const now = Date.now();
   it('says how long in weeks, then months, then years', () => {
+    expect(timeUntil(now + 2 * DAY_MS, now)).toBe('in a few days');
     expect(timeUntil(now + 5 * DAY_MS, now)).toBe('in about a week');
+    expect(timeUntil(now + 10.4 * DAY_MS, now)).toBe('in about a week');
+    expect(timeUntil(now + 12 * DAY_MS, now)).toBe('in about 2 weeks');
     expect(timeUntil(now + 30 * DAY_MS, now)).toBe('in about 4 weeks');
     expect(timeUntil(now + 330 * DAY_MS, now)).toBe('in about 11 months');
+    expect(timeUntil(now + 365 * DAY_MS, now)).toBe('in about a year');
     expect(timeUntil(now + 1000 * DAY_MS, now)).toBe('in about 2.5 years');
   });
 });
