@@ -115,7 +115,7 @@ describe('forecast', () => {
     // Halfway from today (at 70%) to the milestone: halfway from 10 words to 500.
     tap(frame, 20);
     tap(frame, 255);
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 cards by \w+ \d{4}/);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 cards(Back to today)?$/);
     // The legend is back on today, not the day looked at before.
     expect(counts.weeks.textContent).toBe('10');
     expect(el.querySelector<HTMLElement>('.growth-marker')!.style.left).toBe('85%');
@@ -134,7 +134,7 @@ describe('forecast', () => {
     const frame = el.querySelector<HTMLElement>('.growth-frame')!;
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     tap(frame, 210.3);
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~[6-8] cards by /);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~[6-8] cards(Back to today)?$/);
   });
 
   it("opens the list from the level's label without looking along the chart", () => {

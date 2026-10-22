@@ -253,7 +253,7 @@ export function growthChart(
     const from = forecast!.known;
     value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.cards - from))}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][last]);
-    when.textContent = ` cards by ${monthYear(times[last] + u * (next.at - times[last]))}`;
+    when.textContent = ' cards';
     lookAt(false, past + u * (1 - past));
   }
 
