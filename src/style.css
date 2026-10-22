@@ -167,7 +167,6 @@ p {
 
 .btn:active,
 .rate:active,
-.mode:active,
 .icon-btn:active {
   transform: translate(2px, 2px);
   box-shadow: 1px 1px 0 var(--ink);
@@ -925,67 +924,16 @@ p {
   color: var(--muted);
 }
 
-/* Practice */
+/* Drills */
 
-.modes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 18px;
+/* The kinds of question in a round, under the session header when opened. */
+#drill-scope .chips:not(:last-child) {
+  margin-bottom: 8px;
 }
 
-.mode {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 4px;
-  text-align: left;
-  color: var(--on-accent);
-  border: var(--outline);
-  border-radius: var(--radius);
-  box-shadow: 5px 5px 0 var(--ink);
-  padding: 16px;
-  min-height: 140px;
-}
-
-.mode-listen {
-  background: var(--teal);
-}
-
-.mode-read {
-  background: var(--saffron);
-}
-
-.mode-recall {
-  background: var(--magenta);
-}
-
-/* Five modes: Mix it up takes the whole last row. */
-.mode-speak {
-  background: var(--pink);
-}
-
-.mode-mix {
-  background: var(--cream);
-  grid-column: 1 / -1;
-  min-height: 96px;
-}
-
-.mode:disabled {
-  background: var(--surface);
-  color: var(--faint);
-  border: 3px dashed var(--line);
-  box-shadow: none;
-}
-
-.mode-title {
-  font-size: 1.2rem;
-  font-weight: 800;
-}
-
-.mode-desc {
+.scope-note {
+  margin: 0 0 14px;
   font-size: 0.85rem;
-  font-weight: 500;
 }
 
 /* Speaking questions */

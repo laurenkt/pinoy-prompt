@@ -35,3 +35,20 @@ export const noMic = { recordingSupported: () => false, modelDownloaded: async (
 
 /** Let pending promises and timers of 0 ms run. */
 export const flush = () => new Promise((r) => setTimeout(r, 0));
+
+/**
+ * Narrow a drill round to exactly these kinds of question, through its scope chips. The scope is kept across visits,
+ * so a test that cares about it sets it rather than relying on what an earlier test left.
+ */
+export function drillScope(root: HTMLElement, modes: string[]): void {
+  const chips = () => [...root.querySelectorAll<HTMLButtonElement>('#drill-scope [data-mode]')];
+  const set = (on: boolean) => {
+    for (const mode of chips().map((c) => c.dataset.mode!)) {
+      const chip = root.querySelector<HTMLButtonElement>(`#drill-scope [data-mode="${mode}"]`)!;
+      if (modes.includes(mode) === on && (chip.getAttribute('aria-pressed') === 'true') !== on) chip.click();
+    }
+  };
+  // Turn the wanted ones on first, so the last one left on is never one being turned off.
+  set(true);
+  set(false);
+}

@@ -8,7 +8,7 @@ import type { Step } from '../session';
 import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
 import { sessionScreen } from './session';
-import { button, fakeApp, noMic } from '../test/screen';
+import { button, drillScope, fakeApp, noMic } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
 
@@ -115,7 +115,7 @@ describe('moving on after a right answer in a session', () => {
 describe('moving on after a right answer in a drill', () => {
   function round(): HTMLElement {
     const root = mount(practiceScreen(fakeApp(KNOWN), noMic));
-    button(root, 'Read').click();
+    drillScope(root, ['read']);
     return root;
   }
 

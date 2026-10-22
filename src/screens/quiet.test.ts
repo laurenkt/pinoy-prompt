@@ -9,7 +9,7 @@ import { practiceScreen } from './practice';
 import { applyAudioMode, quietToggle } from './quiet';
 import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
-import { button, fakeApp as knowing, flush } from '../test/screen';
+import { button, drillScope, fakeApp as knowing, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'paalam', 'tatlo', 'kape'];
 
@@ -160,16 +160,28 @@ describe('silent quiet mode (no headphones)', () => {
 });
 
 describe('quiet mode in drills', () => {
-  it('turns off the speak drill, and listening too without headphones', async () => {
+  it('takes speaking out of scope, and listening too without headphones', async () => {
     const root = practiceScreen(fakeApp(true, false), micReady);
     await flush();
-    expect(button(root, 'Speak').disabled).toBe(true);
-    expect(button(root, 'Listen').disabled).toBe(true);
-    expect(root.textContent).toContain('Off in quiet mode');
+    const chip = (mode: string) => root.querySelector<HTMLButtonElement>(`#drill-scope [data-mode="${mode}"]`)!;
+    expect(chip('speak').disabled).toBe(true);
+    expect(chip('listen').disabled).toBe(true);
+    expect(root.textContent).toContain('Speak is off in quiet mode.');
     button(root, 'Silent').click();
-    expect(button(root, 'Listen').disabled).toBe(false);
-    expect(button(root, 'Speak').disabled).toBe(true);
+    expect(chip('listen').disabled).toBe(false);
+    expect(chip('speak').disabled).toBe(true);
     button(root, 'Quiet').click();
-    expect(button(root, 'Speak').disabled).toBe(false);
+    expect(chip('speak').disabled).toBe(false);
+  });
+
+  it('swaps an unanswered speaking question for another kind when quiet mode comes on', async () => {
+    const root = practiceScreen(fakeApp(false), micReady);
+    await flush();
+    drillScope(root, ['speak']);
+    expect(speaking(root)).toBe(true);
+    button(root, 'Quiet').click();
+    expect(speaking(root)).toBe(false);
+    expect(root.querySelector('.choice')).not.toBeNull();
+    expect(root.textContent).toContain('0 done');
   });
 });

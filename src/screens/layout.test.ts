@@ -17,7 +17,6 @@ describe('page and session layouts', () => {
   it.each([
     ['Library', wordsScreen],
     ['Settings', settingsScreen],
-    ['Drills', practiceScreen],
   ])('%s is a page: a back arrow to Home above its title', (title, screen) => {
     const app = fakeApp(KNOWN);
     const root = screen(app);
@@ -35,10 +34,12 @@ describe('page and session layouts', () => {
     expect(root.querySelector('.page-header h1')?.textContent).toBe('Drills');
   });
 
-  it('turns Drills into a session once a round starts, with only its close button', () => {
-    const root = practiceScreen(fakeApp(KNOWN));
-    root.querySelector<HTMLButtonElement>('.mode-read')!.click();
+  it('opens Drills straight into a round, a session with only its close button, which goes Home', () => {
+    const app = fakeApp(KNOWN);
+    const root = practiceScreen(app);
     expect(closeButtons(root)).toBe(1);
     expect(backArrows(root)).toBe(0);
+    root.querySelector<HTMLButtonElement>('.session-header .icon-btn')!.click();
+    expect(app.navigate).toHaveBeenCalledWith({ name: 'home' });
   });
 });
