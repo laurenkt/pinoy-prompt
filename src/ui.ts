@@ -168,7 +168,7 @@ export function pageHeader(title: string, onBack: () => void, action?: Node | fa
  * A chosen chip looks the same in every row, whichever it is. A chip in a `radiogroup` says so with
  * `role: 'radio'` in `props` and is checked; any other is pressed.
  */
-export function chip(label: string, selected: boolean, props: Props): HTMLButtonElement {
+export function chip(label: string, selected: boolean, props: Props & { class?: never }): HTMLButtonElement {
   const state = props.role === 'radio' ? 'aria-checked' : 'aria-pressed';
   return h('button', { ...props, class: selected ? 'chip selected' : 'chip', [state]: String(selected) }, label);
 }
