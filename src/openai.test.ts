@@ -3,7 +3,10 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  addSpend,
   AiError,
+  callCost,
+  CENTS_PER_MINUTE,
   CHECK_MODEL,
   checkMeaning,
   errorText,
@@ -12,7 +15,10 @@ import {
   MAX_CALL_SECONDS,
   setApiKey,
   forgetRetiredVoiceChoice,
+  getSpend,
+  PRICES,
   startCall,
+  tokenCost,
   VOICE_MODEL,
   type CallDeps,
   type CallEvents,
@@ -335,5 +341,75 @@ describe('checking a typed meaning', () => {
     await expect(checkMeaning(KEY, CARD, (async () => json(401, { error: { message: 'bad key' } })) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'key' });
     await expect(checkMeaning(KEY, CARD, (async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
     await expect(checkMeaning(KEY, CARD, (async () => json(200, { output: [] })) as unknown as typeof fetch)).rejects.toBeInstanceOf(AiError);
+  });
+});
+
+describe('the spend estimate', () => {
+  beforeEach(() => localStorage.clear());
+  const OCT = new Date(2026, 9, 31, 23, 0).getTime();
+  const NOV = new Date(2026, 10, 1, 0, 30).getTime();
+
+  it('has a price for every token-billed model the app uses', () => {
+    expect(PRICES[CHECK_MODEL]).toBeDefined();
+  });
+
+  it('prices tokens from the usage OpenAI reports, cached input at its own rate', () => {
+    const price = PRICES[CHECK_MODEL];
+    expect(tokenCost(CHECK_MODEL, { input_tokens: 1e6, output_tokens: 1e6 })).toBeCloseTo(price.input + price.output);
+    expect(tokenCost(CHECK_MODEL, { input_tokens: 1e6, input_tokens_details: { cached_tokens: 1e6 } })).toBeCloseTo(price.cachedInput);
+    expect(tokenCost(CHECK_MODEL, undefined)).toBe(0);
+    expect(tokenCost('unknown-model', { input_tokens: 100 })).toBe(0);
+  });
+
+  it('prices call time by the minute', () => {
+    expect(callCost(60)).toBeCloseTo(CENTS_PER_MINUTE / 100);
+    expect(callCost(0)).toBe(0);
+  });
+
+  it('keeps an all-time total and one for each calendar month', () => {
+    expect(getSpend(OCT)).toEqual({ total: 0, month: 0 });
+    addSpend(0.25, OCT);
+    addSpend(0.5, OCT);
+    addSpend(0.1, NOV);
+    expect(getSpend(OCT).month).toBeCloseTo(0.75);
+    expect(getSpend(NOV).month).toBeCloseTo(0.1);
+    expect(getSpend(NOV).total).toBeCloseTo(0.85);
+  });
+
+  it('ignores nothing-costs and survives a damaged copy', () => {
+    addSpend(0, OCT);
+    addSpend(Number.NaN, OCT);
+    expect(localStorage.getItem('pinoy-prompt:openai-spend')).toBeNull();
+    localStorage.setItem('pinoy-prompt:openai-spend', '{not json');
+    addSpend(0.2, OCT);
+    expect(getSpend(OCT)).toEqual({ total: 0.2, month: 0.2 });
+  });
+
+  it('is kept apart from progress and the key, and forgetting the key keeps it', () => {
+    setApiKey(KEY);
+    addSpend(1, OCT);
+    forgetApiKey();
+    expect(Object.keys(localStorage)).toEqual(['pinoy-prompt:openai-spend']);
+    expect(getSpend(OCT).total).toBe(1);
+  });
+
+  it('adds what a meaning check used', async () => {
+    const answer = json(200, {
+      output: [{ type: 'message', content: [{ type: 'output_text', text: '{"right":true}' }] }],
+      usage: { input_tokens: 200, output_tokens: 10 },
+    });
+    await checkMeaning(KEY, { tl: 'Salamat', en: 'Thank you', answer: 'thanks' }, (async () => answer) as unknown as typeof fetch);
+    expect(getSpend().total).toBeCloseTo(tokenCost(CHECK_MODEL, { input_tokens: 200, output_tokens: 10 }));
+    expect(getSpend().total).toBeGreaterThan(0);
+  });
+
+  it("adds a call's time as OpenAI reports it, counting each second once", async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    const call = await startCall(KEY, PROMPT, f.events, f.deps);
+    f.peer.channel.emit({ type: 'session.usage.updated', usage: { seconds: 30 } });
+    f.peer.channel.emit({ type: 'session.usage.updated', usage: { seconds: 90 } });
+    f.peer.channel.emit({ type: 'session.usage.updated', usage: { seconds: 90 } });
+    call.hangUp();
+    expect(getSpend().total).toBeCloseTo(callCost(90));
   });
 });

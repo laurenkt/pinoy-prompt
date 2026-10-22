@@ -54,6 +54,16 @@ const SCREENS = {
   },
   library: (page) => page.click('.library-btn'),
   settings: (page) => page.click('[aria-label="Settings"]'),
+  // With a key saved and some spend on it, so the Chat card shows the estimate.
+  'settings-key': async (page) => {
+    await page.evaluate(async () => {
+      const { addSpend, setApiKey } = await import('/src/openai.ts');
+      setApiKey('sk-screenshot-0000000000000000000000');
+      addSpend(3.1, Date.now() - 62 * 86_400_000);
+      addSpend(1.27);
+    });
+    await page.click('[aria-label="Settings"]');
+  },
   chat: (page) => page.click('.chat-btn'),
   // A new learner's first Study: the topic's introduction, then the first word's.
   'first-study': (page) => page.click('.hub-btn.big:not(.chat-btn)'),

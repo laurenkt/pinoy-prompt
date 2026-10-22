@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 // Settings' Test voice says how long the word took to start, for checking audio lag on a phone,
-// and its Tap sounds switch turns the button tick off.
+// its Tap sounds switch turns the button tick off, and the saved key shows what OpenAI has cost.
 
 import { afterEach, expect, it, vi } from 'vitest';
+import { addSpend, setApiKey } from '../openai';
 import { stop, tickOnPress } from '../speech';
 import { FakeAudioContext, ticks } from '../test/fake-audio';
 import { h } from '../ui';
@@ -60,4 +61,17 @@ it('turns tap sounds off and on again, and keeps the choice', async () => {
   ticks.count = 0;
   other.click();
   expect(ticks.count).toBe(1);
+});
+
+it('shows the estimated OpenAI spend beside the saved key', () => {
+  localStorage.clear();
+  setApiKey('sk-proj-abcdefghijklmnopqrstuvwxyz0123');
+  addSpend(0.004, new Date(2026, 8, 30).getTime());
+  addSpend(1.234);
+  const root = settingsScreen(fakeApp());
+  const stats = [...root.querySelectorAll('.key-spend .stat')].map((s) => s.textContent);
+  expect(stats).toEqual(['$1.23this month', '$1.24all time']);
+  expect(root.textContent).toContain('An estimate');
+  expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'Forget key')).toBe(true);
+  localStorage.clear();
 });
