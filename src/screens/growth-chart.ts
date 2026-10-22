@@ -67,6 +67,17 @@ function monthYear(time: number): string {
   return new Date(time).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 }
 
+/** Roughly how long from `now` until `at`, in plain words: weeks, then months, then years. */
+export function timeUntil(at: number, now: number): string {
+  const days = (at - now) / DAY_MS;
+  if (days < 10) return 'in about a week';
+  if (days < 60) return `in about ${Math.round(days / 7)} weeks`;
+  const months = Math.round(days / 30.4);
+  if (months < 24) return `in about ${months} months`;
+  const years = Math.round(days / 365 * 2) / 2;
+  return `in about ${years} years`;
+}
+
 /** Share of the chart's width for the past when a projection follows it. */
 const PAST = 0.7;
 
@@ -101,7 +112,7 @@ export function forecastView(forecast: Forecast): HTMLElement {
         h(
           'li',
           null,
-          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.words.toLocaleString()}`)),
+          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.words.toLocaleString()} words`)),
           h('strong', null, m.at === 'reached' ? 'Reached' : m.at === null ? '–' : `~${monthYear(m.at)}`),
         ),
       ),
@@ -205,7 +216,10 @@ export function growthChart(
         class: 'growth-goal',
         'aria-expanded': 'false',
         'aria-controls': 'growth-forecast',
-        'aria-label': `${forecast!.early ? 'Early guess: about' : 'About'} ${next.words.toLocaleString()} words around ${monthYear(next.at)} at your recent pace. Show all milestones.`,
+        'aria-label': `${forecast!.early ? 'Early guess: ' : ''}${next.label} ${timeUntil(next.at, times[last])}, around ${monthYear(next.at)}, at your recent pace. Show all milestones.`,
+        // Its own tap, not a look along the chart; a mouse over it doesn't look either.
+        onpointerdown: (e: PointerEvent) => e.stopPropagation(),
+        onpointermove: (e: PointerEvent) => e.stopPropagation(),
         onclick: () => {
           ahead.hidden = !ahead.hidden;
           goal!.setAttribute('aria-expanded', String(!ahead.hidden));
@@ -213,7 +227,8 @@ export function growthChart(
           if (!ahead.hidden) ahead.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
         },
       },
-      `${next.words.toLocaleString()} words`,
+      h('strong', null, next.label),
+      h('span', null, timeUntil(next.at, times[last])),
     );
 
   function show(i: number): void {
@@ -241,14 +256,6 @@ export function growthChart(
     marker.hidden = today;
     marker.style.left = `${x * 100}%`;
     back.hidden = today;
-    // One control in the caption's corner at a time; the list it opens closes with it.
-    if (goal && ahead) {
-      goal.hidden = !today;
-      if (!today) {
-        ahead.hidden = true;
-        goal.setAttribute('aria-expanded', 'false');
-      }
-    }
   }
 
   const frame = h(
@@ -256,6 +263,7 @@ export function growthChart(
     { class: 'growth-frame' },
     plot,
     marker,
+    goal,
     // In the first days the stream is a sliver at the edge; say what is coming.
     times[last] - history.since < 2 * DAY_MS &&
       h('p', { class: 'growth-hint small', style: next ? { right: `${(1 - PAST) * 100 + 4}%` } : null }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
@@ -300,7 +308,7 @@ export function growthChart(
   const el = h(
     'div',
     { class: 'growth' },
-    h('div', { class: 'growth-caption' }, value, when, back, goal),
+    h('div', { class: 'growth-caption' }, value, when, back),
     frame,
     h(
       'div',

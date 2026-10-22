@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type Forecast, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
 import { h } from '../ui';
-import { curve, forecastView, growthChart, projected, smooth } from './growth-chart';
+import { curve, forecastView, growthChart, projected, smooth, timeUntil } from './growth-chart';
 
 describe('smooth', () => {
   it('softens steps but ends exactly on the last value', () => {
@@ -96,7 +96,8 @@ describe('forecast', () => {
     const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
     expect(el.querySelector('.projection')).not.toBeNull();
     const goal = el.querySelector<HTMLButtonElement>('.growth-goal')!;
-    expect(goal.textContent).toBe('500 words');
+    expect(goal.textContent).toBe('Secondin about 13 months');
+    expect(goal.closest('.growth-frame')).not.toBeNull();
     expect(el.querySelector('.growth-axis-ahead')!.textContent).toMatch(/^~\w+ \d{4}$/);
     const panel = el.querySelector<HTMLElement>('.growth-forecast')!;
     expect(panel.hidden).toBe(true);
@@ -120,10 +121,18 @@ describe('forecast', () => {
     expect(el.querySelector<HTMLElement>('.growth-marker')!.style.left).toBe('85%');
     tap(frame, 20);
     expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^0 cards on /);
-    // The way back takes the tag's corner while looking at an earlier day, and the list closes.
-    expect(el.querySelector<HTMLElement>('.growth-forecast')!.hidden).toBe(true);
-    expect(el.querySelector<HTMLElement>('.growth-goal')!.hidden).toBe(true);
+    // The level's label stays, with its list, while looking along the chart.
+    expect(el.querySelector<HTMLElement>('.growth-forecast')!.hidden).toBe(false);
+    expect(el.querySelector<HTMLElement>('.growth-goal')!.hidden).toBe(false);
     expect(el.querySelector<HTMLElement>('.growth-back')!.hidden).toBe(false);
+  });
+
+  it("opens the list from the level's label without looking along the chart", () => {
+    const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
+    const goal = el.querySelector<HTMLElement>('.growth-goal')!;
+    goal.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 290, pointerType: 'mouse' }));
+    goal.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 290, pointerType: 'mouse' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('today');
   });
 
   it('leaves a drag up or down to scroll the page, and follows one sideways', () => {
@@ -189,5 +198,15 @@ describe('projected', () => {
     expect(projected(f(0.7), at, now, 0)).toBeCloseTo(0);
     expect(projected(f(0.7), at, now, 1)).toBeCloseTo(1);
     expect(projected({ ...f(1), curve: null }, at, now, 0.3)).toBe(0.3);
+  });
+});
+
+describe('timeUntil', () => {
+  const now = Date.now();
+  it('says how long in weeks, then months, then years', () => {
+    expect(timeUntil(now + 5 * DAY_MS, now)).toBe('in about a week');
+    expect(timeUntil(now + 30 * DAY_MS, now)).toBe('in about 4 weeks');
+    expect(timeUntil(now + 330 * DAY_MS, now)).toBe('in about 11 months');
+    expect(timeUntil(now + 1000 * DAY_MS, now)).toBe('in about 2.5 years');
   });
 });
