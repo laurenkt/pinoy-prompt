@@ -105,10 +105,43 @@ p {
   vertical-align: -0.2em;
 }
 
+/*
+ * Layout: every screen is at least as tall as the phone's screen, and a screen that fits passes its spare
+ * height down a column to what can use it, so a taller phone gets bigger targets instead of an empty bottom.
+ * Home's hub, a session's panel (its prompt, and most of all its answer choices) and a call's transcript
+ * take it; see "Height" in docs/ARCHITECTURE.md. Pages (Library, Settings) stay as long
+ * as their content and scroll. Sizes that grow with the screen use dvh in a clamp(), so nothing on a short
+ * phone is taller than it was.
+ */
 .screen {
   max-width: 560px;
   margin: 0 auto;
   padding: max(20px, env(safe-area-inset-top)) 18px calc(40px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.screen > * {
+  flex: 1 0 auto;
+}
+
+/* The screen's own bottom padding is the gap at the end. */
+.screen > * > :last-child {
+  margin-bottom: 0;
+}
+
+/* The column from the screen down to the panel. */
+.home,
+.practice,
+.talk,
+.session,
+.session-body,
+.panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
 }
 
 /* Read by screen readers, not shown. */
@@ -516,6 +549,59 @@ p {
   animation: rise 0.25s ease;
 }
 
+/*
+ * In a panel, the prompt grows on phones taller than about 700px (up to 300px), with what's on it centred.
+ * Answer choices take the rest of the spare height, on short phones too until one is picked; otherwise what the learner does next (a button, the
+ * answer and its ratings, the microphone) sits at the bottom, under the thumb.
+ */
+.panel > .prompt {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: clamp(0px, (100dvh - 700px) * 1.8, 300px);
+}
+
+.panel > .choices {
+  flex-grow: 1;
+  /* The gap to the feedback is the feedback's own, as when the two margins merged. */
+  margin-bottom: 0;
+}
+
+/*
+ * Until one is picked, the choices leave room at the bottom for the feedback and Next that come with an
+ * answer, so a right answer doesn't move them. Only where there's height to spare.
+ */
+.panel > .choices:last-child {
+  margin-bottom: clamp(0px, 100dvh - 700px, 124px);
+}
+
+/* A spacer takes the spare height before the panel's last piece, which keeps its own margins as before. */
+.panel:not(:has(> .choices))::after {
+  content: '';
+  order: 1;
+  flex-grow: 1;
+}
+
+.panel:not(:has(> .choices)) > :last-child:not(:first-child) {
+  order: 2;
+}
+
+/* The prompt's 18px is the gap above the answer, as when the two margins merged. */
+.panel > .answer {
+  margin-top: 0;
+}
+
+/* After anything but the feedback, the hook's gap is the margin above it, as when the two merged. */
+.panel > :not(.feedback) + .hook {
+  margin-top: 0;
+}
+
+/* A summary or a topic's introduction is a card, so it sits in the middle rather than stretching. */
+.panel.center {
+  flex-grow: 0;
+  margin: auto 0;
+}
+
 .panel.center {
   background: var(--surface);
   border: var(--outline);
@@ -619,7 +705,8 @@ p {
 .audio-group.big {
   justify-content: center;
   align-items: center;
-  margin: 12px 0 8px;
+  /* 12px under the eyebrow, whose own 6px no longer merges with this in the prompt's column. */
+  margin: 6px 0 8px;
 }
 
 .audio-btn {
@@ -649,6 +736,8 @@ p {
 .audio-btn.huge {
   width: 96px;
   height: 96px;
+  width: clamp(96px, 14dvh, 132px);
+  height: clamp(96px, 14dvh, 132px);
   border-radius: 24px;
   font-size: 2.4rem;
   box-shadow: var(--shadow);
@@ -752,7 +841,11 @@ p {
   border: 3px solid var(--line);
   border-radius: 16px;
   padding: 12px 14px;
+  /* Shares out the choices' spare height, up to a size a thumb can't miss. */
+  flex: 1 0 auto;
   min-height: 56px;
+  max-height: 120px;
+  font-size: clamp(1rem, 0.4rem + 1.5dvh, 1.2rem);
   font-weight: 700;
 }
 
@@ -835,6 +928,7 @@ p {
 /* Back to the card that moved on by itself. Quiet, because most of the time it isn't needed. */
 .prev-btn {
   display: inline-flex;
+  align-self: flex-start;
   align-items: center;
   gap: 6px;
   min-height: 44px;
@@ -890,6 +984,7 @@ p {
   border-radius: 16px;
   padding: 10px 4px;
   min-height: 68px;
+  min-height: clamp(68px, 10dvh, 96px);
   font-weight: 800;
   color: var(--on-accent);
   box-shadow: var(--shadow);
@@ -1712,8 +1807,9 @@ p {
 .talk-chat {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - max(20px, env(safe-area-inset-top)) - 40px - env(safe-area-inset-bottom));
-  height: calc(100dvh - max(20px, env(safe-area-inset-top)) - 40px - env(safe-area-inset-bottom));
+  /* Takes the screen's height (see Layout) without growing it, so a long transcript scrolls inside. */
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .talk-chat > * {
@@ -2147,6 +2243,9 @@ p {
 .hub {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Home's spare height (see Layout), two parts to Study and Chat, one to Drills and Library. */
+  flex: 1 0 auto;
+  grid-template-rows: 2fr 1fr;
   gap: 14px;
   margin-bottom: 22px;
 }

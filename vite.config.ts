@@ -9,5 +9,7 @@ export default defineConfig({
   test: {
     // A zone with daylight saving, so date tests cover clock changes.
     env: { TZ: 'America/New_York' },
+    // Vitest leaves CSS empty unless asked; src/screens/layout.test.ts reads the layout rules.
+    css: { include: [/style\.css/] },
   },
 });
