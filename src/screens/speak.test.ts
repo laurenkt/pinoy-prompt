@@ -93,6 +93,11 @@ describe('first use', () => {
     await open('salamat');
     expect(panel.el.textContent).toContain('71 MB');
     expect(loadModel).not.toHaveBeenCalled();
+    loadModel.mockImplementationOnce(() => new Promise(() => {}));
+    button('Download').click();
+    expect(text('.listen-status')).toBe('Downloading… 0%');
+    panel.dispose();
+    await open('salamat');
     button('Download').click();
     await flush();
     expect(loadModel).toHaveBeenCalled();

@@ -76,6 +76,16 @@ describe('loadPhoneModel', () => {
     expect(progress).toEqual([]);
   });
 
+  it('tells everyone waiting on the download how it is going, not only whoever started it', async () => {
+    vi.stubGlobal('fetch', serve(MODEL_BYTES));
+    const { loadPhoneModel } = await import('./phone-model');
+    const first: number[] = [];
+    const second: number[] = [];
+    await Promise.all([loadPhoneModel((p) => first.push(p)), loadPhoneModel((p) => second.push(p))]);
+    expect(second.at(-1)).toBe(1);
+    expect(second).toEqual(first);
+  });
+
   it("never keeps a download that was cut short, so the next try starts afresh", async () => {
     vi.stubGlobal('fetch', serve(40_000_000));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');

@@ -54,6 +54,10 @@ const PROBLEMS: Record<Problem, string> = {
   failed: 'Something went wrong while checking your pronunciation. Try again.',
 };
 
+/** Not "Downloading" until bytes arrive: a model kept on the device loads without any. */
+const loadingText = (progress: number | null) =>
+  progress === null || progress >= 1 ? 'Getting ready…' : `Downloading… ${Math.round(progress * 100)}%`;
+
 type State =
   | { name: 'checking' }
   | { name: 'offer' }
@@ -159,9 +163,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     set({ name: 'offer' });
   }
 
-  async function load(): Promise<void> {
-    // Not "Downloading" until bytes arrive: a model already on the device loads without any.
-    set({ name: 'loading', progress: null });
+  /** `progress` is 0 when the learner asked for the download, and null when the model should already be on the device. */
+  async function load(progress: number | null = null): Promise<void> {
+    set({ name: 'loading', progress });
     try {
       model = await deps.loadPhoneModel((progress) => {
         if (state.name !== 'loading') return;
@@ -222,7 +226,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     const fill = el.querySelector<HTMLElement>('.bar-fill');
     if (fill) fill.style.width = `${pct}%`;
     const label = el.querySelector('.listen-status');
-    if (label) label.textContent = state.progress >= 1 ? 'Getting ready…' : `Downloading… ${pct}%`;
+    if (label) label.textContent = loadingText(state.progress);
   }
 
   /** Bars follow the real input level, each a little different so it reads as a meter. */
@@ -261,15 +265,15 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
             skip('Not now'),
             h('button', { class: 'btn primary', 'data-autofocus': true, onclick: () => {
                 takeFocus = true;
-                void load();
+                void load(0);
               } }, 'Download'),
           ),
         ];
       case 'loading':
-        if (state.progress === null) return [h('p', { class: 'listen-status center', role: 'status' }, 'Getting ready…')];
+        if (state.progress === null) return [h('p', { class: 'listen-status center', role: 'status' }, loadingText(null))];
         return [
           h('div', { class: 'bar download-bar', role: 'progressbar', 'aria-label': 'Download progress' }, h('div', { class: 'bar-fill', style: { width: `${Math.round(state.progress * 100)}%` } })),
-          h('p', { class: 'listen-status center', role: 'status' }, state.progress >= 1 ? 'Getting ready…' : `Downloading… ${Math.round(state.progress * 100)}%`),
+          h('p', { class: 'listen-status center', role: 'status' }, loadingText(state.progress)),
         ];
       case 'ready':
         return [hint(), micButton('Tap and speak')].filter(Boolean) as HTMLElement[];
