@@ -38,8 +38,8 @@ export interface SpeakDeps {
   modelKnownDownloaded?(): boolean;
   /** Whether the microphone would open without the browser asking (see askForMicrophone). A stand-in without it always would. */
   microphoneAllowed?(): boolean;
-  /** Open the microphone and keep it until the screen is left. */
-  holdMicrophone?(): Promise<void>;
+  /** Open the microphone and keep it until the screen is left; false if it was left meanwhile. */
+  holdMicrophone?(): Promise<boolean>;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -117,15 +117,14 @@ export function needsMicrophone(deps: SpeakDeps): boolean {
 
 /**
  * Open the microphone and hold it until the screen is left. Called from the tap that starts a round that may ask the
- * learner to speak, so the phone asks then, over micWaiting(), rather than over a speaking question. False if it
- * was refused or there's no microphone; the round then leaves speaking out.
+ * learner to speak, so the phone asks then, over micWaiting(), rather than over a speaking question. 'refused' if
+ * it was refused or there's no microphone (the round then leaves speaking out), 'left' if the screen went meanwhile.
  */
-export async function askForMicrophone(deps: SpeakDeps): Promise<boolean> {
+export async function askForMicrophone(deps: SpeakDeps): Promise<'on' | 'refused' | 'left'> {
   try {
-    await deps.holdMicrophone?.();
-    return true;
+    return (await (deps.holdMicrophone?.() ?? true)) ? 'on' : 'left';
   } catch {
-    return false;
+    return 'refused';
   }
 }
 

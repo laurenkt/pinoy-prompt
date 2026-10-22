@@ -22,6 +22,7 @@ import { recordAnswer, rollDay } from '../store';
 import { audioButton, audioPair, choiceList, h, hookView, icon, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
+import { endMicrophoneHold } from '../microphone';
 import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'mic' | 'caught-up' | 'done';
@@ -406,6 +407,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (reviewing) returnToCurrent();
     previous = null;
     if (open && stats.answered + stats.practised > 0 && phase !== 'done') {
+      // The summary asks nothing to be said.
+      endMicrophoneHold();
       speak?.dispose();
       speak = null;
       stop();
@@ -482,10 +485,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (!canSpeak() || !needsMicrophone(deps)) return ask(card, step);
     phase = 'mic';
     draw();
-    void askForMicrophone(deps).then((ok) => {
-      // Left while the phone was asking.
-      if (!root.isConnected) return;
-      speakSkipped = !ok;
+    void askForMicrophone(deps).then((answer) => {
+      if (answer === 'left') return;
+      speakSkipped = answer === 'refused';
       if (phase === 'mic' && card && step) ask(card, step);
     });
   }

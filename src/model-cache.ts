@@ -27,7 +27,7 @@ export async function modelDownloaded(): Promise<boolean> {
     if (!(await caches.has(CACHE))) return (lastFound = false);
     return (lastFound = (await (await caches.open(CACHE)).match(MODEL_URL)) !== undefined);
   } catch {
-    return false;
+    return (lastFound = false);
   }
 }
 

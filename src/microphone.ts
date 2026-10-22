@@ -100,12 +100,14 @@ function closeWhenIdle(): void {
 /**
  * Open the microphone and keep it, switched off, until endMicrophoneHold() (app.navigate calls it), so a
  * screen that asks for it up front isn't asked again partway through. Call from a tap: it may ask the learner.
+ * False if the hold was ended while the learner was being asked: the screen has gone.
  */
-export async function holdMicrophone(): Promise<void> {
+export async function holdMicrophone(): Promise<boolean> {
   const mine = holds;
   const s = await getMicrophone();
   held = mine === holds;
   releaseMicrophone(s);
+  return held;
 }
 
 /** Let the stream close once it's been idle a while, as usual. */

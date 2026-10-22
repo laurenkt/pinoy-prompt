@@ -138,6 +138,27 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     return { card, mode, choices };
   }
 
+  /**
+   * From a tap that may let the round ask to speak (opening Drills, the Speak chip, quiet mode going off): if the
+   * browser would ask for the microphone, the phone asks now, over a holding screen, rather than over a speaking question.
+   */
+  function askForMicrophoneIfNeeded(): void {
+    if (waiting || !canSpeak || !current || !modes().includes('speak') || !needsMicrophone(deps)) return;
+    waiting = true;
+    void askForMicrophone(deps).then((answer) => {
+      if (answer === 'left') return;
+      waiting = false;
+      speakSkipped = answer === 'refused';
+      if (current && !picked && !modes().includes(current.mode)) {
+        current = nextQuestion();
+        if (current) preload(current.card);
+      }
+      // An answered question (the chip tapped after answering) is shown again as it was.
+      if (picked) draw();
+      else ask();
+    });
+  }
+
   /** Note how the current question went, so a miss comes back soon, and pick the one after it. */
   function settle(right: boolean): void {
     if (!current || upcoming) return;
@@ -226,6 +247,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
    * the one showing, while it's unanswered, so the change shows straight away.
    */
   function rescope(): void {
+    askForMicrophoneIfNeeded();
+    if (waiting) return draw();
     const ways = modes();
     if (upcoming && !ways.includes(upcoming.mode)) upcoming = null;
     if (current && !picked && !lookingBack && !ways.includes(current.mode)) {
@@ -443,18 +466,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   if (learned >= MIN_CARDS) {
     current = nextQuestion();
     if (current) preload(current.card);
-    // Still inside the tap that opened Drills: if the round may ask to speak, the phone asks for the microphone now.
-    if (canSpeak && modes().includes('speak') && needsMicrophone(deps)) {
-      waiting = true;
-      void askForMicrophone(deps).then((ok) => {
-        // Left while the phone was asking.
-        if (!root.isConnected) return;
-        waiting = false;
-        speakSkipped = !ok;
-        if (current && !modes().includes(current.mode)) current = nextQuestion();
-        ask();
-      });
-    }
+    // Still inside the tap that opened Drills.
+    askForMicrophoneIfNeeded();
   }
   ask();
   return root;

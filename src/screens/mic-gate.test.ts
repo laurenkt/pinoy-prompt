@@ -16,8 +16,8 @@ function micNotYet(overrides: Partial<SpeakDeps> = {}) {
   let answer: (allow: boolean) => void = () => {};
   const holdMicrophone = vi.fn(
     () =>
-      new Promise<void>((resolve, reject) => {
-        answer = (allow) => (allow ? ((allowed = true), resolve()) : reject(new DOMException('no', 'NotAllowedError')));
+      new Promise<boolean>((resolve, reject) => {
+        answer = (allow) => (allow ? ((allowed = true), resolve(true)) : reject(new DOMException('no', 'NotAllowedError')));
       }),
   );
   const deps = {
@@ -93,6 +93,20 @@ describe('asking for the microphone in Drills', () => {
     expect(readOnly.holdMicrophone).not.toHaveBeenCalled();
     // The scope is kept across visits, so the rest get the whole mix back.
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
+  });
+
+  it('asks when Speak is chosen again mid-round', async () => {
+    const off = micNotYet({ microphoneAllowed: () => true });
+    const root = practiceScreen(fakeApp(), off.deps);
+    drillScope(root, ['read']);
+    const mic = micNotYet();
+    const again = practiceScreen(fakeApp(), mic.deps);
+    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+    again.querySelector<HTMLButtonElement>('.filter-toggle')!.click();
+    again.querySelector<HTMLButtonElement>('[data-mode="speak"]')!.click();
+    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(waiting(again)).toBe(true);
+    drillScope(again, ['listen', 'read', 'recall', 'speak']);
   });
 });
 
