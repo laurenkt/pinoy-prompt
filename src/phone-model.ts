@@ -114,16 +114,20 @@ async function inMemory(body: ReadableStream<Uint8Array>, onProgress?: (fraction
 }
 
 let loading: Promise<PhoneModel> | null = null;
+/** Everyone waiting on the load hears its download progress, not only whoever started it. */
+const listeners = new Set<(fraction: number) => void>();
 
 /** Load the recogniser, downloading it the first time. */
 export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise<PhoneModel> {
+  if (onProgress) listeners.add(onProgress);
+  const onAnyProgress = (fraction: number) => listeners.forEach((listener) => listener(fraction));
   loading ??= (async () => {
     // Single-threaded: threads need cross-origin isolation, which GitHub Pages can't turn on.
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.wasmPaths = { mjs: mjsUrl, wasm: wasmUrl };
     let session: ort.InferenceSession;
     try {
-      session = await ort.InferenceSession.create(await fetchModel(onProgress), { executionProviders: ['wasm'] });
+      session = await ort.InferenceSession.create(await fetchModel(onAnyProgress), { executionProviders: ['wasm'] });
     } catch (err) {
       // A stored copy the runtime can't parse is damaged: drop it so the next try downloads afresh.
       // Anything else (the runtime failing to load offline, running out of memory) says nothing about the model.
@@ -136,6 +140,7 @@ export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise
   loading.catch(() => {
     loading = null;
   });
+  if (onProgress) void loading.finally(() => listeners.delete(onProgress)).catch(() => {});
   return loading;
 }
 
