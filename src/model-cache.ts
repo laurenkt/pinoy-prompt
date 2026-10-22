@@ -22,3 +22,13 @@ export async function modelDownloaded(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Once the model is on the device, load the code that runs it now rather than at the first Speak question.
+ * Those files are named by the build, and an installed app can stay open across a deploy that replaces them,
+ * after which this page could no longer fetch its own copies ("Importing a module script failed").
+ */
+export async function keepSpeakingReady(): Promise<void> {
+  if (!(await modelDownloaded())) return;
+  await (await import('./phone-model')).loadRuntime();
+}
