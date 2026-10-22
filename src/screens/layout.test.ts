@@ -8,6 +8,8 @@ import type { App } from '../app';
 import { homeScreen } from './home';
 import { practiceScreen } from './practice';
 import { sessionScreen } from './session';
+import { talkScreen } from './talk';
+import { setApiKey } from '../openai';
 import css from '../style.css?raw';
 import { settingsScreen } from './settings';
 import { wordsScreen } from './words';
@@ -91,6 +93,17 @@ describe('filling the screen', () => {
     ['a drill round', () => practiceScreen(fakeApp(KNOWN)), '.choices'],
     ['a study question', () => sessionScreen(fakeApp(KNOWN), [{ kind: 'review', cardId: 'salamat', format: 'remember' }]), '.panel > .btn.big'],
     ['Home', () => homeScreen(fakeApp(KNOWN)), '.hub'],
+    // A message with a way forward sits in the middle, the same on every screen.
+    ['a finished study session', () => sessionScreen(fakeApp(KNOWN), []), '.panel.center'],
+    ['Drills before there are words to drill', () => practiceScreen(fakeApp(['salamat'])), '.panel.center'],
+    [
+      'Chat before there are words to chat with',
+      () => {
+        setApiKey('sk-proj-abcdefghijklmnopqrstuvwxyz0123');
+        return talkScreen(fakeApp(['salamat']));
+      },
+      '.panel.center',
+    ],
   ])('passes the height down to what grows on %s', (_, screen, grows) => {
     const root = screen();
     expect(filled(root, root.querySelector(grows))).toBe(true);
