@@ -412,4 +412,20 @@ describe('the spend estimate', () => {
     call.hangUp();
     expect(getSpend().total).toBeCloseTo(callCost(90));
   });
+
+  it("counts the time after OpenAI's last report when the call ends", async () => {
+    vi.useFakeTimers();
+    try {
+      const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+      const call = await startCall(KEY, PROMPT, f.events, f.deps);
+      f.peer.channel.emit({ type: 'session.started', session: {} });
+      vi.advanceTimersByTime(30_000);
+      f.peer.channel.emit({ type: 'session.usage.updated', usage: { seconds: 30 } });
+      vi.advanceTimersByTime(25_000);
+      call.hangUp();
+      expect(getSpend().total).toBeCloseTo(callCost(55));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

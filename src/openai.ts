@@ -339,6 +339,14 @@ export async function startCall(
   let greeted = false;
   /** Seconds of the call already added to the spend estimate. */
   let charged = 0;
+  /** When the call started listening, to count the time after OpenAI's last usage report. */
+  let startedAt: number | undefined;
+  /** Add the call's billed time beyond what is already counted. */
+  const charge = (seconds: number) => {
+    if (seconds <= charged) return;
+    addSpend(callCost(seconds - charged));
+    charged = seconds;
+  };
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
 
@@ -361,6 +369,8 @@ export async function startCall(
     if (ended) return;
     ended = true;
     failure = error ?? new AiError('network', 'The call dropped.');
+    // No usage report comes after this, so the time since the last one is counted by the clock.
+    if (startedAt !== undefined) charge((Date.now() - startedAt) / 1000);
     try {
       if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'session.close' }));
     } catch {
@@ -445,6 +455,7 @@ export async function startCall(
     if (ended) return;
     switch (event.type) {
       case 'session.started':
+        startedAt ??= Date.now();
         events.onStarted();
         if (!greeted && channel?.readyState === 'open') {
           greeted = true;
@@ -465,10 +476,7 @@ export async function startCall(
       case 'session.usage.updated':
         if (typeof event.usage?.seconds === 'number') {
           // OpenAI reports the call's running total; only the time since the last report is new.
-          if (event.usage.seconds > charged) {
-            addSpend(callCost(event.usage.seconds - charged));
-            charged = event.usage.seconds;
-          }
+          charge(event.usage.seconds);
           events.onUsage(event.usage.seconds);
         }
         break;

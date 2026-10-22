@@ -133,6 +133,8 @@ try {
 async function seed(page, words) {
   await page.goto(url);
   await page.evaluate(async (words) => {
+    // Nothing left by an earlier screen at this size (a key saved by settings-key).
+    localStorage.clear();
     // Only drills-mic has the speech model; the others are drawn without it.
     const { CACHE } = await import('/src/model-cache.ts');
     await caches.delete(CACHE);
