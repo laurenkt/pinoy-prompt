@@ -332,13 +332,28 @@ const TAPPABLE = 'button, summary, a[href], [role="button"], input[type="checkbo
 /** The big chunky buttons, which thock; everything else tappable (chips, pills, small and text controls) clicks. */
 const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
 
-/** Tick for every control pressed under `root`, except those marked `data-no-tap` (ones that open the microphone). */
+/**
+ * Tap for every control pressed under `root`. Two marks change that:
+ * - `data-no-tap`: silent, for a control that starts recording, which would catch the tap.
+ * - `data-tap="before"`: tapped before its own handler runs, for one that starts a Chat call. The call opens the
+ *   microphone inside the press, after which nothing would tap; the call's audio takes seconds to connect, so the
+ *   tap is over long before it.
+ */
 export function tickOnPress(root: Node): void {
   if (clipsSupported()) void loadThock().catch(() => {});
+  const kind = (control: Element): TapKind => (control.matches(CHUNKY) ? 'thock' : 'click');
+  root.addEventListener(
+    'click',
+    (e) => {
+      const control = (e.target as Element).closest?.(TAPPABLE);
+      if (control?.getAttribute('data-tap') === 'before') tick(kind(control));
+    },
+    true,
+  );
   // Bubbling, so it runs after the control's own handler, which may have played a word.
   root.addEventListener('click', (e) => {
     const control = (e.target as Element).closest?.(TAPPABLE);
-    if (control && !control.hasAttribute('data-no-tap')) tick(control.matches(CHUNKY) ? 'thock' : 'click');
+    if (control && !control.hasAttribute('data-no-tap') && control.getAttribute('data-tap') !== 'before') tick(kind(control));
   });
 }
 
