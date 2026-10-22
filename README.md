@@ -77,7 +77,11 @@ Tests: `src/screens/speak.test.ts` and `src/screens/practice.speak.test.ts` play
 
 ## Audio
 
-Audio uses the browser's speech synthesis with a Filipino (`fil`/`tl`) voice when the device has one. Otherwise it falls back to a voice with similar spelling-to-sound rules (Indonesian, Malay, then Spanish), and Settings tells the learner which they're getting.
+Recorded sound plays through one shared Web Audio context (`src/audio-engine.ts`): card clips, the native reference sounds and slices of the learner's recording. A clip is decoded once and kept in memory while it's in use, so a tap only has to start a buffer. Card clips are listed in `src/clips.json` by the text they say (`<name>.m4a`, plus `<name>-slow.m4a` said slowly).
+
+Text with no clip uses the browser's speech synthesis with a Filipino (`fil`/`tl`) voice when the device has one. Otherwise it falls back to a voice with similar spelling-to-sound rules (Indonesian, Malay, then Spanish), and Settings tells the learner which they're getting. The built-in voice runs outside the page, so it can't be loaded ahead and can lag; on iPhone it's also muted by the silent switch, so a silent track plays alongside it. Settings' "Test voice" shows how long the word took to be heard, for checking lag on a device.
+
+The microphone's recorder keeps its own context, as iOS changes the hardware rate when the microphone opens and a context made before that can play distorted.
 
 To use a recorded clip instead, put the file in `public/audio/` and set `audio: 'file.mp3'` on the card in `src/deck.ts`.
 

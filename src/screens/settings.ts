@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import { getCard } from '../deck';
 import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai';
-import { play, voiceQuality } from '../speech';
+import { lastStartDelay, play, voiceQuality } from '../speech';
 import { isSilent } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon } from '../ui';
@@ -35,6 +35,16 @@ export function settingsScreen(app: App): HTMLElement {
         "This device has no Filipino voice, so a similar-sounding voice reads the words. It's close, but not perfect. If your phone offers a Filipino text-to-speech voice in its settings, installing it will make audio more natural.",
       none: "This browser can't play speech. You can still read the pronunciation guides.",
     }[quality];
+    // How long the test word took to be heard, for checking audio lag on a phone.
+    const lag = h('p', { class: 'muted small voice-lag', 'aria-live': 'polite', hidden: true });
+    const testVoice = () => {
+      void play(getCard('kumusta')!);
+      void lastStartDelay().then((ms) => {
+        if (ms === null) return;
+        lag.textContent = `Started ${Math.round(ms)} ms after your tap.`;
+        lag.hidden = false;
+      });
+    };
 
     root.replaceChildren(
       h(
@@ -89,7 +99,8 @@ export function settingsScreen(app: App): HTMLElement {
         h('p', { class: 'muted small' }, voiceText),
         isSilent(settings)
           ? h('p', { class: 'muted small' }, 'Quiet mode is on without headphones, so nothing plays. Tap the quiet button on Home to change it.')
-          : h('button', { class: 'btn secondary', onclick: () => void play(getCard('kumusta')!) }, icon('speaker'), ' Test voice'),
+          : h('button', { class: 'btn secondary', onclick: testVoice }, icon('speaker'), ' Test voice'),
+        lag,
       ),
       h('section', { class: 'card' }, h('h2', null, 'Chat'), keyForm(draw)),
       h(

@@ -1,11 +1,15 @@
-// Audio for cards. A recorded clip (card.audio) is used when present; otherwise
-// the browser's built-in speech voice reads the Tagalog text.
+// Audio for cards. A recorded clip is used when there is one (card.audio, or
+// the clip made for that text, listed in clips.json); it plays through the
+// app's one AudioContext, which starts it at once. Otherwise the browser's
+// built-in speech voice reads the Tagalog text.
 //
 // Not every device has a Filipino voice. When it doesn't, we fall back to a
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
 // Malay, then Spanish) and let the UI say so.
 
+import { audioContext, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
 import { setAudioSession } from './audio-session';
+import clips from './clips.json';
 import type { Card } from './deck';
 import { microphoneOpen } from './microphone';
 
@@ -55,7 +59,26 @@ export function voiceQuality(): VoiceQuality {
   return lang.startsWith('fil') || lang.startsWith('tl') ? 'native' : 'approximate';
 }
 
-let currentClip: HTMLAudioElement | null = null;
+/** Clip files by the text they say: `<name>.m4a`, and `<name>-slow.m4a` said slowly. */
+const CLIPS: Record<string, string> = clips;
+
+/** The clip for this text, if there is one. */
+export function clipUrl(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): string | null {
+  const base = `${import.meta.env.BASE_URL}audio/`;
+  if (card.audio) return base + card.audio;
+  const name = CLIPS[card.say ?? card.tl];
+  return name ? `${base}${name}${slow ? '-slow' : ''}.m4a` : null;
+}
+
+let currentClip: Sound | null = null;
+/** Settles with how long the last play() took to be heard, in ms, or null if nothing played. */
+let started: Promise<number | null> = Promise.resolve(null);
+let reportStart: (ms: number | null) => void = () => {};
+
+/** How long after the last play() call its sound was heard, in ms: for checking audio lag on a device. */
+export function lastStartDelay(): Promise<number | null> {
+  return started;
+}
 /** Set by quiet mode without headphones: nothing plays at all. */
 let muted = false;
 
@@ -132,27 +155,36 @@ function holdMediaSession(): void {
 export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
   stop();
   if (muted) return;
-  // Play through the iPhone's silent switch, unless the microphone needs the session.
-  if (!microphoneOpen()) setAudioSession('playback');
-  holdMediaSession();
+  const tapped = performance.now();
+  reportStart(null);
+  started = new Promise((resolve) => (reportStart = resolve));
+  const report = reportStart;
   const mine = generation;
-  if (card.audio) {
-    currentClip = new Audio(`${import.meta.env.BASE_URL}audio/${card.audio}`);
-    currentClip.playbackRate = slow ? 0.75 : 1;
+  const url = clipsSupported() ? clipUrl(card, slow) : null;
+  if (url) {
+    // Made or resumed now, inside the tap, as the clip may only be ready after it.
+    audioContext();
     try {
-      await currentClip.play();
-      // The clip is media itself, so it doesn't need the track.
-      releaseMediaSession();
+      const buffer = await loadClip(url);
+      if (mine !== generation) return;
+      // A slow clip is said slowly already; a card's own clip is slowed down instead.
+      const sound = (currentClip = playBuffer(buffer, slow && card.audio ? 0.75 : 1));
+      void sound.done.then(() => currentClip === sound && (currentClip = null));
+      report(performance.now() - tapped + msUntilHeard(sound.startsAt));
       return;
     } catch {
       // Fall through to speech if the clip can't play.
+      if (mine !== generation) return;
     }
   }
+  // Play through the iPhone's silent switch, unless the microphone needs the session.
+  if (!microphoneOpen()) setAudioSession('playback');
+  holdMediaSession();
   if (!speechSupported()) {
     releaseMediaSession();
+    report(null);
     return;
   }
-  if (mine !== generation) return;
   await initVoices();
   if (mine !== generation) return;
   const utterance = new SpeechSynthesisUtterance(card.say ?? card.tl);
@@ -163,7 +195,9 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
     utterance.lang = 'fil-PH';
   }
   utterance.rate = slow ? 0.6 : 0.9;
+  utterance.onstart = () => report(performance.now() - tapped);
   utterance.onend = utterance.onerror = () => {
+    report(null);
     if (mine === generation) releaseSoon();
   };
   // Also counted from the start, as iOS sometimes skips onend; no word takes this long.
@@ -181,7 +215,8 @@ if (typeof document !== 'undefined') {
 /** Stop any word playing. `release` also stops the silent track now: for leaving a screen or recording. */
 export function stop(release = false): void {
   generation++;
-  currentClip?.pause();
+  reportStart(null);
+  currentClip?.stop();
   currentClip = null;
   if (release) releaseMediaSession();
   // Keeps a countdown already running, so stepping on through cards doesn't hold the track forever.
@@ -194,6 +229,6 @@ export function stop(release = false): void {
 
 /** Whether a card is still being heard, so a screen moving on by itself can wait for it. */
 export function speaking(): boolean {
-  if (currentClip && !currentClip.paused && !currentClip.ended) return true;
+  if (currentClip) return true;
   return speechSupported() && speechSynthesis.speaking;
 }
