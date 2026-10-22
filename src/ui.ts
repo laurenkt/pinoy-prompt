@@ -155,10 +155,27 @@ export function choiceList<T>(
   );
 }
 
-/** The top of a page opened from Home: the back arrow, then the title and any one control beside it. */
-export function pageHeader(title: string, onBack: () => void, action?: Node | false | null): HTMLElement[] {
+/**
+ * A square icon button for a header: the back arrow, Home's settings, quiet mode.
+ * Given `pressed`, it's a toggle: pushed in and teal while on.
+ */
+export function iconButton(name: IconName, label: string, onclick: () => void, opts: { pressed?: boolean; title?: string } = {}): HTMLButtonElement {
+  const { pressed, title } = opts;
+  return h(
+    'button',
+    { class: 'icon-btn', 'aria-label': label, title, 'aria-pressed': pressed === undefined ? undefined : String(pressed), onclick },
+    icon(name),
+  );
+}
+
+/**
+ * The top of a page opened from Home: the back arrow, then the title and any one control beside it.
+ * A page opened by one of Home's header toggles (Settings) shows that toggle, on, where it was on Home,
+ * so tapping it again closes the page.
+ */
+export function pageHeader(title: string, onBack: () => void, action?: Node | false | null, opener?: Node): HTMLElement[] {
   return [
-    h('nav', { class: 'back-bar' }, h('button', { class: 'icon-btn', 'aria-label': 'Home', title: 'Home', onclick: onBack }, icon('back'))),
+    h('nav', { class: 'back-bar' }, iconButton('back', 'Home', onBack, { title: 'Home' }), opener),
     h('header', { class: 'page-header' }, h('h1', null, title), action),
   ];
 }

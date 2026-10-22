@@ -441,8 +441,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
         h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: home }, icon('close')),
         h('span', { class: 'session-count' }, `${done} done`),
         scopeToggle,
-        // Icon only, as on Home: the header also holds the count and the filter, and must fit at 360px.
-        quietToggle(app, rescope, { iconOnly: true }),
+        quietToggle(app, rescope),
       ),
       scopeChips,
     ];

@@ -14,6 +14,7 @@ import { MAX_LEARNING, learningCount, newCardsLeftToday, studyQueue, upcomingNew
 import { h, icon } from '../ui';
 import { growthChart } from './growth-chart';
 import { quietToggle } from './quiet';
+import { settingsToggle } from './settings';
 
 /** A Tagalog greeting for the time of day. */
 function greeting(hour: number): { tl: string; en: string } {
@@ -49,7 +50,7 @@ export function homeScreen(app: App): HTMLElement {
       h(
         'div',
         { class: 'home-actions' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Settings', onclick: () => app.navigate({ name: 'settings' }) }, icon('settings')),
+        settingsToggle(app, false),
         quietSwitch(app),
       ),
     ),
@@ -75,7 +76,7 @@ export function homeScreen(app: App): HTMLElement {
 
 /** The quiet toggle, redrawn in place so the page doesn't jump. */
 function quietSwitch(app: App): HTMLElement {
-  const el: HTMLElement = quietToggle(app, () => el.replaceWith(quietSwitch(app)), { iconOnly: true });
+  const el: HTMLElement = quietToggle(app, () => el.replaceWith(quietSwitch(app)));
   return el;
 }
 

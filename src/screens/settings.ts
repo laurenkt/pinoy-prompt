@@ -4,9 +4,14 @@ import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai'
 import { lastStartDelay, play, voiceQuality } from '../speech';
 import { applyAudioMode, isSilent } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
-import { h, icon, pageHeader } from '../ui';
+import { h, icon, iconButton, pageHeader } from '../ui';
 
 const DAILY_OPTIONS = [5, 8, 12, 15];
+
+/** Home's settings button, which stays put and on while Settings is open, so a second tap closes it. */
+export function settingsToggle(app: App, open: boolean): HTMLButtonElement {
+  return iconButton('settings', 'Settings', () => app.navigate({ name: open ? 'home' : 'settings' }), { pressed: open });
+}
 
 export function settingsScreen(app: App): HTMLElement {
   const root = h('div', { class: 'settings' });
@@ -48,7 +53,7 @@ export function settingsScreen(app: App): HTMLElement {
     };
 
     root.replaceChildren(
-      ...pageHeader('Settings', () => app.navigate({ name: 'home' })),
+      ...pageHeader('Settings', () => app.navigate({ name: 'home' }), null, settingsToggle(app, true)),
       h(
         'section',
         { class: 'card' },
