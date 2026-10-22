@@ -2,7 +2,8 @@
 // Asking for the microphone as a drill round or Study's practice starts, from the tap that starts it, with a
 // holding screen while the phone asks, so its question never comes over a speaking question.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { recordAnswer } from '../store';
 import { practiceScreen } from './practice';
 import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
@@ -135,5 +136,50 @@ describe('asking for the microphone in Study', () => {
     expect(waiting(root)).toBe(false);
     expect(speaking(root)).toBe(false);
     expect(root.querySelector('.panel')).not.toBeNull();
+  });
+});
+
+describe('asking for the microphone around a typed meaning', () => {
+  /** Words settled in Study, so a listening question asks for the meaning typed; quiet with headphones, so quiet mode going off asks. */
+  function typedRound(judge: () => Promise<boolean | null>) {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {} });
+    const app = fakeApp(true);
+    for (const id of KNOWN) recordAnswer(app.progress, id, 'good', app.now());
+    const mic = micNotYet();
+    const root = practiceScreen(app, mic.deps, judge, () => null);
+    document.body.append(root);
+    const box = () => root.querySelector<HTMLInputElement>('.meaning-input')!;
+    const send = (text: string) => {
+      box().value = text;
+      root.querySelector('form.meaning-form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+    };
+    const quietOff = () => root.querySelector<HTMLButtonElement>('.icon-btn[aria-label^="Quiet mode"]')!.click();
+    return { root, mic, box, send, quietOff };
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows a wrong typed meaning again as it was once the phone has asked', async () => {
+    const { root, mic, box, send, quietOff } = typedRound(async () => false);
+    send('good night');
+    await flush();
+    quietOff();
+    expect(waiting(root)).toBe(true);
+    mic.answer(true);
+    await flush();
+    expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
+    expect(box().value).toBe('good night');
+  });
+
+  it("doesn't cover a meaning being checked with the holding screen", async () => {
+    const { root, mic, send, quietOff } = typedRound(() => new Promise(() => {}));
+    send('thanks a lot');
+    quietOff();
+    expect(waiting(root)).toBe(false);
+    expect(mic.holdMicrophone).not.toHaveBeenCalled();
   });
 });

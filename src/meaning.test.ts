@@ -78,6 +78,7 @@ describe('matching a typed meaning on the device', () => {
 
   it('spells out contractions typed with or without the apostrophe', () => {
     expect(words("doesnt didn't wont can't Im")).toEqual(['does', 'not', 'did', 'not', 'will', 'not', 'can', 'not', 'i', 'am']);
+    expect(words('youre were')).toEqual(['you', 'are', 'were']);
   });
 
   it('leaves other wording to the fuller check', () => {

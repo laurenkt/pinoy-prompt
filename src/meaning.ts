@@ -25,7 +25,8 @@ const SAME: [RegExp, string][] = [
   [/\b(do|does|did|is|are|was|were|has|have|could|would|should)nt\b/g, '$1 not'],
   [/\bcant\b/g, 'can not'],
   [/\bwont\b/g, 'will not'],
-  [/\b(you|we|they)re\b/g, '$1 are'],
+  // Not "were", which is a word of its own.
+  [/\b(you|they)re\b/g, '$1 are'],
   [/\b(what|where|that|there|it)s\b/g, '$1 is'],
   [/\bu\b/g, 'you'],
 ];
