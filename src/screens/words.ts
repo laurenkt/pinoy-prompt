@@ -3,7 +3,7 @@ import { UNITS, type Card, type CardKind } from '../deck';
 import { GUIDES, KIND_INFO } from '../guides';
 import { STRENGTHS, strengthOf } from '../memory';
 import { play } from '../speech';
-import { audioButton, h, icon } from '../ui';
+import { audioButton, h, icon, pageHeader } from '../ui';
 
 const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
 
@@ -119,7 +119,7 @@ export function wordsScreen(app: App): HTMLElement {
       current.label,
     );
     root.replaceChildren(
-      h('header', { class: 'home-header' }, h('h1', null, 'Library'), toggle),
+      ...pageHeader('Library', () => app.navigate({ name: 'home' }), toggle),
       chips,
       h('p', { class: 'muted' }, 'Tap the speaker to hear any word.'),
       ...(showVocab ? UNITS.map((unit) => group(unit.title, unit.tlTitle, unit.cards.map(wordItem))) : []),

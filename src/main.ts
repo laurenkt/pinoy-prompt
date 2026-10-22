@@ -15,7 +15,7 @@ import { keepClipsOffline } from './clip-cache';
 import { allClipUrls, initVoices, stop } from './speech';
 import { replaceContents } from './progress-schema';
 import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
-import { h, icon } from './ui';
+import { h } from './ui';
 
 const root = document.getElementById('app')!;
 let keyHandler: ((e: KeyboardEvent) => void) | null = null;
@@ -70,19 +70,15 @@ const screens = backHistory<Route>({
 
 function render(route: Route): void {
   let screen: HTMLElement;
-  // Drills and Library open from Home, so they get a way back to it.
-  let back = false;
   switch (route.name) {
     case 'home':
       screen = homeScreen(app);
       break;
     case 'practice':
       screen = practiceScreen(app);
-      back = true;
       break;
     case 'words':
       screen = wordsScreen(app);
-      back = true;
       break;
     case 'study':
       screen = sessionScreen(app, null);
@@ -97,16 +93,8 @@ function render(route: Route): void {
       screen = settingsScreen(app);
       break;
   }
-  root.replaceChildren(h('main', { class: 'screen' }, back && backBar(), screen));
-}
-
-function backBar(): HTMLElement {
-  return h(
-    'nav',
-    { class: 'back-bar' },
-    // The same size and place as the close button on Study and Chat.
-    h('button', { class: 'icon-btn', 'aria-label': 'Home', title: 'Home', onclick: () => app.navigate({ name: 'home' }) }, icon('back')),
-  );
+  // Each screen draws its own top: a page its back arrow, a session its close button (docs/ARCHITECTURE.md).
+  root.replaceChildren(h('main', { class: 'screen' }, screen));
 }
 
 // A held Enter or Space would otherwise click through several screens at once.

@@ -4,7 +4,7 @@ import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai'
 import { lastStartDelay, play, voiceQuality } from '../speech';
 import { isSilent } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
-import { h, icon } from '../ui';
+import { h, icon, pageHeader } from '../ui';
 
 const DAILY_OPTIONS = [5, 8, 12, 15];
 
@@ -48,12 +48,7 @@ export function settingsScreen(app: App): HTMLElement {
     };
 
     root.replaceChildren(
-      h(
-        'header',
-        { class: 'home-header' },
-        h('h1', null, 'Settings'),
-        h('button', { class: 'icon-btn', 'aria-label': 'Back', onclick: () => app.navigate({ name: 'home' }) }, icon('close')),
-      ),
+      ...pageHeader('Settings', () => app.navigate({ name: 'home' })),
       h(
         'section',
         { class: 'card' },
