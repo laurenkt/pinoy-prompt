@@ -13,6 +13,12 @@ import { practiceScreen, type MeaningHearer } from './practice';
 import type { Take } from '../recorder';
 import type { SpeakDeps } from './speak';
 import { AiError } from '../openai';
+import { play } from '../speech';
+
+vi.mock('../speech', async (actual) => {
+  const speech = await actual<typeof import('../speech')>();
+  return { ...speech, play: vi.fn(speech.play) };
+});
 
 /** Asked in this order, since every pick rolls 0. */
 const KNOWN = ['salamat', 'maraming-salamat', 'magandang-umaga', 'bukas'];
@@ -186,22 +192,36 @@ describe('accepting a typed meaning as it is typed', () => {
     box(root)!.dispatchEvent(new Event('input'));
   }
 
-  it('takes a meaning the device can tell is right without Check', async () => {
-    const root = listen(learner(true));
-    typing(root, 'thank');
-    expect(root.querySelector('.feedback')).toBeNull();
-    typing(root, 'thank you');
-    await flush();
-    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  it('takes a meaning the device can tell is right once typing pauses, without Check', async () => {
+    vi.useFakeTimers();
+    try {
+      const root = listen(learner(true));
+      typing(root, 'thank');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      typing(root, 'thank you');
+      await vi.advanceTimersByTimeAsync(300);
+      expect(root.querySelector('.feedback')).toBeNull();
+      await vi.advanceTimersByTimeAsync(700);
+      expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('never sends part of a longer meaning, or a wrong one, by itself', async () => {
-    const judge = vi.fn<MeaningJudge>(async () => true);
-    const root = listen(learner(true), judge);
-    for (const text of ['good', 'good night', 'goodbye']) typing(root, text);
-    await flush();
-    expect(root.querySelector('.feedback')).toBeNull();
-    expect(judge).not.toHaveBeenCalled();
+    vi.useFakeTimers();
+    try {
+      const judge = vi.fn<MeaningJudge>(async () => true);
+      const root = listen(learner(true), judge);
+      // Right on the way, but typing goes on to something else: "no" on the way to "now".
+      for (const text of ['good', 'good night', 'goodbye', 'thank you', 'thank you very much']) typing(root, text);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      expect(judge).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -259,5 +279,36 @@ describe('saying the meaning out loud', () => {
     quiet.progress.settings.headphones = true;
     expect(micButton(speaking(quiet, async () => '', mic().deps))).toBeNull();
     expect(micButton(speaking(learner(true), async () => '', mic().deps))).not.toBeNull();
+  });
+
+  it("records silently, and doesn't play the word or offer the way back while listening or hearing", async () => {
+    const record = vi.fn(() => ({ audio: new Promise<Take>(() => {}), stop: () => {}, cancel: () => {} }));
+    const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record } as unknown as SpeakDeps;
+    const root = speaking(learner(true), async () => '', deps);
+    vi.mocked(play).mockClear();
+    expect(micButton(root)!.hasAttribute('data-no-tap')).toBe(true);
+    micButton(root)!.click();
+    expect(has(root, 'Previous card')).toBe(false);
+    root.querySelector<HTMLButtonElement>('.prompt button')!.click();
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it("drops a spoken meaning still being heard when the question goes, without touching the next one's", async () => {
+    const { deps } = mic();
+    const replies: ((text: string) => void)[] = [];
+    const root = speaking(learner(true), () => new Promise<string>((r) => replies.push(r)), deps);
+    micButton(root)!.click();
+    await flush();
+    button(root, 'Show choices').click();
+    root.querySelector<HTMLButtonElement>('.choice')!.click();
+    button(root, 'Next').click();
+    micButton(root)!.click();
+    await flush();
+    expect(replies).toHaveLength(2);
+    replies[0]('Thank you.');
+    await flush();
+    expect(root.querySelector('.meaning-status')?.textContent).toContain('Hearing');
+    expect(box(root)!.disabled).toBe(true);
+    expect(root.querySelector('.feedback')).toBeNull();
   });
 });

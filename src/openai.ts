@@ -282,6 +282,8 @@ export async function checkMeaning(
 
 /** Turns a spoken answer in Drills into text. */
 export const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
+/** Longer than a check: a few seconds of audio go up first, over a phone's connection. */
+const TRANSCRIBE_TIMEOUT_MS = 20000;
 
 /** What the learner said, as English text. Sends only the recording. */
 export async function transcribe(key: string, audio: Blob, fetchFn: typeof fetch = (...args) => fetch(...args)): Promise<string> {
@@ -296,7 +298,7 @@ export async function transcribe(key: string, audio: Blob, fetchFn: typeof fetch
       method: 'POST',
       headers: { Authorization: `Bearer ${key}` },
       body: form,
-      signal: timeout(CHECK_TIMEOUT_MS),
+      signal: timeout(TRANSCRIBE_TIMEOUT_MS),
     });
   } catch (e) {
     throw new AiError('network', e instanceof Error ? e.message : String(e));

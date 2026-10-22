@@ -1269,10 +1269,11 @@ p {
 }
 
 /*
- * Until it's answered, the box sits right under the prompt, which doesn't grow, so both stay in sight above
- * the keyboard that comes up with it. The spare height goes below them, where the keyboard is.
+ * The box sits right under the prompt, which doesn't grow, so both stay in sight above the keyboard that comes
+ * up with it. Until it's answered, the spare height goes below them, where the keyboard is; after, above Next.
+ * The prompt stays the same size either way, so the box doesn't move when it's answered.
  */
-.panel:has(> .meaning-form:last-child) > .prompt {
+.panel:has(> .meaning-form) > .prompt {
   min-height: 0;
 }
 
