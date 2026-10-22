@@ -1,0 +1,49 @@
+// The number on the Home Screen icon: how many cards Study would review now,
+// the same count as Home's Study button. Opt-in from Settings.
+//
+// The icon can only change while the app's code runs (when it's opened, used
+// or left), so a card that falls due while the app is closed shows next time
+// it is opened. Changing it from a closed app needs a push from a server,
+// and iOS shows a notification with every push, so the app doesn't.
+
+import { installed } from './app';
+import { studyQueue } from './session';
+import type { Progress } from './store';
+
+interface BadgeNavigator {
+  setAppBadge?: (count?: number) => Promise<void>;
+  clearAppBadge?: () => Promise<void>;
+}
+
+/** Whether this device can show a number on the app's icon: only an installed app can. */
+export function badgeSupported(nav: BadgeNavigator = navigator as BadgeNavigator): boolean {
+  return typeof nav.setAppBadge === 'function' && typeof nav.clearAppBadge === 'function' && installed();
+}
+
+/** Set the icon to the cards due now, or clear it when none are or the setting is off. */
+export function showDueBadge(progress: Progress, now: number, nav: BadgeNavigator = navigator as BadgeNavigator): void {
+  if (!badgeSupported(nav)) return;
+  const due = progress.settings.iconBadge ? studyQueue(progress, now).length : 0;
+  // A refused badge (notifications turned off since) just doesn't show.
+  void (due > 0 ? nav.setAppBadge!(due) : nav.clearAppBadge!()).catch(() => {});
+}
+
+export type BadgePermission = 'granted' | 'denied' | 'default';
+
+/** Where the phone stands on notifications, which iOS asks for before an icon can show a number. */
+export function badgePermission(): BadgePermission {
+  return typeof Notification === 'undefined' ? 'granted' : Notification.permission;
+}
+
+/**
+ * Ask for notifications if the phone hasn't been asked. Call it straight from
+ * the learner's tap: iOS only asks inside one. The app never sends any.
+ */
+export async function allowBadge(): Promise<boolean> {
+  if (badgePermission() !== 'default') return badgePermission() === 'granted';
+  try {
+    return (await Notification.requestPermission()) === 'granted';
+  } catch {
+    return false;
+  }
+}

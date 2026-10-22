@@ -64,6 +64,18 @@ const SCREENS = {
     });
     await page.click('[aria-label="Settings"]');
   },
+  // Opened from the Home Screen, so Settings offers the number on the app's icon.
+  'settings-installed': async (page) => {
+    await page.addInitScript(() => {
+      const real = window.matchMedia.bind(window);
+      window.matchMedia = (q) => (q === '(display-mode: standalone)' ? { ...real(q), matches: true } : real(q));
+      // Headless Chromium refuses notifications outright; a phone that hasn't been asked yet.
+      Object.defineProperty(Notification, 'permission', { get: () => 'default' });
+    });
+    await page.reload();
+    await page.waitForSelector('.home');
+    await page.click('[aria-label="Settings"]');
+  },
   chat: (page) => page.click('.chat-btn'),
   // A new learner's first Study: the topic's introduction, then the first word's.
   'first-study': (page) => page.click('.hub-btn.big:not(.chat-btn)'),

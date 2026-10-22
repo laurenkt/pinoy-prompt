@@ -1,4 +1,5 @@
 import type { App } from '../app';
+import { allowBadge, badgePermission, badgeSupported, showDueBadge } from '../badge';
 import { getCard } from '../deck';
 import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, getSpend, setApiKey } from '../openai';
 import { lastStartDelay, play, voiceQuality } from '../speech';
@@ -7,6 +8,49 @@ import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon, pageHeader, settingsToggle } from '../ui';
 
 const DAILY_OPTIONS = [5, 8, 12, 15];
+
+/** Opt-in number on the Home Screen icon. iOS asks to allow notifications for it, so it asks only when switched on. */
+function iconBadgeCard(app: App, draw: () => void): HTMLElement {
+  const { settings } = app.progress;
+  const blocked = badgePermission() === 'denied';
+  const on = settings.iconBadge && !blocked;
+  return h(
+    'section',
+    { class: 'card' },
+    h('h2', null, 'App icon'),
+    h(
+      'label',
+      { class: 'toggle' },
+      h('input', {
+        type: 'checkbox',
+        checked: on,
+        disabled: blocked,
+        onchange: (e: Event) => {
+          const box = e.target as HTMLInputElement;
+          const set = (value: boolean) => {
+            settings.iconBadge = value;
+            app.commit();
+            showDueBadge(app.progress, app.now());
+          };
+          if (!box.checked) return set(false);
+          // Asked inside the tap, as iOS needs.
+          void allowBadge().then((allowed) => {
+            set(allowed);
+            draw();
+          });
+        },
+      }),
+      h('span', null, 'Show cards due on the icon'),
+    ),
+    h(
+      'p',
+      { class: 'muted small' },
+      blocked
+        ? 'Notifications are turned off for Pinoy Prompt, and the phone needs them on to show a number. You can turn them on in your phone\'s Settings, under Notifications.'
+        : 'The number changes when you open or leave the app, not while it\'s closed. Your phone asks to allow notifications for this; Pinoy Prompt never sends any.',
+    ),
+  );
+}
 
 export function settingsScreen(app: App): HTMLElement {
   const root = h('div', { class: 'settings' });
@@ -112,6 +156,7 @@ export function settingsScreen(app: App): HTMLElement {
           : h('button', { class: 'btn secondary', onclick: testVoice }, icon('speaker'), ' Test voice'),
         lag,
       ),
+      ...(badgeSupported() ? [iconBadgeCard(app, draw)] : []),
       h('section', { class: 'card' }, h('h2', null, 'Chat'), keyForm(draw)),
       h(
         'section',
