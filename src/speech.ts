@@ -103,7 +103,9 @@ let muted = false;
 
 export function setMuted(on: boolean): void {
   muted = on;
-  if (on) stop();
+  if (!on) return;
+  stop();
+  currentChime?.stop();
 }
 /** Bumped by stop(), so a play() still loading a clip or voices doesn't start afterwards. */
 let generation = 0;
@@ -136,7 +138,7 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
       // A context iOS won't start (outside a tap) plays nothing, so the voice reads it instead.
       if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
       if (mine !== generation) return;
-      const sound = (currentClip = playBuffer(buffer));
+      const sound = (currentClip = playBuffer(buffer, 1, afterChime()));
       void sound.done.then(() => {
         if (currentClip === sound) currentClip = null;
       });
@@ -162,6 +164,53 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
   utterance.onstart = () => report(performance.now() - tapped);
   utterance.onend = utterance.onerror = () => report(null);
   speechSynthesis.speak(utterance);
+}
+
+/**
+ * A soft two-note chime for a right answer. It's short and quiet, as praise
+ * should stay small, and goes quiet with the words in silent mode. A word
+ * played with it (the answer, said back) starts once it's done, not over it.
+ */
+export async function chime(): Promise<void> {
+  if (muted || !clipsSupported()) return;
+  const ctx = audioContext();
+  // Outside a tap (a spoken answer judged) iOS may not start the context; better no chime than one on the next tap.
+  if (!(await audioRunning(ctx)) || muted) return;
+  if (chimeBuffer?.sampleRate !== ctx.sampleRate) chimeBuffer = chimeSound(ctx);
+  const sound = (currentChime = playBuffer(chimeBuffer));
+  lastChime = { ctx, ends: sound.startsAt + chimeBuffer.duration };
+}
+
+let chimeBuffer: AudioBuffer | null = null;
+/** Stopped by silent mode, but not by a word starting, which waits for it instead. */
+let currentChime: Sound | null = null;
+/** When the last chime ends, in its context's time. */
+let lastChime: { ctx: AudioContext; ends: number } | null = null;
+
+/** When a word may start so it doesn't play over a chime: 0, for now, unless one is still sounding. */
+function afterChime(): number {
+  // A new context counts from 0 again, so a chime from an old one doesn't hold a word back.
+  return lastChime && lastChime.ctx === audioContext() ? lastChime.ends : 0;
+}
+
+/** Two short bell-like notes rising a fifth (E5 to B5), each fading out quickly. */
+function chimeSound(ctx: AudioContext): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const buffer = ctx.createBuffer(1, Math.round(rate * 0.36), rate);
+  const data = buffer.getChannelData(0);
+  const notes = [
+    { at: 0, freq: 659.25 },
+    { at: 0.09, freq: 987.77 },
+  ];
+  for (const { at, freq } of notes) {
+    for (let i = Math.round(at * rate); i < data.length; i++) {
+      const t = i / rate - at;
+      const envelope = Math.min(1, t / 0.004) * Math.exp(-t / 0.07);
+      // A little of the octave above makes it a bell rather than a beep.
+      data[i] += 0.12 * envelope * (Math.sin(2 * Math.PI * freq * t) + 0.2 * Math.sin(4 * Math.PI * freq * t));
+    }
+  }
+  return buffer;
 }
 
 if (typeof document !== 'undefined') {

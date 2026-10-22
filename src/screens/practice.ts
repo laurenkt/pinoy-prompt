@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
-import { canPlay, play, preload, stop } from '../speech';
+import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, h, hookView, icon, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
@@ -157,6 +157,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         onAttempt: (right) => {
           if (!right || spokenRight) return;
           spokenRight = true;
+          void chime();
           // Pick what's next now, so its word loads while the coaching is up.
           settle(true);
           auto = countdown(root, () => {
@@ -185,8 +186,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     const q = current;
     if (!q || picked) return;
     picked = choice.id;
-    if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
     const right = choice.id === q.card.id;
+    // The chime first, so the word said back is heard after it.
+    if (right) void chime();
+    if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
     settle(right);
     if (right)
       auto = countdown(root, () => {

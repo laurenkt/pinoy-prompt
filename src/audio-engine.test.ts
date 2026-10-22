@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
 const { IDLE_SUSPEND_MS, KEEP_DECODED, loadClip } = await import('./audio-engine');
-const { canPlay, clipUrl, lastStartDelay, play, preload, speaking, stop, voiceQuality } = await import('./speech');
+const { canPlay, chime, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
+  buffer: { duration: number } | null;
   playbackRate: { value: number };
   started: number | null;
   stopped: boolean;
@@ -25,6 +26,7 @@ class FakeContext {
   state = startState;
   closed = false;
   currentTime = 0;
+  sampleRate = 48000;
   outputLatency = 0.02;
   baseLatency = 0.005;
   destination = {};
@@ -44,6 +46,10 @@ class FakeContext {
   }
   decodeAudioData() {
     return Promise.resolve({ duration: 1 });
+  }
+  createBuffer(_channels: number, length: number, sampleRate: number) {
+    const data = new Float32Array(length);
+    return { sampleRate, duration: length / sampleRate, getChannelData: () => data };
   }
   createGain() {
     const param = { setValueAtTime() {}, linearRampToValueAtTime() {} };
@@ -333,5 +339,52 @@ describe('clips', () => {
     expect(fetched).toHaveLength(KEEP_DECODED + 1);
     await loadClip(urls[0]);
     expect(fetched).toHaveLength(KEEP_DECODED + 2);
+  });
+});
+
+describe('the right-answer chime', () => {
+  it('plays a short, quiet sound through the shared context', async () => {
+    await chime();
+    expect(contexts.filter((c) => !c.closed)).toHaveLength(1);
+    expect(sources).toHaveLength(1);
+    const buffer = sources[0].buffer as unknown as { duration: number; getChannelData(): Float32Array };
+    expect(buffer.duration).toBeLessThan(0.5);
+    const peak = buffer.getChannelData().reduce((m, x) => Math.max(m, Math.abs(x)), 0);
+    expect(peak).toBeGreaterThan(0.05);
+    expect(peak).toBeLessThan(0.25);
+  });
+
+  it('holds back a word played with it until it has finished', async () => {
+    void chime();
+    await play({ tl: 'Salamat' });
+    expect(sources[1].started).toBeGreaterThanOrEqual(sources[0].started! + sources[0].buffer!.duration);
+  });
+
+  it("doesn't hold back a word on a new context", async () => {
+    // A call interrupted it, so the next use makes a new one, counting from 0 again.
+    const old = contexts.at(-1)!;
+    old.currentTime = 500;
+    await chime();
+    old.state = 'interrupted';
+    await play({ tl: 'Salamat' });
+    expect(sources.at(-1)!.started).toBeLessThan(0.1);
+  });
+
+  it('is silent in silent mode, and stops when it comes on', async () => {
+    setMuted(true);
+    await chime();
+    setMuted(false);
+    expect(sources).toHaveLength(0);
+    await chime();
+    setMuted(true);
+    setMuted(false);
+    expect(sources[0].stopped).toBe(true);
+  });
+
+  it("isn't left waiting to play on the next tap when iOS won't start the context", async () => {
+    startState = 'suspended';
+    for (const c of contexts) c.state = 'suspended';
+    await chime();
+    expect(sources).toHaveLength(0);
   });
 });

@@ -20,7 +20,7 @@ Each system has one owner module. Anything else that needs it calls that module.
 | Saved progress | `src/store.ts`, `src/progress-schema.ts`, `src/progress-mirror.ts` | Everything in `localStorage` under `pinoy-prompt:progress`, and its IndexedDB mirror. Settings live inside progress. |
 | Learning | `src/deck.ts`, `src/guides.ts`, `src/srs.ts`, `src/session.ts`, `src/memory.ts` | Content, the schedule, what Study asks next, memory stats. No DOM. |
 | Audio out | `src/audio-engine.ts` | The one shared `AudioContext`, decoding and playing buffers. |
-| Card audio | `src/speech.ts`, `src/spoken.ts`, `src/clips.json`, `scripts/generate-audio.mjs` | Playing a card's recorded clip (`play`, `stop`, `preload`), the built-in voice as fallback, mute for quiet mode. |
+| Card audio | `src/speech.ts`, `src/spoken.ts`, `src/clips.json`, `scripts/generate-audio.mjs` | Playing a card's recorded clip (`play`, `stop`, `preload`), the built-in voice as fallback, the right-answer `chime`, mute for quiet mode. |
 | Microphone | `src/microphone.ts`, `src/recorder.ts` | The one shared mic stream; recording a take. |
 | iOS audio session | `src/audio-session.ts` | Called by the engine and card audio (`playback`) and the microphone (`play-and-record`) only. |
 | Speaking | `src/fbank.ts`, `src/phone-model.ts`, `src/model-cache.ts`, `src/phonetics.ts`, `src/coach.ts`, `src/player.ts` | Recognising and judging a spoken attempt; playing slices and reference sounds through the engine. |
@@ -41,7 +41,7 @@ Spacing, gutters, tap targets and colours come from REVIEW.md and the `:root` to
 
 ### Audio
 
-Every recorded sound the app plays goes through `audio-engine.ts`'s shared context: card clips (via `speech.ts`), reference sounds and slices of a recording (via `player.ts`). Screens never make an `AudioContext` or an `Audio` element; they call `play`/`stop` for cards, or a `Player` for the results screen. `speech.ts` also owns one path outside the engine: the built-in voice (`speechSynthesis`), used only when a clip can't play. Other exceptions are deliberate:
+Every recorded sound the app plays goes through `audio-engine.ts`'s shared context: card clips and the right-answer chime (via `speech.ts`), reference sounds and slices of a recording (via `player.ts`). The chime lives beside card audio so it shares its mute, and so a word clip said back with it starts once it ends rather than over it. Screens never make an `AudioContext` or an `Audio` element; they call `play`/`stop` for cards, or a `Player` for the results screen. `speech.ts` also owns one path outside the engine: the built-in voice (`speechSynthesis`), used only when a clip can't play. Other exceptions are deliberate:
 
 - `recorder.ts` keeps its own context, made inside the tap, because iOS changes the hardware rate when the mic opens.
 - Chat's AI voice is a WebRTC stream, played by an `<audio>` element from `openai.ts`, and `visualizer.ts` makes a context for its analysers. If Chat's audio is reworked, move the analysers onto the shared context or note here why they can't.
@@ -56,7 +56,7 @@ Progress is the one thing the app can't lose; the README's "Saved progress" sect
 
 - **One pipeline.** `.github/workflows/ci.yml` tests and builds every pull request and every push to `main`, and publishes to GitHub Pages from `main` only after that has passed, using the build it tested.
 - **One runner.** Vitest. Logic tests run in Node; screen tests opt into `happy-dom` with `// @vitest-environment happy-dom` on their first line.
-- **Shared test pieces live in `src/test/`.** `screen.ts` has the stand-in `App` (`fakeApp`), `button`, `noMic` and `flush` for screen tests; `fake-speech.ts` stands in for the recogniser and player; `fake-storage.ts` for storage; `fixtures/` holds saved progress from every schema. When `App` or `Settings` changes, change `fakeApp` once.
+- **Shared test pieces live in `src/test/`.** `screen.ts` has the stand-in `App` (`fakeApp`), `button`, `noMic` and `flush` for screen tests; `fake-speech.ts` stands in for the recogniser and player; `fake-audio.ts` for the shared AudioContext, counting chimes; `fake-storage.ts` for storage; `fixtures/` holds saved progress from every schema. When `App` or `Settings` changes, change `fakeApp` once.
 - **Stand-ins go through deps, not module mocks,** where a screen offers them (`SpeakDeps`, `TalkDeps`, `CallDeps`, `Player`). Prefer adding a dep over `vi.mock` of a shared module, which can hide a change in that module from every screen test.
 - **Files that can't import each other are checked by a test.** `public/sw.js` can't import from `src/`, so `src/sw.test.ts` checks the cache names and file path it shares with the app. `src/spoken.test.ts` checks every spoken text has its clip. Add a check like these whenever two systems agree on a name by hand.
 - **Screenshots** for UI changes (CLAUDE.md) are taken at 360px and 390px wide, of Home and every changed screen.

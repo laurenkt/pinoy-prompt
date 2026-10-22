@@ -9,6 +9,7 @@ import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
 import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
+import { FakeAudioContext, chimes } from '../test/fake-audio';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
 import { drillScope, fakeApp, flush } from '../test/screen';
 
@@ -59,6 +60,25 @@ describe('Speak mode', () => {
     button('Next').click();
     await flush();
     expect(button('Tap and speak')).toBeTruthy();
+  });
+
+  it('chimes for a right attempt, not a miss', async () => {
+    vi.stubGlobal('AudioContext', FakeAudioContext);
+    chimes.count = 0;
+    const mumble = deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition(['ʃ']) }) });
+    for (const [model, heard] of [[mumble, 0], [deps(), 1]] as const) {
+      const root = practiceScreen(fakeApp(KNOWN), model);
+      document.body.replaceChildren(root);
+      await flush();
+      drillScope(root, ['speak']);
+      await flush();
+      button('Tap and speak').click();
+      button("I'm done").click();
+      await flush();
+      await flush();
+      expect(chimes.count).toBe(heard);
+    }
+    vi.unstubAllGlobals();
   });
 
   it('asks another way when quiet mode comes on mid-round', async () => {
