@@ -25,6 +25,8 @@ export interface Settings {
   quiet: boolean;
   /** With quiet mode: headphones are in, so audio can still play. Without them, quiet mode is silent. */
   headphones: boolean;
+  /** A soft tick when a button is pressed. */
+  tapSounds: boolean;
 }
 
 /** How a day's reviews of already-learned cards went. */
@@ -70,7 +72,7 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   2: (data) => ({ history: {}, ...data }),
 };
 
-export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false, headphones: false };
+export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true };
 
 /** Local calendar day as YYYY-MM-DD. */
 export function dayKey(time: number): string {
@@ -182,6 +184,7 @@ export function sanitize(data: Data, now: number): Progress {
     quiet: typeof s.quiet === 'boolean' ? s.quiet : DEFAULT_SETTINGS.quiet,
     // Quiet mode used to keep audio playing, so a quiet copy saved before this setting keeps it.
     headphones: typeof s.headphones === 'boolean' ? s.headphones : s.quiet === true,
+    tapSounds: typeof s.tapSounds === 'boolean' ? s.tapSounds : DEFAULT_SETTINGS.tapSounds,
   };
 
   return { ...data, cards, today, history, settings };

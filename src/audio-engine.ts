@@ -17,6 +17,8 @@ import { microphoneOpen } from './microphone';
 let context: AudioContext | null = null;
 /** Whether the microphone was open when the context was made. */
 let madeWithMicrophone = false;
+/** When the context was last asked for, by performance.now(). */
+let lastUsed = -Infinity;
 
 function contextClass(): typeof AudioContext | undefined {
   const scope = globalThis as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
@@ -25,6 +27,7 @@ function contextClass(): typeof AudioContext | undefined {
 
 /** The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then. */
 export function audioContext(): AudioContext {
+  lastUsed = performance.now();
   // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback (iOS 17+).
   const mic = microphoneOpen();
   if (!mic) setAudioSession('playback');
@@ -75,6 +78,11 @@ if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) closeContext();
   });
+}
+
+/** Whether something is playing through the shared context, or it was asked for within the last `withinMs` (a sound still loading). */
+export function audioBusy(withinMs: number): boolean {
+  return sounding.size > 0 || performance.now() - lastUsed < withinMs;
 }
 
 /** Whether the shared context can play now, waiting a moment for it to resume. */

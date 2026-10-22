@@ -15,7 +15,15 @@ export class FakeAudioContext {
   decodeAudioData = async () => ({ duration: 1 });
   createBuffer(_channels: number, length: number, sampleRate: number) {
     const data = new Float32Array(length);
-    return { made: true, sampleRate, duration: length / sampleRate, getChannelData: () => data };
+    const buffer = {
+      made: true,
+      sampleRate,
+      duration: length / sampleRate,
+      getChannelData: () => data,
+      // A slice of a recording copied in, not a sound made in code.
+      copyToChannel: () => (buffer.made = false),
+    };
+    return buffer;
   }
   createGain() {
     const param = { setValueAtTime() {}, linearRampToValueAtTime() {} };
@@ -25,9 +33,13 @@ export class FakeAudioContext {
     const source = {
       buffer: null as { made?: boolean; duration: number } | null,
       playbackRate: { value: 1 },
-      onended: null,
+      onended: null as (() => void) | null,
       connect: (to: unknown) => to,
-      start: () => source.buffer?.made && (source.buffer.duration > 0.2 ? chimes.count++ : ticks.count++),
+      start: () => {
+        if (source.buffer?.made) void (source.buffer.duration > 0.2 ? chimes.count++ : ticks.count++);
+        // Ends when it would have, so nothing is left playing for the next test.
+        setTimeout(() => source.onended?.(), (source.buffer?.duration ?? 0) * 1000);
+      },
       stop: () => {},
     };
     return source;

@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import type { Settings } from '../store';
-import { setMuted } from '../speech';
+import { setMuted, setTapSounds } from '../speech';
 import { h, icon, type IconName } from '../ui';
 
 /**
@@ -28,10 +28,11 @@ export function isSilent(settings: Settings): boolean {
   return mode(settings) === 'silent';
 }
 
-/** Mute or unmute card audio, and hide the play buttons when nothing can play. */
+/** Mute or unmute card audio, and hide the play buttons when nothing can play. Also takes up the Tap sounds switch. */
 export function applyAudioMode(settings: Settings): void {
   const silent = isSilent(settings);
   setMuted(silent);
+  setTapSounds(settings.tapSounds);
   document.documentElement.classList.toggle('silent', silent);
 }
 

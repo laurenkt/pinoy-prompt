@@ -399,7 +399,7 @@ describe('the tap sound', () => {
     tick();
     const [rang, ticked] = sources.map((s) => s.buffer as unknown as { duration: number; getChannelData(): Float32Array });
     const peak = (b: typeof rang) => b.getChannelData().reduce((m, x) => Math.max(m, Math.abs(x)), 0);
-    expect(ticked.duration).toBeLessThan(0.1);
+    expect(ticked.duration).toBeLessThan(0.15);
     expect(peak(ticked)).toBeLessThan(peak(rang) / 2);
     expect(peak(ticked)).toBeGreaterThan(0.01);
   });

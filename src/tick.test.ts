@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMicrophone, releaseMicrophone } from './microphone';
+import { webAudioPlayer } from './player';
 import { chime, play, setMuted, stop, tickOnPress } from './speech';
 import { FakeAudioContext, chimes, ticks } from './test/fake-audio';
 import { h } from './ui';
@@ -54,6 +55,18 @@ describe('the tap sound', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(ticks.count).toBe(0);
     expect(chimes.count).toBe(1);
+  });
+
+  it("doesn't tick when the press plays a sound on the results screen", () => {
+    const player = webAudioPlayer();
+    const yours = h('button', { onclick: () => player.playSlice(new Float32Array(4800), 48000, 0, 0.1) }, '▶ Yours');
+    const target = h('button', { onclick: () => player.playUrl('/audio/a.mp3') }, '▶ Target');
+    root.append(yours, target);
+    press(yours);
+    player.stop();
+    press(target);
+    player.stop();
+    expect(ticks.count).toBe(0);
   });
 
   it("doesn't tick for a button that opens the microphone, or while it's in use", async () => {

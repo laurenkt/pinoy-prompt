@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { getCard } from '../deck';
 import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, setApiKey } from '../openai';
 import { lastStartDelay, play, voiceQuality } from '../speech';
-import { isSilent } from './quiet';
+import { applyAudioMode, isSilent } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon, pageHeader } from '../ui';
 
@@ -91,6 +91,20 @@ export function settingsScreen(app: App): HTMLElement {
             },
           }),
           h('span', null, 'Play words automatically'),
+        ),
+        h(
+          'label',
+          { class: 'toggle' },
+          h('input', {
+            type: 'checkbox',
+            checked: settings.tapSounds,
+            onchange: (e: Event) => {
+              settings.tapSounds = (e.target as HTMLInputElement).checked;
+              app.commit();
+              applyAudioMode(settings);
+            },
+          }),
+          h('span', null, 'Tap sounds'),
         ),
         h('p', { class: 'muted small' }, voiceText),
         isSilent(settings)

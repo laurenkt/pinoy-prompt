@@ -136,7 +136,7 @@ describe('damaged saved progress', () => {
 
   it('falls back to defaults for out-of-range settings', () => {
     const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 0, autoplay: 'yes', quiet: 1 } }));
-    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true, quiet: false, headphones: false });
+    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true });
   });
 
   it('never throws and always yields valid progress, whatever is stored', () => {

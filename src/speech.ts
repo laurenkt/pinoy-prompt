@@ -7,7 +7,7 @@
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
 // Malay, then Spanish) and let the UI say so.
 
-import { audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
+import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
 import clips from './clips.json';
 import { microphoneInUse } from './microphone';
 import type { Card } from './deck';
@@ -113,7 +113,6 @@ let generation = 0;
 
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
 export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promise<void> {
-  soundAsked = performance.now();
   stop();
   started = new Promise((resolve) => (reportStart = resolve));
   const report = reportStart;
@@ -174,7 +173,6 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
  * played with it (the answer, said back) starts once it's done, not over it.
  */
 export async function chime(): Promise<void> {
-  soundAsked = performance.now();
   if (muted || !clipsSupported()) return;
   const ctx = audioContext();
   // Outside a tap (a spoken answer judged) iOS may not start the context; better no chime than one on the next tap.
@@ -221,20 +219,27 @@ function bell(ctx: AudioContext, seconds: number, notes: { at: number; freq: num
   return buffer;
 }
 
-/** When play() or chime() was last called, so a tap that already makes a sound doesn't tick as well. */
-let soundAsked = -Infinity;
+/** Settings' Tap sounds switch. */
+let tapSounds = true;
+
+export function setTapSounds(on: boolean): void {
+  tapSounds = on;
+}
+
 let tickBuffer: AudioBuffer | null = null;
 
 /**
  * A very soft tick for a button press, quieter and shorter than the chime.
- * Not when the press already made a sound (a word, the chime) or one is still
- * playing, nor while the microphone is in use, where it would be recorded.
+ * Not when the press already made a sound (a word, the chime, a sound on the
+ * results screen) or one is still playing, nor while the microphone is in use,
+ * where it would be recorded.
  */
 export function tick(): void {
-  if (muted || !clipsSupported() || microphoneInUse()) return;
-  if (performance.now() - soundAsked < 250 || speaking() || currentChime) return;
+  if (!tapSounds || muted || !clipsSupported() || microphoneInUse()) return;
+  // A word or the chime takes the shared context inside the press, and a reference sound or slice too.
+  if (audioBusy(250) || speaking()) return;
   const ctx = audioContext();
-  tickBuffer = tickBuffer?.sampleRate === ctx.sampleRate ? tickBuffer : bell(ctx, 0.06, [{ at: 0, freq: 1320, level: 0.05, decay: 0.012 }]);
+  tickBuffer = tickBuffer?.sampleRate === ctx.sampleRate ? tickBuffer : bell(ctx, 0.12, [{ at: 0, freq: 1320, level: 0.05, decay: 0.03 }]);
   playBuffer(tickBuffer);
 }
 
