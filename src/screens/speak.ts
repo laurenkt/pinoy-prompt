@@ -202,7 +202,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       if (stale()) return;
       const { sounds } = recognition;
       const { text, comparison } = judge(sounds);
-      judged = true;
+      // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
+      if (sounds.length > 0) judged = true;
       options.onAttempt(isRight(comparison));
       set({ name: 'result', text, comparison, tips: coach(text, comparison), heard: sounds, recognition, samples: take.samples });
     } catch (err) {
@@ -229,7 +230,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     });
   }
 
-  const hint = () => card.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), card.hint);
+  // The sounds-like spelling gives the pronunciation away too, so it waits for a first attempt like the audio.
+  const hint = () => judged && card.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), card.hint);
   const micButton = (label: string, className = 'btn mic big') =>
     h('button', { class: className, 'data-autofocus': true, onclick: () => void startRecording() }, icon('mic'), ' ', label);
   const skip = (label = 'Skip') => h('button', { class: 'btn secondary', onclick: options.onNext }, label);
@@ -346,7 +348,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         lettersEl,
         tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
       ),
-      h('div', { class: 'row' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
+      judged && h('div', { class: 'row' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
       actions(right),
     ].filter(Boolean) as HTMLElement[];
   }

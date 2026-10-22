@@ -45,7 +45,7 @@ A learner's progress is the one thing the app can't afford to lose, so it is kep
 
 ## Speaking questions
 
-The **Speak** practice mode shows a word or phrase (without playing it, so it asks how the learner remembers it sounding rather than having them repeat it; it can be played once they've had a go), records the learner saying it, and coaches them on each sound: the letters they said well, the ones that were nearly there, the ones that were off, and a short tip for the most important fix (for example "ng is one sound, like the end of *sing*" or "Filipino r is a quick tap, like the tt in American *butter*").
+The **Speak** practice mode shows a word or phrase (without playing it or showing its sounds-like spelling, so it asks how the learner remembers it sounding rather than having them repeat it; both come once they've had a go), records the learner saying it, and coaches them on each sound: the letters they said well, the ones that were nearly there, the ones that were off, and a short tip for the most important fix (for example "ng is one sound, like the end of *sing*" or "Filipino r is a quick tap, like the tt in American *butter*").
 
 How it works:
 
