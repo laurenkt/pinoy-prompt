@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getMicrophone, releaseMicrophone } from './microphone';
 import { webAudioPlayer } from './player';
 import { chime, play, setMuted, stop, tickOnPress } from './speech';
-import { FakeAudioContext, chimes, ticks } from './test/fake-audio';
+import { FakeAudioContext, chimes, recorded, ticks } from './test/fake-audio';
 import { h } from './ui';
 
 let root: HTMLElement;
@@ -18,6 +18,7 @@ beforeEach(async () => {
   await settle();
   chimes.count = 0;
   ticks.count = 0;
+  recorded.count = 0;
   vi.stubGlobal('AudioContext', FakeAudioContext);
   vi.stubGlobal('fetch', async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
   root = h('div');
@@ -40,6 +41,28 @@ describe('the tap sound', () => {
     press(button.firstElementChild as HTMLElement);
     press(text);
     expect(ticks.count).toBe(1);
+  });
+
+  it('thocks for a big chunky button, and clicks for a pill', async () => {
+    const big = h('button', { class: 'btn primary big' }, 'Next');
+    const chip = h('button', { class: 'chip' }, 'Listen');
+    root.append(big, chip);
+    press(big);
+    await vi.waitFor(() => expect(recorded.count).toBe(1));
+    expect(ticks.count).toBe(0);
+    press(chip);
+    expect(ticks.count).toBe(1);
+  });
+
+  it('ticks for a section opening, a link, a checkbox and its label, once each', () => {
+    const section = h('details', null, h('summary', null, h('span', null, 'Greetings')), h('p', null, 'Kumusta'));
+    const link = h('a', { href: '#' }, 'platform.openai.com');
+    const toggle = h('label', null, h('input', { type: 'checkbox' }), h('span', null, 'Tap sounds'));
+    root.append(section, link, toggle);
+    press(section.querySelector('span')!);
+    press(link);
+    press(toggle.querySelector('span')!);
+    expect(ticks.count).toBe(3);
   });
 
   it("doesn't tick when the press plays a word or the chime", async () => {

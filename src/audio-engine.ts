@@ -25,9 +25,12 @@ function contextClass(): typeof AudioContext | undefined {
   return scope.AudioContext ?? scope.webkitAudioContext;
 }
 
-/** The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then. */
-export function audioContext(): AudioContext {
-  lastUsed = performance.now();
+/**
+ * The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then.
+ * `incidental` is for the tap sound, which shouldn't count as the press having made a sound (audioBusy).
+ */
+export function audioContext(incidental = false): AudioContext {
+  if (!incidental) lastUsed = performance.now();
   // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback (iOS 17+).
   const mic = microphoneOpen();
   if (!mic) setAudioSession('playback');
@@ -113,7 +116,8 @@ export const KEEP_DECODED = 48;
 function decoderContext(): BaseAudioContext {
   const scope = globalThis as { OfflineAudioContext?: typeof OfflineAudioContext; webkitOfflineAudioContext?: typeof OfflineAudioContext };
   const Offline = scope.OfflineAudioContext ?? scope.webkitOfflineAudioContext;
-  return Offline ? new Offline(1, 1, context?.sampleRate ?? 48000) : audioContext();
+  // Decoding plays nothing, so it doesn't count as the app making a sound (audioBusy).
+  return Offline ? new Offline(1, 1, context?.sampleRate ?? 48000) : audioContext(true);
 }
 
 /** A clip decoded and ready to play. Decoding starts on the first call, so calling it early loads ahead. */
@@ -146,9 +150,20 @@ export interface Sound {
   stop(): void;
 }
 
-/** Play a buffer now, or no earlier than `at` (context time), with short fades. */
-export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0): Sound {
-  const ctx = audioContext();
+export interface PlayOptions {
+  /** Playback rate. */
+  rate?: number;
+  /** Start no earlier than this, in the context's time. */
+  at?: number;
+  /** Short fades in and out, so clips and slices don't click. A tap sound starts and ends at silence, and needs its sharp attack. */
+  fades?: boolean;
+  /** A tap sound: it doesn't make the context busy (audioBusy), so taps in quick succession each get one. */
+  incidental?: boolean;
+}
+
+/** Play a buffer now, or no earlier than `at`. */
+export function playBuffer(buffer: AudioBuffer, { rate = 1, at = 0, fades = true, incidental = false }: PlayOptions = {}): Sound {
+  const ctx = audioContext(incidental);
   const source = ctx.createBufferSource();
   const gain = ctx.createGain();
   source.buffer = buffer;
@@ -157,14 +172,16 @@ export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0): Sound {
   // A few ms ahead, so the fade-in is scheduled before the first sample.
   const t0 = Math.max(ctx.currentTime + 0.005, at);
   const length = buffer.duration / rate;
-  gain.gain.setValueAtTime(0, t0);
-  gain.gain.linearRampToValueAtTime(1, t0 + Math.min(FADE, length / 4));
-  gain.gain.setValueAtTime(1, t0 + Math.max(length - FADE, length * 0.75));
-  gain.gain.linearRampToValueAtTime(0, t0 + length);
+  if (fades) {
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(1, t0 + Math.min(FADE, length / 4));
+    gain.gain.setValueAtTime(1, t0 + Math.max(length - FADE, length * 0.75));
+    gain.gain.linearRampToValueAtTime(0, t0 + length);
+  }
   source.start(t0);
   let finish = () => {};
   const done = new Promise<void>((resolve) => (finish = resolve));
-  sounding.add(finish);
+  if (!incidental) sounding.add(finish);
   void done.then(() => {
     sounding.delete(finish);
     suspendWhenIdle();

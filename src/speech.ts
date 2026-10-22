@@ -9,6 +9,7 @@
 
 import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
 import clips from './clips.json';
+import thockFile from './sounds/tap-thock.mp3?inline';
 import { microphoneInUse } from './microphone';
 import type { Card } from './deck';
 
@@ -139,7 +140,7 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
       // A context iOS won't start (outside a tap) plays nothing, so the voice reads it instead.
       if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
       if (mine !== generation) return;
-      const sound = (currentClip = playBuffer(buffer, 1, afterChime()));
+      const sound = (currentClip = playBuffer(buffer, { at: afterChime() }));
       void sound.done.then(() => {
         if (currentClip === sound) currentClip = null;
       });
@@ -226,29 +227,118 @@ export function setTapSounds(on: boolean): void {
   tapSounds = on;
 }
 
-let tickBuffer: AudioBuffer | null = null;
+/** The two tap sounds: a thock for the big chunky buttons, a lighter click for pills, chips and small controls. */
+export type TapKind = 'thock' | 'click';
 
 /**
- * A very soft tick for a button press, quieter and shorter than the chime.
+ * The thock is a recording of a real key press, as a synthesised one came out
+ * as a drum or a "duk". It's one press from "Keyboard single key presses" by
+ * 5ro4 on freesound.org (sound 609534, public domain, CC0), pitched down six
+ * semitones, its low end lifted and its top softened, then levelled. Inlined
+ * into the app as a data URL (a few KB), so it plays offline with no file to
+ * cache.
+ */
+let thock: Promise<AudioBuffer> | null = null;
+let clickBuffer: AudioBuffer | null = null;
+
+/** Decode the thock ahead, offline, so a press only has to start it. Kept here rather than among the recent clips, which come and go. */
+function loadThock(): Promise<AudioBuffer> {
+  thock ??= loadClip(thockFile).catch((error) => {
+    thock = null;
+    throw error;
+  });
+  return thock;
+}
+
+/**
+ * A soft tap sound for a press, much shorter than the chime.
  * Not when the press already made a sound (a word, the chime, a sound on the
  * results screen) or one is still playing, nor while the microphone is in use,
  * where it would be recorded.
  */
-export function tick(): void {
+export function tick(kind: TapKind = 'thock'): void {
   if (!tapSounds || muted || !clipsSupported() || microphoneInUse()) return;
   // A word or the chime takes the shared context inside the press, and a reference sound or slice too.
   if (audioBusy(250) || speaking()) return;
-  const ctx = audioContext();
-  tickBuffer = tickBuffer?.sampleRate === ctx.sampleRate ? tickBuffer : bell(ctx, 0.12, [{ at: 0, freq: 1320, level: 0.05, decay: 0.03 }]);
-  playBuffer(tickBuffer);
+  const ctx = audioContext(true);
+  if (kind === 'thock') {
+    // Decoded ahead (tickOnPress), so this only waits a moment.
+    void loadThock()
+      .then((buffer) => playBuffer(buffer, { fades: false, incidental: true }))
+      .catch(() => {});
+    return;
+  }
+  if (clickBuffer?.sampleRate !== ctx.sampleRate) {
+    const samples = clickSamples(ctx.sampleRate);
+    clickBuffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+    clickBuffer.getChannelData(0).set(samples);
+  }
+  playBuffer(clickBuffer, { fades: false, incidental: true });
 }
 
-/** Tick for every button pressed under `root`, except those marked `data-no-tap` (ones that open the microphone). */
+/**
+ * The click for pills and small controls, made in code: a very short burst of
+ * dull noise (the contact) ringing two heavily damped resonances, with no
+ * pitch to it, so it reads as a light switch rather than a bell.
+ */
+export function clickSamples(rate: number): Float32Array {
+  const length = 0.04;
+  const contact = 0.0012;
+  const lowpass = 0.6;
+  // Frequency (Hz), how fast it dies away (s), and how much of it.
+  const modes = [
+    [1400, 0.004, 1],
+    [2900, 0.0025, 0.5],
+  ];
+  const level = 0.1;
+  const n = Math.round(rate * length);
+  // The same noise every time, so every press sounds alike.
+  let seed = 1;
+  let dull = 0;
+  const burst = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    dull += lowpass * ((seed / 2 ** 32) * 2 - 1 - dull);
+    burst[i] = dull * Math.exp(-i / rate / contact);
+  }
+  const data = burst.map((x) => 0.5 * x);
+  for (const [freq, decay, amount] of modes) {
+    // A two-pole resonator, ringing at `freq` and dying away over `decay`.
+    const r = Math.exp(-1 / (rate * decay));
+    const a1 = 2 * r * Math.cos((2 * Math.PI * freq) / rate);
+    let y1 = 0;
+    let y2 = 0;
+    for (let i = 0; i < n; i++) {
+      const y = burst[i] + a1 * y1 - r * r * y2;
+      data[i] += amount * y;
+      y2 = y1;
+      y1 = y;
+    }
+  }
+  // A last few ms' fall, so it doesn't click off, then scaled to its level.
+  let peak = 0;
+  for (let i = 0; i < n; i++) {
+    data[i] *= Math.min(1, (n - i) / (rate * 0.004));
+    peak = Math.max(peak, Math.abs(data[i]));
+  }
+  return data.map((x) => (x / peak) * level);
+}
+
+/**
+ * Everything that can be tapped: buttons, a section opening (`summary`), links, checkboxes and radios.
+ * A label isn't listed, as tapping one clicks its checkbox too.
+ */
+const TAPPABLE = 'button, summary, a[href], [role="button"], input[type="checkbox"], input[type="radio"]';
+/** The big chunky buttons, which thock; everything else tappable (chips, pills, small and text controls) clicks. */
+const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
+
+/** Tick for every control pressed under `root`, except those marked `data-no-tap` (ones that open the microphone). */
 export function tickOnPress(root: Node): void {
-  // Bubbling, so it runs after the button's own handler, which may have played a word.
+  if (clipsSupported()) void loadThock().catch(() => {});
+  // Bubbling, so it runs after the control's own handler, which may have played a word.
   root.addEventListener('click', (e) => {
-    const button = (e.target as Element).closest?.('button');
-    if (button && !button.hasAttribute('data-no-tap')) tick();
+    const control = (e.target as Element).closest?.(TAPPABLE);
+    if (control && !control.hasAttribute('data-no-tap')) tick(control.matches(CHUNKY) ? 'thock' : 'click');
   });
 }
 

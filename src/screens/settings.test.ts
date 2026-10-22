@@ -53,9 +53,11 @@ it('turns tap sounds off and on again, and keeps the choice', async () => {
   expect(toggle.checked).toBe(true);
   toggle.click();
   expect(app.progress.settings.tapSounds).toBe(false);
+  ticks.count = 0;
   other.click();
   expect(ticks.count).toBe(0);
   toggle.click();
+  ticks.count = 0;
   other.click();
   expect(ticks.count).toBe(1);
 });
