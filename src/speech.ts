@@ -1,7 +1,7 @@
-// Audio for cards. A recorded clip is used when there is one (card.audio, or
-// the clip made for that text, listed in clips.json); it plays through the
-// app's one AudioContext, which starts it at once. Otherwise the browser's
-// built-in speech voice reads the Tagalog text.
+// Audio for cards. Each text has a recorded clip, listed in clips.json (made
+// by scripts/generate-audio.mjs); it plays through the app's one AudioContext,
+// which starts it at once. If a clip can't play, the browser's built-in speech
+// voice reads the Tagalog text instead.
 //
 // Not every device has a Filipino voice. When it doesn't, we fall back to a
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
@@ -19,7 +19,7 @@ const PREFERRED = ['fil', 'tl', 'id', 'ms', 'es'];
 let voice: SpeechSynthesisVoice | null = null;
 let voiceReady: Promise<void> | null = null;
 
-export type VoiceQuality = 'native' | 'approximate' | 'none';
+export type VoiceQuality = 'recorded' | 'native' | 'approximate' | 'none';
 
 export function speechSupported(): boolean {
   return typeof window !== 'undefined' && 'speechSynthesis' in window;
@@ -53,21 +53,40 @@ export function initVoices(): Promise<void> {
   return voiceReady;
 }
 
+/** Whether words can be heard at all: from recorded clips, or the built-in voice. */
+export function canPlay(): boolean {
+  return clipsSupported() || speechSupported();
+}
+
 export function voiceQuality(): VoiceQuality {
+  if (clipsSupported() && Object.keys(CLIPS).length > 0) return 'recorded';
   if (!speechSupported()) return 'none';
   const lang = voice?.lang.toLowerCase() ?? '';
   return lang.startsWith('fil') || lang.startsWith('tl') ? 'native' : 'approximate';
 }
 
-/** Clip files by the text they say: `<name>.m4a`, and `<name>-slow.m4a` said slowly. */
+/** Clip files by the text they say: `<name>.mp3`, and `<name>-slow.mp3` said slowly. */
 const CLIPS: Record<string, string> = clips;
 
 /** The clip for this text, if there is one. */
-export function clipUrl(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): string | null {
-  const base = `${import.meta.env.BASE_URL}audio/`;
-  if (card.audio) return base + card.audio;
+export function clipUrl(card: Pick<Card, 'tl' | 'say'>, slow = false): string | null {
   const name = CLIPS[card.say ?? card.tl];
-  return name ? `${base}${name}${slow ? '-slow' : ''}.m4a` : null;
+  return name ? clipFile(name, slow) : null;
+}
+
+function clipFile(name: string, slow: boolean): string {
+  return `${import.meta.env.BASE_URL}audio/${name}${slow ? '-slow' : ''}.mp3`;
+}
+
+/** Every clip file, to keep offline. */
+export function allClipUrls(): string[] {
+  return Object.values(CLIPS).flatMap((name) => [clipFile(name, false), clipFile(name, true)]);
+}
+
+/** Load a word's clip ahead, so a tap only has to start it. Plays nothing. */
+export function preload(card: Pick<Card, 'tl' | 'say'>): void {
+  const url = !muted && clipsSupported() ? clipUrl(card) : null;
+  if (url) void loadClip(url).catch(() => {});
 }
 
 let currentClip: Sound | null = null;
@@ -154,7 +173,7 @@ function holdMediaSession(): void {
 }
 
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
-export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
+export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promise<void> {
   stop();
   started = new Promise((resolve) => (reportStart = resolve));
   const report = reportStart;
@@ -177,8 +196,7 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
       // A context iOS won't start (outside a tap) plays nothing, so the voice reads it instead.
       if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
       if (mine !== generation) return;
-      // A slow clip is said slowly already; a card's own clip is slowed down instead.
-      const sound = (currentClip = playBuffer(buffer, slow && card.audio ? 0.75 : 1));
+      const sound = (currentClip = playBuffer(buffer));
       void sound.done.then(() => {
         if (currentClip !== sound) return;
         currentClip = null;

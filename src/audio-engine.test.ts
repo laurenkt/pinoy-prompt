@@ -3,10 +3,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Decoded clips are kept between tests, so each test that counts fetches has its own word.
-vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f' } }));
+vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
 const { KEEP_DECODED, loadClip } = await import('./audio-engine');
-const { clipUrl, lastStartDelay, play, speaking, stop } = await import('./speech');
+const { canPlay, clipUrl, lastStartDelay, play, preload, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
   playbackRate: { value: number };
@@ -100,10 +100,9 @@ afterEach(() => {
 
 describe('clips', () => {
   it('finds the clip made for a text, and its slow version', () => {
-    expect(clipUrl({ tl: 'Salamat' })).toMatch(/audio\/salamat-1a2b\.m4a$/);
-    expect(clipUrl({ tl: 'Salamat' }, true)).toMatch(/audio\/salamat-1a2b-slow\.m4a$/);
+    expect(clipUrl({ tl: 'Salamat' })).toMatch(/audio\/salamat-1a2b\.mp3$/);
+    expect(clipUrl({ tl: 'Salamat' }, true)).toMatch(/audio\/salamat-1a2b-slow\.mp3$/);
     expect(clipUrl({ tl: 'Hindi' })).toBeNull();
-    expect(clipUrl({ tl: 'Hindi', audio: 'hindi.m4a' })).toMatch(/audio\/hindi\.m4a$/);
   });
 
   it("plays a word's clip through the one shared context instead of the built-in voice", async () => {
@@ -116,7 +115,7 @@ describe('clips', () => {
     expect(sources.map((s) => s.started !== null)).toEqual([true, true]);
     // The slow clip is already slow, so it isn't slowed again.
     expect(sources[1].playbackRate.value).toBe(1);
-    expect(fetched.at(-1)).toMatch(/salamat-1a2b-slow\.m4a$/);
+    expect(fetched.at(-1)).toMatch(/salamat-1a2b-slow\.mp3$/);
   });
 
   it('decodes a clip once and plays it again from memory', async () => {
@@ -210,6 +209,14 @@ describe('clips', () => {
     expect(contexts.at(-1)).not.toBe(withMic);
   });
 
+  it('counts words as playable from clips alone, and says a recorded voice reads them', () => {
+    expect(canPlay()).toBe(true);
+    expect(voiceQuality()).toBe('recorded');
+    vi.stubGlobal('AudioContext', undefined);
+    expect(canPlay()).toBe(false);
+    expect(voiceQuality()).toBe('none');
+  });
+
   it('uses the older webkitAudioContext where that is all there is', async () => {
     vi.stubGlobal('AudioContext', undefined);
     vi.stubGlobal('webkitAudioContext', FakeContext);
@@ -263,8 +270,31 @@ describe('clips', () => {
     setMuted(false);
   });
 
+  it("loads a clip ahead without taking the audio session, so showing a card doesn't pause the learner's music", async () => {
+    const audioSession = { type: 'auto' };
+    vi.stubGlobal('navigator', { audioSession });
+    const decodedBy: string[] = [];
+    vi.stubGlobal(
+      'OfflineAudioContext',
+      class {
+        decodeAudioData() {
+          decodedBy.push('offline');
+          return Promise.resolve({ duration: 1 });
+        }
+      },
+    );
+    const made = contexts.length;
+    preload({ tl: 'Kumusta?' });
+    await vi.waitFor(() => expect(decodedBy).toEqual(['offline']));
+    expect(contexts.length).toBe(made);
+    expect(audioSession.type).toBe('auto');
+    await play({ tl: 'Kumusta?' });
+    expect(fetched.filter((u) => u.includes('kumusta'))).toHaveLength(1);
+    expect(sources.at(-1)?.started).not.toBeNull();
+  });
+
   it('keeps only recent clips decoded', async () => {
-    const urls = Array.from({ length: KEEP_DECODED + 1 }, (_, i) => `clip-${i}.m4a`);
+    const urls = Array.from({ length: KEEP_DECODED + 1 }, (_, i) => `clip-${i}.mp3`);
     for (const url of urls) await loadClip(url);
     await loadClip(urls.at(-1)!);
     expect(fetched).toHaveLength(KEEP_DECODED + 1);

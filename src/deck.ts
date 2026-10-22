@@ -34,8 +34,6 @@ export interface Card {
    * introduction, after a miss, and on request in review.
    */
   hook: string;
-  /** Optional recorded clip in public/audio/. */
-  audio?: string;
   /** What the speech voice reads instead of `tl`, when the spelling would mislead it. */
   say?: string;
   /** Other accepted pronunciations, as spelled, for when the learner says the card out loud. */

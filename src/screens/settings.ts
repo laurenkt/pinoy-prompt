@@ -30,6 +30,7 @@ export function settingsScreen(app: App): HTMLElement {
     const { settings } = app.progress;
     const quality = voiceQuality();
     const voiceText = {
+      recorded: 'Words are read by a recorded Filipino voice, the same on every device.',
       native: 'Using a Filipino voice on this device.',
       approximate:
         "This device has no Filipino voice, so a similar-sounding voice reads the words. It's close, but not perfect. If your phone offers a Filipino text-to-speech voice in its settings, installing it will make audio more natural.",

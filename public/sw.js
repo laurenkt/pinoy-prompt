@@ -26,6 +26,9 @@ async function cacheShell(cache) {
   await cache.addAll([...new Set(fonts)]);
 }
 
+/** Recorded word clips, kept by the app (src/clip-cache.ts). Must match AUDIO_CACHE there. */
+const AUDIO_CACHE = 'pinoy-prompt-audio-v1';
+
 /** Must match CACHE in src/phone-model.ts. */
 const MODEL_CACHE = 'pinoy-prompt-models-v1';
 
@@ -78,6 +81,21 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => caches.match('./')),
+    );
+    return;
+  }
+
+  // Word clips are named by their sound, so a kept copy is always right; one not kept yet joins the others.
+  if (/\/audio\/[^/]+\.mp3$/.test(new URL(request.url).pathname)) {
+    event.respondWith(
+      caches.match(request, { ignoreVary: true }).then(
+        (hit) =>
+          hit ||
+          fetch(request).then(async (response) => {
+            if (response.status === 200) await (await caches.open(AUDIO_CACHE)).put(request, response.clone());
+            return response;
+          }),
+      ),
     );
     return;
   }

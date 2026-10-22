@@ -11,7 +11,8 @@ import { wordsScreen } from './screens/words';
 import { forgetRetiredVoiceChoice } from './openai';
 import { applyAudioMode } from './screens/quiet';
 import { cancelRecording } from './recorder';
-import { initVoices, stop } from './speech';
+import { keepClipsOffline } from './clip-cache';
+import { allClipUrls, initVoices, stop } from './speech';
 import { replaceContents } from './progress-schema';
 import { emptyProgress, load, loadDurable, onExternalChange, requestPersistence, rollDay, save, type Progress } from './store';
 import { h, icon } from './ui';
@@ -181,5 +182,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
       // Offline support is a bonus; the app works without it.
     });
+    // A few seconds in, so the first screen isn't waiting behind 4 MB of clips.
+    setTimeout(() => void keepClipsOffline(allClipUrls()).catch(() => {}), 5000);
   });
 }
