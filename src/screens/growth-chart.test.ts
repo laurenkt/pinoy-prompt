@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type Forecast, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
 import { h } from '../ui';
-import { curve, forecastView, growthChart, smooth } from './growth-chart';
+import { curve, forecastView, growthChart, projected, smooth } from './growth-chart';
 
 describe('smooth', () => {
   it('softens steps but ends exactly on the last value', () => {
@@ -85,6 +85,7 @@ describe('forecast', () => {
     perDay,
     early: false,
     days: 28,
+    curve: null,
     milestones: [
       { words: 5, label: 'First', at: 'reached' },
       { words: 500, label: 'Second', at },
@@ -167,5 +168,26 @@ describe('forecast', () => {
     const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
     expect(el.querySelector('.growth-goal')!.closest('[role="img"]')).toBeNull();
     expect(el.querySelector('svg')!.getAttribute('aria-label')).toContain('today');
+  });
+});
+
+describe('projected', () => {
+  const now = Date.now();
+  const f = (power: number): Forecast => ({
+    known: 10,
+    perDay: 1,
+    early: false,
+    days: 10,
+    milestones: [],
+    curve: { now, days: 10, known: 10, perDay: 1, power },
+  });
+
+  it('rises early and flattens for a pace that eases off, and runs straight for a steady one', () => {
+    const at = now + 400 * DAY_MS;
+    expect(projected(f(0.7), at, now, 0.5)).toBeGreaterThan(0.52);
+    expect(projected(f(1), at, now, 0.5)).toBeCloseTo(0.5);
+    expect(projected(f(0.7), at, now, 0)).toBeCloseTo(0);
+    expect(projected(f(0.7), at, now, 1)).toBeCloseTo(1);
+    expect(projected({ ...f(1), curve: null }, at, now, 0.3)).toBe(0.3);
   });
 });

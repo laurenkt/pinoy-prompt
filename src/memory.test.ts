@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MILESTONES, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
+import { MILESTONES, curveAt, curveReaches, fitPower, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
 import { LEARN_ORDER } from './deck';
 import { DAY_MS, newCardState, review, startOfDayAfter, type CardState } from './srs';
 import { dayKey, emptyProgress, recordAnswer } from './store';
@@ -203,13 +203,50 @@ describe('forecast', () => {
     return p;
   }
 
-  it('projects the pace of words that stuck over the last four weeks', () => {
+  it('measures the pace of words that stuck over the last four weeks', () => {
     // 14 words stuck in the last 28 days, 6 before: half a word a day.
     const p = learner(20, [...Array(6).fill(35), ...Array(14).fill(10)]);
     const f = forecast(p, NOW);
     expect(f.known).toBe(20);
     expect(f.perDay).toBeCloseTo(0.5);
-    expect(f.milestones[0].at).toBeCloseTo(NOW + (480 / 0.5) * DAY_MS, -3);
+    expect(f.milestones[0].at).toBeGreaterThan(NOW);
+  });
+
+  /** A word met `metDaysAgo` days ago that stuck a week later. */
+  function stuck(p: ReturnType<typeof emptyProgress>, id: string, metDaysAgo: number) {
+    const at = NOW - (metDaysAgo - 7) * DAY_MS;
+    p.cards[id] = card(7, metDaysAgo - 7, { introduced: NOW - metDaysAgo * DAY_MS, log: [[at - 3 * DAY_MS, 1], [at, 7]] });
+  }
+
+  it('runs on from today at the recent pace, steady for a steady learner', () => {
+    // A word met each day for 60 days, each stuck a week later.
+    const p = emptyProgress(NOW - 60 * DAY_MS);
+    LEARN_ORDER.slice(0, 60).forEach((id, i) => stuck(p, id, 60 - i));
+    const f = forecast(p, NOW);
+    expect(f.curve!.power).toBeCloseTo(1, 1);
+    expect(curveAt(f.curve!, NOW)).toBe(f.known);
+    expect(f.milestones[0].at).toBe(curveReaches(f.curve!, 500));
+    // Steady: the date is close to the straight line at today's pace.
+    expect(f.milestones[0].at as number).toBeCloseTo(NOW + ((500 - f.known) / f.perDay!) * DAY_MS, -10);
+  });
+
+  it('follows the recent pace for a learner who has come back', () => {
+    // 20 words a year ago, then 3 a day for the last 30 days.
+    const p = emptyProgress(NOW - 400 * DAY_MS);
+    LEARN_ORDER.slice(0, 20).forEach((id) => stuck(p, id, 380));
+    LEARN_ORDER.slice(20, 110).forEach((id, i) => stuck(p, id, 37 - Math.floor(i / 3)));
+    const f = forecast(p, NOW);
+    const linear = NOW + ((500 - f.known) / f.perDay!) * DAY_MS;
+    expect(f.milestones[0].at as number).toBeLessThan(NOW + 2 * (linear - NOW));
+  });
+
+  it('eases off for a learner whose intake has slowed', () => {
+    // Words met ever more slowly: about 10 × the square root of the day.
+    const p = emptyProgress(NOW - 100 * DAY_MS);
+    LEARN_ORDER.slice(0, 100).forEach((id, i) => stuck(p, id, 100 - Math.round((i / 10) ** 2)));
+    const f = forecast(p, NOW);
+    expect(f.curve!.power).toBeLessThan(0.9);
+    expect(f.milestones[0].at as number).toBeGreaterThan(NOW + ((500 - f.known) / f.perDay!) * DAY_MS);
   });
 
   it('counts only words that have stuck, not words met', () => {
@@ -226,7 +263,7 @@ describe('forecast', () => {
     expect(f.early).toBe(true);
     expect(f.known).toBe(2);
     expect(f.perDay).toBeCloseTo(0.5);
-    expect(typeof f.milestones[0].at).toBe('number');
+    expect(f.curve).not.toBeNull();
   });
 
   it('gives a guess from the first session, as if over a day', () => {
@@ -247,5 +284,21 @@ describe('forecast', () => {
     const levels = [{ words: 3, label: 'a' }, ...MILESTONES];
     const f = forecast(learner(3, [35, 10, 10]), NOW, levels);
     expect(f.milestones.map((m) => m.at === 'reached')).toEqual([true, false, false, false, false]);
+  });
+});
+
+describe('fitPower', () => {
+  it('reads a steady pace as a straight line', () => {
+    expect(fitPower([1, 2, 3, 4, 5].map((d) => [d, 3 * d]))).toBeCloseTo(1);
+  });
+
+  it('reads a pace that eases off, but only so far', () => {
+    expect(fitPower([1, 4, 9, 16].map((d) => [d, 10 * d ** 0.8]))).toBeCloseTo(0.8);
+    expect(fitPower([1, 4, 9, 16].map((d) => [d, 10 * Math.sqrt(d)]))).toBe(0.7);
+  });
+
+  it('needs a few days to show a shape', () => {
+    expect(fitPower([[1, 3], [2, 5]])).toBeNull();
+    expect(fitPower([[0.5, 3], [1, 0], [2, 0], [3, 4]])).toBeNull();
   });
 });

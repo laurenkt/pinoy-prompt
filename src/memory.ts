@@ -252,13 +252,63 @@ export interface Forecast {
   days: number;
   /** When each milestone might be reached: 'reached', a time, null if not at this pace. */
   milestones: { words: number; label: string; at: 'reached' | number | null }[];
+  /** The curve the dates come from; null with no pace to go on. */
+  curve: LearningCurve | null;
 }
 
 /**
- * When the learner might reach each milestone, if they keep up the pace of
- * the last few weeks. The pace counts words that have stuck, not words met,
- * so it follows what has actually been learned, and a word that slips back
- * counts against it. In the first two weeks it is an early guess (see `early`).
+ * Words over time from today: rising at today's pace and bending by `power`,
+ * with days counted from the first word (`days` of them today). A power under
+ * 1 is a pace that eases off, as reviews of earlier words take more of each
+ * session; 1 keeps today's pace.
+ */
+export interface LearningCurve {
+  now: number;
+  days: number;
+  known: number;
+  perDay: number;
+  power: number;
+}
+
+/** The power is kept to this range: a curve that eases off, at most to this extent, or a steady pace. */
+const MIN_POWER = 0.7;
+const MAX_POWER = 1;
+
+export function curveAt(curve: LearningCurve, time: number): number {
+  const { days, known, perDay, power } = curve;
+  const ratio = Math.max(0, days + (time - curve.now) / DAY_MS) / days;
+  return known + ((perDay * days) / power) * (ratio ** power - 1);
+}
+
+/** When the curve reaches `words`. */
+export function curveReaches(curve: LearningCurve, words: number): number {
+  const { days, known, perDay, power } = curve;
+  const ratio = (1 + ((words - known) * power) / (perDay * days)) ** (1 / power);
+  return curve.now + (ratio - 1) * days * DAY_MS;
+}
+
+/**
+ * The power that best fits [days, words] points, by least squares on their
+ * logs, kept within range; null with too few points to show a shape.
+ */
+export function fitPower(points: [number, number][]): number | null {
+  const logs = points.filter(([d, w]) => d >= 1 && w > 0).map(([d, w]) => [Math.log(d), Math.log(w)]);
+  if (logs.length < 3) return null;
+  const mx = logs.reduce((sum, [x]) => sum + x, 0) / logs.length;
+  const my = logs.reduce((sum, [, y]) => sum + y, 0) / logs.length;
+  const sxx = logs.reduce((sum, [x]) => sum + (x - mx) ** 2, 0);
+  if (sxx === 0) return null;
+  const sxy = logs.reduce((sum, [x, y]) => sum + (x - mx) * (y - my), 0);
+  return Math.min(MAX_POWER, Math.max(MIN_POWER, sxy / sxx));
+}
+
+/**
+ * When the learner might reach each milestone, if their learning carries on
+ * the way it has gone: from today's count at the pace of the last few weeks,
+ * bending as their words met over time have (eased off, or steady). It counts
+ * words that have stuck, not words met, so it follows what has actually been
+ * learned, and a word that slips back counts against it. In the first two weeks it is an early guess (see
+ * `early`). With no growth over the last few weeks, there are no dates.
  */
 export function forecast(progress: Progress, now: number, milestones = MILESTONES): Forecast {
   const steps = Object.entries(progress.cards)
@@ -282,11 +332,28 @@ export function forecast(progress: Progress, now: number, milestones = MILESTONE
   // so a first session's words aren't read as a pace per minute.
   const before = days < PACE_DAYS ? 0 : stuckAt(now - days * DAY_MS);
   const perDay = steps.length ? (known - before) / Math.max(1, days) : null;
+  let curve: LearningCurve | null = null;
+  if (perDay && perDay > 0) {
+    // The bend comes from words met, one point a day: they show how intake has
+    // gone without the week's lag before a word can stick. At least a day in,
+    // so a first session isn't read as a pace per minute.
+    const span = Math.max(1, (now - since) / DAY_MS);
+    const met = steps.map((s) => s[0][0]).sort((x, y) => x - y);
+    const points: [number, number][] = [];
+    let n = 0;
+    for (let d = 1; d < span; d++) {
+      // Words met in the first d days.
+      while (n < met.length && met[n] < since + d * DAY_MS) n++;
+      points.push([d, n]);
+    }
+    points.push([span, met.length]);
+    curve = { now, days: span, known, perDay, power: fitPower(points) ?? 1 };
+  }
   const ahead = milestones.map(({ words, label }) => {
     if (known >= words) return { words, label, at: 'reached' as const };
-    if (!perDay || perDay <= 0) return { words, label, at: null };
-    const wait = ((words - known) / perDay) * DAY_MS;
-    return { words, label, at: wait > MAX_FORECAST_YEARS * 365 * DAY_MS ? null : now + wait };
+    if (!curve) return { words, label, at: null };
+    const at = Math.max(now, curveReaches(curve, words));
+    return { words, label, at: at - now > MAX_FORECAST_YEARS * 365 * DAY_MS ? null : at };
   });
-  return { known, perDay, early, days, milestones: ahead };
+  return { known, perDay, early, days, milestones: ahead, curve };
 }
