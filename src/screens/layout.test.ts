@@ -71,8 +71,9 @@ describe('filling the screen', () => {
     return true;
   }
 
-  it("doesn't let the page bounce, so a screen that fits can't be dragged", () => {
-    expect(/html,\nbody \{[^}]*overscroll-behavior: none;/.exec(css)).not.toBeNull();
+  it("stops the page bouncing only while it fits, so a long screen scrolls as usual", () => {
+    expect(/\.fits,\n\.fits body \{[^}]*overscroll-behavior: none;/.exec(css)).not.toBeNull();
+    expect(/html,\nbody \{[^}]*overscroll-behavior/.exec(css)).toBeNull();
   });
 
   it('sizes things from the height less the status bar and home bar, not the raw screen height', () => {

@@ -13,7 +13,7 @@ Each system has one owner module. Anything else that needs it calls that module.
 
 | System | Owner | What it owns |
 | --- | --- | --- |
-| Navigation | `src/app.ts`, `src/main.ts`, `src/back-history.ts` | `Route`, the `App` every screen gets, drawing a screen, the system back gesture. Screens only call `app.navigate`, `app.onBack` and `app.onKey`. |
+| Navigation | `src/app.ts`, `src/main.ts`, `src/back-history.ts`, `src/fit.ts` | `Route`, the `App` every screen gets, drawing a screen, the system back gesture, whether the screen fits (for bounce). Screens only call `app.navigate`, `app.onBack` and `app.onKey`. |
 | Screens | `src/screens/*.ts` | One file per screen, each a function from `App` to an element, plus the pieces several screens share that need screen context (`quiet.ts`, `auto-advance.ts`, `speak.ts`, `speak-result.ts`, `growth-chart.ts`). |
 | Shared UI | `src/ui.ts` | `h`, `svg`, `icon`, and the plain pieces used on three or more screens. A shared piece with its own behaviour gets its own file in `src/screens/` (the quiet toggle in `quiet.ts`). |
 | Look | `src/style.css` | Colour, outline, shadow and radius tokens on `:root`; one section per screen. |
@@ -42,7 +42,7 @@ Home is the hub and has its own header. A screen never shows both a back arrow a
 - In a session's `.panel`, the prompt grows on phones taller than about 700px, answer choices share the rest (up to a size a thumb can't miss, leaving room below for the feedback an answer brings so a right answer doesn't move them), and otherwise the panel's last piece (its button, the answer and ratings, the microphone) sits at the bottom, under the thumb. A `.panel.center` card (a summary, a topic's introduction) sits in the middle instead.
 - On Home the hub takes it; in a call, the transcript.
 - Pages (Library, Settings) are as long as their content and scroll.
-- Nothing bounces (`overscroll-behavior: none` on the page): a screen that fits can't be dragged, and a long one stops at its ends. Sizes that grow are worked out from `--fill`, the phone's height less the status bar and home bar, so a screen that fits on an installed iPhone doesn't scroll by the insets. `npm run screenshots` emulates those insets and reports any screen that scrolls, so one that should fit but is a few pixels over shows up.
+- A screen that fits doesn't bounce: `src/fit.ts` keeps `fits` on the page while there's nothing below the fold, and style.css turns off overscroll then. Once a screen runs long (a wrong answer's feedback, Library) it scrolls and bounces as iOS always does. Sizes that grow are worked out from `--fill`, the phone's height less the status bar and home bar, so a screen that fits on an installed iPhone doesn't scroll by the insets. `npm run screenshots` emulates those insets and reports any screen that scrolls, so one that should fit but is a few pixels over shows up.
 
 A new screen or panel gets this by using those containers; a wrapper element between them breaks the column, which `src/screens/layout.test.ts` checks. Sizes that should grow with the phone use `dvh` in a `clamp()`, so on a short phone (375×667) nothing is taller than it was; only answer choices use what little room is left, until one is picked.
 
