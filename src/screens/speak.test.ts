@@ -7,6 +7,7 @@ import type { PhoneModel } from '../phone-model';
 import { RecordError, type RecorderEvents, type Take } from '../recorder';
 import { compare, toPhones } from '../phonetics';
 import { isRight, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { DownloadError } from '../model-cache';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
 import { flush } from '../test/screen';
 
@@ -132,8 +133,17 @@ describe('first use', () => {
   });
 
   it('explains a failed download and offers to retry', async () => {
-    await open('salamat', { loadPhoneModel: async () => Promise.reject(new Error('offline')) });
+    await open('salamat', { loadPhoneModel: async () => Promise.reject(new DownloadError('Model download failed: TypeError: Load failed')) });
     expect(text('.feedback')).toContain("Couldn't download");
+    expect(text('.problem-detail')).toContain('Load failed');
+    expect(button('Try again')).toBeTruthy();
+  });
+
+  it("doesn't blame the connection when the model is there but won't start", async () => {
+    await open('salamat', { loadPhoneModel: async () => Promise.reject(new RangeError('Out of memory')) });
+    expect(text('.feedback')).toContain("Couldn't start");
+    expect(text('.feedback')).not.toContain('connection');
+    expect(text('.problem-detail')).toBe('RangeError: Out of memory');
     expect(button('Try again')).toBeTruthy();
   });
 

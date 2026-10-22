@@ -90,8 +90,24 @@ describe('loadPhoneModel', () => {
     vi.stubGlobal('fetch', serve(40_000_000));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
     await expect(loadPhoneModel()).rejects.toThrow(/incomplete/);
+    await expect(loadPhoneModel()).rejects.toBeInstanceOf((await import('./model-cache')).DownloadError);
     expect(await modelDownloaded()).toBe(false);
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('counts no connection as a failed download', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Load failed'))));
+    const { loadPhoneModel } = await import('./phone-model');
+    const { DownloadError } = await import('./model-cache');
+    await expect(loadPhoneModel()).rejects.toBeInstanceOf(DownloadError);
+  });
+
+  it("doesn't count running out of memory as a failed download", async () => {
+    vi.stubGlobal('fetch', serve(MODEL_BYTES));
+    create.mockRejectedValueOnce(new RangeError('Out of memory'));
+    const { loadPhoneModel } = await import('./phone-model');
+    const { DownloadError } = await import('./model-cache');
+    await expect(loadPhoneModel()).rejects.not.toBeInstanceOf(DownloadError);
   });
 
   it("drops a stored model the runtime can't load", async () => {

@@ -2,6 +2,7 @@
 // on the device, and coach them sound by sound.
 
 import { coach, type Tip } from '../coach';
+import { DownloadError } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonetics';
@@ -44,13 +45,14 @@ export const defaultDeps: SpeakDeps = {
 };
 let sharedPlayer: Player | null = null;
 
-type Problem = RecordProblem | 'download' | 'failed';
+type Problem = RecordProblem | 'download' | 'start' | 'failed';
 
 const PROBLEMS: Record<Problem, string> = {
   unsupported: "This browser can't record from the microphone, so speaking questions are off here.",
   denied: 'The microphone is blocked. Allow it for this site in your browser settings, then try again.',
   'no-mic': "Couldn't use the microphone. Check that the device has one and no other app is using it.",
   download: "Couldn't download the pronunciation model. Check your connection and try again.",
+  start: "Couldn't start the pronunciation model. Close the app completely, open it again, and try again.",
   failed: 'Something went wrong while checking your pronunciation. Try again.',
 };
 
@@ -67,7 +69,8 @@ type State =
   | { name: 'recording'; speech: boolean }
   | { name: 'analysing' }
   | { name: 'result'; text: string; comparison: Comparison; tips: Tip[]; heard: string[]; recognition?: Recognition; samples?: Float32Array }
-  | { name: 'problem'; problem: Problem };
+  /** detail is what went wrong in the browser's words, shown small so a failure seen only on one phone can be told apart. */
+  | { name: 'problem'; problem: Problem; detail?: string };
 
 export interface SpeakOptions {
   /** Play the card's audio (slowly if asked). */
@@ -175,8 +178,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       });
       set({ name: 'ready' });
       options.onReady?.();
-    } catch {
-      set({ name: 'problem', problem: 'download' });
+    } catch (err) {
+      // Only a failed fetch is the connection's fault; the runtime failing to load or running out of memory isn't.
+      set({ name: 'problem', problem: err instanceof DownloadError ? 'download' : 'start', detail: String(err) });
     }
   }
 
@@ -288,7 +292,14 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         return [h('p', { class: 'listen-status center', role: 'status' }, 'Checking your sounds…')];
       case 'problem':
         return [
-          h('div', { class: 'feedback bad', role: 'status' }, h('strong', null, 'Hmm.'), ' ', PROBLEMS[state.problem]),
+          h(
+            'div',
+            { class: 'feedback bad', role: 'status' },
+            h('strong', null, 'Hmm.'),
+            ' ',
+            PROBLEMS[state.problem],
+            state.detail && h('p', { class: 'small muted problem-detail' }, state.detail),
+          ),
           h(
             'div',
             { class: 'row' },
