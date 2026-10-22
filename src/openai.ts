@@ -206,6 +206,13 @@ async function failure(response: Response): Promise<AiError> {
   return new AiError('other', message);
 }
 
+/** A signal that aborts after `ms`. AbortSignal.timeout would do, but iOS only has it from 16. */
+function timeout(ms: number): AbortSignal {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 async function post(key: string, path: string, body: unknown, fetchFn: typeof fetch, signal?: AbortSignal): Promise<Response> {
   let response: Response;
   try {
@@ -259,7 +266,7 @@ export async function checkMeaning(
       store: false,
     },
     fetchFn,
-    AbortSignal.timeout(CHECK_TIMEOUT_MS),
+    timeout(CHECK_TIMEOUT_MS),
   );
   const body = (await response.json()) as { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
   addSpend(tokenCost(CHECK_MODEL, body.usage));
@@ -289,7 +296,7 @@ export async function transcribe(key: string, audio: Blob, fetchFn: typeof fetch
       method: 'POST',
       headers: { Authorization: `Bearer ${key}` },
       body: form,
-      signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+      signal: timeout(CHECK_TIMEOUT_MS),
     });
   } catch (e) {
     throw new AiError('network', e instanceof Error ? e.message : String(e));

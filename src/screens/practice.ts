@@ -188,18 +188,20 @@ export function practiceScreen(
    * browser would ask for the microphone, the phone asks now, over a holding screen, rather than over a speaking question.
    */
   function askForMicrophoneIfNeeded(): void {
+    // Not over an answer being checked or heard, or one counting down to the next: the holding screen would hide it. A later speaking question asks for itself.
+    if (checking || hearing || listening || auto) return;
     if (waiting || !canSpeak || !current || !modes().includes('speak') || !needsMicrophone(deps)) return;
     waiting = true;
     void askForMicrophone(deps).then((answer) => {
       if (answer === 'left') return;
       waiting = false;
       speakSkipped = answer === 'refused';
-      if (current && !picked && !modes().includes(current.mode)) {
+      if (current && picked === null && !modes().includes(current.mode)) {
         current = nextQuestion();
         if (current) preload(current.card);
       }
       // An answered question (the chip tapped after answering) is shown again as it was.
-      if (picked) draw();
+      if (picked !== null) draw();
       else ask();
     });
   }
