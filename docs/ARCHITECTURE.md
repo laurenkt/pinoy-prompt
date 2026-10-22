@@ -32,10 +32,10 @@ Each system has one owner module. Anything else that needs it calls that module.
 
 Every screen is one of two kinds, and each kind has one layout:
 
-- **A page** (Library, Drills' menu, Settings): opened from Home, browsed, left. It has the back arrow (`.back-bar`) at the top left, then its title. System back goes Home.
+- **A page** (Library, Drills' menu, Settings): opened from Home, browsed, left. It starts with `pageHeader()` from `ui.ts`: the back arrow (`.back-bar`) at the top left, then its title with at most one control beside it (`.page-header`). System back goes Home.
 - **A session** (Study, a drill round, Chat): something in progress. It has `.session-header` with the close button (×) at the left, then progress and any controls. Close, and system back, end the session the way the screen chooses (Study shows its summary, a drill round returns to the menu).
 
-Home is the hub and has its own header. A screen never shows both a back arrow and a close button. (Until the follow-up to finding 1 lands, Settings still closes with × and a drill round still shows both.) New screens pick one of the two kinds; a new kind of screen is a decision worth writing down here first.
+Home is the hub and has its own header. A screen never shows both a back arrow and a close button. New screens pick one of the two kinds; a new kind of screen is a decision worth writing down here first.
 
 Spacing, gutters, tap targets and colours come from REVIEW.md and the `:root` tokens in `style.css`.
 
@@ -65,11 +65,11 @@ Progress is the one thing the app can't lose; the README's "Saved progress" sect
 
 What a review of the whole app found, most important first, and what has been done.
 
-1. **Two ways out of a drill round.** A drill round showed the page back arrow (to Home) above the session's close button (to the menu): two controls for one job, going to different places. Settings closed with × while Library and Drills used the back arrow. *Fix: the page and session layouts above, in a follow-up pull request.*
+1. **Two ways out of a drill round.** A drill round showed the page back arrow (to Home) above the session's close button (to the menu): two controls for one job, going to different places. Settings closed with × while Library and Drills used the back arrow. *Fixed: each screen draws its own top, pages with `pageHeader` from `ui.ts`; `src/screens/layout.test.ts` holds them to it.*
 2. **Deploy didn't wait for tests.** CI and deploy were separate workflows, so a push to `main` was published even if its tests failed. *Fixed: one pipeline that deploys the build it tested.*
 3. **Screen test setup copied eight times.** Each screen test had its own stand-in `App`, and most their own `button` finder, so a change to `App` (as `onBack` was) meant editing every file. *Fixed: `src/test/screen.ts`.*
 4. **Service worker names kept in step by hand.** `public/sw.js` repeats two cache names and a source path from `src/`, with a comment pointing at the wrong file. A rename would have broken offline audio or speaking without a failing test. *Fixed: `src/sw.test.ts`.*
-5. **Copied UI pieces.** The play / play slowly pair was written out six times across Study and Drills, and the numbered answer choices three times. *Fix: shared pieces in `ui.ts`, in the follow-up.*
+5. **Copied UI pieces.** The play / play slowly pair was written out six times across Study and Drills, and the numbered answer choices three times. *Fixed: `audioPair` and `choiceList` in `ui.ts`.*
 6. **Study and Drills ask the same questions with separate code.** Read, listen and recall prompts and their feedback are built twice, and the words have drifted: Drills says "Tama!" / "Mali.", Study a rotating "Magaling!" / "Not quite.". Not worth merging yet; the next change to how either asks a question should move the prompts into one place and settle on one wording.
 7. **Audio is now one system.** After the clip rewrite, card audio, reference sounds and slices all go through the shared engine, and the built-in voice is only a fallback. The remaining loose end is the visualizer's own context (see Audio).
 8. **`screens/session.ts` is large** (about 900 lines: introductions, quizzes, flashcards, guide drills, tile building, speaking, the summary). Fine while it changes rarely; split the guide views into their own file the next time they grow.

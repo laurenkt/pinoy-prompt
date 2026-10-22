@@ -80,6 +80,53 @@ export function audioButton(onPlay: () => void, label = 'Play audio', extraClass
   );
 }
 
+/** A word's play and play-slowly buttons; `big` for a question that is only heard. */
+export function audioPair(say: (slow: boolean) => void, big = false): HTMLElement {
+  return h(
+    'div',
+    { class: `audio-group${big ? ' big' : ''}` },
+    big ? audioButton(() => say(false), 'Play again', 'huge') : audioButton(() => say(false)),
+    audioButton(() => say(true), 'Play slowly', 'slow'),
+  );
+}
+
+/**
+ * Numbered answer buttons. Once one is picked, all are disabled, the answer is
+ * marked right and a wrong pick is marked wrong. Keys 1–n are the screen's to handle.
+ */
+export function choiceList<T>(
+  choices: T[],
+  { key, label, answer, picked, lang, onPick }: { key: (c: T) => string; label: (c: T) => string; answer: string; picked: string | null; lang?: string; onPick: (c: T) => void },
+): HTMLElement {
+  const answered = picked !== null;
+  return h(
+    'div',
+    { class: 'choices' },
+    choices.map((choice, i) =>
+      h(
+        'button',
+        {
+          class: `choice ${answered && key(choice) === answer ? 'correct' : ''} ${answered && key(choice) === picked && picked !== answer ? 'wrong' : ''}`,
+          disabled: answered,
+          'data-autofocus': (!answered && i === 0) || undefined,
+          lang,
+          onclick: () => onPick(choice),
+        },
+        h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
+        label(choice),
+      ),
+    ),
+  );
+}
+
+/** The top of a page opened from Home: the back arrow, then the title and any one control beside it. */
+export function pageHeader(title: string, onBack: () => void, action?: Node | false | null): HTMLElement[] {
+  return [
+    h('nav', { class: 'back-bar' }, h('button', { class: 'icon-btn', 'aria-label': 'Home', title: 'Home', onclick: onBack }, icon('back'))),
+    h('header', { class: 'page-header' }, h('h1', null, title), action),
+  ];
+}
+
 export function progressBar(value: number, max: number, label?: string): HTMLElement {
   const pct = max === 0 ? 0 : Math.round((value / max) * 100);
   return h(

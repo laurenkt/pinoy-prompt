@@ -3,7 +3,7 @@ import { VOCAB, getCard, isVocab, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { canPlay, play, preload, stop } from '../speech';
-import { audioButton, h, hookView, icon } from '../ui';
+import { audioButton, audioPair, choiceList, h, hookView, icon, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
@@ -199,6 +199,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     ask();
   }
 
+  const home = () => app.navigate({ name: 'home' });
+
   /** Stop counting down: the learner wants another look. */
   function endRound(): void {
     app.navigate({ name: 'practice' });
@@ -228,7 +230,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       return h(
         'div',
         null,
-        h('h1', null, 'Drills'),
+        ...pageHeader('Drills', home),
         h(
           'section',
           { class: 'card center' },
@@ -240,7 +242,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     return h(
       'div',
       null,
-      h('div', { class: 'title-row' }, h('h1', null, 'Drills'), quietToggle(app, draw)),
+      ...pageHeader('Drills', home, quietToggle(app, draw)),
       h('p', { class: 'muted' }, `Pick one skill and drill it with the ${learned} words you know, for as long as you like. Study already mixes these in; drills are for working on one on purpose. They don't change your review schedule.`),
       h(
         'div',
@@ -276,7 +278,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         'div',
         { class: 'prompt' },
         h('p', { class: 'eyebrow' }, 'Say this out loud'),
-        h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), h('div', { class: 'audio-group' }, audioButton(() => say()), audioButton(() => say(true), 'Play slowly', 'slow'))),
+        h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioPair(say)),
         h('p', { class: 'prompt-meaning' }, q.card.en),
       );
     } else if (q.mode === 'listen') {
@@ -284,7 +286,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         'div',
         { class: 'prompt center' },
         h('p', { class: 'eyebrow' }, 'What did you hear?'),
-        h('div', { class: 'audio-group big' }, audioButton(() => say(), 'Play again', 'huge'), audioButton(() => say(true), 'Play slowly', 'slow')),
+        audioPair(say, true),
         answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
       );
     } else if (q.mode === 'read') {
@@ -314,24 +316,15 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         { class: 'panel' },
         prompt,
         q.mode === 'speak' ? speak?.el : null,
-        q.mode !== 'speak' && h(
-          'div',
-          { class: 'choices' },
-          q.choices.map((choice, i) =>
-            h(
-              'button',
-              {
-                class: `choice ${answered && choice.id === q.card.id ? 'correct' : ''} ${answered && choice.id === picked && !right ? 'wrong' : ''}`,
-                disabled: answered,
-                'data-autofocus': (!answered && i === 0) || undefined,
-                lang: field === 'tl' ? 'fil' : undefined,
-                onclick: () => choose(choice),
-              },
-              h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
-              choice[field],
-            ),
-          ),
-        ),
+        q.mode !== 'speak' &&
+          choiceList(q.choices, {
+            key: (c) => c.id,
+            label: (c) => c[field],
+            answer: q.card.id,
+            picked,
+            lang: field === 'tl' ? 'fil' : undefined,
+            onPick: choose,
+          }),
         q.mode !== 'speak' && answered &&
           h(
             'div',
@@ -360,7 +353,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });
   // Back from a round goes to the drills menu, as its close button does.
-  app.onBack(() => (current ? endRound() : app.navigate({ name: 'home' })));
+  app.onBack(() => (current ? endRound() : home()));
 
   draw();
   return root;
