@@ -294,6 +294,44 @@ p {
   transition: width 0.3s ease;
 }
 
+/* Chips: a row of choices (ui.ts's chip). A chosen chip looks the same in every row. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.chips[hidden] {
+  display: none;
+}
+
+.chip {
+  border: 3px solid var(--line);
+  background: var(--surface);
+  border-radius: 99px;
+  padding: 6px 14px;
+  min-height: 40px;
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.chip.selected {
+  background: var(--saffron);
+  color: var(--on-accent);
+  border-color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+/* The chip that opens a row of chips names what's chosen, and looks the same whatever that is. */
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  flex: none;
+}
+
 /* Home */
 
 .home-header {
@@ -2020,21 +2058,6 @@ p {
   margin-bottom: 14px;
 }
 
-.chip {
-  border: var(--outline);
-  border-radius: 999px;
-  background: var(--surface);
-  padding: 6px 14px;
-  min-height: 40px;
-  font-weight: 700;
-}
-
-.chip.selected {
-  background: var(--teal);
-  color: var(--on-accent);
-  box-shadow: 2px 2px 0 var(--ink);
-}
-
 /* A call fills the screen: the transcript scrolls between the header and the controls, which stay put. */
 .talk-chat {
   display: flex;
@@ -2420,41 +2443,6 @@ p {
 }
 
 /* Library */
-
-.filter-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  flex: none;
-}
-
-.chips[hidden] {
-  display: none;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 16px;
-}
-
-.chip {
-  border: 3px solid var(--line);
-  background: var(--surface);
-  border-radius: 99px;
-  padding: 6px 14px;
-  min-height: 40px;
-  font-weight: 800;
-  font-size: 0.9rem;
-}
-
-.chip.selected {
-  background: var(--saffron);
-  color: var(--on-accent);
-  border-color: var(--ink);
-}
 
 .word.guide .word-en {
   margin-bottom: 4px;

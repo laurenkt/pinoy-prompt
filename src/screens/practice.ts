@@ -6,7 +6,7 @@ import { RecordError, toWav, type Recording } from '../recorder';
 import { distractors, settled, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, h, hookView, icon, iconButton, pageHeader } from '../ui';
+import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, PROBLEMS, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
@@ -477,7 +477,7 @@ export function practiceScreen(
     const toggle = h(
       'button',
       {
-        class: `chip filter-toggle ${mix ? '' : 'selected'}`,
+        class: 'chip filter-toggle',
         'aria-expanded': String(scopeOpen),
         'aria-controls': 'drill-scope',
         'aria-label': `Questions: ${label}`,
@@ -499,20 +499,14 @@ export function practiceScreen(
         { class: 'chips', role: 'group', 'aria-label': 'Ask' },
         MODES.map((m) => {
           const on = scope.has(m.id);
-          return h(
-            'button',
-            {
-              class: `chip ${on ? 'selected' : ''}`,
-              'data-mode': m.id,
-              'aria-pressed': String(on),
-              // One that can't be asked right now keeps its place, for when quiet mode goes off.
-              disabled: unavailable(m.id) !== null,
-              // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
-              'aria-disabled': String(on && picks.length === 1 && picks[0] === m.id),
-              onclick: () => toggleScope(m.id),
-            },
-            m.title,
-          );
+          return chip(m.title, on, {
+            'data-mode': m.id,
+            // One that can't be asked right now keeps its place, for when quiet mode goes off.
+            disabled: unavailable(m.id) !== null,
+            // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
+            'aria-disabled': String(on && picks.length === 1 && picks[0] === m.id),
+            onclick: () => toggleScope(m.id),
+          });
         }),
       ),
       reasons.length > 0 && h('p', { class: 'muted scope-note' }, reasons.join(' ')),
