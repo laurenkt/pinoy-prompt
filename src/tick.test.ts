@@ -2,9 +2,10 @@
 // A soft tick for a button press, unless the press already makes a sound or the microphone is in use.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { audioContext } from './audio-engine';
 import { getMicrophone, releaseMicrophone } from './microphone';
 import { webAudioPlayer } from './player';
-import { chime, play, setMuted, stop, tickOnPress } from './speech';
+import { DETENT_GAP_MS, chime, detents, play, setMuted, setTapSounds, stop, tickOnPress } from './speech';
 import { FakeAudioContext, chimes, recorded, ticks } from './test/fake-audio';
 import { h } from './ui';
 
@@ -125,6 +126,61 @@ describe('the tap sound', () => {
     root.append(button);
     setMuted(true);
     press(button);
+    expect(ticks.count).toBe(0);
+  });
+});
+
+describe('ticks for scrubbing across the chart', () => {
+  /** A scrub's steps, each a gap apart. */
+  async function scrub(step: (s: string | null) => void, steps: (string | null)[]): Promise<void> {
+    for (const s of steps) {
+      step(s);
+      await new Promise((r) => setTimeout(r, DETENT_GAP_MS + 5));
+    }
+  }
+
+  it('ticks, and taps on the phone where it can, at each new step but not where the drag starts', async () => {
+    const vibrate = vi.fn();
+    vi.stubGlobal('navigator', { vibrate });
+    const step = detents();
+    // The context is running, as it is once the app has made any sound.
+    tickOnPress(root);
+    const button = h('button', null, 'Next');
+    root.append(button);
+    press(button);
+    ticks.count = 0;
+    await scrub(step, ['day 3', 'day 3', 'day 4', 'day 5', 'day 4', null, 'day 9']);
+    expect(ticks.count).toBe(3);
+    expect(vibrate).toHaveBeenCalledTimes(3);
+  });
+
+  it("stays a ratchet, not a buzz, when the finger moves fast", () => {
+    const step = detents();
+    for (const s of ['day 1', 'day 2', 'day 3', 'day 4', 'day 5']) step(s);
+    expect(ticks.count).toBeLessThanOrEqual(1);
+  });
+
+  it('is off with Tap sounds, and silent in silent mode', async () => {
+    const vibrate = vi.fn();
+    vi.stubGlobal('navigator', { vibrate });
+    setTapSounds(false);
+    await scrub(detents(), ['day 1', 'day 2']);
+    setTapSounds(true);
+    expect(vibrate).not.toHaveBeenCalled();
+    setMuted(true);
+    await scrub(detents(), ['day 1', 'day 2']);
+    expect(ticks.count).toBe(0);
+    // Silent mode is about sound; the tap on the phone stays.
+    expect(vibrate).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't start audio for a drag, as iOS would only play it late", async () => {
+    const step = detents();
+    // Suspended after a while idle; a drag can't resume it.
+    const ctx = audioContext() as unknown as { state: string };
+    ctx.state = 'suspended';
+    await scrub(step, ['day 1', 'day 2', 'day 3']);
+    ctx.state = 'running';
     expect(ticks.count).toBe(0);
   });
 });

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { type Forecast, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
 import { h } from '../ui';
@@ -165,6 +165,34 @@ describe('forecast', () => {
     frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 50, pointerType: 'touch' }));
     frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 20, clientY: 52, pointerType: 'touch' }));
     expect(caption()).toMatch(/^0 cards on /);
+  });
+
+  it('ticks as a finger scrubs from day to day, but not for a mouse hovering', async () => {
+    const vibrate = vi.fn();
+    vi.stubGlobal('navigator', { vibrate });
+    const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
+    const frame = el.querySelector<HTMLElement>('.growth-frame')!;
+    frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
+    const move = (clientX: number, pointerType = 'touch') => frame.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY: 50, pointerType }));
+    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 50, pointerType: 'touch' }));
+    const seen: string[] = [];
+    for (const x of [180, 150, 120, 90, 60, 30, 0]) {
+      move(x);
+      const shown = el.querySelector('.growth-caption')!.textContent!;
+      if (shown !== seen.at(-1)) seen.push(shown);
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    frame.dispatchEvent(new PointerEvent('pointerup', { clientX: 0, clientY: 50, pointerType: 'touch' }));
+    // One tick for each day moved to; none for the one the scrub starts on.
+    expect(seen.length).toBeGreaterThan(1);
+    expect(vibrate).toHaveBeenCalledTimes(seen.length - 1);
+    const scrubbed = vibrate.mock.calls.length;
+    for (const x of [0, 100, 200]) {
+      move(x, 'mouse');
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    expect(vibrate).toHaveBeenCalledTimes(scrubbed);
+    vi.unstubAllGlobals();
   });
 
   it('draws no projection without a date ahead', () => {

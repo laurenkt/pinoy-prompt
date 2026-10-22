@@ -4,6 +4,7 @@
 // today towards the next milestone, with roughly when it might be reached.
 
 import { STRENGTHS, curveAt, type Forecast, type MemoryHistory, type Strength } from '../memory';
+import { detents } from '../speech';
 import { DAY_MS } from '../srs';
 import { h, svg } from '../ui';
 
@@ -274,13 +275,22 @@ export function growthChart(
     times[last] - history.since < 2 * DAY_MS &&
       h('p', { class: next ? 'growth-hint small under-goal' : 'growth-hint small', style: next ? { right: `${(1 - PAST) * 100 + 4}%` } : null }, 'This fills in day by day as your cards settle.'),
   );
-  const pick = (e: PointerEvent) => {
+  /** Shows the point under the pointer, and says which step of the chart it is: a day, or a twentieth of the way ahead. */
+  const pick = (e: PointerEvent): string | null => {
     const box = frame.getBoundingClientRect();
-    if (!box.width) return;
+    if (!box.width) return null;
     const x = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
-    if (x > past && next) showAhead(Math.min(1, (x - past) / (1 - past)));
-    else show(Math.round(Math.min(1, x / past) * last));
+    if (x > past && next) {
+      const u = Math.min(1, (x - past) / (1 - past));
+      showAhead(u);
+      return `ahead ${Math.round(u * 20)}`;
+    }
+    const i = Math.round(Math.min(1, x / past) * last);
+    show(i);
+    return `day ${i}`;
   };
+  // A finger scrubbing across the days ticks at each one, like a picker wheel.
+  const detent = detents();
   // A mouse looks by hovering. A finger looks by dragging sideways or tapping;
   // a drag that starts up or down is left to scroll the page.
   let touch: { x: number; y: number; scrub: boolean } | null = null;
@@ -296,15 +306,17 @@ export function growthChart(
     if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
     else if (touch.scrub || (dx > 8 && dx > dy)) {
       touch.scrub = true;
-      pick(e);
+      detent(pick(e));
     }
   });
   frame.addEventListener('pointerup', (e) => {
     if (touch && !touch.scrub) pick(e);
     touch = null;
+    detent(null);
   });
   frame.addEventListener('pointercancel', () => {
     touch = null;
+    detent(null);
   });
   frame.addEventListener('pointerleave', (e) => {
     if (e.pointerType === 'mouse') show(last);
