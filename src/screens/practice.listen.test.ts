@@ -10,6 +10,7 @@ import { recordAnswer } from '../store';
 import { button, fakeApp, flush, noMic } from '../test/screen';
 import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
+import { AiError } from '../openai';
 
 /** Asked in this order, since every pick rolls 0. */
 const KNOWN = ['salamat', 'maraming-salamat', 'magandang-umaga', 'bukas'];
@@ -102,11 +103,33 @@ describe('listening to words that have settled', () => {
     expect(has(root, 'I had it right')).toBe(false);
   });
 
-  it('counts an empty answer as not knowing it', async () => {
-    const root = listen(learner(true));
-    type(root, '');
+  it("doesn't take an empty box as an answer", async () => {
+    const judge = vi.fn<MeaningJudge>(async () => true);
+    const root = listen(learner(true), judge);
+    type(root, '  ');
     await flush();
-    expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(box(root)!.disabled).toBe(false);
+    expect(judge).not.toHaveBeenCalled();
+  });
+
+  it('goes to the choices while a check is slow, and drops the check', async () => {
+    let answer: (right: boolean) => void = () => {};
+    const root = listen(learner(true), () => new Promise((r) => (answer = r)));
+    type(root, 'thanks a lot');
+    button(root, 'Show choices').click();
+    expect(root.querySelectorAll('.choice')).toHaveLength(4);
+    answer(true);
+    await flush();
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(root.querySelectorAll('.choice:disabled')).toHaveLength(0);
+  });
+
+  it('says what to fix when OpenAI turns the key down', async () => {
+    const root = listen(learner(true), async () => Promise.reject(new AiError('key', 'bad key')));
+    type(root, 'thanks a lot');
+    await flush();
+    expect(root.querySelector('.feedback-note')?.textContent).toContain("didn't accept the API key");
   });
 
   it('offers the choices instead, for a word the learner is unsure of', () => {

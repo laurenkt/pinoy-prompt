@@ -32,6 +32,12 @@ describe('matching a typed meaning on the device', () => {
     ['isang-libo', '1,000'],
     ['isang-libo', 'one thousand'],
     ['nauuhaw-ako', 'im thirsy'],
+    ['siya', 'he or she'],
+    ['siya', 'he/she'],
+    ['bahay', 'house / home'],
+    ['sumakay', 'to ride'],
+    ['sumakay', 'get on'],
+    ['isang-daan', 'a hundred'],
   ])('%s: "%s" is right', (id, answer) => {
     expect(matchesMeaning(answer, card(id))).toBe(true);
   });
@@ -48,10 +54,15 @@ describe('matching a typed meaning on the device', () => {
     ['lola', 'grandfather'],
     ['meron', 'three'],
     ['walo', 'eighty'],
+    ['siya', 'he or they'],
     ['apat', 'fourth'],
     ['dalawampu', '21'],
   ])('%s: "%s" is not matched', (id, answer) => {
     expect(matchesMeaning(answer, card(id))).toBe(false);
+  });
+
+  it("takes every card's own meaning, as written", () => {
+    for (const c of VOCAB.filter(canTypeMeaning)) expect(matchesMeaning(c.en, c), c.en).toBe(true);
   });
 
   it("never takes one card's meaning for another's", () => {
@@ -96,7 +107,7 @@ describe('judging a typed meaning', () => {
   it("goes by the device's check without OpenAI, or when it fails, and says when it failed", async () => {
     expect(await judgeMeaning('thanks a lot', card('maraming-salamat'), null)).toEqual({ right: false });
     expect(await judgeMeaning('thanks a lot', card('maraming-salamat'), async () => null)).toEqual({ right: false });
-    expect(await judgeMeaning('thanks a lot', card('maraming-salamat'), async () => Promise.reject(new Error('offline')))).toEqual({ right: false, unchecked: true });
+    expect(await judgeMeaning('thanks a lot', card('maraming-salamat'), async () => Promise.reject(new Error('offline')))).toEqual({ right: false, failure: new Error('offline') });
   });
 
   it("counts an empty answer as not knowing, and doesn't ask about it", async () => {

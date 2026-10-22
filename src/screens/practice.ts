@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card } from '../deck';
 import { canTypeMeaning, judgeMeaning, type MeaningJudge } from '../meaning';
-import { checkMeaning, getApiKey } from '../openai';
+import { AiError, checkMeaning, errorText, getApiKey } from '../openai';
 import { distractors, settled, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { canPlay, chime, play, preload, stop } from '../speech';
@@ -36,8 +36,10 @@ interface Question {
   draft?: string;
   /** What was typed, once it's sent. */
   answer?: string;
-  /** OpenAI couldn't be asked about the answer, so it was only checked on the device. */
-  unchecked?: boolean;
+  /** Why OpenAI couldn't be asked about the answer, so it was only checked on the device. */
+  failure?: unknown;
+  /** The box has been offered, and taken focus, once: later redraws leave the keyboard alone. */
+  offered?: boolean;
 }
 
 /** What `picked` holds for a typed meaning that wasn't right. */
@@ -158,13 +160,16 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
   /** Note how the current question went, so a miss comes back soon, and pick the one after it. */
   function settle(right: boolean): void {
     if (!current || upcoming) return;
-    const id = current.card.id;
+    tally(current.card.id, right);
+    upcoming = nextQuestion();
+    if (upcoming) preload(upcoming.card);
+  }
+
+  function tally(id: string, right: boolean): void {
     const misses = missed.get(id) ?? 0;
     if (!right) missed.set(id, misses + 1);
     else if (misses > 1) missed.set(id, misses - 1);
     else missed.delete(id);
-    upcoming = nextQuestion();
-    if (upcoming) preload(upcoming.card);
   }
 
   function ask(): void {
@@ -213,15 +218,16 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
   /** Check a typed meaning: on the device, then with OpenAI when there's a key. */
   function send(text: string): void {
     const q = current;
-    if (!q || picked !== null || checking) return;
+    // Nothing typed (an Enter meant for Next, say) isn't an answer; "Show choices" is there for not knowing.
+    if (!q || picked !== null || checking || !text.trim()) return;
     q.answer = text.trim();
     checking = true;
     draw();
-    void judgeMeaning(q.answer, q.card, askMeaning).then(({ right, unchecked }) => {
+    void judgeMeaning(q.answer, q.card, askMeaning).then(({ right, failure }) => {
+      // Left the question (or the drill), or went to the choices, while it was being checked.
+      if (current !== q || !q.typed || !root.isConnected) return;
       checking = false;
-      // Left the question (or the drill) while it was being checked.
-      if (current !== q || !root.isConnected) return;
-      q.unchecked = unchecked;
+      q.failure = failure;
       answer(q, right ? q.card.id : MISSED);
     });
   }
@@ -246,18 +252,20 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
     const q = current;
     if (!q || picked !== MISSED) return;
     picked = q.card.id;
-    // Take back the miss, so the word doesn't come round again sooner.
+    // Count it as the right answer it was: take back the miss, then tally it right.
     const misses = missed.get(q.card.id) ?? 0;
     if (misses > 1) missed.set(q.card.id, misses - 1);
     else missed.delete(q.card.id);
+    tally(q.card.id, true);
     draw();
   }
 
-  /** Not sure enough to type it: pick from choices instead. */
+  /** Not sure enough to type it, or tired of waiting for the check: pick from choices instead. */
   function showChoices(): void {
     const q = current;
-    if (!q || picked !== null || checking) return;
+    if (!q || picked !== null) return;
     q.typed = false;
+    checking = false;
     draw();
   }
 
@@ -468,7 +476,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
             h('strong', null, right ? 'Tama!' : 'Mali.'),
             ' ',
             `${q.card.tl} = ${q.card.en}`,
-            !right && q.unchecked && h('p', { class: 'feedback-note' }, "Couldn't reach OpenAI to check other wordings. If you meant the same thing, tap I had it right."),
+            !right && q.failure !== undefined && h('p', { class: 'feedback-note' }, checkProblem(q.failure)),
           ),
         q.mode !== 'speak' && answered && (!right || reviewing) &&
           hookView(q.card),
@@ -490,10 +498,11 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
       autocomplete: 'off',
       enterkeyhint: 'done',
       disabled: answered || checking,
-      'data-autofocus': !answered || undefined,
+      'data-autofocus': (!answered && !q.offered) || undefined,
       oninput: () => (q.draft = input.value),
     });
     input.value = q.answer ?? q.draft ?? '';
+    q.offered = true;
     return h(
       'form',
       {
@@ -508,7 +517,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
         h(
           'div',
           { class: 'row' },
-          h('button', { class: 'btn secondary', type: 'button', disabled: checking, onclick: showChoices }, 'Show choices'),
+          h('button', { class: 'btn secondary', type: 'button', onclick: showChoices }, 'Show choices'),
           h('button', { class: 'btn primary', type: 'submit', disabled: checking }, checking ? 'Checking…' : 'Check'),
         ),
     );
@@ -534,4 +543,10 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
   }
   ask();
   return root;
+}
+
+/** Why a typed meaning was only checked on the device. A key or billing problem says what to fix; anything else, that OpenAI couldn't be reached. */
+function checkProblem(failure: unknown): string {
+  const fix = failure instanceof AiError && (failure.kind === 'key' || failure.kind === 'quota') ? `${errorText(failure)} ` : "Couldn't reach OpenAI to check other wordings. ";
+  return `${fix}If you meant the same thing, tap I had it right.`;
 }

@@ -19,6 +19,7 @@ const SAME: [RegExp, string][] = [
   [/\b(bye|good bye)\b/g, 'goodbye'],
   [/\bo ?clock\b/g, 'oclock'],
   [/\bcannot\b/g, 'can not'],
+  [/\ba (hundred|thousand)\b/g, 'one $1'],
   // Contractions typed without the apostrophe.
   [/\bim\b/g, 'i am'],
   [/\b(do|does|did|is|are|was|were|has|have|could|would|should)nt\b/g, '$1 not'],
@@ -55,7 +56,8 @@ export function words(text: string): string[] {
 
 /** The words that matter; all of them when every one is filler ("the"). */
 function meaningful(list: string[]): string[] {
-  const kept = list.filter((w) => !FILLER.has(w));
+  // "To ride" is "ride": the "to" in front of a doing word adds nothing.
+  const kept = list.filter((w, i) => !FILLER.has(w) && !(i === 0 && w === 'to' && list.length > 1));
   return kept.length ? kept : list;
 }
 
@@ -127,10 +129,12 @@ function sameWord(typed: string, word: string): boolean {
  * evening" isn't taken for "good morning". False means "not sure", not "wrong".
  */
 export function matchesMeaning(answer: string, card: Card): boolean {
-  const given = meaningful(words(answer));
-  if (given.length === 0) return false;
-  return meanings(card).some(
-    (alt) => alt.every((w) => given.some((g) => sameWord(g, w))) && given.every((g) => alt.some((w) => sameWord(g, w))),
+  // "He or she", "house / home": every meaning given has to be one of the card's.
+  const parts = answer.replace(/\([^)]*\)/g, ' ').split(/\/|\bor\b/i).map((part) => meaningful(words(part))).filter((part) => part.length > 0);
+  if (parts.length === 0) return false;
+  const alts = meanings(card);
+  return parts.every((given) =>
+    alts.some((alt) => alt.every((w) => given.some((g) => sameWord(g, w))) && given.every((g) => alt.some((w) => sameWord(g, w)))),
   );
 }
 
@@ -145,13 +149,13 @@ export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge
   if (!ask) return { right: false };
   try {
     return { right: (await ask(answer, card)) ?? false };
-  } catch {
-    return { right: false, unchecked: true };
+  } catch (e) {
+    return { right: false, failure: e };
   }
 }
 
 export interface Verdict {
   right: boolean;
-  /** OpenAI was asked but couldn't answer, so only the device's check counted. */
-  unchecked?: boolean;
+  /** Why OpenAI couldn't answer when it was asked, so only the device's check counted. */
+  failure?: unknown;
 }

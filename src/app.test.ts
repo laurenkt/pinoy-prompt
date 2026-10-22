@@ -18,7 +18,10 @@ describe('typing into a box', () => {
     expect(typingInBox(press(document.createElement('textarea')))).toBe(true);
   });
 
-  it('is a shortcut anywhere else', () => {
+  it('is a shortcut anywhere else, a checkbox included', () => {
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    expect(typingInBox(press(box))).toBe(false);
     expect(typingInBox(press(document.createElement('button')))).toBe(false);
     expect(typingInBox(press(document.body.appendChild(document.createElement('div'))))).toBe(false);
   });
