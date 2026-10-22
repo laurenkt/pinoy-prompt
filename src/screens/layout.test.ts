@@ -141,6 +141,7 @@ describe('two kinds of text', () => {
   });
 
   it('keeps the known words in a Chat message copyable with the rest of it', () => {
+    // The markup of a message from talk.ts's bubble(); talk.test.ts checks a real call puts its word buttons there.
     const message = h('p', { class: 'bubble ai' }, 'Ay, ', h('span', { class: 'tl-word' }, h('button', { lang: 'fil' }, 'salamat')), '!');
     expect(isChrome(message.querySelector('button')!)).toBe(false);
   });
