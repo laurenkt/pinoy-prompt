@@ -24,7 +24,7 @@ Each system has one owner module. Anything else that needs it calls that module.
 | Microphone | `src/microphone.ts`, `src/recorder.ts` | The one shared mic stream; recording a take. |
 | iOS audio session | `src/audio-session.ts` | Called by the engine and card audio (`playback`) and the microphone (`play-and-record`) only. |
 | Speaking | `src/fbank.ts`, `src/phone-model.ts`, `src/model-cache.ts`, `src/phonetics.ts`, `src/coach.ts`, `src/player.ts` | Recognising and judging a spoken attempt; playing slices and reference sounds through the engine. |
-| Chat | `src/openai.ts`, `src/talk.ts`, `src/visualizer.ts`, `src/screens/talk.ts` | The OpenAI key and call, what the AI is told, the backdrop. `openai.ts` is the one place that talks to OpenAI, so Drills' meaning check (`checkMeaning`) lives there too. |
+| Chat | `src/openai.ts`, `src/talk.ts`, `src/visualizer.ts`, `src/screens/talk.ts` | The OpenAI key and call, what the AI is told, the backdrop. `openai.ts` is the one place that talks to OpenAI, so Drills' meaning check (`checkMeaning`) lives there too, and so does the spend estimate Settings shows: each request adds what it cost (`addSpend`, priced from `PRICES` and `CENTS_PER_MINUTE`), kept like the key outside progress. A new request adds its cost the same way. |
 | Offline | `public/sw.js`, `src/clip-cache.ts`, `src/model-cache.ts` | The app shell, word clips and the speech model in Cache Storage. Code loaded on demand is named by the build, and an installed app can stay open across a deploy that removes it, so it's loaded at start instead (`keepSpeakingReady`); a new dynamic import needs the same. |
 | Tests and CI | `src/**/*.test.ts`, `src/test/`, `.github/workflows/ci.yml` | See below. |
 
@@ -63,7 +63,7 @@ Every recorded sound the app plays goes through `audio-engine.ts`'s shared conte
 
 ### Saved progress and settings
 
-Progress is the one thing the app can't lose; the README's "Saved progress" section and REVIEW.md are the rules. In short: change its shape only with a `SCHEMA` bump, a migration and a fixture, or add an optional field with a default. Settings are part of progress. The OpenAI key is the one thing kept outside it, on purpose, so it never goes into a backup.
+Progress is the one thing the app can't lose; the README's "Saved progress" section and REVIEW.md are the rules. In short: change its shape only with a `SCHEMA` bump, a migration and a fixture, or add an optional field with a default. Settings are part of progress. The OpenAI key is kept outside it, on purpose, so it never goes into a backup, and with it the estimate of what OpenAI has cost on this device (`pinoy-prompt:openai-spend`): it belongs to the key and this device, not to learning, so Reset leaves it and a backup restored elsewhere does not carry it.
 
 ### Tests and CI as one system
 

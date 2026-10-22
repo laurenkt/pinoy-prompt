@@ -3,8 +3,11 @@
 // sent only to api.openai.com. There is no server of ours in between.
 
 import { getMicrophone, releaseMicrophone } from './microphone';
+import { dayKey } from './progress-schema';
 
 const KEY_STORAGE = 'pinoy-prompt:openai-key';
+/** What the app's calls are estimated to have cost, kept beside the key and, like it, out of progress and backups. */
+const SPEND_STORAGE = 'pinoy-prompt:openai-spend';
 /** Where the old voice choice was kept, before Talk only used Beacon. */
 const RETIRED_VOICE_STORAGE = 'pinoy-prompt:talk-voice';
 const API = 'https://api.openai.com/v1';
@@ -57,6 +60,81 @@ export function forgetRetiredVoiceChoice(): void {
 
 export function looksLikeKey(key: string): boolean {
   return /^sk-[A-Za-z0-9_-]{20,}$/.test(key);
+}
+
+/**
+ * OpenAI's list prices for what the app uses, in US dollars per million
+ * tokens. Every model the app sends a token-billed request to has a row here
+ * (openai.test.ts checks it). GPT-Live is billed by the minute instead
+ * (CENTS_PER_MINUTE).
+ */
+export const PRICES: Record<string, { input: number; cachedInput: number; output: number }> = {
+  'gpt-5.4-mini': { input: 0.75, cachedInput: 0.075, output: 4.5 },
+};
+
+/** The token counts a Responses API answer reports. */
+export interface TokenUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number };
+}
+
+/** What a token-billed request cost, in US dollars, from the usage OpenAI reported. */
+export function tokenCost(model: string, usage: TokenUsage | undefined): number {
+  const price = PRICES[model];
+  if (!price || !usage) return 0;
+  const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
+  const input = count(usage.input_tokens);
+  const cached = Math.min(count(usage.input_tokens_details?.cached_tokens), input);
+  return ((input - cached) * price.input + cached * price.cachedInput + count(usage.output_tokens) * price.output) / 1e6;
+}
+
+/** What `seconds` of a GPT-Live call cost, in US dollars. */
+export function callCost(seconds: number): number {
+  return seconds > 0 ? ((seconds / 60) * CENTS_PER_MINUTE) / 100 : 0;
+}
+
+/** The estimated spend so far, in US dollars, by calendar month (YYYY-MM, local time). */
+interface Spend {
+  total: number;
+  months: Record<string, number>;
+}
+
+function readSpend(): Spend {
+  const spend: Spend = { total: 0, months: {} };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SPEND_STORAGE) ?? 'null') as { total?: unknown; months?: unknown } | null;
+    const amount = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+    spend.total = amount(saved?.total);
+    if (saved?.months && typeof saved.months === 'object') {
+      for (const [month, value] of Object.entries(saved.months)) {
+        if (/^\d{4}-\d{2}$/.test(month) && amount(value)) spend.months[month] = amount(value);
+      }
+    }
+  } catch {
+    // Unreadable: start again from nothing rather than fail a call over it.
+  }
+  return spend;
+}
+
+/** Add to the estimate. Every request the app makes to OpenAI goes through here once it knows what it cost. */
+export function addSpend(dollars: number, now = Date.now()): void {
+  if (!(dollars > 0) || !Number.isFinite(dollars)) return;
+  const spend = readSpend();
+  const month = dayKey(now).slice(0, 7);
+  spend.total += dollars;
+  spend.months[month] = (spend.months[month] ?? 0) + dollars;
+  try {
+    localStorage.setItem(SPEND_STORAGE, JSON.stringify(spend));
+  } catch {
+    // Full storage or private mode: the estimate just misses this one.
+  }
+}
+
+/** The estimated spend in US dollars: in all, and in the calendar month of `now`. */
+export function getSpend(now = Date.now()): { total: number; month: number } {
+  const spend = readSpend();
+  return { total: spend.total, month: spend.months[dayKey(now).slice(0, 7)] ?? 0 };
 }
 
 export type AiErrorKind = 'key' | 'quota' | 'access' | 'network' | 'other';
@@ -163,7 +241,8 @@ export async function checkMeaning(
     fetchFn,
     AbortSignal.timeout(CHECK_TIMEOUT_MS),
   );
-  const body = (await response.json()) as { output?: { type?: string; content?: { type?: string; text?: string }[] }[] };
+  const body = (await response.json()) as { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
+  addSpend(tokenCost(CHECK_MODEL, body.usage));
   const text = body.output?.find((o) => o.type === 'message')?.content?.find((c) => c.type === 'output_text')?.text;
   try {
     const verdict = JSON.parse(text ?? '') as { right?: unknown };
@@ -258,6 +337,16 @@ export async function startCall(
   let channel: RTCDataChannel | null = null;
   let ended = false;
   let greeted = false;
+  /** Seconds of the call already added to the spend estimate. */
+  let charged = 0;
+  /** When the call started listening, to count the time after OpenAI's last usage report. */
+  let startedAt: number | undefined;
+  /** Add the call's billed time beyond what is already counted. */
+  const charge = (seconds: number) => {
+    if (seconds <= charged) return;
+    addSpend(callCost(seconds - charged));
+    charged = seconds;
+  };
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
 
@@ -280,6 +369,8 @@ export async function startCall(
     if (ended) return;
     ended = true;
     failure = error ?? new AiError('network', 'The call dropped.');
+    // No usage report comes after this, so the time since the last one is counted by the clock.
+    if (startedAt !== undefined) charge((Date.now() - startedAt) / 1000);
     try {
       if (channel?.readyState === 'open') channel.send(JSON.stringify({ type: 'session.close' }));
     } catch {
@@ -364,6 +455,7 @@ export async function startCall(
     if (ended) return;
     switch (event.type) {
       case 'session.started':
+        startedAt ??= Date.now();
         events.onStarted();
         if (!greeted && channel?.readyState === 'open') {
           greeted = true;
@@ -382,7 +474,11 @@ export async function startCall(
         }
         break;
       case 'session.usage.updated':
-        if (typeof event.usage?.seconds === 'number') events.onUsage(event.usage.seconds);
+        if (typeof event.usage?.seconds === 'number') {
+          // OpenAI reports the call's running total; only the time since the last report is new.
+          charge(event.usage.seconds);
+          events.onUsage(event.usage.seconds);
+        }
         break;
       case 'session.closed':
         finish();
