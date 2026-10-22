@@ -135,7 +135,7 @@ describe('an attempt', () => {
     await open('salamat');
     button('Tap and speak').click();
     expect(text('.listen-status')).toBe('Mic on. Say it now.');
-    expect(panel.recording()).toBe(true);
+    expect(panel.mayPlay()).toBe(false);
     mic.events.onSpeech?.();
     expect(text('.listen-status')).toBe('Hearing you…');
     expect(panel.el.classList).toContain('phase-sound');
@@ -210,6 +210,26 @@ describe('an attempt', () => {
     mic.fail(new RecordError('denied'));
     await flush();
     expect(text('.feedback')).toContain('microphone is blocked');
+  });
+
+  it("lets the card's audio play only once an attempt has been judged", async () => {
+    heard = ['s', 'a', 'm', 'a', 't'];
+    await open('salamat');
+    expect(panel.mayPlay()).toBe(false);
+    // Nor does the sounds-like spelling show yet.
+    expect(panel.el.querySelector('.hint')).toBeNull();
+    button('Tap and speak').click();
+    mic.finish({ samples: new Float32Array(0), speech: false });
+    await flush();
+    // Nothing heard isn't an attempt, so it offers nothing to listen to either.
+    expect(panel.mayPlay()).toBe(false);
+    expect(panel.el.textContent).not.toContain('Hear it slowly');
+    button('Try again').click();
+    button("I'm done").click();
+    await flush();
+    expect(panel.mayPlay()).toBe(true);
+    button('Try again').click();
+    expect(text('.hint')).toContain(getCard('salamat')!.hint!);
   });
 
   it('stops recording when the question goes away', async () => {

@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
+import { speaking, stop } from '../speech';
 import { toPhones } from '../phonetics';
 import type { Take } from '../recorder';
 import { ADVANCE_MS } from './auto-advance';
@@ -102,6 +103,42 @@ describe('Speak mode', () => {
     document.body.append(practiceScreen(fakeApp(KNOWN), deps({ recordingSupported: () => false })));
     expect(document.querySelector<HTMLButtonElement>('#drill-scope [data-mode="speak"]')!.disabled).toBe(true);
     expect(document.body.textContent).toContain("this browser can't record");
+  });
+});
+
+describe('the word before an attempt', () => {
+  const speak = vi.fn();
+  beforeEach(() => {
+    speak.mockClear();
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak, cancel: () => {}, addEventListener: () => {}, speaking: false, pending: false });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("isn't played, so the drill asks what the learner remembers, then can be heard on the result", async () => {
+    const root = practiceScreen(fakeApp(KNOWN, { autoplay: true }), deps());
+    document.body.append(root);
+    await flush();
+    // The round opens mixed, and its first question may have played.
+    stop();
+    drillScope(root, ['speak']);
+    await flush();
+    expect(root.querySelector('.prompt .audio-btn')).toBeNull();
+    expect(speaking()).toBe(false);
+    button('Tap and speak').click();
+    button("I'm done").click();
+    await flush();
+    button('▶ Target').click();
+    expect(speaking()).toBe(true);
+  });
+
+  it("isn't offered on a speaking step in Study either", async () => {
+    const root = sessionScreen(fakeApp(KNOWN), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, deps());
+    document.body.append(root);
+    await flush();
+    button('Keep practising').click();
+    await flush();
+    expect(root.querySelector('.prompt .tl')?.textContent).toBe('Salamat');
+    expect(root.querySelector('.prompt .audio-btn')).toBeNull();
   });
 });
 

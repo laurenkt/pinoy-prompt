@@ -106,12 +106,12 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   /**
-   * Play the card, except while the microphone is open: it would record the app's
-   * voice. A guide plays the sentence it is asking about, if there is one,
+   * Play the card, except on a speaking step before an attempt or while the
+   * microphone is open (see `mayPlay`). A guide plays the sentence it is asking about, if there is one,
    * but only once answered: the sentence is the answer.
    */
   const say = (slow = false) => {
-    if (!card || speak?.recording()) return;
+    if (!card || (speak && !speak.mayPlay())) return;
     if (isVocab(card)) void play(card, slow);
     else if (drill?.tl && (phase === 'feedback' || phase === 'back' || phase === 'missed')) void play({ tl: drillSentence(drill) }, slow);
   };
@@ -503,7 +503,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     return h(
       'div',
       { class: 'panel speak-step' },
-      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Say this out loud'), tagalog(c), h('p', { class: 'prompt-meaning' }, c.en)),
+      // No audio until the learner has had a go: the word is played on the result.
+      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Say this out loud'), h('p', { class: 'tl', lang: 'fil' }, c.tl), h('p', { class: 'prompt-meaning' }, c.en)),
       speak?.el,
     );
   }

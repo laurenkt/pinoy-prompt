@@ -83,8 +83,12 @@ export interface SpeakOptions {
 
 export interface SpeakPanel {
   el: HTMLElement;
-  /** Whether the microphone is open (the card's audio shouldn't play then). */
-  recording(): boolean;
+  /**
+   * Whether the card's audio may play: only once an attempt has been judged, as the
+   * question is whether the learner remembers how it sounds, not whether they can
+   * repeat it; and not while the microphone is open.
+   */
+  mayPlay(): boolean;
   dispose(): void;
 }
 
@@ -124,6 +128,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let disposed = false;
   /** Bumped for each attempt, so a stale attempt's result is ignored. */
   let attempt = 0;
+  /** Set once an attempt has been judged, after which the card's audio can play. */
+  let judged = false;
   /** Whether a redraw may move focus to its main button. */
   let takeFocus = options.autofocus ?? true;
   // The card's spelling and any other accepted pronunciations (e.g. Kamusta for Kumusta).
@@ -196,6 +202,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       if (stale()) return;
       const { sounds } = recognition;
       const { text, comparison } = judge(sounds);
+      // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
+      if (sounds.length > 0) judged = true;
       options.onAttempt(isRight(comparison));
       set({ name: 'result', text, comparison, tips: coach(text, comparison), heard: sounds, recognition, samples: take.samples });
     } catch (err) {
@@ -222,7 +230,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     });
   }
 
-  const hint = () => card.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), card.hint);
+  // The sounds-like spelling gives the pronunciation away too, so it waits for a first attempt like the audio.
+  const hint = () => judged && card.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), card.hint);
   const micButton = (label: string, className = 'btn mic big') =>
     h('button', { class: className, 'data-autofocus': true, onclick: () => void startRecording() }, icon('mic'), ' ', label);
   const skip = (label = 'Skip') => h('button', { class: 'btn secondary', onclick: options.onNext }, label);
@@ -339,7 +348,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         lettersEl,
         tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
       ),
-      h('div', { class: 'row' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
+      judged && h('div', { class: 'row' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
       actions(right),
     ].filter(Boolean) as HTMLElement[];
   }
@@ -379,7 +388,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   return {
     el,
-    recording: () => state.name === 'recording',
+    mayPlay: () => judged && state.name !== 'recording',
     dispose: () => {
       disposed = true;
       recording?.cancel();

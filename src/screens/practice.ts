@@ -173,12 +173,12 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       });
     }
     draw();
-    if (q && q.mode !== 'recall' && (q.mode === 'listen' || app.progress.settings.autoplay)) void play(q.card);
+    if (q && (q.mode === 'listen' || (q.mode === 'read' && app.progress.settings.autoplay))) void play(q.card);
   }
 
-  /** Play a card, except while the microphone is open: it would record the app's voice, not the learner's. */
+  /** Play a card, except on a speaking question before an attempt or while the microphone is open (see `mayPlay`). */
   function sayCard(card: Card, slow = false): void {
-    if (speak?.recording()) return;
+    if (speak && !speak.mayPlay()) return;
     void play(card, slow);
   }
 
@@ -345,7 +345,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         'div',
         { class: 'prompt' },
         h('p', { class: 'eyebrow' }, 'Say this out loud'),
-        h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioPair(say)),
+        // No audio until the learner has had a go: the word is played on the result.
+        h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
         h('p', { class: 'prompt-meaning' }, q.card.en),
       );
     } else if (q.mode === 'listen') {
