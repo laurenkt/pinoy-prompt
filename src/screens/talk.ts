@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey, MAX_CALL_SECONDS, startCall, type Call, type CallDeps } from '../openai';
 import { play, stop } from '../speech';
 import { addPiece, findWords, talkGreeting, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
-import { h, icon } from '../ui';
+import { h, icon, iconButton } from '../ui';
 import { createVisualizer, type Visualizer } from '../visualizer';
 import { keyForm } from './settings';
 
@@ -186,7 +186,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     return h(
       'header',
       { class: 'session-header' },
-      h('button', { class: 'icon-btn', 'aria-label': 'Leave Chat', onclick: leave }, icon('close')),
+      iconButton('close', 'Leave Chat', leave),
       h('span', { class: 'session-count' }, title),
       extra,
     );

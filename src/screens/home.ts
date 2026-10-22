@@ -11,10 +11,9 @@ import {
   type Strength,
 } from '../memory';
 import { MAX_LEARNING, learningCount, newCardsLeftToday, studyQueue, upcomingNewCards } from '../session';
-import { h, icon } from '../ui';
+import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
 import { quietToggle } from './quiet';
-import { settingsToggle } from './settings';
 
 /** A Tagalog greeting for the time of day. */
 function greeting(hour: number): { tl: string; en: string } {

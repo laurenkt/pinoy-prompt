@@ -19,7 +19,7 @@ import {
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { canPlay, play, preload, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
-import { audioButton, audioPair, choiceList, h, hookView, icon, progressBar } from '../ui';
+import { audioButton, audioPair, choiceList, h, hookView, iconButton, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
 import { endMicrophoneHold } from '../microphone';
@@ -425,7 +425,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       return h(
         'header',
         { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Stop studying', onclick: close }, icon('close')),
+        iconButton('close', 'Stop studying', close),
         h('span', { class: 'session-count' }, done === 1 ? '1 done' : `${done} done`),
         h('span', { class: 'session-title' }, step?.kind === 'extra' && phase !== 'done' ? 'Extra practice' : 'Study'),
         quietToggle(app, quietChanged),
@@ -436,7 +436,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     return h(
       'header',
       { class: 'session-header' },
-      h('button', { class: 'icon-btn', 'aria-label': 'Close session', onclick: close }, icon('close')),
+      iconButton('close', 'Close session', close),
       progressBar(completed, completed + remaining, 'Session progress'),
       title ? h('span', { class: 'session-title' }, title) : null,
       quietToggle(app, quietChanged),

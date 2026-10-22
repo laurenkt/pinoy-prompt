@@ -319,12 +319,11 @@ p {
   flex: none;
 }
 
-/* A header toggle that's on (quiet mode, Settings while it's open): teal and pushed in, so it's clear at a glance. */
+/* A header toggle that's on (quiet mode, Settings while it's open): teal, so it's clear at a glance.
+   It stays where it is, lined up with the buttons beside it, and still presses in when tapped. */
 .icon-btn[aria-pressed='true'] {
   background: var(--teal);
   color: var(--on-accent);
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--ink);
 }
 
 /* Silent quiet mode: nothing can play, so the play buttons go. */

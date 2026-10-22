@@ -1,6 +1,7 @@
 // A tiny helper for building DOM elements, so screens read like markup
 // without pulling in a framework.
 
+import type { App } from './app';
 import { speaking } from './speech';
 
 type Child = Node | string | number | null | undefined | false | Child[];
@@ -157,7 +158,7 @@ export function choiceList<T>(
 
 /**
  * A square icon button for a header: the back arrow, Home's settings, quiet mode.
- * Given `pressed`, it's a toggle: pushed in and teal while on.
+ * Given `pressed`, it's a toggle: teal while on.
  */
 export function iconButton(name: IconName, label: string, onclick: () => void, opts: { pressed?: boolean; title?: string } = {}): HTMLButtonElement {
   const { pressed, title } = opts;
@@ -166,6 +167,11 @@ export function iconButton(name: IconName, label: string, onclick: () => void, o
     { class: 'icon-btn', 'aria-label': label, title, 'aria-pressed': pressed === undefined ? undefined : String(pressed), onclick },
     icon(name),
   );
+}
+
+/** Home's settings button, which stays put and on while Settings is open, so a second tap closes it. */
+export function settingsToggle(app: App, open: boolean): HTMLButtonElement {
+  return iconButton('settings', 'Settings', () => app.navigate({ name: open ? 'home' : 'settings' }), { pressed: open });
 }
 
 /**

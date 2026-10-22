@@ -5,7 +5,7 @@ import { AiError, checkMeaning, errorText, getApiKey } from '../openai';
 import { distractors, settled, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, h, hookView, icon, pageHeader } from '../ui';
+import { audioButton, audioPair, choiceList, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
@@ -438,7 +438,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps, askMeani
       h(
         'header',
         { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: home }, icon('close')),
+        iconButton('close', 'End drill', home),
         h('span', { class: 'session-count' }, `${done} done`),
         scopeToggle,
         quietToggle(app, rescope),
