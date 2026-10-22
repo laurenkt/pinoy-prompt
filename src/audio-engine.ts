@@ -32,6 +32,8 @@ export function audioContext(): AudioContext {
   // resume from there; a new one made in the tap starts at once.
   const stuck = context && context.state !== 'running' && context.state !== 'suspended';
   if (context && (madeWithMicrophone !== mic || stuck)) {
+    // A closed context never reports its sounds ended, so they're finished here.
+    for (const finish of [...sounding]) finish();
     void context.close().catch(() => {});
     context = null;
   }
@@ -53,12 +55,13 @@ export function audioContext(): AudioContext {
  */
 export const IDLE_SUSPEND_MS = 30_000;
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
-let playing = 0;
+/** What's playing now, by the function that finishes it. */
+const sounding = new Set<() => void>();
 
 function suspendWhenIdle(): void {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
-    if (playing === 0 && context?.state === 'running') void context.suspend().catch(() => {});
+    if (sounding.size === 0 && context?.state === 'running') void context.suspend().catch(() => {});
   }, IDLE_SUSPEND_MS);
 }
 
@@ -145,14 +148,11 @@ export function playBuffer(buffer: AudioBuffer, rate = 1): Sound {
   gain.gain.setValueAtTime(1, t0 + Math.max(length - FADE, length * 0.75));
   gain.gain.linearRampToValueAtTime(0, t0 + length);
   source.start(t0);
-  playing++;
-  let finished = false;
   let finish = () => {};
   const done = new Promise<void>((resolve) => (finish = resolve));
+  sounding.add(finish);
   void done.then(() => {
-    if (finished) return;
-    finished = true;
-    playing--;
+    sounding.delete(finish);
     suspendWhenIdle();
   });
   source.onended = () => finish();

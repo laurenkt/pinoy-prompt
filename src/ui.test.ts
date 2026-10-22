@@ -39,3 +39,15 @@ it('stays lit a moment for a word that takes a while to start', () => {
   vi.advanceTimersByTime(400);
   expect(button.classList.contains('playing')).toBe(false);
 });
+
+it('keeps a button lit when it is tapped again while its word restarts', () => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'performance'] });
+  const button = document.body.appendChild(audioButton(() => (playing = true)));
+  button.click();
+  vi.advanceTimersByTime(1000);
+  // The word restarts: a moment with nothing playing, then the new one.
+  playing = false;
+  button.click();
+  vi.advanceTimersByTime(100);
+  expect(button.classList.contains('playing')).toBe(true);
+});

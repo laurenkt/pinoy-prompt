@@ -116,10 +116,19 @@ export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promis
   if (muted) return report(null);
   const tapped = performance.now();
   const mine = generation;
+  try {
+    await playNow(card, slow, mine, tapped, report);
+  } finally {
+    if (loading === mine) loading = null;
+  }
+}
+
+async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: number, tapped: number, report: (ms: number | null) => void): Promise<void> {
   const url = clipsSupported() ? clipUrl(card, slow) : null;
   if (url) {
     // Made or resumed now, inside the tap, as the clip may only be ready after it.
     audioContext();
+    // Counted as playing until the word starts, so a screen (or a lit button) waits for it.
     loading = mine;
     try {
       const buffer = await loadClip(url);
@@ -136,11 +145,10 @@ export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promis
     } catch {
       // Fall through to speech if the clip can't play.
       if (mine !== generation) return;
-    } finally {
-      if (loading === mine) loading = null;
     }
   }
   if (!speechSupported()) return report(null);
+  loading = mine;
   await initVoices();
   if (mine !== generation) return;
   const utterance = new SpeechSynthesisUtterance(card.say ?? card.tl);
@@ -177,5 +185,6 @@ export function stop(): void {
 /** Whether a card is still being heard, so a screen moving on by itself can wait for it. */
 export function speaking(): boolean {
   if (currentClip || loading === generation) return true;
-  return speechSupported() && speechSynthesis.speaking;
+  // Pending until the voice gets going, which can take a moment.
+  return speechSupported() && (speechSynthesis.speaking || speechSynthesis.pending);
 }

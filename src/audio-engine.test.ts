@@ -262,6 +262,26 @@ describe('clips', () => {
     expect(sources.at(-1)!.started).not.toBeNull();
   });
 
+  it('still lets go once idle after a context closed mid-word', async () => {
+    vi.useFakeTimers();
+    const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } });
+    const { closeMicrophone, getMicrophone } = await import('./microphone');
+    const { playBuffer } = await import('./audio-engine');
+    // Playing outside speech.ts, as the pronunciation results do, so nothing stops it.
+    playBuffer({ duration: 1 } as AudioBuffer);
+    // The microphone opening replaces the context the sound was playing on.
+    await getMicrophone();
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    await Promise.resolve();
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS);
+    expect(ctx.state).toBe('suspended');
+    closeMicrophone();
+  });
+
   it('makes a new context when iOS left the old one interrupted, rather than going quiet', async () => {
     const speech = stubSpeech();
     await play({ tl: 'Salamat' });

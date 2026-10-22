@@ -75,16 +75,19 @@ export function icon(name: IconName): SVGSVGElement {
 
 /** The audio button whose word is playing, lit until the word ends or another starts. */
 let lit: HTMLButtonElement | null = null;
-/** The built-in voice can take a moment to report it's speaking, so a tap lights the button for at least this long. */
+/** A tap lights its button for at least this long, so it shows even when there's nothing to hear. */
 const LIGHT_AT_LEAST_MS = 400;
+/** Bumped by each tap, so only the latest tap's check can put the light out. */
+let lighting = 0;
 
 function lightWhilePlaying(button: HTMLButtonElement): void {
   lit?.classList.remove('playing');
   lit = button;
   button.classList.add('playing');
   const from = performance.now();
+  const mine = ++lighting;
   const check = () => {
-    if (lit !== button) return;
+    if (mine !== lighting) return;
     if (button.isConnected && (speaking() || performance.now() - from < LIGHT_AT_LEAST_MS)) {
       requestAnimationFrame(check);
       return;

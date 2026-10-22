@@ -680,7 +680,8 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .audio-btn.playing {
+  .audio-btn.playing,
+  .audio-btn.slow.playing {
     animation: none;
   }
 }
