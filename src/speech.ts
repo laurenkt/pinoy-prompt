@@ -178,7 +178,7 @@ export async function chime(): Promise<void> {
   // Outside a tap (a spoken answer judged) iOS may not start the context; better no chime than one on the next tap.
   if (!(await audioRunning(ctx)) || muted) return;
   if (chimeBuffer?.sampleRate !== ctx.sampleRate) chimeBuffer = chimeSound(ctx);
-  const sound = (currentChime = playBuffer(chimeBuffer));
+  const sound = (currentChime = playBuffer(chimeBuffer, 1, 0, false));
   void sound.done.then(() => currentChime === sound && (currentChime = null));
   lastChime = { ctx, ends: sound.startsAt + chimeBuffer.duration };
 }
@@ -229,7 +229,7 @@ export function setTapSounds(on: boolean): void {
 let tickBuffer: AudioBuffer | null = null;
 
 /**
- * A very soft tick for a button press, quieter and shorter than the chime.
+ * A soft tap sound for a button press (`thockSamples`), shorter than the chime.
  * Not when the press already made a sound (a word, the chime, a sound on the
  * results screen) or one is still playing, nor while the microphone is in use,
  * where it would be recorded.
@@ -239,8 +239,40 @@ export function tick(): void {
   // A word or the chime takes the shared context inside the press, and a reference sound or slice too.
   if (audioBusy(250) || speaking()) return;
   const ctx = audioContext();
-  tickBuffer = tickBuffer?.sampleRate === ctx.sampleRate ? tickBuffer : bell(ctx, 0.12, [{ at: 0, freq: 1320, level: 0.05, decay: 0.03 }]);
-  playBuffer(tickBuffer);
+  if (tickBuffer?.sampleRate !== ctx.sampleRate) {
+    const samples = thockSamples(ctx.sampleRate);
+    tickBuffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+    tickBuffer.getChannelData(0).set(samples);
+  }
+  playBuffer(tickBuffer, 1, 0, false);
+}
+
+/**
+ * The tap sound: a short, low, muted thock, like a chunky key going down, to
+ * suit the big outlined buttons. A pitch that drops fast gives the knock, a
+ * woody overtone its body, and a little dull noise the moment of contact.
+ * Pitched where a phone's speaker still plays it (around 200–400 Hz).
+ */
+export function thockSamples(rate: number): Float32Array {
+  const data = new Float32Array(Math.round(rate * 0.08));
+  // The same noise every time, so every press sounds alike.
+  let seed = 1;
+  let noise = 0;
+  let phase = 0;
+  for (let i = 0; i < data.length; i++) {
+    const t = i / rate;
+    const freq = 190 + 230 * Math.exp(-t / 0.01);
+    phase += (2 * Math.PI * freq) / rate;
+    const body = Math.exp(-t / 0.018) * (Math.sin(phase) + 0.35 * Math.sin(2.4 * phase) * Math.exp(-t / 0.006));
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    // Low-passed, so it thuds rather than hisses.
+    noise += 0.2 * ((seed / 2 ** 32) * 2 - 1 - noise);
+    const contact = noise * Math.exp(-t / 0.004);
+    // A millisecond's rise and a last few ms' fall, so it neither clicks on nor off.
+    const edges = Math.min(1, t / 0.001) * Math.min(1, (data.length - i) / (rate * 0.004));
+    data[i] = 0.15 * edges * (body + 0.8 * contact);
+  }
+  return data;
 }
 
 /** Tick for every button pressed under `root`, except those marked `data-no-tap` (ones that open the microphone). */

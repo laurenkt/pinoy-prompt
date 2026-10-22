@@ -146,8 +146,12 @@ export interface Sound {
   stop(): void;
 }
 
-/** Play a buffer now, or no earlier than `at` (context time), with short fades. */
-export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0): Sound {
+/**
+ * Play a buffer now, or no earlier than `at` (context time), with short fades.
+ * A sound made in code already starts and ends at silence, so `fades` can be
+ * turned off to keep its attack sharp.
+ */
+export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0, fades = true): Sound {
   const ctx = audioContext();
   const source = ctx.createBufferSource();
   const gain = ctx.createGain();
@@ -157,10 +161,12 @@ export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0): Sound {
   // A few ms ahead, so the fade-in is scheduled before the first sample.
   const t0 = Math.max(ctx.currentTime + 0.005, at);
   const length = buffer.duration / rate;
-  gain.gain.setValueAtTime(0, t0);
-  gain.gain.linearRampToValueAtTime(1, t0 + Math.min(FADE, length / 4));
-  gain.gain.setValueAtTime(1, t0 + Math.max(length - FADE, length * 0.75));
-  gain.gain.linearRampToValueAtTime(0, t0 + length);
+  if (fades) {
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(1, t0 + Math.min(FADE, length / 4));
+    gain.gain.setValueAtTime(1, t0 + Math.max(length - FADE, length * 0.75));
+    gain.gain.linearRampToValueAtTime(0, t0 + length);
+  }
   source.start(t0);
   let finish = () => {};
   const done = new Promise<void>((resolve) => (finish = resolve));
