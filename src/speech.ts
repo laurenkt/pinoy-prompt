@@ -1,7 +1,7 @@
-// Audio for cards. A recorded clip is used when there is one (card.audio, or
-// the clip made for that text, listed in clips.json); it plays through the
-// app's one AudioContext, which starts it at once. Otherwise the browser's
-// built-in speech voice reads the Tagalog text.
+// Audio for cards. Each text has a recorded clip, listed in clips.json (made
+// by scripts/generate-audio.mjs); it plays through the app's one AudioContext,
+// which starts it at once. If a clip can't play, the browser's built-in speech
+// voice reads the Tagalog text instead.
 //
 // Not every device has a Filipino voice. When it doesn't, we fall back to a
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
@@ -69,15 +69,22 @@ export function voiceQuality(): VoiceQuality {
 const CLIPS: Record<string, string> = clips;
 
 /** The clip for this text, if there is one. */
-export function clipUrl(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): string | null {
-  const base = `${import.meta.env.BASE_URL}audio/`;
-  if (card.audio) return base + card.audio;
+export function clipUrl(card: Pick<Card, 'tl' | 'say'>, slow = false): string | null {
   const name = CLIPS[card.say ?? card.tl];
-  return name ? `${base}${name}${slow ? '-slow' : ''}.mp3` : null;
+  return name ? clipFile(name, slow) : null;
+}
+
+function clipFile(name: string, slow: boolean): string {
+  return `${import.meta.env.BASE_URL}audio/${name}${slow ? '-slow' : ''}.mp3`;
+}
+
+/** Every clip file, to keep offline. */
+export function allClipUrls(): string[] {
+  return Object.values(CLIPS).flatMap((name) => [clipFile(name, false), clipFile(name, true)]);
 }
 
 /** Load a word's clip ahead, so a tap only has to start it. Plays nothing. */
-export function preload(card: Pick<Card, 'tl' | 'audio' | 'say'>): void {
+export function preload(card: Pick<Card, 'tl' | 'say'>): void {
   const url = !muted && clipsSupported() ? clipUrl(card) : null;
   if (url) void loadClip(url).catch(() => {});
 }
@@ -166,7 +173,7 @@ function holdMediaSession(): void {
 }
 
 /** Play a card, or any Tagalog text (an example sentence) given as `{ tl }`. */
-export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = false): Promise<void> {
+export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promise<void> {
   stop();
   started = new Promise((resolve) => (reportStart = resolve));
   const report = reportStart;
@@ -189,8 +196,7 @@ export async function play(card: Pick<Card, 'tl' | 'audio' | 'say'>, slow = fals
       // A context iOS won't start (outside a tap) plays nothing, so the voice reads it instead.
       if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
       if (mine !== generation) return;
-      // A slow clip is said slowly already; a card's own clip is slowed down instead.
-      const sound = (currentClip = playBuffer(buffer, slow && card.audio ? 0.75 : 1));
+      const sound = (currentClip = playBuffer(buffer));
       void sound.done.then(() => {
         if (currentClip !== sound) return;
         currentClip = null;

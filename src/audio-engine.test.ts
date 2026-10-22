@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
 const { KEEP_DECODED, loadClip } = await import('./audio-engine');
-const { clipUrl, lastStartDelay, play, preload, speaking, stop } = await import('./speech');
+const { canPlay, clipUrl, lastStartDelay, play, preload, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
   playbackRate: { value: number };
@@ -103,7 +103,6 @@ describe('clips', () => {
     expect(clipUrl({ tl: 'Salamat' })).toMatch(/audio\/salamat-1a2b\.mp3$/);
     expect(clipUrl({ tl: 'Salamat' }, true)).toMatch(/audio\/salamat-1a2b-slow\.mp3$/);
     expect(clipUrl({ tl: 'Hindi' })).toBeNull();
-    expect(clipUrl({ tl: 'Hindi', audio: 'hindi.mp3' })).toMatch(/audio\/hindi\.mp3$/);
   });
 
   it("plays a word's clip through the one shared context instead of the built-in voice", async () => {
@@ -208,6 +207,14 @@ describe('clips', () => {
     await play({ tl: 'Salamat' });
     expect(withMic.closed).toBe(true);
     expect(contexts.at(-1)).not.toBe(withMic);
+  });
+
+  it('counts words as playable from clips alone, and says a recorded voice reads them', () => {
+    expect(canPlay()).toBe(true);
+    expect(voiceQuality()).toBe('recorded');
+    vi.stubGlobal('AudioContext', undefined);
+    expect(canPlay()).toBe(false);
+    expect(voiceQuality()).toBe('none');
   });
 
   it('uses the older webkitAudioContext where that is all there is', async () => {

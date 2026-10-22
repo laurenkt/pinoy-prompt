@@ -10,25 +10,27 @@
 // the first few, for trying a change out. Needs ffmpeg.
 //
 // Each text gets two clips in public/audio/: `<name>.mp3` at a natural pace and
-// `<name>-slow.mp3`, the same take slowed down, listed in src/clips.json by text (what play()
-// looks up) and in public/audio/files.json (what the service worker keeps offline).
-// Every take is transcribed back and compared with its text; a take that
-// doesn't match is made again, up to three times, and any still unsure are
-// listed at the end to be checked by ear.
+// `<name>-slow.mp3`, the same take slowed down, listed in src/clips.json by
+// text (what play() looks up, and what the app keeps offline). A name ends in
+// a hash of the sound, so a remade take gets a new name and phones that kept
+// the old one fetch it again. Every take is transcribed back and compared with
+// its text; a take that doesn't match is made again, up to three times, and
+// any still unsure are listed at the end to be checked by ear. A remade take
+// that never matches leaves the old clip as it was.
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createServer } from 'vite';
 
 const run = promisify(execFile);
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const AUDIO_DIR = join(ROOT, 'public/audio');
 const MANIFEST = join(ROOT, 'src/clips.json');
-const FILES = join(AUDIO_DIR, 'files.json');
 
 const MODEL = 'gpt-4o-mini-tts';
 const VOICE = 'coral';
@@ -55,16 +57,16 @@ async function spokenTexts() {
   }
 }
 
-/** A readable, stable file name: the text's first letters and a hash of the whole text. */
-function clipName(text) {
+/** A readable file name: the text's first letters, and a hash of the take so a new take gets a new name. */
+function clipName(text, take) {
   const slug = text
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 32);
-  return `${slug || 'clip'}-${createHash('sha1').update(text).digest('hex').slice(0, 8)}`;
+  return `${slug || 'clip'}-${createHash('sha1').update(take).digest('hex').slice(0, 8)}`;
 }
 
 async function api(path, init) {
@@ -99,7 +101,7 @@ async function transcribe(wav) {
   return (await response.json()).text;
 }
 
-/** Trim the silence at each end, even out loudness, and save as mono MP3: once as said, and once slowed down. */
+/** Trim the silence at each end, even out loudness, and save as mono MP3 in `work`: once as said, and once slowed down. */
 async function encode(wav, name, work) {
   const input = join(work, `${name}.wav`);
   await writeFile(input, wav);
@@ -109,7 +111,7 @@ async function encode(wav, name, work) {
   // every browser decodes it (open-source Chromium builds can't decode AAC).
   const mp3 = ['-ar', '24000', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '32k'];
   for (const [suffix, tempo] of [['', ''], ['-slow', `,atempo=${SLOW_TEMPO}`]]) {
-    await run('ffmpeg', ['-v', 'error', '-y', '-i', input, '-af', `${clean}${tempo},apad=pad_dur=0.05`, ...mp3, join(AUDIO_DIR, `${name}${suffix}.mp3`)]);
+    await run('ffmpeg', ['-v', 'error', '-y', '-i', input, '-af', `${clean}${tempo},apad=pad_dur=0.05`, ...mp3, join(work, `${name}${suffix}.mp3`)]);
   }
   await rm(input);
 }
@@ -145,13 +147,26 @@ function heardRight(text, heard) {
   return distance(want, words(heard)) <= Math.max(1, Math.floor(want.length / 12));
 }
 
-async function makeClip(text, name, work, unsure) {
+/** Make a text's clips, returning their name, or null if no take sounded right and there's already a clip to keep. */
+async function makeClip(text, work, unsure, keepOld) {
   for (let attempt = 1; ; attempt++) {
     const take = await speak(text, NATURAL);
-    await encode(take, name, work);
-    const heard = await transcribe(take).catch((error) => `(couldn't transcribe: ${error.message.split('\n')[0]})`);
-    if (heardRight(text, heard)) return;
-    if (attempt === ATTEMPTS) return unsure.push({ text, file: `${name}.mp3`, heard });
+    const draft = `take-${createHash('sha1').update(take).digest('hex')}`;
+    await encode(take, draft, work);
+    let heard;
+    try {
+      heard = await transcribe(take);
+    } catch (error) {
+      // Not worth paying for more takes when the check itself failed.
+      heard = `(couldn't transcribe: ${error.message.split('\n')[0]})`;
+    }
+    const right = heard.startsWith('(') || heardRight(text, heard);
+    if (!right && attempt < ATTEMPTS) continue;
+    if (!right || heard.startsWith('(')) unsure.push({ text, heard, kept: !right && keepOld });
+    if (!right && keepOld) return null;
+    const name = clipName(text, await readFile(join(work, `${draft}.mp3`)));
+    for (const suffix of ['', '-slow']) await rename(join(work, `${draft}${suffix}.mp3`), join(AUDIO_DIR, `${name}${suffix}.mp3`));
+    return name;
   }
 }
 
@@ -174,9 +189,9 @@ function save(prune = false) {
 async function write(prune) {
   const kept = Object.fromEntries(texts.filter((t) => manifest[t]).map((t) => [t, manifest[t]]));
   await writeFile(MANIFEST, `${JSON.stringify(kept, null, 2)}\n`);
-  const files = Object.values(kept).flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
-  await writeFile(FILES, `${JSON.stringify(files, null, 2)}\n`);
   if (!prune) return;
+  // Every clip here is one this script made, so one no longer listed can go.
+  const files = Object.values(kept).flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
   for (const file of await readdir(AUDIO_DIR)) {
     if (file.endsWith('.mp3') && !files.includes(file)) await rm(join(AUDIO_DIR, file));
   }
@@ -188,9 +203,8 @@ const queue = [...todo];
 await Promise.all(
   Array.from({ length: PARALLEL }, async () => {
     for (let text; (text = queue.shift()) !== undefined; ) {
-      const name = clipName(text);
-      await makeClip(text, name, work, unsure);
-      manifest[text] = name;
+      const name = await makeClip(text, work, unsure, !!manifest[text]);
+      if (name) manifest[text] = name;
       await save();
       console.log(`${++done}/${todo.length} ${text}`);
     }
@@ -200,6 +214,6 @@ await rm(work, { recursive: true });
 await save(true);
 
 if (unsure.length) {
-  console.log(`\nThese takes didn't transcribe back to their text after ${ATTEMPTS} tries. Listen to them, and --redo any that sound wrong:`);
-  for (const u of unsure) console.log(`  ${u.file}: "${u.text}" heard as "${u.heard}"`);
+  console.log(`\nThese didn't transcribe back to their text. Listen to them, and --redo any that sound wrong:`);
+  for (const u of unsure) console.log(`  "${u.text}" heard as "${u.heard}"${u.kept ? ', so the old clip was kept' : ''}`);
 }

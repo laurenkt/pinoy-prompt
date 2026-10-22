@@ -1,16 +1,16 @@
-// Every piece of Tagalog the app can say has its recorded clip, and the service worker keeps them all offline.
+// Every piece of Tagalog the app can say has its recorded clip, and every clip listed is there to keep offline.
 
 import { describe, expect, it } from 'vitest';
-import files from '../public/audio/files.json';
 import clips from './clips.json';
 import { VOCAB } from './deck';
 import { GUIDES } from './guides';
 import { drillSentence } from './session';
+import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
 
 const CLIPS: Record<string, string> = clips;
 /** The clip files in public/audio, by name. */
-const onDisk = new Set(Object.keys(import.meta.glob('../public/audio/*.mp3')).map((path) => path.split('/').pop()));
+const onDisk = new Set(Object.keys(import.meta.glob('../public/audio/*')).map((path) => path.split('/').pop()));
 
 describe('recorded clips', () => {
   it('lists every card, guide example and drill sentence', () => {
@@ -31,9 +31,9 @@ describe('recorded clips', () => {
     expect(Object.keys(CLIPS).filter((t) => !spoken.has(t))).toEqual([]);
   });
 
-  it('has both files of every clip, and lists them for the service worker', () => {
-    const expected = Object.values(CLIPS).flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
-    expect([...files].sort()).toEqual(expected.sort());
+  it('has both files of every clip, and nothing else, so all of them can be kept offline', () => {
+    const files = allClipUrls().map((url) => url.split('/').pop());
+    expect(files).toHaveLength(2 * Object.keys(CLIPS).length);
     expect(files.filter((f) => !onDisk.has(f))).toEqual([]);
     expect(onDisk.size).toBe(files.length);
   });
