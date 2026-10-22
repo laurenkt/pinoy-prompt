@@ -2,7 +2,7 @@
 // Nothing here is stored: it is all derived from saved progress, so it is
 // right for progress saved by any earlier version of the app too.
 
-import { getCard, isVocab } from './deck';
+import { ALL_CARDS, getCard, isVocab, type Card } from './deck';
 import { DAY_MS, startOfDayAfter, type CardState } from './srs';
 import { dayKey, type Progress } from './progress-schema';
 
@@ -230,6 +230,27 @@ export const MILESTONES: { words: number; label: string }[] = [
   { words: 4000, label: 'Talk about most things' },
 ];
 
+/**
+ * Cards the deck spends on each Tagalog word it teaches, so the milestones can
+ * be counted in cards like the rest of the chart. A phrase teaches several
+ * words but repeats many met before, and guides (patterns, sounds) teach none.
+ * Each spelling counts as a word, so "maganda" and "magandang" are two: rough,
+ * like the milestones themselves.
+ */
+export function cardsPerWord(cards: readonly Card[] = ALL_CARDS): number {
+  const words = new Set(cards.filter(isVocab).flatMap((c) => c.tl.toLowerCase().match(/\p{L}[\p{L}'-]*/gu) ?? []));
+  return words.size ? cards.length / words.size : 1;
+}
+
+/** Worked out once: the deck only changes with the app. */
+const CARDS_PER_WORD = cardsPerWord();
+
+/** A milestone's words as cards, rounded so it doesn't read as exact. */
+function inCards(words: number, perWord: number): number {
+  const step = words >= 100 ? 50 : 1;
+  return Math.round((words * perWord) / step) * step;
+}
+
 /** How far back the pace looks. */
 export const PACE_DAYS = 28;
 /** Less learning than this to look back on, and the pace is only an early guess. */
@@ -238,20 +259,20 @@ export const MIN_PACE_DAYS = 14;
 const MAX_FORECAST_YEARS = 20;
 
 export interface Forecast {
-  /** Words and phrases that have stuck: they hold for a week or more (early on, every word met). */
+  /** Cards that have stuck: they hold for a week or more (early on, every card met). */
   known: number;
-  /** Net words stuck per day over the days looked back on; null with too little to go on. */
+  /** Net cards stuck per day over the days looked back on; null with too little to go on. */
   perDay: number | null;
   /**
-   * Under MIN_PACE_DAYS of learning, too few words have had a week to stick,
-   * so an early guess counts every word met instead. It runs ahead of the real
-   * pace, as some of those words will slip.
+   * Under MIN_PACE_DAYS of learning, too few cards have had a week to stick,
+   * so an early guess counts every card met instead. It runs ahead of the real
+   * pace, as some of those cards will slip.
    */
   early: boolean;
   /** Days the pace was measured over. */
   days: number;
-  /** When each milestone might be reached: 'reached', a time, null if not at this pace. */
-  milestones: { words: number; label: string; at: 'reached' | number | null }[];
+  /** When each milestone, in cards, might be reached: 'reached', a time, null if not at this pace. */
+  milestones: { cards: number; label: string; at: 'reached' | number | null }[];
   /** The curve the dates come from; null with no pace to go on. */
   curve: LearningCurve | null;
 }
@@ -305,17 +326,15 @@ export function fitPower(points: [number, number][]): number | null {
 /**
  * When the learner might reach each milestone, if their learning carries on
  * the way it has gone: from today's count at the pace of the last few weeks,
- * bending as their words met over time have (eased off, or steady). It counts
- * words that have stuck, not words met, so it follows what has actually been
- * learned, and a word that slips back counts against it. In the first two weeks it is an early guess (see
+ * bending as their cards met over time have (eased off, or steady). It counts
+ * cards, like the chart, each milestone's words turned into cards by
+ * `perWord`; and cards that have stuck, not cards met, so it follows what has
+ * actually been learned, and a card that slips back counts against it. In the first two weeks it is an early guess (see
  * `early`). With no growth over the last few weeks, there are no dates.
  */
-export function forecast(progress: Progress, now: number, milestones = MILESTONES): Forecast {
+export function forecast(progress: Progress, now: number, milestones = MILESTONES, perWord = CARDS_PER_WORD): Forecast {
   const steps = Object.entries(progress.cards)
-    .filter(([id]) => {
-      const card = getCard(id);
-      return card && isVocab(card);
-    })
+    .filter(([id]) => getCard(id))
     .map(([, card]) => strengthSteps(card, now));
   const since = Math.max(EARLIEST, Math.min(now, ...steps.map((s) => s[0][0])));
   const days = Math.min(PACE_DAYS, (now - since) / DAY_MS);
@@ -350,10 +369,11 @@ export function forecast(progress: Progress, now: number, milestones = MILESTONE
     curve = { now, days: span, known, perDay, power: fitPower(points) ?? 1 };
   }
   const ahead = milestones.map(({ words, label }) => {
-    if (known >= words) return { words, label, at: 'reached' as const };
-    if (!curve) return { words, label, at: null };
-    const at = Math.max(now, curveReaches(curve, words));
-    return { words, label, at: at - now > MAX_FORECAST_YEARS * 365 * DAY_MS ? null : at };
+    const cards = inCards(words, perWord);
+    if (known >= cards) return { cards, label, at: 'reached' as const };
+    if (!curve) return { cards, label, at: null };
+    const at = Math.max(now, curveReaches(curve, cards));
+    return { cards, label, at: at - now > MAX_FORECAST_YEARS * 365 * DAY_MS ? null : at };
   });
   return { known, perDay, early, days, milestones: ahead, curve };
 }

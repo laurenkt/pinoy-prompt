@@ -97,7 +97,7 @@ export function projected(forecast: Forecast, at: number, now: number, u: number
 }
 
 /** The milestone the projection runs to: the next one with a date, if any. */
-export function nextMilestone(forecast: Forecast | undefined): { words: number; label: string; at: number } | null {
+export function nextMilestone(forecast: Forecast | undefined): { cards: number; label: string; at: number } | null {
   const next = forecast?.milestones.find((m) => m.at !== 'reached');
   return next && typeof next.at === 'number' ? { ...next, at: next.at } : null;
 }
@@ -114,7 +114,7 @@ export function forecastView(forecast: Forecast): HTMLElement {
         h(
           'li',
           null,
-          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.words.toLocaleString()} words`)),
+          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.cards.toLocaleString()} cards`)),
           h('strong', null, m.at === 'reached' ? 'Reached' : m.at === null ? '–' : `~${monthYear(m.at)}`),
         ),
       ),
@@ -157,7 +157,7 @@ export function growthChart(
     preserveAspectRatio: 'none',
     class: 'growth-svg',
     role: 'img',
-    'aria-label': `Words by strength over time: ${total(0)} on ${shortDate(times[0])}, ${total(last)} today.`,
+    'aria-label': `Cards by strength over time: ${total(0)} on ${shortDate(times[0])}, ${total(last)} today.`,
   });
   const backXs = [...xs].reverse();
   LAYERS.forEach((id, k) => {
@@ -182,7 +182,8 @@ export function growthChart(
     // The stream carries on as a hatched area, rising along the learner's curve from today towards the
     // milestone in the corner under its tag (its date on the axis), with the same outline dashed. The
     // milestone is off this scale, so it shows the direction and the tag the numbers.
-    const from = yOf(tops[tops.length - 1][last]);
+    // From today's cards that have stuck (the top of the firm layers), which the forecast counts.
+    const from = yOf(forecast!.known);
     const steps = Array.from({ length: 25 }, (_, i) => i / 24);
     const aheadXs = steps.map((u) => xs[last] + u * (W - xs[last]));
     const aheadYs = steps.map((u) => from + (8 - from) * projected(forecast!, next.at, times[last], u));
@@ -248,11 +249,11 @@ export function growthChart(
   /** A point `u` of the way from today to the next milestone, read off the projection. */
   function showAhead(u: number): void {
     if (!next) return;
-    // From where the drawn projection starts, today's top of the stream.
-    const from = total(last);
-    value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.words - from))}`;
+    // From where the drawn projection starts: today's cards that have stuck.
+    const from = forecast!.known;
+    value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.cards - from))}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][last]);
-    when.textContent = ` words by ${monthYear(times[last] + u * (next.at - times[last]))}`;
+    when.textContent = ` cards by ${monthYear(times[last] + u * (next.at - times[last]))}`;
     lookAt(false, past + u * (1 - past));
   }
 

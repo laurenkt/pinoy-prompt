@@ -87,8 +87,8 @@ describe('forecast', () => {
     days: 28,
     curve: null,
     milestones: [
-      { words: 5, label: 'First', at: 'reached' },
-      { words: 500, label: 'Second', at },
+      { cards: 5, label: 'First', at: 'reached' },
+      { cards: 500, label: 'Second', at },
     ],
   });
 
@@ -115,7 +115,7 @@ describe('forecast', () => {
     // Halfway from today (at 70%) to the milestone: halfway from 10 words to 500.
     tap(frame, 20);
     tap(frame, 255);
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 words by \w+ \d{4}/);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 cards by \w+ \d{4}/);
     // The legend is back on today, not the day looked at before.
     expect(counts.weeks.textContent).toBe('10');
     expect(el.querySelector<HTMLElement>('.growth-marker')!.style.left).toBe('85%');
@@ -125,6 +125,16 @@ describe('forecast', () => {
     expect(el.querySelector<HTMLElement>('.growth-forecast')!.hidden).toBe(false);
     expect(el.querySelector<HTMLElement>('.growth-goal')!.hidden).toBe(false);
     expect(el.querySelector<HTMLElement>('.growth-back')!.hidden).toBe(false);
+  });
+
+  it('starts the projection from the cards that have stuck, the count the forecast runs on', () => {
+    // 10 cards today, 4 of them only days old: 6 have stuck.
+    const met = { ...history, counts: { new: [0, 0], days: [0, 4], weeks: [0, 6], long: [0, 0] } };
+    const el = growthChart(met, legend(), { ...ahead(0.5, now + 400 * DAY_MS), known: 6 });
+    const frame = el.querySelector<HTMLElement>('.growth-frame')!;
+    frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
+    tap(frame, 210.3);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~[6-8] cards by /);
   });
 
   it("opens the list from the level's label without looking along the chart", () => {
