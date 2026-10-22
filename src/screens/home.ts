@@ -11,7 +11,7 @@ import {
   type Strength,
 } from '../memory';
 import { MAX_LEARNING, learningCount, newCardsLeftToday, studyQueue, upcomingNewCards } from '../session';
-import { h, icon } from '../ui';
+import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
 import { quietToggle } from './quiet';
 
@@ -49,7 +49,7 @@ export function homeScreen(app: App): HTMLElement {
       h(
         'div',
         { class: 'home-actions' },
-        h('button', { class: 'icon-btn', 'aria-label': 'Settings', onclick: () => app.navigate({ name: 'settings' }) }, icon('settings')),
+        settingsToggle(app, false),
         quietSwitch(app),
       ),
     ),
@@ -75,7 +75,7 @@ export function homeScreen(app: App): HTMLElement {
 
 /** The quiet toggle, redrawn in place so the page doesn't jump. */
 function quietSwitch(app: App): HTMLElement {
-  const el: HTMLElement = quietToggle(app, () => el.replaceWith(quietSwitch(app)), { iconOnly: true });
+  const el: HTMLElement = quietToggle(app, () => el.replaceWith(quietSwitch(app)));
   return el;
 }
 

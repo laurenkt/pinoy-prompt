@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import type { Settings } from '../store';
 import { setMuted, setTapSounds } from '../speech';
-import { h, icon, type IconName } from '../ui';
+import { iconButton, type IconName } from '../ui';
 
 /**
  * Quiet mode, for the tube or anywhere speaking out loud won't do. It has two
@@ -13,9 +13,9 @@ import { h, icon, type IconName } from '../ui';
 type Mode = 'off' | 'silent' | 'headphones';
 
 const MODES: Record<Mode, { icon: IconName; label: string; title: string; next: Mode }> = {
-  off: { icon: 'mic', label: 'Quiet', title: 'Quiet mode is off. Tap for silent: no sound and no speaking.', next: 'silent' },
-  silent: { icon: 'quiet', label: 'Silent', title: 'Silent: no sound and no speaking. Tap if your headphones are in.', next: 'headphones' },
-  headphones: { icon: 'headphones', label: 'Quiet', title: 'Quiet with headphones: listening, but no speaking. Tap to turn quiet mode off.', next: 'off' },
+  off: { icon: 'mic', label: 'Quiet mode: off', title: 'Quiet mode is off. Tap for silent: no sound and no speaking.', next: 'silent' },
+  silent: { icon: 'quiet', label: 'Quiet mode: silent', title: 'Silent: no sound and no speaking. Tap if your headphones are in.', next: 'headphones' },
+  headphones: { icon: 'headphones', label: 'Quiet mode: headphones in', title: 'Quiet with headphones: listening, but no speaking. Tap to turn quiet mode off.', next: 'off' },
 };
 
 function mode(settings: Settings): Mode {
@@ -36,29 +36,23 @@ export function applyAudioMode(settings: Settings): void {
   document.documentElement.classList.toggle('silent', silent);
 }
 
-/** One button that steps through off, silent, and quiet with headphones. */
-export function quietToggle(app: App, onChange: () => void, { iconOnly = false } = {}): HTMLButtonElement {
+/** One button that steps through off, silent, and quiet with headphones: the same icon toggle on every screen. */
+export function quietToggle(app: App, onChange: () => void): HTMLButtonElement {
   const settings = app.progress.settings;
   const current = MODES[mode(settings)];
-  return h(
-    'button',
-    {
-      // Icon only, it matches the icon buttons beside it; otherwise it's a labelled pill.
-      class: `${iconOnly ? 'icon-btn quiet-icon' : 'quiet-toggle'}${settings.quiet ? ' on' : ''}`,
-      'aria-label': `Quiet mode: ${mode(settings) === 'off' ? 'off' : mode(settings) === 'silent' ? 'silent' : 'headphones in'}`,
-      title: current.title,
-      onclick: () => {
-        // Another tab's save may have replaced the settings object since this was drawn.
-        const settings = app.progress.settings;
-        const next = current.next;
-        settings.quiet = next !== 'off';
-        settings.headphones = next === 'headphones';
-        app.commit();
-        applyAudioMode(settings);
-        onChange();
-      },
+  return iconButton(
+    current.icon,
+    current.label,
+    () => {
+      // Another tab's save may have replaced the settings object since this was drawn.
+      const settings = app.progress.settings;
+      const next = current.next;
+      settings.quiet = next !== 'off';
+      settings.headphones = next === 'headphones';
+      app.commit();
+      applyAudioMode(settings);
+      onChange();
     },
-    icon(current.icon),
-    !iconOnly && h('span', null, current.label),
+    { pressed: settings.quiet, title: current.title },
   );
 }

@@ -35,6 +35,22 @@ describe('page and session layouts', () => {
     expect(app.navigate).toHaveBeenCalledWith({ name: 'home' });
   });
 
+  it("keeps Home's settings button on Settings, pressed, so a second tap closes it", () => {
+    const app = fakeApp(KNOWN);
+    const home = homeScreen(app);
+    const settings = settingsScreen(app);
+    const gear = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.icon-btn[aria-label="Settings"]')!;
+    expect(gear(home).getAttribute('aria-pressed')).toBe('false');
+    expect(gear(settings).getAttribute('aria-pressed')).toBe('true');
+    // At the top right of both: last in the top row, after the back arrow on Settings.
+    expect(gear(settings).parentElement?.classList.contains('back-bar')).toBe(true);
+    expect(gear(settings).parentElement?.lastElementChild).toBe(gear(settings));
+    gear(home).click();
+    expect(app.navigate).toHaveBeenLastCalledWith({ name: 'settings' });
+    gear(settings).click();
+    expect(app.navigate).toHaveBeenLastCalledWith({ name: 'home' });
+  });
+
   it('keeps the way back on Drills before there are enough words to drill', () => {
     const root = practiceScreen(fakeApp(['salamat']));
     expect(root.textContent).toContain('Learn at least');
