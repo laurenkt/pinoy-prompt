@@ -23,6 +23,8 @@ function fakeCall(response: Response = new Response(JSON.stringify({ session: { 
   const peer = {
     closed: false,
     ontrack: null as ((e: { streams: MediaStream[]; track: MediaStreamTrack }) => void) | null,
+    onconnectionstatechange: null as (() => void) | null,
+    connectionState: 'connected',
     addTrack() {},
     createDataChannel() {
       channel = { onmessage: null, readyState: 'open', send() {} };
@@ -36,9 +38,11 @@ function fakeCall(response: Response = new Response(JSON.stringify({ session: { 
     },
   };
   const track = { enabled: true, stop() {} };
-  const visual = { shown: [] as string[], muted: false, stopped: false };
+  const visual = { shown: [] as string[], phase: 'waiting', muted: false, stopped: false };
   const visualizer = () => ({
     listen: (who: string) => void visual.shown.push(who),
+    connected: () => void (visual.phase = 'live'),
+    ended: () => void (visual.phase = 'dead'),
     setMuted: (m: boolean) => void (visual.muted = m),
     stop: () => void (visual.stopped = true),
   });
@@ -243,7 +247,7 @@ describe('Talk', () => {
     expect(transcript(root)).toEqual(['Kumusta! Salamat.']);
   });
 
-  it('shows both voices moving while the call is on, and stops when it ends', async () => {
+  it('shows both voices moving while the call is on, and powers the backdrop down when it ends', async () => {
     setApiKey(KEY);
     const f = fakeCall();
     const root = talkScreen(fakeApp(), f.deps);
@@ -256,16 +260,61 @@ describe('Talk', () => {
     button(root, 'Mute').click();
     expect(f.visual.muted).toBe(true);
     button(root, 'End call').click();
+    expect(f.visual.phase).toBe('dead');
+    expect(f.visual.stopped).toBe(false);
+    expect(root.querySelector('canvas.talk-backdrop')).not.toBeNull();
+    button(root, 'Change topic').click();
     expect(f.visual.stopped).toBe(true);
     expect(root.querySelector('canvas.talk-backdrop')).toBeNull();
   });
 
-  it('stops the visual when a call fails to start, or on leaving', async () => {
+  it('keeps the backdrop dormant until the call is connected and listening', async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    const root = talkScreen(fakeApp(), f.deps);
+    button(root, 'Start talking').click();
+    await flush();
+    // The microphone is attached by now, but OpenAI hasn't said the session is listening.
+    expect(f.visual.shown).toEqual(['you']);
+    expect(f.visual.phase).toBe('waiting');
+    expect(button(root, 'Mute').disabled).toBe(true);
+    f.send({ type: 'session.started' });
+    expect(f.visual.phase).toBe('live');
+    expect(button(root, 'Mute').disabled).toBe(false);
+  });
+
+  it('comes alive on the first words if they arrive before OpenAI says it has started', async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    talkScreen(fakeApp(), f.deps, true);
+    await flush();
+    f.say('ai', 'Kumusta!');
+    expect(f.visual.phase).toBe('live');
+  });
+
+  it('collapses the backdrop when the call drops, and keeps it dark behind the error', async () => {
+    setApiKey(KEY);
+    const f = fakeCall();
+    const root = talkScreen(fakeApp(), f.deps);
+    button(root, 'Start talking').click();
+    await flush();
+    f.send({ type: 'session.started' });
+    f.peer.connectionState = 'failed';
+    f.peer.onconnectionstatechange!();
+    expect(f.visual.phase).toBe('dead');
+    expect(f.visual.stopped).toBe(false);
+    expect(root.querySelector('canvas.talk-backdrop')).not.toBeNull();
+    expect(root.querySelector('[role="alert"]')!.textContent).toContain("Couldn't reach OpenAI");
+  });
+
+  it('collapses the backdrop when a call fails to start, and stops it on leaving', async () => {
     setApiKey(KEY);
     const failed = fakeCall(new Response('{}', { status: 401 }));
     let root = talkScreen(fakeApp(), failed.deps);
     button(root, 'Start talking').click();
     await flush();
+    expect(failed.visual.phase).toBe('dead');
+    root.querySelector<HTMLButtonElement>('[aria-label="Leave Chat"]')!.click();
     expect(failed.visual.stopped).toBe(true);
     const left = fakeCall();
     root = talkScreen(fakeApp(), left.deps);
@@ -293,6 +342,44 @@ describe('Talk', () => {
     log.scrollTop = 0;
     f.say('you', ' Ikaw?');
     expect(log.scrollTop).toBe(0);
+  });
+
+  it('gives up a call still connecting as soon as the screen is left, by any route', async () => {
+    setApiKey(KEY);
+    let answer: (r: Response) => void = () => {};
+    const f = fakeCall();
+    f.deps.call.fetch = (() => new Promise<Response>((resolve) => (answer = resolve))) as typeof fetch;
+    talkScreen(fakeApp(), f.deps, true);
+    await flush();
+    // The back gesture goes Home through app.navigate, which hangs up.
+    hangUpTalk();
+    expect(f.peer.closed).toBe(true);
+    expect(f.visual.stopped).toBe(true);
+    // OpenAI answering late doesn't bring the old call back.
+    answer(new Response(JSON.stringify({ transport: { type: 'webrtc', sdp: 'answer' } }), { status: 201 }));
+    await flush();
+    const next = fakeCall();
+    const root = talkScreen(fakeApp(), next.deps, true);
+    await flush();
+    next.send({ type: 'session.started' });
+    expect(root.textContent).toContain('Listening');
+    expect(next.visual.phase).toBe('live');
+  });
+
+  it('says once why a call dropped while it was still connecting', async () => {
+    setApiKey(KEY);
+    let answer: (r: Response) => void = () => {};
+    const f = fakeCall();
+    f.deps.call.fetch = (() => new Promise<Response>((resolve) => (answer = resolve))) as typeof fetch;
+    const root = talkScreen(fakeApp(), f.deps, true);
+    await flush();
+    f.peer.connectionState = 'failed';
+    f.peer.onconnectionstatechange!();
+    answer(new Response(JSON.stringify({ transport: { type: 'webrtc', sdp: 'answer' } }), { status: 201 }));
+    await flush();
+    expect(f.visual.phase).toBe('dead');
+    expect(root.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(root.querySelector('[role="alert"]')!.textContent).toContain("Couldn't reach OpenAI");
   });
 
   it("explains when the browser can't make calls", () => {

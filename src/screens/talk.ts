@@ -18,14 +18,30 @@ const MIN_WORDS = 4;
 
 let activeCall: Call | null = null;
 let activeVisual: Visualizer | null = null;
+/** Gives up the call still connecting, if there is one. */
+let connecting: AbortController | null = null;
 /** Bumped whenever a call is started or abandoned, so a call still connecting can tell it's no longer wanted. */
 let generation = 0;
 
-/** End a spoken conversation that's going or still connecting, as when leaving the screen. */
-export function hangUpTalk(): void {
+/**
+ * End a call that's going or still connecting, leaving the backdrop to power down behind the screen.
+ * One still connecting is given up at once, so nothing of it lingers to get in the way of the next.
+ */
+function endCall(): void {
   generation++;
+  connecting?.abort();
+  connecting = null;
   activeCall?.hangUp();
   activeCall = null;
+  activeVisual?.ended();
+}
+
+/**
+ * End a spoken conversation that's going or still connecting, and its backdrop. Leaving the screen by
+ * any route (its close button, the back gesture, anything else) comes here through `app.navigate`.
+ */
+export function hangUpTalk(): void {
+  endCall();
   activeVisual?.stop();
   activeVisual = null;
 }
@@ -66,20 +82,32 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     const visual = deps.visualizer(canvas);
     activeVisual = visual;
     draw();
+    /** Connected and listening: only now does the backdrop come alive and the call's controls work. */
+    const connected = () => {
+      state = { name: 'call', muted: false };
+      visual.connected();
+      draw();
+    };
+    /** The call is over, by either side or by failing: the backdrop powers down and stays dark behind what happened. */
+    const over = (e?: unknown) => {
+      activeCall = null;
+      visual.ended();
+      if (e) error = errorText(e);
+      state = { name: 'ended' };
+      draw();
+    };
+    const abort = new AbortController();
+    connecting = abort;
     try {
-      const call = await startCall(key, { instructions: talkInstructions(plan, new Date(app.now())), greeting: talkGreeting(plan) }, {
+      const call = await startCall(key, { instructions: talkInstructions(plan, new Date(app.now())), greeting: talkGreeting(plan), signal: abort.signal }, {
         onStarted: () => {
-          if (!current() || state.name !== 'connecting') return;
-          state = { name: 'call', muted: false };
-          draw();
+          if (current() && state.name === 'connecting') connected();
         },
         onTranscript: (who, text, start, end) => {
           if (!current()) return;
           const { index, added } = addPiece(turns, who, text, start, end);
-          if (state.name === 'connecting') {
-            state = { name: 'call', muted: false };
-            draw();
-          } else showTurn(index, added);
+          if (state.name === 'connecting') connected();
+          else showTurn(index, added);
         },
         onUsage: (s) => {
           if (!current()) return;
@@ -91,30 +119,22 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
           if (current()) visual.listen(who, stream);
         },
         onEnded: (e) => {
-          if (!current()) return;
-          activeCall = null;
-          visual.stop();
-          activeVisual = null;
-          if (e) error = errorText(e);
-          state = { name: 'ended' };
-          draw();
+          if (current()) over(e);
         },
       }, deps.call);
       // Ended, left or restarted while it was connecting.
       if (current()) activeCall = call;
       else call.hangUp();
     } catch (e) {
-      if (!current()) return;
-      visual.stop();
-      activeVisual = null;
-      error = errorText(e);
-      state = { name: 'ended' };
-      draw();
+      // A call that dropped while connecting has already been shown as over.
+      if (current() && (state as State).name !== 'ended') over(e);
+    } finally {
+      if (connecting === abort) connecting = null;
     }
   }
 
   function end(): void {
-    hangUpTalk();
+    endCall();
     state = { name: 'ended' };
     draw();
   }
@@ -235,12 +255,14 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
 
   function conversation(): HTMLElement {
     const live = state.name === 'call' || state.name === 'connecting';
+    // After a call, its backdrop stays behind the screen, dark, until the learner moves on.
+    const backdrop = live || (state.name === 'ended' && activeVisual !== null);
     const status = state.name === 'connecting' ? 'Connecting…' : state.name === 'call' ? (state.muted ? 'Muted' : 'Listening. Just talk.') : null;
     log = h('div', { class: 'talk-log', 'aria-live': 'polite' }, turns.map(bubble));
     return h(
       'div',
       { class: 'talk-chat' },
-      live && canvas,
+      backdrop && canvas,
       header('Talking', h('span', { class: 'session-title talk-meter' }, meterText())),
       log,
       status && h('p', { class: 'talk-status' }, status),
@@ -272,7 +294,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
         h(
           'div',
           { class: 'row' },
-          h('button', { class: 'btn secondary', onclick: () => { state = { name: 'menu' }; draw(); } }, 'Change topic'),
+          h('button', { class: 'btn secondary', onclick: () => { hangUpTalk(); state = { name: 'menu' }; draw(); } }, 'Change topic'),
           h('button', { class: 'btn primary', 'data-tap': 'before', onclick: () => void begin() }, 'Chat again'),
         ),
     );

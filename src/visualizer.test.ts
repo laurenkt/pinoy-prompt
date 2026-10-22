@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { createVisualizer, follow, loudness, quiet, SAMPLES } from './visualizer';
+import { advance, BURST_SECONDS, COLLAPSE_SECONDS, createVisualizer, enter, follow, loudness, quiet, SAMPLES, waiting, type Stage } from './visualizer';
 
 const silent = () => new Float32Array(1024);
 /** A tone with the given amplitude (0 to 1) and number of samples per cycle. */
@@ -120,5 +120,50 @@ describe('createVisualizer', () => {
       visual.setMuted(true);
       visual.stop();
     }).not.toThrow();
+  });
+});
+
+describe('stages of a call', () => {
+  const run = (stage: Stage, seconds: number) => {
+    for (let t = 0; t < seconds; t += 1 / 60) advance(stage, 1 / 60);
+  };
+
+  it('stays dormant however long connecting takes', () => {
+    const stage = waiting();
+    run(stage, 20);
+    expect(stage.alive).toBe(0);
+    expect(stage.warp).toBe(0);
+  });
+
+  it('bursts into life once connected, then settles', () => {
+    const stage = waiting();
+    enter(stage, 'live', false);
+    expect(stage.warp).toBe(1);
+    expect(stage.jolt).toBe(1);
+    run(stage, 0.5);
+    expect(stage.alive).toBeGreaterThan(0.9);
+    run(stage, BURST_SECONDS);
+    expect(stage.alive).toBe(1);
+    expect(stage.warp).toBeLessThan(0.01);
+  });
+
+  it('powers down when the call ends, and stays dark', () => {
+    const stage = waiting();
+    enter(stage, 'live', false);
+    run(stage, 3);
+    enter(stage, 'dead', false);
+    run(stage, COLLAPSE_SECONDS + 0.5);
+    expect(stage.alive).toBe(0);
+    enter(stage, 'live', false);
+    expect(stage.phase).toBe('dead');
+  });
+
+  it('only fades the colour in and out with reduced motion', () => {
+    const stage = waiting();
+    enter(stage, 'live', true);
+    expect(stage.warp).toBe(0);
+    expect(stage.jolt).toBe(0);
+    run(stage, 1.5);
+    expect(stage.alive).toBe(1);
   });
 });

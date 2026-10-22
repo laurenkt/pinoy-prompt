@@ -207,6 +207,32 @@ describe('startCall', () => {
     expect(f.events.onEnded).not.toHaveBeenCalled();
   });
 
+  it('gives up a call abandoned while connecting at once, leaving nothing of it running', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    let request: RequestInit | undefined;
+    // OpenAI takes its time to answer, until the request is cancelled.
+    f.deps.fetch = ((_url: RequestInfo | URL, init?: RequestInit) => {
+      request = init;
+      return new Promise((_, reject) => init!.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError'))));
+    }) as typeof fetch;
+    const abort = new AbortController();
+    const started = startCall(KEY, { ...PROMPT, signal: abort.signal }, f.events, f.deps);
+    await vi.waitFor(() => expect(request).toBeDefined());
+    abort.abort();
+    expect(f.peer.closed).toBe(true);
+    expect(f.track.stopped).toBe(true);
+    await expect(started).rejects.toBeInstanceOf(AiError);
+    expect(f.events.onEnded).not.toHaveBeenCalled();
+  });
+
+  it("doesn't start a call already abandoned", async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    const abort = new AbortController();
+    abort.abort();
+    await expect(startCall(KEY, { ...PROMPT, signal: abort.signal }, f.events, f.deps)).rejects.toBeInstanceOf(AiError);
+    expect(f.fetchFn).not.toHaveBeenCalled();
+  });
+
   it('turns refusals into errors the learner can act on', async () => {
     const refused = async (response: Response | Error) => {
       const f = fakeCall(json(201, {}));

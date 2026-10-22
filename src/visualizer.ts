@@ -5,6 +5,13 @@
 // The rings follow the sound instantly; the brightness of the whole screen eases,
 // so it never flashes.
 //
+// It lies dormant until the call is connected and listening, so it never looks
+// ready before it is: dark, drained of colour, deaf to the microphone, with one
+// spark circling the outer ring. Once connected it bursts into life: bands of
+// saffron, magenta and teal blast out from the middle, bringing the colour with
+// them, the tunnel lurches forward and the rings spring out. When the call ends
+// it powers down: the rings are sucked in, the colour drains and it stays dark.
+//
 // The signal is read raw, straight from the waveform, so the picture moves with
 // the sound and not behind it. The analysers run on the audio thread already,
 // so the main thread only copies the latest samples once a frame.
@@ -13,8 +20,12 @@
 export type Voice = 'you' | 'ai';
 
 export interface Visualizer {
-  /** Start showing a voice. */
+  /** Start showing a voice. Heard only once connected. */
   listen(who: Voice, stream: MediaStream): void;
+  /** The call is connected and listening: burst into life. */
+  connected(): void;
+  /** The call is over or lost: collapse back to dormant and stay there. */
+  ended(): void;
   /** Quieten the learner's part while the microphone is muted. */
   setMuted(muted: boolean): void;
   stop(): void;
@@ -54,6 +65,47 @@ const NOISE = 0.004;
 /** The rings' waveform is scaled to fill this much of their swing, up to MAX_GAIN, so quiet talk still draws big shapes. */
 const REACH = 0.8;
 const MAX_GAIN = 12;
+
+/** Waiting to connect, connected and live, or ended and dark. */
+export type Phase = 'waiting' | 'live' | 'dead';
+
+export interface Stage {
+  phase: Phase;
+  /** How alive the picture is, 0 (dormant) to 1, eased: colour, sound and motion all scale with it. */
+  alive: number;
+  /** Seconds since the phase changed. */
+  since: number;
+  /** A lurch forward through the tunnel when it comes alive, decaying. */
+  warp: number;
+  /** The colours pulled apart for a moment, on coming alive or dying. */
+  jolt: number;
+}
+
+export const waiting = (): Stage => ({ phase: 'waiting', alive: 0, since: 0, warp: 0, jolt: 0 });
+
+/** The burst on connecting takes this long to sweep past the edges of the screen. */
+export const BURST_SECONDS = 2;
+/** Powering down, from live to dark. */
+export const COLLAPSE_SECONDS = 1;
+
+/** Move to a new phase. With reduced motion there's no lurch or jolt, only the colour coming and going. */
+export function enter(stage: Stage, phase: Phase, still: boolean): void {
+  if (stage.phase === phase || stage.phase === 'dead') return;
+  stage.phase = phase;
+  stage.since = 0;
+  stage.warp = phase === 'live' && !still ? 1 : 0;
+  stage.jolt = still ? 0 : 1;
+}
+
+export function advance(stage: Stage, dt: number): void {
+  stage.since += dt;
+  const target = stage.phase === 'live' ? 1 : 0;
+  // Comes alive in about half a second, behind the burst, and drains away as quickly while the rings are sucked in.
+  stage.alive += (target - stage.alive) * (1 - Math.exp(-dt * 6));
+  if (Math.abs(target - stage.alive) < 0.001) stage.alive = target;
+  stage.warp *= Math.exp(-dt * 2.5);
+  stage.jolt *= Math.exp(-dt * 5);
+}
 
 /** Loudness from 0 to 1 for a wave's root mean square level. */
 export function loudness(rms: number): number {
@@ -123,6 +175,11 @@ uniform vec2 u_level;
 uniform float u_glow;
 uniform float u_kick;
 uniform float u_bright;
+uniform float u_alive;
+uniform float u_burst;
+uniform float u_fall;
+uniform float u_seek;
+uniform float u_seek_turn;
 uniform sampler2D u_wave;
 
 const float TAU = 6.28318;
@@ -131,6 +188,11 @@ const vec3 NIGHT = vec3(0.090, 0.071, 0.231);
 const vec3 TEAL = vec3(0.180, 0.769, 0.714);
 const vec3 SAFFRON = vec3(1.0, 0.714, 0.153);
 const vec3 MAGENTA = vec3(0.910, 0.247, 0.435);
+const vec3 INK = vec3(0.051, 0.039, 0.141);
+const vec3 FAINT = vec3(0.643, 0.612, 0.788);
+/** The burst's three bands, each this deep, with an ink outline at each edge. */
+const float BAND = 0.09;
+const float OUTLINE = 0.016;
 
 float wave(float row, float x) {
   return texture2D(u_wave, vec2(x, row)).r * 2.0 - 1.0;
@@ -172,13 +234,44 @@ void main() {
     col.b = tunnel(max(0.0, r - shift), a, voice).b;
   }
   col *= 0.45 + 0.55 * u_glow;
+  // The burst's front races out from the middle and slows; the colour comes in behind it.
+  bool bursting = u_burst < 2.0;
+  float front = 1.9 * (1.0 - exp(-2.6 * u_burst));
+  float on = u_alive * (bursting ? step(r, front - 3.0 * BAND) : 1.0);
+  // Dormant, the frozen tunnel is only a dark shape in the night.
+  vec3 dormant = NIGHT * (0.55 + 0.6 * dot(col, vec3(0.3, 0.59, 0.11)));
+  col = mix(dormant, col, on);
+  // The rings spring out past their places as they come alive, and are sucked into the middle as they die.
+  float swell = 1.0;
+  if (bursting) swell += 0.3 * exp(-3.0 * u_burst) * sin(u_burst * 11.0);
+  if (u_fall < 1.0) swell *= 1.0 - 0.85 * sin(3.14159 * u_fall);
   float turns = angle / TAU + 0.5;
-  col += SAFFRON * scope(r, turns, 0.75, 0.42, 0.08 + u_level.y * 0.3, u_turn.y) * (0.25 + u_level.y);
-  col += TEAL * scope(r, turns, 0.25, 0.3, 0.06 + u_level.x * 0.3, u_turn.x) * (0.25 + u_level.x);
+  float outer = scope(r, turns, 0.75, 0.42 * swell, (0.08 + u_level.y * 0.3) * on, u_turn.y);
+  float inner = scope(r, turns, 0.25, 0.3 * swell, (0.06 + u_level.x * 0.3) * on, u_turn.x);
+  col += mix(FAINT * 0.065, SAFFRON * (0.25 + u_level.y), on) * outer;
+  col += mix(FAINT * 0.065, TEAL * (0.25 + u_level.x), on) * inner;
+  // While connecting, one spark circles the outer ring with a tail behind it.
+  col += FAINT * 0.65 * u_seek * outer * exp(-fract(u_seek_turn - turns) * 10.0);
   // Scanlines and a vignette, then dimmed so the transcript stays readable.
   col *= 0.88 + 0.12 * sin(gl_FragCoord.y * 3.14159);
   col *= 1.0 - 0.25 * dot(p, p);
-  gl_FragColor = vec4(mix(NIGHT, col, 0.85) * 0.8, 1.0);
+  col = mix(NIGHT, col, 0.85) * 0.8;
+  if (bursting) {
+    float fade = 1.0 - smoothstep(1.1, 2.0, u_burst);
+    // Six spokes shoot out with the front, thinning as they go.
+    float spoke = step(a, 0.06 * (1.0 - u_burst / 2.0)) * step(r, front) * step(0.05, r);
+    col = mix(col, SAFFRON, spoke * fade * 0.9);
+    // Solid bands, saffron leading, outlined in ink like everything else in the app.
+    float d = front - r;
+    if (d > 0.0 && d < 3.0 * BAND) {
+      float k = floor(d / BAND);
+      vec3 band = k < 0.5 ? SAFFRON : k < 1.5 ? MAGENTA : TEAL;
+      float edge = mod(d, BAND);
+      band = edge < OUTLINE || BAND - edge < OUTLINE * 0.5 ? INK : band;
+      col = mix(col, band, fade);
+    }
+  }
+  gl_FragColor = vec4(col, 1.0);
 }`;
 
 function compile(gl: WebGLRenderingContext, type: number, source: string): WebGLShader | null {
@@ -189,7 +282,7 @@ function compile(gl: WebGLRenderingContext, type: number, source: string): WebGL
   return gl.getShaderParameter(shader, gl.COMPILE_STATUS) ? shader : null;
 }
 
-const NOTHING: Visualizer = { listen() {}, setMuted() {}, stop() {} };
+const NOTHING: Visualizer = { listen() {}, connected() {}, ended() {}, setMuted() {}, stop() {} };
 
 /** Phases are wrapped at these, which every frequency using them repeats over, so wrapping never shows. */
 const TIME_PERIOD = 8 * Math.PI;
@@ -250,8 +343,21 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
   const uGlow = u('u_glow');
   const uKick = u('u_kick');
   const uBright = u('u_bright');
+  const uAlive = u('u_alive');
+  const uBurst = u('u_burst');
+  const uFall = u('u_fall');
+  const uSeek = u('u_seek');
+  const uSeekTurn = u('u_seek_turn');
 
   const audio = new Context();
+  let deaf = false;
+  /** Once dark nothing more is heard, so the analysers and their context go straight away. */
+  function closeAudio(): void {
+    if (deaf) return;
+    deaf = true;
+    for (const a of Object.values(analysers)) a?.source.disconnect();
+    void audio.close?.()?.catch(() => {});
+  }
   // Older WebKit has no promise-returning resume or close.
   const resume = () => void audio.resume?.()?.catch(() => {});
   resume();
@@ -260,8 +366,10 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
   const bytes = new Uint8Array(FFT_SIZE);
   const env: Record<Voice, Envelope> = { you: quiet(), ai: quiet() };
   const still = matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const stage = waiting();
   let muted = false;
   let frame = 0;
+  let seekTurn = 0;
   let last = performance.now();
   let time = 0;
   let travel = 0;
@@ -276,9 +384,20 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     canvas.hidden = true;
   }
   canvas.addEventListener('webglcontextlost', lost);
+  let resting = false;
+  // A resting picture is drawn again when the screen changes size (the phone turned), rather than stretched.
+  function wake(): void {
+    if (!resting || canvas.hidden) return;
+    resting = false;
+    last = performance.now();
+    frame = requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', wake);
 
   function draw(now: number): void {
-    frame = requestAnimationFrame(draw);
+    // Once dark after a call, the last frame stays on screen and nothing more is drawn.
+    resting = stage.phase === 'dead' && stage.since > COLLAPSE_SECONDS && stage.alive === 0;
+    if (!resting) frame = requestAnimationFrame(draw);
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
     last = now;
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -306,15 +425,21 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
       // With reduced motion the rings stay round, and only swell and fade with each voice.
       if (still) row.fill(128);
     });
-    const level = Math.max(env.you.level, env.ai.level);
+    advance(stage, dt);
+    // Sound only shows once connected, so a voice moving it always means the call can hear.
+    const alive = stage.alive;
+    const level = Math.max(env.you.level, env.ai.level) * alive;
     // With reduced motion the picture still answers each voice, but doesn't fly or spin.
     if (!still) {
-      time = (time + dt) % TIME_PERIOD;
-      travel = (travel + dt * (0.25 + level * 2.5)) % TRAVEL_PERIOD;
-      spin = (spin + dt * (0.08 + env.ai.level * 0.6 - env.you.level * 0.4) + TAU) % TAU;
-      turnAi = (turnAi + dt * 0.05) % 1;
-      turnYou = (turnYou + 1 - dt * 0.07) % 1;
+      time = (time + dt * alive) % TIME_PERIOD;
+      travel = (travel + dt * (alive * (0.25 + level * 2.5) + stage.warp * 6)) % TRAVEL_PERIOD;
+      spin = (spin + dt * (alive * (0.08 + env.ai.level * 0.6 - env.you.level * 0.4) + stage.warp * 2.5) + TAU) % TAU;
+      turnAi = (turnAi + dt * 0.05 * alive) % 1;
+      turnYou = (turnYou + 1 - dt * 0.07 * alive) % 1;
+      seekTurn = (seekTurn + dt * 0.6) % 1;
     }
+    const live = stage.phase === 'live';
+    const dead = stage.phase === 'dead';
     gl!.viewport(0, 0, w, h);
     gl!.texSubImage2D(gl!.TEXTURE_2D, 0, 0, 0, SAMPLES, 2, gl!.LUMINANCE, gl!.UNSIGNED_BYTE, texture);
     gl!.uniform2f(uRes, w, h);
@@ -322,17 +447,23 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
     gl!.uniform1f(uTravel, travel);
     gl!.uniform1f(uSpin, spin);
     gl!.uniform2f(uTurn, turnYou, turnAi);
-    gl!.uniform2f(uLevel, still ? env.you.glow : env.you.level, still ? env.ai.glow : env.ai.level);
-    gl!.uniform1f(uGlow, Math.max(env.you.glow, env.ai.glow));
-    gl!.uniform1f(uKick, still ? 0 : Math.max(env.you.kick, env.ai.kick));
-    gl!.uniform1f(uBright, Math.max(env.you.bright, env.ai.bright));
+    gl!.uniform2f(uLevel, (still ? env.you.glow : env.you.level) * alive, (still ? env.ai.glow : env.ai.level) * alive);
+    gl!.uniform1f(uGlow, Math.max(env.you.glow, env.ai.glow) * alive);
+    gl!.uniform1f(uKick, still ? 0 : Math.max(Math.max(env.you.kick, env.ai.kick) * alive, stage.jolt));
+    gl!.uniform1f(uBright, Math.max(env.you.bright, env.ai.bright) * alive);
+    gl!.uniform1f(uAlive, alive);
+    // With reduced motion the colour just fades in and out, with no burst or collapse.
+    gl!.uniform1f(uBurst, live && !still ? stage.since : 99);
+    gl!.uniform1f(uFall, dead && !still ? stage.since : 99);
+    gl!.uniform1f(uSeek, stage.phase === 'waiting' ? 1 : 0);
+    gl!.uniform1f(uSeekTurn, seekTurn);
     gl!.drawArrays(gl!.TRIANGLE_STRIP, 0, 4);
   }
   frame = requestAnimationFrame(draw);
 
   return {
     listen(who, stream) {
-      if (audio.state === 'closed' || !stream.getAudioTracks().length) return;
+      if (deaf || audio.state === 'closed' || !stream.getAudioTracks().length) return;
       analysers[who]?.source.disconnect();
       const node = audio.createAnalyser();
       node.fftSize = FFT_SIZE;
@@ -343,14 +474,21 @@ export function createVisualizer(canvas: HTMLCanvasElement): Visualizer {
       // Starting the microphone can suspend audio on iOS.
       if (audio.state !== 'running') resume();
     },
+    connected() {
+      enter(stage, 'live', still);
+    },
+    ended() {
+      enter(stage, 'dead', still);
+      closeAudio();
+    },
     setMuted(m) {
       muted = m;
     },
     stop() {
       cancelAnimationFrame(frame);
       canvas.removeEventListener('webglcontextlost', lost);
-      for (const a of Object.values(analysers)) a?.source.disconnect();
-      void audio.close?.()?.catch(() => {});
+      window.removeEventListener('resize', wake);
+      closeAudio();
       // The canvas is reused by the next call, which sets up its own.
       release();
     },
