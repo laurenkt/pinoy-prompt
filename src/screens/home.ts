@@ -2,8 +2,10 @@ import type { App } from '../app';
 import {
   MIN_MEASURED_REVIEWS,
   STRENGTHS,
+  forecast,
   memoryHistory,
   memorySummary,
+  type Forecast,
   type MemoryHistory,
   type MemorySummary,
   type Strength,
@@ -66,7 +68,7 @@ export function homeScreen(app: App): HTMLElement {
       h('button', { class: 'hub-btn drills-btn', onclick: () => app.navigate({ name: 'practice' }) }, h('span', { class: 'hub-title' }, 'Drills')),
       h('button', { class: 'hub-btn library-btn', onclick: () => app.navigate({ name: 'words' }) }, h('span', { class: 'hub-title' }, 'Library')),
     ),
-    isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now)),
+    isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now), forecast(progress, now)),
   );
 }
 
@@ -114,7 +116,7 @@ function studyButton(app: App, isFirstRun: boolean): HTMLElement {
 }
 
 /** The chart carries the story; the text around it is just the numbers it can't show. */
-function memoryCard(memory: MemorySummary, history: MemoryHistory): HTMLElement {
+function memoryCard(memory: MemorySummary, history: MemoryHistory, ahead: Forecast): HTMLElement {
   const { strengths, recent, due } = memory;
   const measured = recent.reviews >= MIN_MEASURED_REVIEWS;
   const recall = measured ? 1 - recent.missed / recent.reviews : (memory.estimatedRecall ?? 0);
@@ -131,7 +133,7 @@ function memoryCard(memory: MemorySummary, history: MemoryHistory): HTMLElement 
     'section',
     { class: 'card strength-card', 'aria-labelledby': 'memory-title' },
     h('h2', { class: 'sr-only', id: 'memory-title' }, 'Your memory'),
-    growthChart(history, counts),
+    growthChart(history, counts, ahead),
     h(
       'ul',
       { class: 'strength-legend' },

@@ -356,6 +356,72 @@ p {
   margin-left: auto;
 }
 
+.growth-svg .projection {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 3px;
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+}
+
+.growth-goal {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 44px;
+  padding: 4px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--saffron);
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: 12px;
+  box-shadow: 2px 2px 0 var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.growth-goal strong {
+  font-size: 0.9rem;
+}
+
+.growth-goal[aria-expanded='true'] {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.growth-forecast {
+  margin: 14px 0 0;
+}
+
+.growth-forecast p {
+  margin: 0;
+}
+
+.growth-forecast ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+  display: grid;
+  gap: 6px;
+}
+
+.growth-forecast li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.growth-forecast li strong {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .growth-frame {
   position: relative;
   /* A little shorter where the phone's insets would otherwise push Home past one screen. */
@@ -441,15 +507,19 @@ p {
 }
 
 .growth-back[hidden],
+.growth-forecast[hidden],
 .growth-marker[hidden] {
   display: none;
 }
 
 .growth-axis {
-  display: flex;
-  justify-content: space-between;
   margin-top: 10px;
   font-weight: 700;
+}
+
+.growth-axis-past {
+  display: flex;
+  justify-content: space-between;
 }
 
 .s-new {
