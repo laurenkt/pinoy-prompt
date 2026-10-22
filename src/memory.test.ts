@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MILESTONES, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
+import { MILESTONES, curveAt, curveReaches, fitPower, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
 import { LEARN_ORDER } from './deck';
 import { DAY_MS, newCardState, review, startOfDayAfter, type CardState } from './srs';
 import { dayKey, emptyProgress, recordAnswer } from './store';
@@ -203,13 +203,22 @@ describe('forecast', () => {
     return p;
   }
 
-  it('projects the pace of words that stuck over the last four weeks', () => {
+  it('measures the pace of words that stuck over the last four weeks', () => {
     // 14 words stuck in the last 28 days, 6 before: half a word a day.
     const p = learner(20, [...Array(6).fill(35), ...Array(14).fill(10)]);
     const f = forecast(p, NOW);
     expect(f.known).toBe(20);
     expect(f.perDay).toBeCloseTo(0.5);
-    expect(f.milestones[0].at).toBeCloseTo(NOW + (480 / 0.5) * DAY_MS, -3);
+    expect(f.milestones[0].at).toBeGreaterThan(NOW);
+  });
+
+  it('dates milestones along a curve through today, steady for a steady learner', () => {
+    // One word a day sticking for 30 days.
+    const p = learner(30, Array.from({ length: 30 }, (_, i) => i));
+    const f = forecast(p, NOW);
+    expect(f.curve!.power).toBeCloseTo(1, 1);
+    expect(curveAt(f.curve!, NOW)).toBeCloseTo(30, 0);
+    expect(f.milestones[0].at).toBe(curveReaches(f.curve!, 500));
   });
 
   it('counts only words that have stuck, not words met', () => {
@@ -226,7 +235,7 @@ describe('forecast', () => {
     expect(f.early).toBe(true);
     expect(f.known).toBe(2);
     expect(f.perDay).toBeCloseTo(0.5);
-    expect(typeof f.milestones[0].at).toBe('number');
+    expect(f.curve).not.toBeNull();
   });
 
   it('gives a guess from the first session, as if over a day', () => {
@@ -247,5 +256,21 @@ describe('forecast', () => {
     const levels = [{ words: 3, label: 'a' }, ...MILESTONES];
     const f = forecast(learner(3, [35, 10, 10]), NOW, levels);
     expect(f.milestones.map((m) => m.at === 'reached')).toEqual([true, false, false, false, false]);
+  });
+});
+
+describe('fitPower', () => {
+  it('reads a steady pace as a straight line', () => {
+    expect(fitPower([1, 2, 3, 4, 5].map((d) => [d, 3 * d]))).toBeCloseTo(1);
+  });
+
+  it('reads a pace that eases off, but only so far', () => {
+    expect(fitPower([1, 4, 9, 16].map((d) => [d, 10 * d ** 0.8]))).toBeCloseTo(0.8);
+    expect(fitPower([1, 4, 9, 16].map((d) => [d, 10 * Math.sqrt(d)]))).toBe(0.7);
+  });
+
+  it('needs a few days to show a shape', () => {
+    expect(fitPower([[1, 3], [2, 5]])).toBeNull();
+    expect(fitPower([[0.5, 3], [1, 0], [2, 0], [3, 4]])).toBeNull();
   });
 });

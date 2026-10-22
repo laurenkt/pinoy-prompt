@@ -3,7 +3,7 @@
 // it to see any earlier day. With a forecast, the stream carries on hatched from
 // today towards the next milestone, with roughly when it might be reached.
 
-import { STRENGTHS, type Forecast, type MemoryHistory, type Strength } from '../memory';
+import { STRENGTHS, curveAt, type Forecast, type MemoryHistory, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
 import { h, svg } from '../ui';
 
@@ -69,6 +69,19 @@ function monthYear(time: number): string {
 
 /** Share of the chart's width for the past when a projection follows it. */
 const PAST = 0.7;
+
+/**
+ * How far along the projection is, 0 today to 1 at the milestone, `u` of the
+ * way there in time: along the learner's curve, so a pace that eases off rises
+ * early and flattens, or in a straight line without one.
+ */
+export function projected(forecast: Forecast, at: number, now: number, u: number): number {
+  const { curve } = forecast;
+  if (!curve) return u;
+  const start = curveAt(curve, now);
+  const end = curveAt(curve, at);
+  return end > start ? (curveAt(curve, now + u * (at - now)) - start) / (end - start) : u;
+}
 
 /** The milestone the projection runs to: the next one with a date, if any. */
 export function nextMilestone(forecast: Forecast | undefined): { words: number; label: string; at: number } | null {
@@ -153,10 +166,13 @@ export function growthChart(
     );
   });
   if (next) {
-    // The stream carries on as a hatched area, rising from today towards the
+    // The stream carries on as a hatched area, rising along the learner's curve from today towards the
     // milestone in the corner under its tag (its date on the axis), with the same outline dashed. The
     // milestone is off this scale, so it shows the direction and the tag the numbers.
     const from = yOf(tops[tops.length - 1][last]);
+    const steps = Array.from({ length: 25 }, (_, i) => i / 24);
+    const aheadXs = steps.map((u) => xs[last] + u * (W - xs[last]));
+    const aheadYs = steps.map((u) => from + (8 - from) * projected(forecast!, next.at, times[last], u));
     plot.prepend(
       svg(
         'defs',
@@ -169,8 +185,8 @@ export function growthChart(
       ),
     );
     plot.append(
-      svg('path', { d: `M${f(xs[last])},${f(H)} L${f(xs[last])},${f(from)} L${f(W)},${f(8)} L${f(W)},${f(H)} Z`, class: 'projection' }),
-      svg('path', { d: `M${f(xs[last])},${f(from)} L${f(W)},${f(8)}`, class: 'edge outer projection-edge', 'vector-effect': 'non-scaling-stroke' }),
+      svg('path', { d: `M${f(xs[last])},${f(H)} L${f(xs[last])},${f(from)}${curve(aheadXs, aheadYs)} L${f(W)},${f(H)} Z`, class: 'projection' }),
+      svg('path', { d: `M${f(xs[last])},${f(from)}${curve(aheadXs, aheadYs)}`, class: 'edge outer projection-edge', 'vector-effect': 'non-scaling-stroke' }),
     );
   }
 
@@ -214,7 +230,7 @@ export function growthChart(
     if (!next) return;
     // From where the drawn projection starts, today's top of the stream.
     const from = total(last);
-    value.textContent = `~${Math.round(from + u * (next.words - from))}`;
+    value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.words - from))}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][last]);
     when.textContent = ` words by ${monthYear(times[last] + u * (next.at - times[last]))}`;
     lookAt(false, past + u * (1 - past));
