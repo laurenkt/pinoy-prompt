@@ -6,6 +6,7 @@ import { coach } from '../coach';
 import { compare, toPhones } from '../phonetics';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
 import { referenceFor, resultView, spanOf, type Attempt } from './speak-result';
+import { flush } from '../test/screen';
 
 function attempt(text: string, heard: string[]): Attempt {
   const comparison = compare(toPhones(text), heard);
@@ -16,7 +17,6 @@ function attempt(text: string, heard: string[]): Attempt {
 let player: FakePlayer;
 const q = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T & HTMLElement>(sel)!;
 const all = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)];
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 function show(a: Attempt) {
   const view = resultView(a, { player });

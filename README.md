@@ -94,7 +94,7 @@ npm test         # unit tests (scheduler, sessions, saved progress, deck checks)
 npm run build    # type-check and build to dist/
 ```
 
-No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
+No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the app's systems, which module owns each, and how screens are laid out.
 
 | Path | What's there |
 | --- | --- |
@@ -106,7 +106,8 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 | `src/store.ts` | Saving and loading progress, daily counters and backups. |
 | `src/progress-schema.ts` | The saved progress format, its migrations and repair. |
 | `src/progress-mirror.ts` | The IndexedDB copy of saved progress. |
-| `src/speech.ts` | Audio playback and voice selection. |
+| `src/audio-engine.ts` | The one shared Web Audio context that every recorded sound plays through. |
+| `src/speech.ts` | Playing a card's recorded clip, with the built-in voice as a fallback. |
 | `src/recorder.ts` | Microphone recording for speaking questions. |
 | `src/fbank.ts`, `src/phone-model.ts` | Audio features and the on-device phone recogniser. |
 | `src/phonetics.ts`, `src/coach.ts` | Expected sounds, comparison and pronunciation tips. |
@@ -116,4 +117,4 @@ No framework: TypeScript, Vite, and a tiny `h()` DOM helper in `src/ui.ts`.
 
 ## Deploying
 
-`.github/workflows/deploy.yml` publishes to GitHub Pages on every push to `main` (Pages is enabled with **Settings › Pages › Source: GitHub Actions**). The build uses relative paths, so it also works from any static host.
+`.github/workflows/ci.yml` tests and builds every pull request and push, and publishes to GitHub Pages on every push to `main` once its tests pass (Pages is enabled with **Settings › Pages › Source: GitHub Actions**). The build uses relative paths, so it also works from any static host.

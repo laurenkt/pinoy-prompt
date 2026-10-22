@@ -3,27 +3,9 @@
 // review until the learner asks for one or misses the card.
 
 import { describe, expect, it } from 'vitest';
-import type { App } from '../app';
 import { getCard } from '../deck';
-import { emptyProgress, recordAnswer } from '../store';
 import { sessionScreen } from './session';
-import type { SpeakDeps } from './speak';
-
-const noMic = { recordingSupported: () => false, modelDownloaded: async () => false } as unknown as SpeakDeps;
-
-function fakeApp(known: string[] = []): App {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  progress.settings.autoplay = false;
-  for (const id of known) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
-
-function button(root: HTMLElement, text: string): HTMLButtonElement {
-  const found = [...root.querySelectorAll('button')].find((b) => b.textContent?.includes(text));
-  if (!found) throw new Error(`No "${text}" button`);
-  return found;
-}
+import { button, fakeApp, noMic } from '../test/screen';
 
 const hookText = (root: HTMLElement) => root.querySelector('.hook')?.textContent ?? null;
 

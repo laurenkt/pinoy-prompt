@@ -2,17 +2,12 @@
 
 import { describe, expect, it } from 'vitest';
 import type { App } from '../app';
-import { emptyProgress, recordAnswer } from '../store';
+import { fakeApp as screenApp } from '../test/screen';
 import { pickNext } from './practice';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
 
-function fakeApp(known = KNOWN): App {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  for (const id of known) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
+const fakeApp = (known = KNOWN) => screenApp(known);
 
 /** How often each word comes up over many picks. */
 function counts(app: App, recent: string[], missed = new Map<string, number>()): Map<string, number> {
