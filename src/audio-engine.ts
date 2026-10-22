@@ -116,7 +116,8 @@ export const KEEP_DECODED = 48;
 function decoderContext(): BaseAudioContext {
   const scope = globalThis as { OfflineAudioContext?: typeof OfflineAudioContext; webkitOfflineAudioContext?: typeof OfflineAudioContext };
   const Offline = scope.OfflineAudioContext ?? scope.webkitOfflineAudioContext;
-  return Offline ? new Offline(1, 1, context?.sampleRate ?? 48000) : audioContext();
+  // Decoding plays nothing, so it doesn't count as the app making a sound (audioBusy).
+  return Offline ? new Offline(1, 1, context?.sampleRate ?? 48000) : audioContext(true);
 }
 
 /** A clip decoded and ready to play. Decoding starts on the first call, so calling it early loads ahead. */

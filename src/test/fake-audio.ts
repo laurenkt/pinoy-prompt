@@ -3,6 +3,8 @@
 /** Sounds made in code, as against clips decoded from a file: the chime, and the shorter tick. */
 export const chimes = { count: 0 };
 export const ticks = { count: 0 };
+/** Sounds decoded from a file: word clips, and the thock. */
+export const recorded = { count: 0 };
 
 export class FakeAudioContext {
   state = 'running';
@@ -37,6 +39,7 @@ export class FakeAudioContext {
       connect: (to: unknown) => to,
       start: () => {
         if (source.buffer?.made) void (source.buffer.duration > 0.2 ? chimes.count++ : ticks.count++);
+        else recorded.count++;
         // Ends when it would have, so nothing is left playing for the next test.
         setTimeout(() => source.onended?.(), (source.buffer?.duration ?? 0) * 1000);
       },

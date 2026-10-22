@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
 const { IDLE_SUSPEND_MS, KEEP_DECODED, loadClip } = await import('./audio-engine');
-const { canPlay, chime, tapSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
+const { canPlay, chime, clickSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
   buffer: { duration: number } | null;
@@ -389,26 +389,21 @@ describe('the right-answer chime', () => {
   });
 });
 
-describe('the tap sound', () => {
-  it('is a short knock, not a ding: no pitch to it, and gone within a tenth of a second', () => {
+describe('the tap sounds', () => {
+  it('makes the click a short knock, not a ding: gone within a few hundredths of a second', () => {
     const rate = 48000;
-    for (const kind of ['thock', 'click'] as const) {
-      const tap = tapSamples(rate, kind);
-      expect(tap.length / rate).toBeLessThan(0.1);
-      const peak = tap.reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
-      expect(peak).toBeGreaterThan(0.05);
-      expect(peak).toBeLessThan(0.21);
-      // A ding rings on; this has died to a twentieth of its peak within 30 ms.
-      const tail = tap.subarray(Math.round(rate * 0.03)).reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
-      expect(tail).toBeLessThan(peak / 20);
-      expect(Math.abs(tap[tap.length - 1])).toBeLessThan(0.001);
-    }
-    // The click is the lighter of the two.
-    const level = (kind: 'thock' | 'click') => tapSamples(rate, kind).reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
-    expect(level('click')).toBeLessThan(level('thock'));
+    const click = clickSamples(rate);
+    expect(click.length / rate).toBeLessThan(0.05);
+    const peak = click.reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
+    expect(peak).toBeGreaterThan(0.05);
+    expect(peak).toBeLessThan(0.11);
+    // A ding rings on; this has died to a twentieth of its peak within 20 ms.
+    const tail = click.subarray(Math.round(rate * 0.02)).reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
+    expect(tail).toBeLessThan(peak / 20);
+    expect(Math.abs(click[click.length - 1])).toBeLessThan(0.001);
   });
 
-  it('plays through the shared context, each of quick taps in turn, without fading its attack', async () => {
+  it('plays both through the shared context, each of quick taps in turn, without fading their attack', async () => {
     for (const c of contexts) c.state = 'running';
     await new Promise((r) => setTimeout(r, 300));
     const ramps: number[] = [];
@@ -419,9 +414,12 @@ describe('the tap sound', () => {
       node.gain.linearRampToValueAtTime = () => void ramps.push(1);
       return node;
     };
-    tick();
     tick('click');
-    expect(sources).toHaveLength(2);
+    tick('thock');
+    // The thock is a recording, decoded first.
+    await vi.waitFor(() => expect(sources).toHaveLength(2));
+    // It's inlined in the app, so it plays offline without a file of its own.
+    expect(fetched.at(-1)).toMatch(/^data:audio\/mpeg;base64,/);
     expect(ramps).toHaveLength(0);
   });
 });
