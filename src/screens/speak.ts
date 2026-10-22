@@ -83,8 +83,12 @@ export interface SpeakOptions {
 
 export interface SpeakPanel {
   el: HTMLElement;
-  /** Whether the microphone is open (the card's audio shouldn't play then). */
-  recording(): boolean;
+  /**
+   * Whether the card's audio may play: only once an attempt has been judged, as the
+   * question is whether the learner remembers how it sounds, not whether they can
+   * repeat it; and not while the microphone is open.
+   */
+  mayPlay(): boolean;
   dispose(): void;
 }
 
@@ -124,6 +128,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let disposed = false;
   /** Bumped for each attempt, so a stale attempt's result is ignored. */
   let attempt = 0;
+  /** Set once an attempt has been judged, after which the card's audio can play. */
+  let judged = false;
   /** Whether a redraw may move focus to its main button. */
   let takeFocus = options.autofocus ?? true;
   // The card's spelling and any other accepted pronunciations (e.g. Kamusta for Kumusta).
@@ -196,6 +202,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       if (stale()) return;
       const { sounds } = recognition;
       const { text, comparison } = judge(sounds);
+      judged = true;
       options.onAttempt(isRight(comparison));
       set({ name: 'result', text, comparison, tips: coach(text, comparison), heard: sounds, recognition, samples: take.samples });
     } catch (err) {
@@ -379,7 +386,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   return {
     el,
-    recording: () => state.name === 'recording',
+    mayPlay: () => judged && state.name !== 'recording',
     dispose: () => {
       disposed = true;
       recording?.cancel();
