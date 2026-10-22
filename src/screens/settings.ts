@@ -1,5 +1,5 @@
 import type { App } from '../app';
-import { allowBadge, badgePermission, badgeSupported, showDueBadge } from '../badge';
+import { allowBadge, badgePermission, badgeSupported } from '../badge';
 import { getCard } from '../deck';
 import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, getSpend, setApiKey } from '../openai';
 import { lastStartDelay, play, voiceQuality } from '../speech';
@@ -11,9 +11,8 @@ const DAILY_OPTIONS = [5, 8, 12, 15];
 
 /** Opt-in number on the Home Screen icon. iOS asks to allow notifications for it, so it asks only when switched on. */
 function iconBadgeCard(app: App, draw: () => void): HTMLElement {
-  const { settings } = app.progress;
   const blocked = badgePermission() === 'denied';
-  const on = settings.iconBadge && !blocked;
+  const on = app.progress.settings.iconBadge && !blocked;
   return h(
     'section',
     { class: 'card' },
@@ -27,14 +26,16 @@ function iconBadgeCard(app: App, draw: () => void): HTMLElement {
         disabled: blocked,
         onchange: (e: Event) => {
           const box = e.target as HTMLInputElement;
+          // Read at the time: another tab's save replaces the settings object (onExternalChange). Saving updates the icon.
           const set = (value: boolean) => {
-            settings.iconBadge = value;
+            app.progress.settings.iconBadge = value;
             app.commit();
-            showDueBadge(app.progress, app.now());
           };
           if (!box.checked) return set(false);
           // Asked inside the tap, as iOS needs.
           void allowBadge().then((allowed) => {
+            // Switched off again while the phone was asking: that tap wins.
+            if (!box.checked) return;
             set(allowed);
             draw();
           });

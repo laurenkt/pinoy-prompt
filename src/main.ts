@@ -1,7 +1,7 @@
 import '@fontsource-variable/bricolage-grotesque';
 import './style.css';
 import { installed, typingInBox, type App, type Route } from './app';
-import { showDueBadge } from './badge';
+import { keepBadgeCurrent, showDueBadge } from './badge';
 import { backHistory } from './back-history';
 import { homeScreen } from './screens/home';
 import { practiceScreen } from './screens/practice';
@@ -35,10 +35,12 @@ const app: App = {
   now: () => Date.now(),
   commit() {
     saved(save(app.progress));
+    showDueBadge(app.progress, Date.now());
   },
   replaceProgress(progress: Progress) {
     app.progress = progress;
     saved(save(progress));
+    showDueBadge(progress, Date.now());
   },
   navigate(route: Route) {
     // Done at once: going Home waits a moment for history, and the old screen mustn't act meanwhile.
@@ -134,7 +136,6 @@ document.addEventListener('keydown', (e) => {
 
 /** Tell the learner, once, if progress stops saving, so they can back it up. */
 function saved(ok: boolean): void {
-  showDueBadge(app.progress, Date.now());
   if (ok) {
     askToPersist();
     return;
@@ -150,8 +151,8 @@ function saved(ok: boolean): void {
   document.body.append(banner);
 }
 
-// The icon's number can only change while the app runs, so it's set as the learner leaves, from what's due then.
-document.addEventListener('visibilitychange', () => showDueBadge(app.progress, Date.now()));
+// The number on the app's icon, set again as the learner opens or leaves the app.
+keepBadgeCurrent(() => app.progress);
 
 async function start(): Promise<void> {
   // Another tab saved: pick up its progress in place, so screens holding it see the change.

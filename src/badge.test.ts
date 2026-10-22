@@ -3,7 +3,7 @@
 // the learner turns it on, and only an installed app tries.
 
 import { afterEach, beforeEach, expect, it, vi, type Mock } from 'vitest';
-import { allowBadge, showDueBadge } from './badge';
+import { allowBadge, keepBadgeCurrent, showDueBadge } from './badge';
 import { DAY_MS } from './srs';
 import { fakeApp } from './test/screen';
 
@@ -62,4 +62,20 @@ it('asks for notifications only if the phone has not been asked', async () => {
   vi.stubGlobal('Notification', { permission: 'denied', requestPermission });
   expect(await allowBadge()).toBe(false);
   expect(requestPermission).toHaveBeenCalledOnce();
+});
+
+it('sets the icon again when the app is opened or left', () => {
+  const { progress } = learner(true);
+  for (const card of Object.values(progress.cards)) card.due = Date.now() - 1;
+  const doc = new EventTarget() as Document;
+  keepBadgeCurrent(() => progress, doc, nav);
+  doc.dispatchEvent(new Event('visibilitychange'));
+  expect(nav.setAppBadge).toHaveBeenCalledWith(3);
+});
+
+it("doesn't touch the icon again while the number stays the same", () => {
+  const { progress, now } = learner(false);
+  showDueBadge(progress, now, nav);
+  showDueBadge(progress, now, nav);
+  expect(nav.clearAppBadge).toHaveBeenCalledOnce();
 });

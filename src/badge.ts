@@ -20,12 +20,25 @@ export function badgeSupported(nav: BadgeNavigator = navigator as BadgeNavigator
   return typeof nav.setAppBadge === 'function' && typeof nav.clearAppBadge === 'function' && installed();
 }
 
+/** What each icon was last set to, so a save that doesn't change the number (most, with the setting off) costs nothing. */
+const shown = new WeakMap<BadgeNavigator, number>();
+
 /** Set the icon to the cards due now, or clear it when none are or the setting is off. */
 export function showDueBadge(progress: Progress, now: number, nav: BadgeNavigator = navigator as BadgeNavigator): void {
   if (!badgeSupported(nav)) return;
   const due = progress.settings.iconBadge ? studyQueue(progress, now).length : 0;
+  if (shown.get(nav) === due) return;
+  shown.set(nav, due);
   // A refused badge (notifications turned off since) just doesn't show.
   void (due > 0 ? nav.setAppBadge!(due) : nav.clearAppBadge!()).catch(() => {});
+}
+
+/**
+ * The number can only change while the app runs, so it's set again whenever
+ * the app is opened or left, from what's due then.
+ */
+export function keepBadgeCurrent(progress: () => Progress, doc: Document = document, nav: BadgeNavigator = navigator as BadgeNavigator): void {
+  doc.addEventListener('visibilitychange', () => showDueBadge(progress(), Date.now(), nav));
 }
 
 export type BadgePermission = 'granted' | 'denied' | 'default';

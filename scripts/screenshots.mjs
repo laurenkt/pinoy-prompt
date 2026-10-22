@@ -68,7 +68,11 @@ const SCREENS = {
   'settings-installed': async (page) => {
     await page.addInitScript(() => {
       const real = window.matchMedia.bind(window);
-      window.matchMedia = (q) => (q === '(display-mode: standalone)' ? { ...real(q), matches: true } : real(q));
+      window.matchMedia = (q) => {
+        const list = real(q);
+        if (q === '(display-mode: standalone)') Object.defineProperty(list, 'matches', { value: true });
+        return list;
+      };
       // Headless Chromium refuses notifications outright; a phone that hasn't been asked yet.
       Object.defineProperty(Notification, 'permission', { get: () => 'default' });
     });

@@ -107,3 +107,20 @@ it('asks for notifications when the icon badge is turned on, and stays off if re
   await vi.waitFor(() => expect(app.progress.settings.iconBadge).toBe(true));
   expect(toggle().checked).toBe(true);
 });
+
+it("leaves the icon badge off when it's switched off while the phone is still asking", async () => {
+  vi.stubGlobal('matchMedia', (q: string) => ({ matches: q === '(display-mode: standalone)' }));
+  Object.assign(navigator, { setAppBadge: vi.fn(async () => {}), clearAppBadge: vi.fn(async () => {}) });
+  let answer!: (value: string) => void;
+  vi.stubGlobal('Notification', { permission: 'default', requestPermission: () => new Promise((r) => (answer = r)) });
+  const app = fakeApp();
+  const root = settingsScreen(app);
+  const toggle = [...root.querySelectorAll('label.toggle')].find((l) => l.textContent?.includes('on the icon'))!.querySelector('input')!;
+  toggle.checked = true;
+  toggle.dispatchEvent(new Event('change'));
+  toggle.checked = false;
+  toggle.dispatchEvent(new Event('change'));
+  answer('granted');
+  await flush();
+  expect(app.progress.settings.iconBadge).toBe(false);
+});
