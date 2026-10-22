@@ -2117,6 +2117,18 @@ p {
 
 /* Library */
 
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  flex: none;
+}
+
+.chips[hidden] {
+  display: none;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
