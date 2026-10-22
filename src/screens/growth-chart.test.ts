@@ -122,5 +122,12 @@ describe('forecast', () => {
     expect(text).toContain('Reached');
     expect(text).toMatch(/~\w+ \d{4}/);
     expect(text).toContain('rough');
+    expect(forecastView(ahead(0.05, now + 400 * DAY_MS)).textContent).toContain('less than a word a week');
+  });
+
+  it('keeps the tag a button to a screen reader, outside the picture', () => {
+    const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
+    expect(el.querySelector('.growth-goal')!.closest('[role="img"]')).toBeNull();
+    expect(el.querySelector('svg')!.getAttribute('aria-label')).toContain('today');
   });
 });

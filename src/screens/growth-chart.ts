@@ -69,7 +69,8 @@ function monthYear(time: number): string {
 
 function pace(perDay: number): string {
   if (perDay >= 1) return `about ${Math.round(perDay)} ${Math.round(perDay) === 1 ? 'word' : 'words'} a day`;
-  const week = Math.max(1, Math.round(perDay * 7));
+  const week = Math.round(perDay * 7);
+  if (week < 1) return 'less than a word a week';
   return `about ${week} ${week === 1 ? 'word' : 'words'} a week`;
 }
 
@@ -131,7 +132,15 @@ export function growthChart(
   const yOf = (v: number) => H - (v / (peak * (next ? 2 : 1.12))) * H;
   const xs = times.map((_, i) => (i / last) * W * past);
 
-  const plot = svg('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', class: 'growth-svg', 'aria-hidden': 'true' });
+  const total = (i: number) => LAYERS.reduce((sum, id) => sum + raw[id][i], 0);
+  // The picture is the svg, not the frame, so the milestone tag beside it stays a button to a screen reader.
+  const plot = svg('svg', {
+    viewBox: `0 0 ${W} ${H}`,
+    preserveAspectRatio: 'none',
+    class: 'growth-svg',
+    role: 'img',
+    'aria-label': `Words by strength over time: ${total(0)} on ${shortDate(times[0])}, ${total(last)} today.`,
+  });
   const backXs = [...xs].reverse();
   LAYERS.forEach((id, k) => {
     // Along the layer's top edge, then back along the edge of the one below.
@@ -152,10 +161,10 @@ export function growthChart(
     );
   });
   if (next) {
-    // From today's words that have stuck (the bottom two layers) up to the
-    // milestone in the corner. The milestone is off this scale, so the line
-    // shows the direction and the label the numbers.
-    const stuck = yOf(tops[LAYERS.indexOf('weeks')][last]);
+    // From today's words that have stuck (within the bottom two layers, which
+    // also hold guides) up to the milestone in the corner. The milestone is
+    // off this scale, so the line shows the direction and the tag the numbers.
+    const stuck = yOf(forecast!.known);
     plot.append(
       svg('path', {
         d: `M${f(xs[last])},${f(stuck)} L${f(W - 56)},${f(62)}`,
@@ -165,7 +174,6 @@ export function growthChart(
     );
   }
 
-  const total = (i: number) => LAYERS.reduce((sum, id) => sum + raw[id][i], 0);
   const value = h('strong', { class: 'growth-total' });
   const when = h('span', { class: 'muted' });
   const back = h('button', { class: 'link-btn growth-back', hidden: true, onclick: () => show(last) }, 'Back to today');
@@ -187,6 +195,8 @@ export function growthChart(
         onclick: () => {
           ahead.hidden = !ahead.hidden;
           goal!.setAttribute('aria-expanded', String(!ahead.hidden));
+          // On a short phone the list opens below the fold; bring it up.
+          if (!ahead.hidden) ahead.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
         },
       },
       h('strong', null, `~${monthYear(next.at)}`),
@@ -206,11 +216,7 @@ export function growthChart(
 
   const frame = h(
     'div',
-    {
-      class: 'growth-frame',
-      role: 'img',
-      'aria-label': `Words by strength over time: ${total(0)} on ${shortDate(times[0])}, ${total(last)} today.`,
-    },
+    { class: 'growth-frame' },
     plot,
     marker,
     goal,
