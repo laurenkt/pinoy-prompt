@@ -7,7 +7,7 @@
 // voice whose spelling-to-sound rules are close to Tagalog's (Indonesian,
 // Malay, then Spanish) and let the UI say so.
 
-import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, type Sound } from './audio-engine';
+import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, runningContext, type Sound } from './audio-engine';
 import clips from './clips.json';
 import thockFile from './sounds/tap-thock.mp3?inline';
 import { hapticTick } from './haptics';
@@ -301,8 +301,8 @@ export function detents(): (step: string | null) => void {
     hapticTick();
     if (muted || !clipsSupported() || microphoneInUse() || speaking()) return;
     // A drag isn't a tap, so iOS won't start audio from it: tick only if it's already going, never late.
-    const ctx = audioContext(true);
-    if (ctx.state !== 'running') return;
+    const ctx = runningContext();
+    if (!ctx) return;
     if (detentBuffer?.sampleRate !== ctx.sampleRate) {
       const samples = clickSamples(ctx.sampleRate, 0.05);
       detentBuffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);

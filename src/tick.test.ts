@@ -179,8 +179,10 @@ describe('ticks for scrubbing across the chart', () => {
     // Suspended after a while idle; a drag can't resume it.
     const ctx = audioContext() as unknown as { state: string };
     ctx.state = 'suspended';
+    const resume = vi.spyOn(ctx as unknown as AudioContext, 'resume');
     await scrub(step, ['day 1', 'day 2', 'day 3']);
     ctx.state = 'running';
     expect(ticks.count).toBe(0);
+    expect(resume).not.toHaveBeenCalled();
   });
 });
