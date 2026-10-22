@@ -8,12 +8,15 @@
 //
 // iOS changes the hardware rate when the microphone opens or closes, and a
 // context made before that can play distorted, so the context is replaced
-// whenever the audio session changes. The recorder keeps its own for the same reason.
+// whenever the microphone has opened or closed since it was made. The recorder
+// keeps its own for the same reason.
 
-import { onAudioSessionChange, setAudioSession } from './audio-session';
+import { setAudioSession } from './audio-session';
 import { microphoneOpen } from './microphone';
 
 let context: AudioContext | null = null;
+/** Whether the microphone was open when the context was made. */
+let madeWithMicrophone = false;
 
 function contextClass(): typeof AudioContext | undefined {
   const scope = globalThis as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
@@ -23,8 +26,16 @@ function contextClass(): typeof AudioContext | undefined {
 /** The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then. */
 export function audioContext(): AudioContext {
   // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback.
-  if (!microphoneOpen()) setAudioSession('playback');
-  context ??= new (contextClass()!)({ latencyHint: 'interactive' });
+  const mic = microphoneOpen();
+  if (!mic) setAudioSession('playback');
+  if (context && madeWithMicrophone !== mic) {
+    void context.close().catch(() => {});
+    context = null;
+  }
+  if (!context) {
+    context = new (contextClass()!)({ latencyHint: 'interactive' });
+    madeWithMicrophone = mic;
+  }
   if (context.state !== 'running') void context.resume().catch(() => {});
   return context;
 }
@@ -35,11 +46,6 @@ export async function audioRunning(ctx: AudioContext, waitMs = 300): Promise<boo
   await Promise.race([ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, waitMs))]);
   return (ctx.state as AudioContextState) === 'running';
 }
-
-onAudioSessionChange(() => {
-  void context?.close().catch(() => {});
-  context = null;
-});
 
 /** Whether this browser can play clips at all. */
 export function clipsSupported(): boolean {

@@ -81,7 +81,7 @@ Recorded sound plays through one shared Web Audio context (`src/audio-engine.ts`
 
 Text with no clip uses the browser's speech synthesis with a Filipino (`fil`/`tl`) voice when the device has one. Otherwise it falls back to a voice with similar spelling-to-sound rules (Indonesian, Malay, then Spanish), and Settings tells the learner which they're getting. The built-in voice runs outside the page, so it can't be loaded ahead and can lag; on iPhone it's also muted by the silent switch, so a silent track plays alongside it. Settings' "Test voice" says how long the word took to start, for checking lag on a device.
 
-iOS changes the hardware rate when the microphone opens or closes, and a context made before that can play distorted, so the shared context is replaced whenever the audio session changes, and the recorder keeps its own. If the context can't start (iOS only starts audio from a tap), the built-in voice reads the word instead. The silent track also plays with clips, as before iOS 17 it's the only way through the silent switch.
+iOS changes the hardware rate when the microphone opens or closes, and a context made before that can play distorted, so the shared context is replaced once the microphone has opened or closed, and the recorder keeps its own. If the context can't start (iOS only starts audio from a tap), the built-in voice reads the word instead. The silent track also plays with clips, as before iOS 17 it's the only way through the silent switch.
 
 To use a recorded clip instead, put the file in `public/audio/` and set `audio: 'file.mp3'` on the card in `src/deck.ts`.
 

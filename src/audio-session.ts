@@ -13,16 +13,7 @@ function session(): AudioSession | undefined {
   return typeof navigator === 'undefined' ? undefined : (navigator as { audioSession?: AudioSession }).audioSession;
 }
 
-const changeListeners: (() => void)[] = [];
-
-/** Called whenever the session type changes, as the audio hardware may be set up again then. */
-export function onAudioSessionChange(listener: () => void): void {
-  changeListeners.push(listener);
-}
-
 export function setAudioSession(type: SessionType): void {
   const s = session();
-  if (!s || s.type === type) return;
-  s.type = type;
-  for (const listener of changeListeners) listener();
+  if (s && s.type !== type) s.type = type;
 }

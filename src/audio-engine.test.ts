@@ -180,28 +180,43 @@ describe('clips', () => {
   });
 
   it("lets the built-in voice read a word when iOS won't start the context, rather than play nothing", async () => {
-    vi.stubGlobal('navigator', { audioSession: { type: 'auto' } });
-    // A new session makes a new context, which starts suspended outside a tap and stays so.
+    // Outside a tap iOS leaves the context suspended, and resume() doesn't change that.
     startState = 'suspended';
+    for (const c of contexts) c.state = 'suspended';
     const speech = stubSpeech();
     await play({ tl: 'Salamat' });
     expect(sources).toHaveLength(0);
     expect(speech.spoken.map((u) => u.text)).toEqual(['Salamat']);
   });
 
-  it('makes a new context when the microphone takes the audio session, as the old one can play distorted', async () => {
-    const audioSession = { type: 'auto' };
+  it('makes a new context once the microphone has opened or closed, as the old one can play distorted', async () => {
+    // No audio session, as before iOS 17: the microphone still changes the hardware rate.
     const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
     const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
-    vi.stubGlobal('navigator', { audioSession, mediaDevices: { getUserMedia: async () => stream } });
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } });
     await play({ tl: 'Salamat' });
     const before = contexts.at(-1)!;
+    await play({ tl: 'Salamat' });
+    expect(contexts.at(-1)).toBe(before);
     const { closeMicrophone, getMicrophone } = await import('./microphone');
     await getMicrophone();
-    expect(before.closed).toBe(true);
     await play({ tl: 'Salamat' });
-    expect(contexts.at(-1)).not.toBe(before);
+    expect(before.closed).toBe(true);
+    const withMic = contexts.at(-1)!;
+    expect(withMic).not.toBe(before);
     closeMicrophone();
+    await play({ tl: 'Salamat' });
+    expect(withMic.closed).toBe(true);
+    expect(contexts.at(-1)).not.toBe(withMic);
+  });
+
+  it('uses the older webkitAudioContext where that is all there is', async () => {
+    vi.stubGlobal('AudioContext', undefined);
+    vi.stubGlobal('webkitAudioContext', FakeContext);
+    const speech = stubSpeech();
+    await play({ tl: 'Salamat' });
+    expect(speech.spoken).toHaveLength(0);
+    expect(sources.at(-1)?.started).not.toBeNull();
   });
 
   it('counts a word as playing while its clip loads, so a screen moving on waits for it', async () => {
