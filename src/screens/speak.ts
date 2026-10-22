@@ -8,12 +8,20 @@ import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonet
 import { record, RecordError, recordingSupported, type RecordProblem, type Recording } from '../recorder';
 import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
+import { continueButton } from './auto-advance';
 import { resultView as soundResults, type ResultView } from './speak-result';
 
 /** Download size shown to the learner before they agree to it. */
 const MODEL_MB = 71;
-/** At or above this score, with nothing off or missing, the attempt counts as right. */
-const GOOD = 0.9;
+/**
+ * At or above this score the attempt counts as right: clearly understood and
+ * fairly natural, not native-perfect. A sound said well scores 1 and a nearly
+ * there one half, so a phrase of 10 or more sounds can pass with one sound off
+ * (in context a listener still gets it), and any word with one sound in five
+ * nearly there. A short word with a sound off, which can turn it into another
+ * word, still needs another go.
+ */
+export const GOOD = 0.9;
 const CLOSE = 0.65;
 
 /** What the Speak question needs from the outside, so tests can stand in for the microphone and model. */
@@ -63,6 +71,8 @@ export interface SpeakOptions {
   silence(): void;
   /** Called after each judged attempt; `right` is true for a good one. */
   onAttempt(right: boolean): void;
+  /** Whether the screen is counting down to the next word after a right attempt. */
+  counting?(): boolean;
   onNext(): void;
   /** Called once the model is loaded and the learner can speak. */
   onReady?(): void;
@@ -100,7 +110,7 @@ export function markLetters(text: string, comparison: Comparison): { text: strin
 
 /** True when the attempt was good enough to count as right. */
 export function isRight(comparison: Comparison): boolean {
-  return comparison.score >= GOOD && !comparison.sounds.some((s) => s.verdict === 'off' || s.verdict === 'missing');
+  return comparison.score >= GOOD;
 }
 
 export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
@@ -279,7 +289,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       heard.length === 0
         ? 'Speak a little louder or closer to the phone.'
         : right
-          ? 'Every sound came through clearly.'
+          ? comparison.sounds.every((s) => s.verdict === 'good')
+            ? 'Every sound came through clearly.'
+            : 'Easy to understand. The coloured letters could be sharper.'
           : 'Letters in pink need work; yellow ones were nearly there.';
     breakdown =
       heard.length > 0 && recognition && samples
@@ -326,7 +338,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       'div',
       { class: 'row result-actions' },
       right
-        ? h('button', { class: 'btn primary', 'data-autofocus': true, onclick: options.onNext }, 'Next')
+        ? continueButton(options.onNext, options.counting?.() ?? false, 'Next', false)
         : [h('button', { class: 'btn secondary', onclick: options.onNext }, 'Next word'), micButton('Try again', 'btn mic')],
     );
   }
