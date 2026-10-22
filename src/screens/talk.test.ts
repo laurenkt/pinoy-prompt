@@ -7,6 +7,7 @@ import { setApiKey, type CallDeps } from '../openai';
 import { stop } from '../speech';
 import { emptyProgress, recordAnswer } from '../store';
 import { hangUpTalk, talkScreen, type TalkDeps } from './talk';
+import { button, flush } from '../test/screen';
 
 vi.mock('../speech', async (actual) => ({ ...(await actual<typeof import('../speech')>()), stop: vi.fn() }));
 
@@ -20,14 +21,6 @@ function fakeApp(known = KNOWN) {
   const app = { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: vi.fn<App['navigate']>(), onKey: () => {}, onBack: () => {} };
   return app satisfies App;
 }
-
-function button(root: HTMLElement, text: string): HTMLButtonElement {
-  const found = [...root.querySelectorAll('button')].find((b) => b.textContent?.includes(text));
-  if (!found) throw new Error(`No "${text}" button`);
-  return found;
-}
-
-const flush = () => new Promise((r) => setTimeout(r, 0));
 
 /** A call that connects straight away; `say` sends what OpenAI would on the data channel. */
 function fakeCall(response: Response = new Response(JSON.stringify({ session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }), { status: 201 })) {

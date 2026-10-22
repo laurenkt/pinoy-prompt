@@ -7,6 +7,7 @@ import type { PhoneModel } from '../phone-model';
 import { RecordError, type RecorderEvents, type Take } from '../recorder';
 import { speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
+import { flush } from '../test/screen';
 
 /** A scriptable microphone: the test decides what it hears and when it stops. */
 class FakeMic {
@@ -62,7 +63,6 @@ function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
   };
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
 const text = (selector: string) => panel.el.querySelector(selector)?.textContent ?? '';
 function button(name: string): HTMLButtonElement {
   const match = [...panel.el.querySelectorAll('button')].find((b) => b.textContent?.trim().endsWith(name));
