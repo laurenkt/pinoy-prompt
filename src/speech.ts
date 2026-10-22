@@ -139,7 +139,7 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
       // A context iOS won't start (outside a tap) plays nothing, so the voice reads it instead.
       if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
       if (mine !== generation) return;
-      const sound = (currentClip = playBuffer(buffer, 1, afterChime()));
+      const sound = (currentClip = playBuffer(buffer, { at: afterChime() }));
       void sound.done.then(() => {
         if (currentClip === sound) currentClip = null;
       });
@@ -178,7 +178,7 @@ export async function chime(): Promise<void> {
   // Outside a tap (a spoken answer judged) iOS may not start the context; better no chime than one on the next tap.
   if (!(await audioRunning(ctx)) || muted) return;
   if (chimeBuffer?.sampleRate !== ctx.sampleRate) chimeBuffer = chimeSound(ctx);
-  const sound = (currentChime = playBuffer(chimeBuffer, 1, 0, false));
+  const sound = (currentChime = playBuffer(chimeBuffer));
   void sound.done.then(() => currentChime === sound && (currentChime = null));
   lastChime = { ctx, ends: sound.startsAt + chimeBuffer.duration };
 }
@@ -226,61 +226,111 @@ export function setTapSounds(on: boolean): void {
   tapSounds = on;
 }
 
-let tickBuffer: AudioBuffer | null = null;
+const tapBuffers = new Map<TapKind, AudioBuffer>();
 
 /**
- * A soft tap sound for a button press (`thockSamples`), shorter than the chime.
+ * A soft tap sound for a press (`tapSamples`), much shorter than the chime.
  * Not when the press already made a sound (a word, the chime, a sound on the
  * results screen) or one is still playing, nor while the microphone is in use,
  * where it would be recorded.
  */
-export function tick(): void {
+export function tick(kind: TapKind = 'thock'): void {
   if (!tapSounds || muted || !clipsSupported() || microphoneInUse()) return;
   // A word or the chime takes the shared context inside the press, and a reference sound or slice too.
   if (audioBusy(250) || speaking()) return;
-  const ctx = audioContext();
-  if (tickBuffer?.sampleRate !== ctx.sampleRate) {
-    const samples = thockSamples(ctx.sampleRate);
-    tickBuffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
-    tickBuffer.getChannelData(0).set(samples);
+  const ctx = audioContext(true);
+  let buffer = tapBuffers.get(kind);
+  if (buffer?.sampleRate !== ctx.sampleRate) {
+    const samples = tapSamples(ctx.sampleRate, kind);
+    buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+    buffer.getChannelData(0).set(samples);
+    tapBuffers.set(kind, buffer);
   }
-  playBuffer(tickBuffer, 1, 0, false);
+  playBuffer(buffer, { fades: false, incidental: true });
+}
+
+/** The two tap sounds: a knock for the big chunky buttons, a lighter click for pills, chips and small controls. */
+export type TapKind = 'thock' | 'click';
+
+/**
+ * A tap sound, modelled as a knock: a very short burst of dull noise (the
+ * contact) ringing a few heavily damped resonances (the body), with no
+ * pitch sweep, so it reads as a key going down rather than a drum or a bell.
+ * The thock's body sits around 350–1500 Hz, where a phone's speaker still
+ * plays it; the click is higher, shorter and quieter.
+ */
+export function tapSamples(rate: number, kind: TapKind): Float32Array {
+  const { length, contact, lowpass, modes, level } =
+    kind === 'thock'
+      ? {
+          length: 0.07,
+          contact: 0.0025,
+          lowpass: 0.35,
+          // Frequency (Hz), how fast it dies away (s), and how much of it.
+          modes: [
+            [380, 0.01, 1],
+            [760, 0.006, 0.5],
+            [1500, 0.003, 0.35],
+          ],
+          level: 0.2,
+        }
+      : {
+          length: 0.04,
+          contact: 0.0012,
+          lowpass: 0.6,
+          modes: [
+            [1400, 0.004, 1],
+            [2900, 0.0025, 0.5],
+          ],
+          level: 0.1,
+        };
+  const n = Math.round(rate * length);
+  // The same noise every time, so every press sounds alike.
+  let seed = 1;
+  let dull = 0;
+  const burst = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    dull += lowpass * ((seed / 2 ** 32) * 2 - 1 - dull);
+    burst[i] = dull * Math.exp(-i / rate / contact);
+  }
+  const data = burst.map((x) => 0.5 * x);
+  for (const [freq, decay, amount] of modes) {
+    // A two-pole resonator, ringing at `freq` and dying away over `decay`.
+    const r = Math.exp(-1 / (rate * decay));
+    const a1 = 2 * r * Math.cos((2 * Math.PI * freq) / rate);
+    let y1 = 0;
+    let y2 = 0;
+    for (let i = 0; i < n; i++) {
+      const y = burst[i] + a1 * y1 - r * r * y2;
+      data[i] += amount * y;
+      y2 = y1;
+      y1 = y;
+    }
+  }
+  // A last few ms' fall, so it doesn't click off, then scaled to its level.
+  let peak = 0;
+  for (let i = 0; i < n; i++) {
+    data[i] *= Math.min(1, (n - i) / (rate * 0.004));
+    peak = Math.max(peak, Math.abs(data[i]));
+  }
+  return data.map((x) => (x / peak) * level);
 }
 
 /**
- * The tap sound: a short, low, muted thock, like a chunky key going down, to
- * suit the big outlined buttons. A pitch that drops fast gives the knock, a
- * woody overtone its body, and a little dull noise the moment of contact.
- * Pitched where a phone's speaker still plays it (around 200–400 Hz).
+ * Everything that can be tapped: buttons, a section opening (`summary`), links, checkboxes and radios.
+ * A label isn't listed, as tapping one clicks its checkbox too.
  */
-export function thockSamples(rate: number): Float32Array {
-  const data = new Float32Array(Math.round(rate * 0.08));
-  // The same noise every time, so every press sounds alike.
-  let seed = 1;
-  let noise = 0;
-  let phase = 0;
-  for (let i = 0; i < data.length; i++) {
-    const t = i / rate;
-    const freq = 190 + 230 * Math.exp(-t / 0.01);
-    phase += (2 * Math.PI * freq) / rate;
-    const body = Math.exp(-t / 0.018) * (Math.sin(phase) + 0.35 * Math.sin(2.4 * phase) * Math.exp(-t / 0.006));
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    // Low-passed, so it thuds rather than hisses.
-    noise += 0.2 * ((seed / 2 ** 32) * 2 - 1 - noise);
-    const contact = noise * Math.exp(-t / 0.004);
-    // A millisecond's rise and a last few ms' fall, so it neither clicks on nor off.
-    const edges = Math.min(1, t / 0.001) * Math.min(1, (data.length - i) / (rate * 0.004));
-    data[i] = 0.15 * edges * (body + 0.8 * contact);
-  }
-  return data;
-}
+const TAPPABLE = 'button, summary, a[href], [role="button"], input[type="checkbox"], input[type="radio"]';
+/** The big chunky buttons, which thock; everything else tappable (chips, pills, small and text controls) clicks. */
+const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
 
-/** Tick for every button pressed under `root`, except those marked `data-no-tap` (ones that open the microphone). */
+/** Tick for every control pressed under `root`, except those marked `data-no-tap` (ones that open the microphone). */
 export function tickOnPress(root: Node): void {
-  // Bubbling, so it runs after the button's own handler, which may have played a word.
+  // Bubbling, so it runs after the control's own handler, which may have played a word.
   root.addEventListener('click', (e) => {
-    const button = (e.target as Element).closest?.('button');
-    if (button && !button.hasAttribute('data-no-tap')) tick();
+    const control = (e.target as Element).closest?.(TAPPABLE);
+    if (control && !control.hasAttribute('data-no-tap')) tick(control.matches(CHUNKY) ? 'thock' : 'click');
   });
 }
 

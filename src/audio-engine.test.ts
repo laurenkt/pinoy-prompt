@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
 const { IDLE_SUSPEND_MS, KEEP_DECODED, loadClip } = await import('./audio-engine');
-const { canPlay, chime, thockSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
+const { canPlay, chime, tapSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
   buffer: { duration: number } | null;
@@ -390,27 +390,38 @@ describe('the right-answer chime', () => {
 });
 
 describe('the tap sound', () => {
-  it('is a short, low thock, not a ding', () => {
+  it('is a short knock, not a ding: no pitch to it, and gone within a tenth of a second', () => {
     const rate = 48000;
-    const thock = thockSamples(rate);
-    expect(thock.length / rate).toBeLessThan(0.1);
-    const peak = thock.reduce((m, x) => Math.max(m, Math.abs(x)), 0);
-    expect(peak).toBeGreaterThan(0.05);
-    expect(peak).toBeLessThan(0.2);
-    // Its pitch, from how often it crosses zero once the knock has passed: low, where a ding sits well above.
-    const body = thock.subarray(Math.round(rate * 0.02), Math.round(rate * 0.06));
-    let crossings = 0;
-    for (let i = 1; i < body.length; i++) if (Math.sign(body[i]) !== Math.sign(body[i - 1])) crossings++;
-    expect(crossings / 2 / 0.04).toBeLessThan(400);
-    // It starts and ends at silence, so it plays without the clip fades that would soften its knock.
-    expect(Math.abs(thock[0])).toBeLessThan(0.001);
-    expect(Math.abs(thock[thock.length - 1])).toBeLessThan(0.001);
+    for (const kind of ['thock', 'click'] as const) {
+      const tap = tapSamples(rate, kind);
+      expect(tap.length / rate).toBeLessThan(0.1);
+      const peak = tap.reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
+      expect(peak).toBeGreaterThan(0.05);
+      expect(peak).toBeLessThan(0.21);
+      // A ding rings on; this has died to a twentieth of its peak within 30 ms.
+      const tail = tap.subarray(Math.round(rate * 0.03)).reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
+      expect(tail).toBeLessThan(peak / 20);
+      expect(Math.abs(tap[tap.length - 1])).toBeLessThan(0.001);
+    }
+    // The click is the lighter of the two.
+    const level = (kind: 'thock' | 'click') => tapSamples(rate, kind).reduce((m: number, x: number) => Math.max(m, Math.abs(x)), 0);
+    expect(level('click')).toBeLessThan(level('thock'));
   });
 
-  it('plays through the shared context', async () => {
+  it('plays through the shared context, each of quick taps in turn, without fading its attack', async () => {
     for (const c of contexts) c.state = 'running';
     await new Promise((r) => setTimeout(r, 300));
+    const ramps: number[] = [];
+    const ctx = contexts.at(-1)!;
+    const gain = ctx.createGain.bind(ctx);
+    ctx.createGain = () => {
+      const node = gain();
+      node.gain.linearRampToValueAtTime = () => void ramps.push(1);
+      return node;
+    };
     tick();
-    expect(sources).toHaveLength(1);
+    tick('click');
+    expect(sources).toHaveLength(2);
+    expect(ramps).toHaveLength(0);
   });
 });

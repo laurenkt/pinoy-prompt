@@ -25,9 +25,12 @@ function contextClass(): typeof AudioContext | undefined {
   return scope.AudioContext ?? scope.webkitAudioContext;
 }
 
-/** The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then. */
-export function audioContext(): AudioContext {
-  lastUsed = performance.now();
+/**
+ * The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then.
+ * `incidental` is for the tap sound, which shouldn't count as the press having made a sound (audioBusy).
+ */
+export function audioContext(incidental = false): AudioContext {
+  if (!incidental) lastUsed = performance.now();
   // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback (iOS 17+).
   const mic = microphoneOpen();
   if (!mic) setAudioSession('playback');
@@ -146,13 +149,20 @@ export interface Sound {
   stop(): void;
 }
 
-/**
- * Play a buffer now, or no earlier than `at` (context time), with short fades.
- * A sound made in code already starts and ends at silence, so `fades` can be
- * turned off to keep its attack sharp.
- */
-export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0, fades = true): Sound {
-  const ctx = audioContext();
+export interface PlayOptions {
+  /** Playback rate. */
+  rate?: number;
+  /** Start no earlier than this, in the context's time. */
+  at?: number;
+  /** Short fades in and out, so clips and slices don't click. A tap sound starts and ends at silence, and needs its sharp attack. */
+  fades?: boolean;
+  /** A tap sound: it doesn't make the context busy (audioBusy), so taps in quick succession each get one. */
+  incidental?: boolean;
+}
+
+/** Play a buffer now, or no earlier than `at`. */
+export function playBuffer(buffer: AudioBuffer, { rate = 1, at = 0, fades = true, incidental = false }: PlayOptions = {}): Sound {
+  const ctx = audioContext(incidental);
   const source = ctx.createBufferSource();
   const gain = ctx.createGain();
   source.buffer = buffer;
@@ -170,7 +180,7 @@ export function playBuffer(buffer: AudioBuffer, rate = 1, at = 0, fades = true):
   source.start(t0);
   let finish = () => {};
   const done = new Promise<void>((resolve) => (finish = resolve));
-  sounding.add(finish);
+  if (!incidental) sounding.add(finish);
   void done.then(() => {
     sounding.delete(finish);
     suspendWhenIdle();

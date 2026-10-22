@@ -42,6 +42,17 @@ describe('the tap sound', () => {
     expect(ticks.count).toBe(1);
   });
 
+  it('ticks for a section opening, a link, a checkbox and its label, once each', () => {
+    const section = h('details', null, h('summary', null, h('span', null, 'Greetings')), h('p', null, 'Kumusta'));
+    const link = h('a', { href: '#' }, 'platform.openai.com');
+    const toggle = h('label', null, h('input', { type: 'checkbox' }), h('span', null, 'Tap sounds'));
+    root.append(section, link, toggle);
+    press(section.querySelector('span')!);
+    press(link);
+    press(toggle.querySelector('span')!);
+    expect(ticks.count).toBe(3);
+  });
+
   it("doesn't tick when the press plays a word or the chime", async () => {
     vi.useFakeTimers();
     const word = h('button', { onclick: () => void play({ tl: 'Salamat' }) }, 'Play');
