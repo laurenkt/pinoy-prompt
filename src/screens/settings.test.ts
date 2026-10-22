@@ -2,21 +2,14 @@
 // Settings' Test voice says how long the word took to start, for checking audio lag on a phone.
 
 import { afterEach, expect, it, vi } from 'vitest';
-import type { App } from '../app';
 import { stop } from '../speech';
-import { emptyProgress } from '../store';
 import { settingsScreen } from './settings';
+import { fakeApp } from '../test/screen';
 
 afterEach(() => {
   stop();
   vi.unstubAllGlobals();
 });
-
-function fakeApp(): App {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
 
 it('says how long the test word took to start, once it has', async () => {
   const spoken: { onstart: (() => void) | null }[] = [];

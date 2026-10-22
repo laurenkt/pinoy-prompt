@@ -5,8 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
 import type { PhoneModel } from '../phone-model';
 import { RecordError, type RecorderEvents, type Take } from '../recorder';
-import { speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { compare, toPhones } from '../phonetics';
+import { isRight, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
+import { flush } from '../test/screen';
 
 /** A scriptable microphone: the test decides what it hears and when it stops. */
 class FakeMic {
@@ -62,7 +64,6 @@ function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
   };
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
 const text = (selector: string) => panel.el.querySelector(selector)?.textContent ?? '';
 function button(name: string): HTMLButtonElement {
   const match = [...panel.el.querySelectorAll('button')].find((b) => b.textContent?.trim().endsWith(name));
@@ -216,5 +217,29 @@ describe('an attempt', () => {
     button('Tap and speak').click();
     panel.dispose();
     expect(mic.cancelled).toBe(true);
+  });
+});
+
+describe('what counts as right', () => {
+  /** The sounds of `tl` said cleanly, then with the sounds at `drop` left out. */
+  function saidWithout(tl: string, drop: number[]) {
+    const phones = toPhones(tl);
+    const heard = phones.filter((p) => !p.optional).map((p) => p.ipa).filter((_, i) => !drop.includes(i));
+    return compare(phones, heard);
+  }
+
+  it('passes a long phrase with one sound slipping, as a listener would still get it', () => {
+    const one = saidWithout('Hindi ko maintindihan.', [4]);
+    expect(one.score).toBeGreaterThan(0.9);
+    expect(one.sounds.some((s) => s.verdict === 'missing')).toBe(true);
+    expect(isRight(one)).toBe(true);
+  });
+
+  it('fails a long phrase with several sounds missing', () => {
+    expect(isRight(saidWithout('Hindi ko maintindihan.', [1, 5, 9, 13]))).toBe(false);
+  });
+
+  it('fails a short word with one sound missing, as that can make another word', () => {
+    expect(isRight(saidWithout('Salamat', [2]))).toBe(false);
   });
 });

@@ -273,17 +273,6 @@ p {
   box-shadow: 1px 1px 0 var(--ink);
 }
 
-.title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 0.5rem;
-}
-
-.title-row h1 {
-  margin: 0;
-}
 
 .welcome {
   background: var(--teal);
@@ -2279,8 +2268,21 @@ p {
   background: var(--cream);
 }
 
+/* Pages opened from Home (Library, Drills, Settings): the back arrow, then the title row. */
 .back-bar {
   margin-bottom: 20px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.page-header h1 {
+  margin: 0;
 }
 
 /* Settings: how long the test word took to be heard, under the Test voice button. */

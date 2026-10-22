@@ -1,25 +1,19 @@
 // @vitest-environment happy-dom
 // Speak mode inside a practice round, with a stand-in microphone and model.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
 import { getCard } from '../deck';
 import { toPhones } from '../phonetics';
 import type { Take } from '../recorder';
-import { emptyProgress, recordAnswer } from '../store';
+import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
+import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
+import { fakeApp, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'tatlo', 'paalam', 'oo', 'kape'];
-
-function fakeApp(): App {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  progress.settings.autoplay = false;
-  for (const id of KNOWN) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
 
 /** A model that hears whatever the card should sound like, so every attempt is right. */
 function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
@@ -44,7 +38,6 @@ function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
   };
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
 function button(name: string): HTMLButtonElement {
   const match = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(name) || b.textContent?.trim().endsWith(name));
   if (!match) throw new Error(`No button "${name}" in: ${document.body.textContent}`);
@@ -54,8 +47,8 @@ function button(name: string): HTMLButtonElement {
 beforeEach(() => document.body.replaceChildren());
 
 describe('Speak mode', () => {
-  it('runs a round of spoken questions and counts the good ones', async () => {
-    document.body.append(practiceScreen(fakeApp(), deps()));
+  it('runs a round of spoken questions', async () => {
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps()));
     await flush();
     button('Speak').click();
     await flush();
@@ -63,21 +56,104 @@ describe('Speak mode', () => {
     button("I'm done").click();
     await flush();
     expect(document.querySelector('.feedback strong')?.textContent).toBe('Tama!');
-    expect(document.querySelector('.session-title')?.textContent).toBe('1 right');
     button('Next').click();
     await flush();
     expect(button('Tap and speak')).toBeTruthy();
   });
 
+  it('goes back to the menu when quiet mode comes on mid-round', async () => {
+    const app = fakeApp(KNOWN);
+    document.body.append(practiceScreen(app, deps()));
+    await flush();
+    button('Speak').click();
+    await flush();
+    button('Tap and speak').click();
+    button("I'm done").click();
+    await flush();
+    app.progress.settings.quiet = true;
+    button('Next').click();
+    expect(document.querySelector('.session-header')).toBeNull();
+    expect(document.body.textContent).toContain('Off in quiet mode');
+  });
+
   it('is offered but explained when the browser cannot record', async () => {
-    document.body.append(practiceScreen(fakeApp(), deps({ recordingSupported: () => false })));
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps({ recordingSupported: () => false })));
     expect(document.body.textContent).toContain("can't record from the microphone");
+  });
+});
+
+describe('moving on after a right attempt', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** Say the word on screen, right or (by saying nothing like it) wrong. */
+  async function attempt(): Promise<void> {
+    button('Tap and speak').click();
+    button("I'm done").click();
+    await vi.advanceTimersByTimeAsync(0);
+  }
+  const shown = () => document.querySelector('.prompt .tl')?.textContent;
+  const mumble = deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition(['ʃ']) }) });
+
+  it('goes to the next word by itself in a drill', async () => {
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps()));
+    await vi.advanceTimersByTimeAsync(0);
+    button('Speak').click();
+    await vi.advanceTimersByTimeAsync(0);
+    await attempt();
+    expect(document.querySelector('.continue.counting')).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(document.querySelector('.session-count')?.textContent).toBe('1 done');
+    // The next word doesn't take focus, so a late Enter meant for Next can't start a recording.
+    expect(document.activeElement).not.toBe(button('Tap and speak'));
+  });
+
+  it('waits after a miss', async () => {
+    document.body.append(practiceScreen(fakeApp(KNOWN), mumble));
+    await vi.advanceTimersByTimeAsync(0);
+    button('Speak').click();
+    await vi.advanceTimersByTimeAsync(0);
+    await attempt();
+    expect(document.querySelector('.counting')).toBeNull();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS * 5);
+    expect(button('Try again')).toBeTruthy();
+  });
+
+  it('stops counting down when the learner plays their attempt back', async () => {
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps()));
+    await vi.advanceTimersByTimeAsync(0);
+    button('Speak').click();
+    await vi.advanceTimersByTimeAsync(0);
+    await attempt();
+    const word = shown();
+    button('▶ Yours').click();
+    expect(document.querySelector('.counting')).toBeNull();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS * 5);
+    expect(shown()).toBe(word);
+    expect(document.querySelector('.session-count')?.textContent).toBe('0 done');
+  });
+
+  it('goes to the next card by itself in Study', async () => {
+    const root = sessionScreen(fakeApp(KNOWN), [
+      { kind: 'extra', cardId: 'salamat', format: 'speak' },
+      { kind: 'extra', cardId: 'kape', format: 'speak' },
+    ], undefined, deps());
+    document.body.append(root);
+    await vi.advanceTimersByTimeAsync(0);
+    button('Keep practising').click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shown()).toBe(getCard('salamat')!.tl);
+    await attempt();
+    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(shown()).toBe(getCard('kape')!.tl);
   });
 });
 
 describe('back gesture in Drills', () => {
   it('goes from a round to the drills menu, and from the menu Home', async () => {
-    const app = fakeApp();
+    const app = fakeApp(KNOWN);
     const navigate = vi.fn<App['navigate']>();
     app.navigate = navigate;
     let back = () => {};

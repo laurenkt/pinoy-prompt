@@ -3,13 +3,13 @@
 // Without headphones it's silent too: nothing plays and nothing needs listening.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { App } from '../app';
 import { play } from '../speech';
-import { emptyProgress, recordAnswer } from '../store';
+import { emptyProgress } from '../store';
 import { practiceScreen } from './practice';
 import { applyAudioMode, quietToggle } from './quiet';
 import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
+import { button, fakeApp as knowing, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'paalam', 'tatlo', 'kape'];
 
@@ -21,21 +21,8 @@ const micReady = {
 } as unknown as SpeakDeps;
 
 /** Quiet, quiet with headphones in, or off. */
-function fakeApp(quiet: boolean, headphones = true): App {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  progress.settings.autoplay = false;
-  progress.settings.dailyNew = KNOWN.length;
-  progress.settings.quiet = quiet;
-  progress.settings.headphones = headphones;
-  for (const id of KNOWN) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
-
-function button(root: HTMLElement, text: string): HTMLButtonElement {
-  const found = [...root.querySelectorAll('button')].find((b) => b.textContent?.includes(text));
-  if (!found) throw new Error(`No "${text}" button in: ${root.textContent}`);
-  return found;
+function fakeApp(quiet: boolean, headphones = true) {
+  return knowing(KNOWN, { dailyNew: KNOWN.length, quiet, headphones });
 }
 
 /** Pick the first choice, right or wrong, and move on. */
@@ -44,7 +31,6 @@ function answer(root: HTMLElement): void {
   root.querySelector<HTMLButtonElement>('.btn.primary')!.click();
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
 const speaking = (root: HTMLElement) => root.textContent?.includes('Say this out loud') ?? false;
 
 const hearing = (root: HTMLElement) => /What did you hear|what you heard/.test(root.textContent ?? '');

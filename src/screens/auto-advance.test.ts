@@ -3,36 +3,19 @@
 // way back to it; a miss, or a card missed earlier, waits for Continue.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { App } from '../app';
 import { VOCAB, getCard } from '../deck';
 import type { Step } from '../session';
-import { emptyProgress, recordAnswer } from '../store';
 import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
 import { sessionScreen } from './session';
-import type { SpeakDeps } from './speak';
+import { button, fakeApp, noMic } from '../test/screen';
 
-const noMic = { recordingSupported: () => false, modelDownloaded: async () => false } as unknown as SpeakDeps;
 const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
-
-function fakeApp(): App {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  progress.settings.autoplay = false;
-  for (const id of KNOWN) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
 
 /** Mount a screen, since one that has been left never moves on. */
 function mount(el: HTMLElement): HTMLElement {
   document.body.replaceChildren(el);
   return el;
-}
-
-function button(root: HTMLElement, text: string): HTMLButtonElement {
-  const found = [...root.querySelectorAll('button')].find((b) => b.textContent?.includes(text));
-  if (!found) throw new Error(`No "${text}" button`);
-  return found;
 }
 
 const has = (root: HTMLElement, text: string) => [...root.querySelectorAll('button')].some((b) => b.textContent?.includes(text));
@@ -50,7 +33,7 @@ afterEach(() => {
 
 describe('moving on after a right answer in a session', () => {
   it('goes to the next card by itself, with a way back to the one before', () => {
-    const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
     answer(root, true);
     expect(root.querySelector('.continue.counting')).not.toBeNull();
     vi.advanceTimersByTime(ADVANCE_MS - 1);
@@ -73,7 +56,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('waits for Continue after a miss', () => {
-    const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
     answer(root, false);
     expect(root.querySelector('.counting')).toBeNull();
     vi.advanceTimersByTime(ADVANCE_MS * 5);
@@ -83,7 +66,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('keeps the hook up when a card missed earlier is got right', () => {
-    const root = mount(sessionScreen(fakeApp(), reads('salamat'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat'), undefined, noMic));
     answer(root, false);
     button(root, 'Continue').click();
     expect(shownCard(root).id).toBe('salamat');
@@ -94,7 +77,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('stops counting down when the learner taps something else', () => {
-    const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
     answer(root, true);
     root.querySelector<HTMLButtonElement>('.audio-btn')!.click();
     expect(root.querySelector('.counting')).toBeNull();
@@ -103,7 +86,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('moves on straight away from Continue, without offering the way back', () => {
-    const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
     answer(root, true);
     button(root, 'Continue').click();
     expect(shownCard(root).id).toBe('oo');
@@ -113,7 +96,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it("doesn't put focus on the next card's choices, so a late Enter can't answer it", () => {
-    const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
     answer(root, true);
     vi.advanceTimersByTime(ADVANCE_MS);
     expect(shownCard(root).id).toBe('oo');
@@ -121,7 +104,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('does nothing once the screen has been left', () => {
-    const root = mount(sessionScreen(fakeApp(), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
     answer(root, true);
     document.body.replaceChildren();
     vi.advanceTimersByTime(ADVANCE_MS * 5);
@@ -131,7 +114,7 @@ describe('moving on after a right answer in a session', () => {
 
 describe('moving on after a right answer in a drill', () => {
   function round(): HTMLElement {
-    const root = mount(practiceScreen(fakeApp(), noMic));
+    const root = mount(practiceScreen(fakeApp(KNOWN), noMic));
     button(root, 'Read').click();
     return root;
   }
@@ -147,7 +130,20 @@ describe('moving on after a right answer in a drill', () => {
     expect(root.querySelector('.hook')?.textContent).toContain(first.hook);
     button(root, 'Back to the current card').click();
     expect(root.querySelector('.choice:disabled')).toBeNull();
-    expect(root.querySelector('.session-title')?.textContent).toBe('1 right');
+    expect(root.querySelector('.session-count')?.textContent).toBe('1 done');
+  });
+
+  it('keeps asking until the learner closes it, with no word straight after itself', () => {
+    const root = round();
+    let last = '';
+    for (let i = 0; i < 25; i++) {
+      const card = shownCard(root);
+      expect(card.id).not.toBe(last);
+      last = card.id;
+      answer(root, true);
+      vi.advanceTimersByTime(ADVANCE_MS);
+    }
+    expect(root.querySelector('.session-count')?.textContent).toBe('25 done');
   });
 
   it('waits for Next after a miss', () => {

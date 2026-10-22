@@ -19,7 +19,7 @@ import {
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { canPlay, play, preload, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
-import { audioButton, h, hookView, icon, progressBar } from '../ui';
+import { audioButton, audioPair, choiceList, h, hookView, icon, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
@@ -189,6 +189,13 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         say: (slow) => say(slow),
         silence: () => stop(),
         onAttempt: (right) => {
+          // A right attempt moves on by itself, even after a miss: getting it right was the point.
+          // There's nothing to look back at on a speaking step, so it moves on without one.
+          if (right && !auto)
+            auto = countdown(root, () => {
+              autoMoved = true;
+              next();
+            });
           if (picked) return;
           picked = c.id;
           stats.practised++;
@@ -196,8 +203,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
           misses.set(c.id, (misses.get(c.id) ?? 0) + 1);
           struggled.add(c.id);
         },
+        counting: () => auto !== null,
         onNext: next,
         onReady: () => (speakReady = true),
+        autofocus: !autoMoved,
         deps,
       });
     } else if (format === 'remember' || format === 'hear' || format === 'produce') {
@@ -552,7 +561,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         'div',
         { class: 'prompt center' },
         h('p', { class: 'eyebrow' }, 'What did you hear?'),
-        h('div', { class: 'audio-group big' }, audioButton(() => say(), 'Play again', 'huge'), audioButton(() => say(true), 'Play slowly', 'slow')),
+        audioPair(say, true),
         answered && h('p', { class: 'tl', lang: 'fil' }, c.tl),
       );
     }
@@ -568,24 +577,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       'div',
       { class: 'panel' },
       quizPrompt(c, answered),
-      h(
-        'div',
-        { class: 'choices' },
-        choices.map((choice, i) =>
-          h(
-            'button',
-            {
-              class: `choice ${answered && choice.id === c.id ? 'correct' : ''} ${answered && choice.id === picked && !right ? 'wrong' : ''}`,
-              disabled: answered,
-              'data-autofocus': (!answered && i === 0) || undefined,
-              lang: field === 'tl' ? 'fil' : undefined,
-              onclick: () => pick(choice),
-            },
-            h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
-            choice[field],
-          ),
-        ),
-      ),
+      choiceList(choices, { key: (o) => o.id, label: (o) => o[field], answer: c.id, picked, lang: field === 'tl' ? 'fil' : undefined, onPick: pick }),
       answered &&
         h(
           'div',
@@ -614,7 +606,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
             'div',
             { class: 'prompt center' },
             h('p', { class: 'eyebrow' }, 'Do you know what you heard?'),
-            h('div', { class: 'audio-group big' }, audioButton(() => say(), 'Play again', 'huge'), audioButton(() => say(true), 'Play slowly', 'slow')),
+            audioPair(say, true),
             showBack && h('p', { class: 'tl', lang: 'fil' }, c.tl),
           )
         : h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Do you remember?'), tagalog(c));
@@ -734,7 +726,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       'div',
       { class: 'tl-row' },
       h('p', { class: 'tl drill-tl', lang: 'fil' }, before, h('span', { class: `gap ${filled ? 'filled' : ''}` }, filled ? d.answer : '___'), after),
-      filled && h('div', { class: 'audio-group' }, audioButton(() => say()), audioButton(() => say(true), 'Play slowly', 'slow')),
+      filled && audioPair(say),
     );
   }
 
@@ -771,24 +763,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       'div',
       { class: 'panel' },
       drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label),
-      h(
-        'div',
-        { class: 'choices' },
-        drillChoices.map((choice, i) =>
-          h(
-            'button',
-            {
-              class: `choice ${answered && choice === d.answer ? 'correct' : ''} ${answered && choice === picked && !right ? 'wrong' : ''}`,
-              disabled: answered,
-              'data-autofocus': (!answered && i === 0) || undefined,
-              lang: d.tl ? 'fil' : undefined,
-              onclick: () => pickAnswer(choice),
-            },
-            h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
-            choice,
-          ),
-        ),
-      ),
+      choiceList(drillChoices, { key: (o) => o, label: (o) => o, answer: d.answer, picked, lang: d.tl ? 'fil' : undefined, onPick: pickAnswer }),
       answered && drillFeedback(c, right),
       answered && right && lookAgain(c) && hookView(c),
       answered && proceed(),
@@ -882,7 +857,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       'div',
       { class: 'tl-row' },
       h('p', { class: 'tl', lang: 'fil' }, c.tl),
-      h('div', { class: 'audio-group' }, audioButton(() => say()), audioButton(() => say(true), 'Play slowly', 'slow')),
+      audioPair(say),
     );
   }
 

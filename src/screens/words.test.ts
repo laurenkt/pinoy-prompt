@@ -2,21 +2,9 @@
 // The Library: filters stay out of the way until asked for.
 
 import { afterEach, describe, expect, it } from 'vitest';
-import type { App } from '../app';
 import { UNITS } from '../deck';
-import { emptyProgress } from '../store';
 import { wordsScreen } from './words';
-
-function fakeApp(): App {
-  const now = Date.now();
-  return { progress: emptyProgress(now), now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
-
-function button(root: HTMLElement, text: string): HTMLButtonElement {
-  const found = [...root.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
-  if (!found) throw new Error(`No "${text}" button`);
-  return found;
-}
+import { button, fakeApp } from '../test/screen';
 
 const toggle = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.filter-toggle')!;
 const chips = (root: HTMLElement) => root.querySelector<HTMLElement>('.chips')!;

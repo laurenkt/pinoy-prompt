@@ -29,7 +29,7 @@ async function cacheShell(cache) {
 /** Recorded word clips, kept by the app (src/clip-cache.ts). Must match AUDIO_CACHE there. */
 const AUDIO_CACHE = 'pinoy-prompt-audio-v1';
 
-/** Must match CACHE in src/phone-model.ts. */
+/** Kept by the app (src/model-cache.ts). Must match CACHE there. */
 const MODEL_CACHE = 'pinoy-prompt-models-v1';
 
 /**
