@@ -167,8 +167,8 @@ export function growthChart(
     );
   });
   if (next) {
-    // From today's words that have stuck (within the bottom two layers, which
-    // also hold guides) up to the corner, under the milestone's tag. The milestone is
+    // From today's count the forecast goes by (words that have stuck, or early
+    // on every word met) up to the corner, under the milestone's tag. The milestone is
     // off this scale, so the line shows the direction and the tag the numbers.
     const stuck = yOf(forecast!.known);
     plot.append(
@@ -195,7 +195,7 @@ export function growthChart(
         class: 'growth-goal',
         'aria-expanded': 'false',
         'aria-controls': 'growth-forecast',
-        'aria-label': `About ${next.words.toLocaleString()} words around ${monthYear(next.at)} at your recent pace. Show all milestones.`,
+        'aria-label': `${forecast!.early ? 'Early guess: about' : 'About'} ${next.words.toLocaleString()} words around ${monthYear(next.at)} at your recent pace. Show all milestones.`,
         onclick: () => {
           ahead.hidden = !ahead.hidden;
           goal!.setAttribute('aria-expanded', String(!ahead.hidden));
@@ -216,8 +216,14 @@ export function growthChart(
     marker.hidden = today;
     marker.style.left = `${(i / last) * 100 * past}%`;
     back.hidden = today;
-    // One control in the caption's corner at a time.
-    if (goal) goal.hidden = !today;
+    // One control in the caption's corner at a time; the list it opens closes with it.
+    if (goal && ahead) {
+      goal.hidden = !today;
+      if (!today) {
+        ahead.hidden = true;
+        goal.setAttribute('aria-expanded', 'false');
+      }
+    }
   }
 
   const frame = h(
@@ -227,7 +233,7 @@ export function growthChart(
     marker,
     // In the first days the stream is a sliver at the edge; say what is coming.
     times[last] - history.since < 2 * DAY_MS &&
-      h('p', { class: 'growth-hint small' }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
+      h('p', { class: 'growth-hint small', style: next ? { right: `${(1 - PAST) * 100 + 4}%` } : null }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
   );
   const pick = (e: PointerEvent) => {
     const box = frame.getBoundingClientRect();
