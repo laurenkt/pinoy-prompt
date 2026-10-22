@@ -37,6 +37,14 @@ Every screen is one of two kinds, and each kind has one layout:
 
 Home is the hub and has its own header. A screen never shows both a back arrow and a close button. New screens pick one of the two kinds; a new kind of screen is a decision worth writing down here first.
 
+**Height.** Every screen is at least as tall as the phone's screen (`.screen` in `style.css`, under "Layout"). A screen that fits passes its spare height down a column of containers (`.home`, `.practice`, `.talk`, `.session`, `.session-body`, `.panel`) to what can use it, so a taller phone gets bigger targets rather than an empty bottom:
+
+- In a session's `.panel`, the prompt grows to about a third of the screen, answer choices share the rest (up to a size a thumb can't miss), and otherwise the panel's last piece (its button, the answer and ratings, the microphone) sits at the bottom, under the thumb. A `.panel.center` card (a summary, a topic's introduction) sits in the middle instead.
+- On Home the hub takes it; in a call, the transcript.
+- Pages (Library, Settings) are as long as their content and scroll.
+
+A new screen or panel gets this by using those containers; a wrapper element between them breaks the column, which `src/screens/layout.test.ts` checks. Sizes that should grow with the phone use `dvh` in a `clamp()`, so short phones keep the usual sizes.
+
 Spacing, gutters, tap targets and colours come from REVIEW.md and the `:root` tokens in `style.css`.
 
 ### Audio
@@ -59,7 +67,7 @@ Progress is the one thing the app can't lose; the README's "Saved progress" sect
 - **Shared test pieces live in `src/test/`.** `screen.ts` has the stand-in `App` (`fakeApp`), `button`, `noMic` and `flush` for screen tests; `fake-speech.ts` stands in for the recogniser and player; `fake-storage.ts` for storage; `fixtures/` holds saved progress from every schema. When `App` or `Settings` changes, change `fakeApp` once.
 - **Stand-ins go through deps, not module mocks,** where a screen offers them (`SpeakDeps`, `TalkDeps`, `CallDeps`, `Player`). Prefer adding a dep over `vi.mock` of a shared module, which can hide a change in that module from every screen test.
 - **Files that can't import each other are checked by a test.** `public/sw.js` can't import from `src/`, so `src/sw.test.ts` checks the cache names and file path it shares with the app. `src/spoken.test.ts` checks every spoken text has its clip. Add a check like these whenever two systems agree on a name by hand.
-- **Screenshots** for UI changes (CLAUDE.md) are taken at 360px and 390px wide, of Home and every changed screen.
+- **Screenshots** for UI changes (CLAUDE.md) are taken with `npm run screenshots -- <out-dir> [screen ...]` (`scripts/screenshots.mjs`): Playwright on the dev server, at 360×640, 390×844, an iPhone SE (375×667) and a Pro Max (430×932), on a seeded learner so before and after match. It prints Home's scroll height and any screen wider than the phone. Add a screen to its list when a change needs one it doesn't reach.
 
 ## Findings, October 2026
 
@@ -73,4 +81,4 @@ What a review of the whole app found, most important first, and what has been do
 6. **Study and Drills ask the same questions with separate code.** Read, listen and recall prompts and their feedback are built twice, and the words have drifted: Drills says "Tama!" / "Mali.", Study a rotating "Magaling!" / "Not quite.". Not worth merging yet; the next change to how either asks a question should move the prompts into one place and settle on one wording.
 7. **Audio is now one system.** After the clip rewrite, card audio, reference sounds and slices all go through the shared engine, and the built-in voice is only a fallback. The remaining loose end is the visualizer's own context (see Audio).
 8. **`screens/session.ts` is large** (about 900 lines: introductions, quizzes, flashcards, guide drills, tile building, speaking, the summary). Fine while it changes rarely; split the guide views into their own file the next time they grow.
-9. **Screenshots are taken by a new script each time.** Worth a shared `npm run screenshots` (Playwright, Home plus a given screen at 360px and 390px, reporting Home's scroll height and any sideways scroll) the next time a UI change needs them, so REVIEW.md's layout checks are measured the same way every time.
+9. **Screenshots are taken by a new script each time.** Worth a shared `npm run screenshots` (Playwright, Home plus a given screen at 360px and 390px, reporting Home's scroll height and any sideways scroll) the next time a UI change needs them, so REVIEW.md's layout checks are measured the same way every time. *Fixed: `npm run screenshots`, added with the full-height layout.*

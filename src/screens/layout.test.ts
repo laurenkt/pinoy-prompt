@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
 // Every screen is a page or a session (docs/ARCHITECTURE.md): a page has the
-// back arrow to Home, a session the close button, and never both.
+// back arrow to Home, a session the close button, and never both. A screen
+// that fits passes the phone's height down to what can use it.
 
 import { describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
+import { homeScreen } from './home';
 import { practiceScreen } from './practice';
+import { sessionScreen } from './session';
+import css from '../style.css?raw';
 import { settingsScreen } from './settings';
 import { wordsScreen } from './words';
 import { fakeApp } from '../test/screen';
@@ -51,5 +55,32 @@ describe('page and session layouts', () => {
     practiceScreen(app);
     // Without a handler of its own, the system back gesture goes Home.
     expect(onBack.mock.calls.every(([handler]) => handler === null)).toBe(true);
+  });
+});
+
+describe('filling the screen', () => {
+  // The containers style.css lays out as a column that takes the spare height ("Layout").
+  const column = /\/\* The column from the screen down to the panel\. \*\/\n([^{]+)\{/.exec(css)?.[1].trim();
+
+  /** Whether every element from the screen's root down to `el` passes the height on. */
+  function filled(root: HTMLElement, el: Element | null): boolean {
+    expect(el).not.toBeNull();
+    for (let node = el!.parentElement; node && node !== root.parentElement; node = node.parentElement) {
+      if (!node.matches(column!)) return false;
+    }
+    return true;
+  }
+
+  it('names the column in style.css', () => {
+    expect(column).toBeTruthy();
+  });
+
+  it.each([
+    ['a drill round', () => practiceScreen(fakeApp(KNOWN)), '.choices'],
+    ['a study question', () => sessionScreen(fakeApp(KNOWN), [{ kind: 'review', cardId: 'salamat', format: 'remember' }]), '.panel > .btn.big'],
+    ['Home', () => homeScreen(fakeApp(KNOWN)), '.hub'],
+  ])('passes the height down to what grows on %s', (_, screen, grows) => {
+    const root = screen();
+    expect(filled(root, root.querySelector(grows))).toBe(true);
   });
 });
