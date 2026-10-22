@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
 const { IDLE_SUSPEND_MS, KEEP_DECODED, loadClip } = await import('./audio-engine');
-const { canPlay, chime, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
+const { canPlay, chime, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
   buffer: { duration: number } | null;
@@ -386,5 +386,21 @@ describe('the right-answer chime', () => {
     for (const c of contexts) c.state = 'suspended';
     await chime();
     expect(sources).toHaveLength(0);
+  });
+});
+
+describe('the tap sound', () => {
+  it('is shorter and quieter than the chime', async () => {
+    for (const c of contexts) c.state = 'running';
+    await new Promise((r) => setTimeout(r, 300));
+    await chime();
+    sources[0].onended!();
+    await new Promise((r) => setTimeout(r, 300));
+    tick();
+    const [rang, ticked] = sources.map((s) => s.buffer as unknown as { duration: number; getChannelData(): Float32Array });
+    const peak = (b: typeof rang) => b.getChannelData().reduce((m, x) => Math.max(m, Math.abs(x)), 0);
+    expect(ticked.duration).toBeLessThan(0.15);
+    expect(peak(ticked)).toBeLessThan(peak(rang) / 2);
+    expect(peak(ticked)).toBeGreaterThan(0.01);
   });
 });

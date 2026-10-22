@@ -222,7 +222,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
         ),
       ),
       plan.newWord && h('p', { class: 'muted small' }, 'New word this time: ', h('strong', { lang: 'fil' }, plan.newWord.tl), ` (${plan.newWord.en})`),
-      h('button', { class: 'btn primary big', disabled: !canCall, onclick: () => void begin() }, icon('mic'), ' Start talking'),
+      h('button', { class: 'btn primary big', disabled: !canCall, 'data-no-tap': true, onclick: () => void begin() }, icon('mic'), ' Start talking'),
       h(
         'p',
         { class: 'muted small center' },
@@ -273,7 +273,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
           'div',
           { class: 'row' },
           h('button', { class: 'btn secondary', onclick: () => { state = { name: 'menu' }; draw(); } }, 'Change topic'),
-          h('button', { class: 'btn primary', onclick: () => void begin() }, 'Chat again'),
+          h('button', { class: 'btn primary', 'data-no-tap': true, onclick: () => void begin() }, 'Chat again'),
         ),
     );
   }
