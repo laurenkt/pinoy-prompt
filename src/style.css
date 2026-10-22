@@ -340,9 +340,20 @@ p {
 .growth-caption {
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
   margin: 0 0 10px;
   min-height: 1.6rem;
+}
+
+/* One line whatever its length, so the chart below never moves; the words give way first. */
+.growth-caption > .muted {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.growth-caption > button {
+  flex-shrink: 0;
 }
 
 .growth-total {
@@ -365,11 +376,11 @@ p {
 }
 
 .growth-goal {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  /* A full-size target that doesn't make the caption row taller. */
+  margin: -9px 0 -9px auto;
+  align-self: center;
   min-height: 44px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -380,7 +391,7 @@ p {
   border-radius: 12px;
   box-shadow: 2px 2px 0 var(--ink);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   line-height: 1.15;
   white-space: nowrap;
 }
@@ -507,6 +518,7 @@ p {
 }
 
 .growth-back[hidden],
+.growth-goal[hidden],
 .growth-forecast[hidden],
 .growth-marker[hidden] {
   display: none;
