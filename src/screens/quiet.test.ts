@@ -5,11 +5,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { play } from '../speech';
 import { emptyProgress } from '../store';
+import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
 import { applyAudioMode, quietToggle } from './quiet';
 import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
-import { button, fakeApp as knowing, flush } from '../test/screen';
+import { button, drillScope, fakeApp as knowing, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'paalam', 'tatlo', 'kape'];
 
@@ -43,6 +44,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   applyAudioMode(emptyProgress(0).settings);
@@ -160,16 +162,53 @@ describe('silent quiet mode (no headphones)', () => {
 });
 
 describe('quiet mode in drills', () => {
-  it('turns off the speak drill, and listening too without headphones', async () => {
+  /** The round's quiet toggle, an icon in its header. */
+  const quiet = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.session-header [aria-label^="Quiet mode"]')!;
+
+  it('takes speaking out of scope, and listening too without headphones', async () => {
     const root = practiceScreen(fakeApp(true, false), micReady);
     await flush();
-    expect(button(root, 'Speak').disabled).toBe(true);
-    expect(button(root, 'Listen').disabled).toBe(true);
-    expect(root.textContent).toContain('Off in quiet mode');
-    button(root, 'Silent').click();
-    expect(button(root, 'Listen').disabled).toBe(false);
-    expect(button(root, 'Speak').disabled).toBe(true);
-    button(root, 'Quiet').click();
-    expect(button(root, 'Speak').disabled).toBe(false);
+    const chip = (mode: string) => root.querySelector<HTMLButtonElement>(`#drill-scope [data-mode="${mode}"]`)!;
+    expect(chip('speak').disabled).toBe(true);
+    expect(chip('listen').disabled).toBe(true);
+    expect(root.textContent).toContain('Speak is off in quiet mode.');
+    quiet(root).click();
+    expect(chip('listen').disabled).toBe(false);
+    expect(chip('speak').disabled).toBe(true);
+    quiet(root).click();
+    expect(chip('speak').disabled).toBe(false);
+  });
+
+  it('swaps a listening question for another kind when silent mode came on while looking back', () => {
+    vi.useFakeTimers();
+    const root = practiceScreen(fakeApp(false), micReady);
+    document.body.replaceChildren(root);
+    drillScope(root, ['listen']);
+    // Answer until one is right, so the round moves on by itself and the one before can be looked back at.
+    for (let i = 0; i < 20 && !root.textContent?.includes('Tama!'); i++) {
+      if (root.querySelector('.feedback')) button(root, 'Next').click();
+      root.querySelector<HTMLButtonElement>('.choice')!.click();
+    }
+    // Long enough to give up waiting for the answer's audio, which never finishes here.
+    vi.advanceTimersByTime(ADVANCE_MS * 4);
+    expect(hearing(root)).toBe(true);
+    button(root, 'Previous card').click();
+    quiet(root).click();
+    expect(root.querySelector('[aria-label="Quiet mode: silent"]')).not.toBeNull();
+    button(root, 'Back to the current card').click();
+    expect(hearing(root)).toBe(false);
+    drillScope(root, ['listen', 'read', 'recall', 'speak']);
+    document.body.replaceChildren();
+  });
+
+  it('swaps an unanswered speaking question for another kind when quiet mode comes on', async () => {
+    const root = practiceScreen(fakeApp(false), micReady);
+    await flush();
+    drillScope(root, ['speak']);
+    expect(speaking(root)).toBe(true);
+    quiet(root).click();
+    expect(speaking(root)).toBe(false);
+    expect(root.querySelector('.choice')).not.toBeNull();
+    expect(root.textContent).toContain('0 done');
   });
 });

@@ -32,8 +32,8 @@ Each system has one owner module. Anything else that needs it calls that module.
 
 Every screen is one of two kinds, and each kind has one layout:
 
-- **A page** (Library, Drills' menu, Settings): opened from Home, browsed, left. It starts with `pageHeader()` from `ui.ts`: the back arrow (`.back-bar`) at the top left, then its title with at most one control beside it (`.page-header`). System back goes Home.
-- **A session** (Study, a drill round, Chat): something in progress. It has `.session-header` with the close button (×) at the left, then progress and any controls. Close, and system back, end the session the way the screen chooses (Study shows its summary, a drill round returns to the menu).
+- **A page** (Library, Settings): opened from Home, browsed, left. It starts with `pageHeader()` from `ui.ts`: the back arrow (`.back-bar`) at the top left, then its title with at most one control beside it (`.page-header`). System back goes Home.
+- **A session** (Study, a drill round, Chat): something in progress. It has `.session-header` with the close button (×) at the left, then progress and any controls. Close, and system back, end the session the way the screen chooses (Study shows its summary, a drill round goes Home). Drills open straight into a round, so they are a session; only with too few words to drill do they show a page saying so.
 
 Home is the hub and has its own header. A screen never shows both a back arrow and a close button. New screens pick one of the two kinds; a new kind of screen is a decision worth writing down here first.
 

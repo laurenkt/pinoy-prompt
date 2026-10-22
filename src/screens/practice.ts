@@ -9,19 +9,20 @@ import { isSilent, quietToggle } from './quiet';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
-type MenuMode = Mode | 'mix';
 
 const MIN_CARDS = 4;
 /** How many of the last questions' words are kept out of the next one, so nothing comes straight back. */
 const RECENT = 3;
 
-const MODES: { id: MenuMode; title: string; desc: string }[] = [
-  { id: 'listen', title: 'Listen', desc: 'Hear Tagalog, pick the meaning' },
-  { id: 'read', title: 'Read', desc: 'See Tagalog, pick the meaning' },
-  { id: 'recall', title: 'Recall', desc: 'See English, pick the Tagalog' },
-  { id: 'speak', title: 'Speak', desc: 'Say it out loud, get coaching on each sound' },
-  { id: 'mix', title: 'Mix it up', desc: 'A bit of everything' },
+const MODES: { id: Mode; title: string }[] = [
+  { id: 'listen', title: 'Listen' },
+  { id: 'read', title: 'Read' },
+  { id: 'recall', title: 'Recall' },
+  { id: 'speak', title: 'Speak' },
 ];
+
+/** The kinds of question a round may ask. Kept across visits, as the Library's filter is, and back to all of them when the app opens. */
+let scope = new Set<Mode>(MODES.map((m) => m.id));
 
 interface Question {
   card: Card;
@@ -65,7 +66,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     );
   }
 
-  /** The question being asked; null on the menu. */
+  /** The question being asked; null only when there are too few words to drill. */
   let current: Question | null = null;
   /** The question before, for looking back at. */
   let previous: Question | null = null;
@@ -74,7 +75,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   let picked: string | null = null;
   /** Questions moved past this round. */
   let done = 0;
-  let menuMode: MenuMode = 'mix';
   let distractorPool: Card[] = VOCAB;
   /** The last few words asked, oldest first. */
   let recent: string[] = [];
@@ -89,37 +89,42 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   let lookingBack = false;
   /** Set as a question moves on by itself, so the next one doesn't take focus: an Enter meant for Next would answer it. */
   let autoMoved = false;
+  /** The kinds of question are tucked away until asked for. */
+  let scopeOpen = false;
 
   holdOnTap(root, hold);
 
-  function start(mode: MenuMode): void {
-    menuMode = mode;
-    const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
-    distractorPool = known.length >= 6 ? known : VOCAB;
-    recent = [];
-    missed = new Map();
-    done = 0;
-    picked = null;
-    previous = null;
-    previousPick = null;
-    upcoming = null;
-    current = nextQuestion();
-    if (current) preload(current.card);
-    ask();
+  /** Why a kind of question can't be asked right now, if it can't: quiet or silent mode may have come on mid-round, here or in another tab. */
+  function unavailable(mode: Mode): string | null {
+    if (mode === 'listen' && !canListen) return 'Listen needs a voice, and this device has none.';
+    if (mode === 'listen' && isSilent(app.progress.settings)) return 'Listen is off in silent mode.';
+    if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
+    if (mode === 'speak' && app.progress.settings.quiet) return 'Speak is off in quiet mode.';
+    return null;
   }
 
-  /** Whether a question can be asked this way right now: quiet or silent mode may have come on mid-round, here or in another tab. */
-  function askable(mode: Mode): boolean {
-    if (mode === 'listen') return canListen && !isSilent(app.progress.settings);
-    if (mode === 'speak') return canSpeak && !app.progress.settings.quiet;
-    return true;
+  /** The kinds in scope that can be asked right now, before the speaking model is taken into account. */
+  function chosen(): Mode[] {
+    return MODES.map((m) => m.id).filter((m) => scope.has(m) && unavailable(m) === null);
   }
 
-  /** A question on the next word, asked the menu's way; for a mix, any way this device can right now. Null when the menu's way can't be asked any more. */
+  /**
+   * The kinds of question the next one can be: those in scope that can be asked right now. Speaking waits for the model
+   * to be on the device, so a round never stops for a download, unless Speak is all that's chosen: then it asks for it.
+   * When nothing in scope can be asked (only Listen, then silent mode), it falls back to everything that can.
+   */
+  function modes(): Mode[] {
+    const picks = chosen();
+    if (picks.length === 1 && picks[0] === 'speak') return picks;
+    const ready = (m: Mode) => m !== 'speak' || speakReady;
+    const ways = picks.filter(ready);
+    return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
+  }
+
+  /** A question on the next word, asked any way the scope allows right now. Null only with no words to ask. */
   function nextQuestion(): Question | null {
-    const modes: Mode[] = (['read', 'recall', 'listen', 'speak'] as const).filter((m) => askable(m) && (m !== 'speak' || speakReady));
-    const mode = menuMode === 'mix' ? modes[Math.floor(Math.random() * modes.length)] : menuMode;
-    if (!askable(mode)) return null;
+    const ways = modes();
+    const mode = ways[Math.floor(Math.random() * ways.length)];
     const card = pickNext(app, recent, missed);
     if (!card) return null;
     recent = [...recent.slice(-RECENT), card.id];
@@ -198,8 +203,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     done++;
     previous = current;
     previousPick = back;
-    // Picked before quiet or silent mode may have come on; a drill that can't go on goes back to the menu.
-    current = upcoming && askable(upcoming.mode) ? upcoming : nextQuestion();
+    // Picked before quiet or silent mode may have come on, or the scope changed.
+    current = upcoming && modes().includes(upcoming.mode) ? upcoming : nextQuestion();
     upcoming = null;
     picked = null;
     ask();
@@ -207,11 +212,34 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   const home = () => app.navigate({ name: 'home' });
 
-  /** Stop counting down: the learner wants another look. */
-  function endRound(): void {
-    app.navigate({ name: 'practice' });
+  /**
+   * The scope or quiet mode changed: a question waiting to be asked that can't be any more is picked again, and so is
+   * the one showing, while it's unanswered, so the change shows straight away.
+   */
+  function rescope(): void {
+    const ways = modes();
+    if (upcoming && !ways.includes(upcoming.mode)) upcoming = null;
+    if (current && !picked && !lookingBack && !ways.includes(current.mode)) {
+      hold();
+      // Anything settled on the old question (a right spoken attempt picks what's next) goes with it.
+      upcoming = null;
+      current = nextQuestion();
+      if (current) preload(current.card);
+      return ask();
+    }
+    draw();
   }
 
+  function toggleScope(mode: Mode): void {
+    // The last kind left in that can be asked stays on, so the round asks what was chosen.
+    const picks = chosen();
+    if (picks.length === 1 && picks[0] === mode) return;
+    if (!scope.delete(mode)) scope.add(mode);
+    rescope();
+    root.querySelector<HTMLButtonElement>(`[data-mode="${mode}"]`)?.focus();
+  }
+
+  /** Stop counting down: the learner wants another look. */
   function hold(): void {
     auto?.cancel();
     auto = null;
@@ -220,54 +248,84 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   function setLookingBack(on: boolean): void {
     stop();
     lookingBack = on;
-    draw();
+    // Quiet mode or the scope may have changed while looking back.
+    if (!on) rescope();
+    else draw();
   }
 
   function draw(): void {
-    if (!current) root.replaceChildren(menu());
+    if (!current) root.replaceChildren(tooFew());
     else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
     autoMoved = false;
   }
 
-  function menu(): HTMLElement {
-    if (learned < MIN_CARDS) {
-      return h(
-        'div',
-        null,
-        ...pageHeader('Drills', home),
-        h(
-          'section',
-          { class: 'card center' },
-          h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to drill them.`),
-          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
-        ),
-      );
-    }
+  /** Before there are words enough to drill, a page saying so. */
+  function tooFew(): HTMLElement {
     return h(
       'div',
       null,
-      ...pageHeader('Drills', home, quietToggle(app, draw)),
-      h('p', { class: 'muted' }, `Pick one skill and drill it with the ${learned} words you know, for as long as you like. Study already mixes these in; drills are for working on one on purpose. They don't change your review schedule.`),
+      ...pageHeader('Drills', home),
+      h(
+        'section',
+        { class: 'card center' },
+        h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to drill them.`),
+        h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
+      ),
+    );
+  }
+
+  /** The control for which kinds of question a round asks, and its chips, shown when it's opened. */
+  function scopeControls(): [HTMLElement, HTMLElement] {
+    // Kinds that can't be asked right now don't count either way: with all the rest chosen, or none, it's the mix.
+    const picks = chosen();
+    const mix = picks.length === 0 || picks.length === MODES.filter((m) => unavailable(m.id) === null).length;
+    const label = mix ? 'Mix' : picks.length === 1 ? MODES.find((m) => m.id === picks[0])!.title : `${picks.length} kinds`;
+    const toggle = h(
+      'button',
+      {
+        class: `chip filter-toggle ${mix ? '' : 'selected'}`,
+        'aria-expanded': String(scopeOpen),
+        'aria-controls': 'drill-scope',
+        'aria-label': `Questions: ${label}`,
+        onclick: () => {
+          scopeOpen = !scopeOpen;
+          draw();
+          root.querySelector<HTMLButtonElement>('.filter-toggle')?.focus();
+        },
+      },
+      icon('filter'),
+      label,
+    );
+    const reasons = MODES.map((m) => unavailable(m.id)).filter(Boolean);
+    const chips = h(
+      'div',
+      { id: 'drill-scope', hidden: !scopeOpen },
       h(
         'div',
-        { class: 'modes' },
+        { class: 'chips', role: 'group', 'aria-label': 'Ask' },
         MODES.map((m) => {
-          let unavailable: string | null = null;
-          if (m.id === 'listen' && !canListen) unavailable = 'No voice on this device';
-          else if (m.id === 'listen' && isSilent(app.progress.settings)) unavailable = 'Silent mode: needs headphones';
-          if (m.id === 'speak' && !canSpeak) unavailable = "This browser can't record from the microphone";
-          else if (m.id === 'speak' && app.progress.settings.quiet) unavailable = 'Off in quiet mode';
+          const on = scope.has(m.id);
           return h(
             'button',
-            { class: `mode mode-${m.id}`, disabled: unavailable !== null, onclick: () => start(m.id) },
-            h('span', { class: 'mode-title' }, m.title),
-            h('span', { class: 'mode-desc' }, unavailable ?? m.desc),
+            {
+              class: `chip ${on ? 'selected' : ''}`,
+              'data-mode': m.id,
+              'aria-pressed': String(on),
+              // One that can't be asked right now keeps its place, for when quiet mode goes off.
+              disabled: unavailable(m.id) !== null,
+              // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
+              'aria-disabled': String(on && picks.length === 1 && picks[0] === m.id),
+              onclick: () => toggleScope(m.id),
+            },
+            m.title,
           );
         }),
       ),
+      reasons.length > 0 && h('p', { class: 'muted scope-note' }, reasons.join(' ')),
     );
+    return [toggle, chips];
   }
 
   /** A question with what was picked on it; the one before, while looking back. */
@@ -306,16 +364,20 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       prompt = h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
     }
 
+    const [scopeToggle, scopeChips] = scopeControls();
     return h(
       'div',
       { class: 'session' },
       h(
         'header',
         { class: 'session-header' },
-        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: endRound }, icon('close')),
+        h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: home }, icon('close')),
         h('span', { class: 'session-count' }, `${done} done`),
-        h('span', { class: 'session-title' }, MODES.find((m) => m.id === menuMode)!.title),
+        scopeToggle,
+        // Icon only, as on Home: the header also holds the count and the filter, and must fit at 360px.
+        quietToggle(app, rescope, { iconOnly: true }),
       ),
+      scopeChips,
       previousPick && !answered && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
       h(
         'div',
@@ -358,9 +420,13 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     const n = Number(e.key);
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });
-  // Back from a round goes to the drills menu, as its close button does.
-  app.onBack(() => (current ? endRound() : home()));
-
-  draw();
+  // Drills open straight into a round; closing it, or going back, goes Home.
+  const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
+  distractorPool = known.length >= 6 ? known : VOCAB;
+  if (learned >= MIN_CARDS) {
+    current = nextQuestion();
+    if (current) preload(current.card);
+  }
+  ask();
   return root;
 }
