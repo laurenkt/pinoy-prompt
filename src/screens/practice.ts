@@ -3,7 +3,7 @@ import { VOCAB, getCard, isVocab, type Card } from '../deck';
 import { distractors, shuffle } from '../session';
 import type { CardState } from '../srs';
 import { canPlay, play, preload, stop } from '../speech';
-import { audioButton, h, hookView, icon, progressBar } from '../ui';
+import { audioButton, h, hookView, icon } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { isSilent, quietToggle } from './quiet';
 import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
@@ -11,8 +11,9 @@ import { defaultDeps, speakPanel, type SpeakDeps, type SpeakPanel } from './spea
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
 type MenuMode = Mode | 'mix';
 
-const ROUND_SIZE = 10;
 const MIN_CARDS = 4;
+/** How many of the last questions' words are kept out of the next one, so nothing comes straight back. */
+const RECENT = 3;
 
 const MODES: { id: MenuMode; title: string; desc: string }[] = [
   { id: 'listen', title: 'Listen', desc: 'Hear Tagalog, pick the meaning' },
@@ -33,18 +34,20 @@ function weight(state: CardState): number {
   return 1 + state.lapses * 2 + Math.max(0, 3 - state.ease) * 2 + (state.interval < 3 ? 2 : 0);
 }
 
-function pickRound(app: App, size: number): Card[] {
+/**
+ * The next word for a round that runs until the learner stops it. Weak and due words come up more,
+ * a word missed this round comes back after a few others, and the last few words asked sit out.
+ */
+export function pickNext(app: App, recent: string[], missed: Map<string, number>, random = Math.random): Card | null {
   // Drills are for words and phrases; guides are practised in Study.
-  const pool = Object.entries(app.progress.cards).map(([id, state]) => ({ card: getCard(id)!, w: weight(state) }))
+  const pool = Object.entries(app.progress.cards)
+    .map(([id, state]) => ({ card: getCard(id)!, w: weight(state) + (state.due <= app.now() ? 2 : 0) + (missed.get(id) ?? 0) * 4 }))
     .filter((p) => p.card && isVocab(p.card));
-  const picked: Card[] = [];
-  while (picked.length < size && pool.length > 0) {
-    const total = pool.reduce((sum, p) => sum + p.w, 0);
-    let r = Math.random() * total;
-    const i = pool.findIndex((p) => (r -= p.w) <= 0);
-    picked.push(pool.splice(i === -1 ? pool.length - 1 : i, 1)[0].card);
-  }
-  return picked;
+  const skip = new Set(recent.slice(-Math.min(RECENT, pool.length - 1)));
+  const open = pool.filter((p) => !skip.has(p.card.id));
+  if (open.length === 0) return null;
+  let r = random() * open.reduce((sum, p) => sum + p.w, 0);
+  return (open.find((p) => (r -= p.w) <= 0) ?? open[open.length - 1]).card;
 }
 
 export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLElement {
@@ -61,11 +64,19 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     );
   }
 
-  let questions: Question[] = [];
-  let index = 0;
+  /** The question being asked; null on the menu. */
+  let current: Question | null = null;
+  /** The question before, for looking back at. */
+  let previous: Question | null = null;
+  /** The question after, picked once this one is answered so its word can load. */
+  let upcoming: Question | null = null;
   let picked: string | null = null;
   let score = 0;
-  let lastMode: MenuMode = 'mix';
+  let menuMode: MenuMode = 'mix';
+  /** Words asked this round, oldest first. */
+  let recent: string[] = [];
+  /** Words missed this round and not yet got right since, with how many times. */
+  let missed = new Map<string, number>();
   let speak: SpeakPanel | null = null;
   let spokenRight = false;
   /** Counting down to the next question after a right answer. */
@@ -78,41 +89,61 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   holdOnTap(root, hold);
 
-  function start(menuMode: MenuMode): void {
+  function start(mode: MenuMode): void {
     // Silence may have come on in another tab since the menu was drawn.
-    if (menuMode === 'listen' && isSilent(app.progress.settings)) {
-      questions = [];
+    if (mode === 'listen' && isSilent(app.progress.settings)) {
+      current = null;
       return draw();
     }
-    lastMode = menuMode;
+    menuMode = mode;
+    recent = [];
+    missed = new Map();
+    score = 0;
+    picked = null;
+    previous = null;
+    previousPick = null;
+    upcoming = null;
+    current = nextQuestion();
+    if (current) preload(current.card);
+    ask();
+  }
+
+  /** A question on the next word, asked the menu's way; for a mix, any way this device can right now. */
+  function nextQuestion(): Question | null {
+    const card = pickNext(app, recent, missed);
+    if (!card) return null;
+    recent = [...recent.slice(-RECENT), card.id];
     const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
     const distractorPool = known.length >= 6 ? known : VOCAB;
     const modes: Mode[] = ['read', 'recall'];
     if (canListen && !isSilent(app.progress.settings)) modes.push('listen');
     if (canSpeak && speakReady && !app.progress.settings.quiet) modes.push('speak');
-    questions = pickRound(app, ROUND_SIZE).map((card) => {
-      const mode = menuMode === 'mix' ? modes[Math.floor(Math.random() * modes.length)] : menuMode;
-      const field = mode === 'recall' ? 'tl' : 'en';
-      const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
-      return { card, mode, choices };
-    });
-    // A round is only ten words, so all of them load now and each plays the moment it's asked.
-    for (const q of questions) preload(q.card);
-    index = 0;
-    score = 0;
-    picked = null;
-    previousPick = null;
-    ask();
+    const mode = menuMode === 'mix' ? modes[Math.floor(Math.random() * modes.length)] : menuMode;
+    const field = mode === 'recall' ? 'tl' : 'en';
+    const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
+    return { card, mode, choices };
+  }
+
+  /** Note how the current question went, so a miss comes back soon, and pick the one after it. */
+  function settle(right: boolean): void {
+    if (!current || upcoming) return;
+    const id = current.card.id;
+    const misses = missed.get(id) ?? 0;
+    if (!right) missed.set(id, misses + 1);
+    else if (misses > 1) missed.set(id, misses - 1);
+    else missed.delete(id);
+    upcoming = nextQuestion();
+    if (upcoming) preload(upcoming.card);
   }
 
   function ask(): void {
     speak?.dispose();
     speak = null;
     spokenRight = false;
-    const current = questions[index];
-    if (current?.mode === 'speak') {
-      speak = speakPanel(current.card, {
-        say: (slow) => sayCard(current.card, slow),
+    const q = current;
+    if (q?.mode === 'speak') {
+      speak = speakPanel(q.card, {
+        say: (slow) => sayCard(q.card, slow),
         silence: () => stop(true),
         onAttempt: (right) => {
           if (!right || spokenRight) return;
@@ -127,7 +158,6 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       });
     }
     draw();
-    const q = questions[index];
     if (q && q.mode !== 'recall' && (q.mode === 'listen' || app.progress.settings.autoplay)) void play(q.card);
   }
 
@@ -138,13 +168,14 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   }
 
   function choose(choice: Card): void {
-    const q = questions[index];
+    const q = current;
     if (!q || picked) return;
     picked = choice.id;
     if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
-    if (choice.id === q.card.id) score++;
-    // The last question stays up: the results that follow have no way back to it.
-    if (choice.id === q.card.id && index < questions.length - 1)
+    const right = choice.id === q.card.id;
+    if (right) score++;
+    settle(right);
+    if (right)
       auto = countdown(root, () => {
         autoMoved = true;
         advance(choice.id);
@@ -155,8 +186,11 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   /** Next question; `back` is this one's pick, when it moved on by itself, so it can be looked back at. */
   function advance(back: string | null = null): void {
     hold();
+    settle(spokenRight);
+    previous = current;
     previousPick = back;
-    index++;
+    current = upcoming;
+    upcoming = null;
     picked = null;
     ask();
   }
@@ -178,10 +212,9 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
   }
 
   function draw(): void {
-    if (questions.length === 0) root.replaceChildren(menu());
-    else if (index >= questions.length) root.replaceChildren(results());
-    else if (lookingBack && previousPick) root.replaceChildren(questionView(questions[index - 1], previousPick));
-    else root.replaceChildren(questionView(questions[index], picked));
+    if (!current) root.replaceChildren(menu());
+    else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
+    else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
     autoMoved = false;
   }
@@ -204,7 +237,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
       'div',
       null,
       h('div', { class: 'title-row' }, h('h1', null, 'Drills'), quietToggle(app, draw)),
-      h('p', { class: 'muted' }, `Pick one skill and drill it: quick rounds of ${ROUND_SIZE} using the ${learned} words you know. Study already mixes these in; drills are for working on one on purpose. They don't change your review schedule.`),
+      h('p', { class: 'muted' }, `Pick one skill and drill it with the ${learned} words you know, for as long as you like. Study already mixes these in; drills are for working on one on purpose. They don't change your review schedule.`),
       h(
         'div',
         { class: 'modes' },
@@ -227,7 +260,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
 
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
-    const reviewing = q !== questions[index];
+    const reviewing = q !== current;
     const answered = picked !== null;
     const right = picked === q.card.id;
     const field = q.mode === 'recall' ? 'tl' : 'en';
@@ -268,7 +301,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
         'header',
         { class: 'session-header' },
         h('button', { class: 'icon-btn', 'aria-label': 'End drill', onclick: endRound }, icon('close')),
-        progressBar(index, questions.length, 'Round progress'),
+        h('span', { class: 'session-count' }, MODES.find((m) => m.id === menuMode)!.title),
         h('span', { class: 'session-title' }, `${score} right`),
       ),
       previousPick && !answered && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
@@ -311,24 +344,8 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     );
   }
 
-  function results(): HTMLElement {
-    const perfect = score === questions.length;
-    return h(
-      'div',
-      { class: 'panel center' },
-      h('h2', null, `${score} / ${questions.length}`),
-      h('p', null, perfect ? 'Perpekto! Perfect round.' : score >= questions.length / 2 ? 'Magaling! Nice work.' : 'Kaya mo yan! You can do it.'),
-      h(
-        'div',
-        { class: 'row' },
-        h('button', { class: 'btn secondary', onclick: () => { questions = []; draw(); } }, 'Change mode'),
-        h('button', { class: 'btn primary', 'data-autofocus': true, onclick: () => start(lastMode) }, 'Play again'),
-      ),
-    );
-  }
-
   app.onKey((e) => {
-    const q = lookingBack ? questions[index - 1] : questions[index];
+    const q = lookingBack ? previous : current;
     if (!q) return;
     if (e.key === 'r' || e.key === 'R') {
       hold();
@@ -339,7 +356,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (!picked && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
   });
   // Back from a round goes to the drills menu, as its close button does.
-  app.onBack(() => (questions.length > 0 ? endRound() : app.navigate({ name: 'home' })));
+  app.onBack(() => (current ? endRound() : app.navigate({ name: 'home' })));
 
   draw();
   return root;

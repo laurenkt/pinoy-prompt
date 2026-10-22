@@ -150,6 +150,19 @@ describe('moving on after a right answer in a drill', () => {
     expect(root.querySelector('.session-title')?.textContent).toBe('1 right');
   });
 
+  it('keeps asking until the learner closes it, with no word straight after itself', () => {
+    const root = round();
+    let last = '';
+    for (let i = 0; i < 25; i++) {
+      const card = shownCard(root);
+      expect(card.id).not.toBe(last);
+      last = card.id;
+      answer(root, true);
+      vi.advanceTimersByTime(ADVANCE_MS);
+    }
+    expect(root.querySelector('.session-title')?.textContent).toBe('25 right');
+  });
+
   it('waits for Next after a miss', () => {
     const root = round();
     answer(root, false);
