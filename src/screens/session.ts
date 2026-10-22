@@ -187,7 +187,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       phase = 'speak';
       speak = speakPanel(c, {
         say: (slow) => say(slow),
-        silence: () => stop(true),
+        silence: () => stop(),
         onAttempt: (right) => {
           if (picked) return;
           picked = c.id;

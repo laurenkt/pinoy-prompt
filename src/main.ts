@@ -36,7 +36,7 @@ const app: App = {
   },
   navigate(route: Route) {
     // Done at once: going Home waits a moment for history, and the old screen mustn't act meanwhile.
-    stop(true);
+    stop();
     cancelRecording();
     hangUpTalk();
     keyHandler = null;

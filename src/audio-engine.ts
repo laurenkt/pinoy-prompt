@@ -25,19 +25,47 @@ function contextClass(): typeof AudioContext | undefined {
 
 /** The shared context, resumed. Call it from inside a tap the first time, as iOS only starts audio then. */
 export function audioContext(): AudioContext {
-  // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback.
+  // Web Audio is muted by the iPhone's silent switch too, unless the session says it's playback (iOS 17+).
   const mic = microphoneOpen();
   if (!mic) setAudioSession('playback');
-  if (context && madeWithMicrophone !== mic) {
+  // iOS leaves a context "interrupted" after a call, Siri or another app's audio, and it may never
+  // resume from there; a new one made in the tap starts at once.
+  const stuck = context && context.state !== 'running' && context.state !== 'suspended';
+  if (context && (madeWithMicrophone !== mic || stuck)) {
     void context.close().catch(() => {});
     context = null;
   }
+  // Counted again from every use, and it waits for anything still playing.
+  suspendWhenIdle();
   if (!context) {
     context = new (contextClass()!)({ latencyHint: 'interactive' });
     madeWithMicrophone = mic;
   }
   if (context.state !== 'running') void context.resume().catch(() => {});
   return context;
+}
+
+/**
+ * A running context holds the phone's audio (it shows in the Dynamic Island,
+ * and other apps' audio stays paused), so it's suspended once nothing has
+ * played for a while, and when the app goes into the background. The next
+ * tap resumes it.
+ */
+export const IDLE_SUSPEND_MS = 30_000;
+let idleTimer: ReturnType<typeof setTimeout> | undefined;
+let playing = 0;
+
+function suspendWhenIdle(): void {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    if (playing === 0 && context?.state === 'running') void context.suspend().catch(() => {});
+  }, IDLE_SUSPEND_MS);
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && context?.state === 'running') void context.suspend().catch(() => {});
+  });
 }
 
 /** Whether the shared context can play now, waiting a moment for it to resume. */
@@ -117,8 +145,16 @@ export function playBuffer(buffer: AudioBuffer, rate = 1): Sound {
   gain.gain.setValueAtTime(1, t0 + Math.max(length - FADE, length * 0.75));
   gain.gain.linearRampToValueAtTime(0, t0 + length);
   source.start(t0);
+  playing++;
+  let finished = false;
   let finish = () => {};
   const done = new Promise<void>((resolve) => (finish = resolve));
+  void done.then(() => {
+    if (finished) return;
+    finished = true;
+    playing--;
+    suspendWhenIdle();
+  });
   source.onended = () => finish();
   return {
     startsAt: t0,

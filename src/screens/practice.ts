@@ -113,7 +113,7 @@ export function practiceScreen(app: App, deps: SpeakDeps = defaultDeps): HTMLEle
     if (current?.mode === 'speak') {
       speak = speakPanel(current.card, {
         say: (slow) => sayCard(current.card, slow),
-        silence: () => stop(true),
+        silence: () => stop(),
         onAttempt: (right) => {
           if (!right || spokenRight) return;
           spokenRight = true;

@@ -1,6 +1,8 @@
 // A tiny helper for building DOM elements, so screens read like markup
 // without pulling in a framework.
 
+import { speaking } from './speech';
+
 type Child = Node | string | number | null | undefined | false | Child[];
 type Props = Record<string, unknown>;
 
@@ -71,13 +73,44 @@ export function icon(name: IconName): SVGSVGElement {
   return svg;
 }
 
-/** A speaker button that plays a card's audio; the slow one is labelled 0.5×. */
+/** The audio button whose word is playing, lit until the word ends or another starts. */
+let lit: HTMLButtonElement | null = null;
+/** The built-in voice can take a moment to report it's speaking, so a tap lights the button for at least this long. */
+const LIGHT_AT_LEAST_MS = 400;
+
+function lightWhilePlaying(button: HTMLButtonElement): void {
+  lit?.classList.remove('playing');
+  lit = button;
+  button.classList.add('playing');
+  const from = performance.now();
+  const check = () => {
+    if (lit !== button) return;
+    if (button.isConnected && (speaking() || performance.now() - from < LIGHT_AT_LEAST_MS)) {
+      requestAnimationFrame(check);
+      return;
+    }
+    button.classList.remove('playing');
+    lit = null;
+  };
+  requestAnimationFrame(check);
+}
+
+/** A speaker button that plays a card's audio, lit while it plays; the slow one is labelled 0.5×. */
 export function audioButton(onPlay: () => void, label = 'Play audio', extraClass = ''): HTMLButtonElement {
-  return h(
+  const button: HTMLButtonElement = h(
     'button',
-    { class: `audio-btn ${extraClass}`.trim(), 'aria-label': label, title: label, onclick: onPlay },
+    {
+      class: `audio-btn ${extraClass}`.trim(),
+      'aria-label': label,
+      title: label,
+      onclick: () => {
+        onPlay();
+        lightWhilePlaying(button);
+      },
+    },
     extraClass.includes('slow') ? h('span', { 'aria-hidden': 'true' }, '0.5×') : icon('speaker'),
   );
+  return button;
 }
 
 export function progressBar(value: number, max: number, label?: string): HTMLElement {

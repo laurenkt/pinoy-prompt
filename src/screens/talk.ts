@@ -51,8 +51,8 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
   async function begin(): Promise<void> {
     const key = getApiKey();
     if (!key) return;
-    // A word tapped earlier leaves the silent track running, which mustn't share the microphone's session.
-    stop(true);
+    // A word still playing mustn't talk over the call.
+    stop();
     hangUpTalk();
     const mine = generation;
     const current = () => mine === generation;

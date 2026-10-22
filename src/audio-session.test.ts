@@ -1,4 +1,4 @@
-// Card audio plays through the iPhone's silent switch, except while the microphone holds the session.
+// Card clips play through the iPhone's silent switch (iOS 17+), except while the microphone holds the session.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeMicrophone, getMicrophone, releaseMicrophone } from './microphone';
@@ -7,6 +7,8 @@ import { play, stop } from './speech';
 let audioSession: { type: string };
 
 beforeEach(() => {
+  vi.stubGlobal('AudioContext', FakeContext);
+  vi.stubGlobal('fetch', async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
   audioSession = { type: 'auto' };
   const track = { enabled: true, readyState: 'live', stop() {} };
   const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
@@ -14,36 +16,22 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  stop(true);
-  vi.useRealTimers();
+  stop();
   closeMicrophone();
   vi.unstubAllGlobals();
 });
 
-// speech.ts keeps one silent track for good, so every test sees the tracks made so far.
-const tracks: { src: string; loop: boolean; paused: boolean; plays: number }[] = [];
-const silentTrack = () => tracks.find((t) => t.src.startsWith('data:audio/wav'));
-
-function stubAudio() {
-  vi.stubGlobal(
-    'Audio',
-    class {
-      loop = false;
-      paused = true;
-      plays = 0;
-      constructor(public src: string) {
-        tracks.push(this);
-      }
-      play() {
-        this.paused = false;
-        this.plays++;
-        return Promise.resolve();
-      }
-      pause() {
-        this.paused = true;
-      }
-    },
-  );
+/** Just enough of a context for a clip to start, so play() takes the recorded path. */
+class FakeContext {
+  state = 'running';
+  currentTime = 0;
+  destination = {};
+  resume = () => Promise.resolve();
+  suspend = () => Promise.resolve();
+  close = () => Promise.resolve();
+  decodeAudioData = () => Promise.resolve({ duration: 1 });
+  createGain = () => ({ gain: { setValueAtTime() {}, linearRampToValueAtTime() {} }, connect: (to: unknown) => to });
+  createBufferSource = () => ({ playbackRate: { value: 1 }, connect: (to: unknown) => to, start() {}, stop() {} });
 }
 
 function stubSpeech() {
@@ -65,7 +53,7 @@ function stubSpeech() {
 }
 
 describe('audio session', () => {
-  it('asks for playback, which ignores the silent switch, when a card plays', () => {
+  it('asks for playback, which ignores the silent switch, when a clip plays', () => {
     void play({ tl: 'Salamat' });
     expect(audioSession.type).toBe('playback');
   });
@@ -82,57 +70,9 @@ describe('audio session', () => {
     expect(audioSession.type).toBe('playback');
   });
 
-  it('does not leave the silent track looping where there is no voice to play', () => {
-    stubAudio();
-    void play({ tl: 'Salamat' });
-    expect(silentTrack()).toMatchObject({ loop: true, paused: true });
-  });
-
-  it('plays a looping silent track with the voice, so the silent switch lets it through, and stops it after', async () => {
-    vi.useFakeTimers();
-    stubAudio();
-    const speech = stubSpeech();
-    const playing = play({ tl: 'Salamat' });
-    const silence = silentTrack();
-    expect(silence).toMatchObject({ loop: true, paused: false });
-    await playing;
-    speech.spoken[0].onend!();
-    // Kept running between words, as restarting it delays the next one on iOS.
-    vi.advanceTimersByTime(5_000);
-    expect(silence!.paused).toBe(false);
-    const plays = silence!.plays;
-    void play({ tl: 'Salamat' });
-    stop();
-    void play({ tl: 'Salamat' });
-    expect(silence!.plays).toBe(plays);
-    stop();
-    vi.advanceTimersByTime(15_000);
-    expect(silence!.paused).toBe(true);
-    void play({ tl: 'Salamat' });
-    expect(silence!.paused).toBe(false);
-    stop(true);
-    expect(silence!.paused).toBe(true);
-  });
-
-  it("doesn't pause the silent track mid-word, or keep it for good while cards keep changing", async () => {
-    vi.useFakeTimers();
-    stubAudio();
-    const speech = stubSpeech();
-    await play({ tl: 'Salamat' });
-    speech.speaking = true;
-    vi.advanceTimersByTime(20_000);
-    expect(silentTrack()!.paused).toBe(false);
-    speech.speaking = false;
-    for (let i = 0; i < 4; i++) {
-      stop();
-      vi.advanceTimersByTime(5_000);
-    }
-    expect(silentTrack()!.paused).toBe(true);
-  });
-
   it('only cancels speech when something is playing or stuck, as Safari can drop the next word', async () => {
-    stubAudio();
     const speech = stubSpeech();
+    vi.stubGlobal('AudioContext', undefined);
     await play({ tl: 'Salamat' });
     expect(speech.cancels).toBe(0);
     speech.speaking = true;

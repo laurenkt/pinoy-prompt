@@ -8,7 +8,7 @@ import { emptyProgress } from '../store';
 import { settingsScreen } from './settings';
 
 afterEach(() => {
-  stop(true);
+  stop();
   vi.unstubAllGlobals();
 });
 

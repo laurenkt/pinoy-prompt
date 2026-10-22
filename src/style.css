@@ -665,6 +665,26 @@ p {
   box-shadow: var(--shadow);
 }
 
+/* Lit while its word plays, so a tap that seems to do nothing shows whether sound should be coming. */
+.audio-btn.playing,
+.audio-btn.slow.playing {
+  background: var(--saffron);
+  color: var(--on-accent);
+  animation: audio-playing 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes audio-playing {
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-btn.playing {
+    animation: none;
+  }
+}
+
 .hint {
   font-size: 1rem;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;

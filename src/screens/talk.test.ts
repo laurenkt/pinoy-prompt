@@ -185,13 +185,13 @@ describe('Talk', () => {
     expect(button(root, 'Chat again')).toBeTruthy();
   });
 
-  it("stops a word's silent track before the microphone opens", async () => {
+  it("stops a word still playing before the call starts", async () => {
     setApiKey(KEY);
     const f = fakeCall();
     const root = talkScreen(fakeApp(), f.deps);
     vi.mocked(stop).mockClear();
     button(root, 'Start talking').click();
-    expect(stop).toHaveBeenCalledWith(true);
+    expect(stop).toHaveBeenCalled();
   });
 
   it('says what went wrong when OpenAI refuses the call', async () => {
