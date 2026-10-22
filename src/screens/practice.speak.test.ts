@@ -6,20 +6,12 @@ import type { App } from '../app';
 import { getCard } from '../deck';
 import { toPhones } from '../phonetics';
 import type { Take } from '../recorder';
-import { emptyProgress, recordAnswer } from '../store';
 import { practiceScreen } from './practice';
 import type { SpeakDeps } from './speak';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
+import { fakeApp, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'tatlo', 'paalam', 'oo', 'kape'];
-
-function fakeApp(): App {
-  const now = Date.now();
-  const progress = emptyProgress(now);
-  progress.settings.autoplay = false;
-  for (const id of KNOWN) recordAnswer(progress, id, 'good', now);
-  return { progress, now: () => now, commit: () => {}, replaceProgress: () => {}, navigate: () => {}, onKey: () => {}, onBack: () => {} };
-}
 
 /** A model that hears whatever the card should sound like, so every attempt is right. */
 function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
@@ -44,7 +36,6 @@ function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
   };
 }
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
 function button(name: string): HTMLButtonElement {
   const match = [...document.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(name) || b.textContent?.trim().endsWith(name));
   if (!match) throw new Error(`No button "${name}" in: ${document.body.textContent}`);
@@ -55,7 +46,7 @@ beforeEach(() => document.body.replaceChildren());
 
 describe('Speak mode', () => {
   it('runs a round of spoken questions and counts the good ones', async () => {
-    document.body.append(practiceScreen(fakeApp(), deps()));
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps()));
     await flush();
     button('Speak').click();
     await flush();
@@ -70,14 +61,14 @@ describe('Speak mode', () => {
   });
 
   it('is offered but explained when the browser cannot record', async () => {
-    document.body.append(practiceScreen(fakeApp(), deps({ recordingSupported: () => false })));
+    document.body.append(practiceScreen(fakeApp(KNOWN), deps({ recordingSupported: () => false })));
     expect(document.body.textContent).toContain("can't record from the microphone");
   });
 });
 
 describe('back gesture in Drills', () => {
   it('goes from a round to the drills menu, and from the menu Home', async () => {
-    const app = fakeApp();
+    const app = fakeApp(KNOWN);
     const navigate = vi.fn<App['navigate']>();
     app.navigate = navigate;
     let back = () => {};
