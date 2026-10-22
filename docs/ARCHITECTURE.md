@@ -25,7 +25,7 @@ Each system has one owner module. Anything else that needs it calls that module.
 | iOS audio session | `src/audio-session.ts` | Called by the engine and card audio (`playback`) and the microphone (`play-and-record`) only. |
 | Speaking | `src/fbank.ts`, `src/phone-model.ts`, `src/model-cache.ts`, `src/phonetics.ts`, `src/coach.ts`, `src/player.ts` | Recognising and judging a spoken attempt; playing slices and reference sounds through the engine. |
 | Chat | `src/openai.ts`, `src/talk.ts`, `src/visualizer.ts`, `src/screens/talk.ts` | The OpenAI key and call, what the AI is told, the backdrop. |
-| Offline | `public/sw.js`, `src/clip-cache.ts`, `src/model-cache.ts` | The app shell, word clips and the speech model in Cache Storage. |
+| Offline | `public/sw.js`, `src/clip-cache.ts`, `src/model-cache.ts` | The app shell, word clips and the speech model in Cache Storage. Code loaded on demand is named by the build, and an installed app can stay open across a deploy that removes it, so it's loaded at start instead (`keepSpeakingReady`); a new dynamic import needs the same. |
 | Tests and CI | `src/**/*.test.ts`, `src/test/`, `.github/workflows/ci.yml` | See below. |
 
 ### Navigation and page layout

@@ -7,6 +7,11 @@ export const MODEL_URL =
 // public/sw.js checks for this cache by name to keep the model's runtime offline too.
 export const CACHE = 'pinoy-prompt-models-v1';
 
+/** The model couldn't be fetched: no connection, a server error, or a download cut short. Anything else that stops it loading is not this. */
+export class DownloadError extends Error {
+  override name = 'DownloadError';
+}
+
 /** Whether the model is already on the device. */
 export async function modelDownloaded(): Promise<boolean> {
   try {
@@ -16,4 +21,14 @@ export async function modelDownloaded(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Once the model is on the device, load the code that runs it now rather than at the first Speak question.
+ * Those files are named by the build, and an installed app can stay open across a deploy that replaces them,
+ * after which this page could no longer fetch its own copies ("Importing a module script failed").
+ */
+export async function keepSpeakingReady(): Promise<void> {
+  if (!(await modelDownloaded())) return;
+  await (await import('./phone-model')).loadRuntime();
 }

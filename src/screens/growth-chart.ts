@@ -67,6 +67,19 @@ function monthYear(time: number): string {
   return new Date(time).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
 }
 
+/** Roughly how long from `now` until `at`, in plain words: weeks, then months, then years. */
+export function timeUntil(at: number, now: number): string {
+  const days = (at - now) / DAY_MS;
+  if (days < 4) return 'in a few days';
+  if (days < 11) return 'in about a week';
+  if (days < 60) return `in about ${Math.round(days / 7)} weeks`;
+  const months = Math.round(days / 30.4);
+  if (months === 12) return 'in about a year';
+  if (months < 24) return `in about ${months} months`;
+  const years = Math.round(days / 365 * 2) / 2;
+  return `in about ${years.toLocaleString()} years`;
+}
+
 /** Share of the chart's width for the past when a projection follows it. */
 const PAST = 0.7;
 
@@ -84,7 +97,7 @@ export function projected(forecast: Forecast, at: number, now: number, u: number
 }
 
 /** The milestone the projection runs to: the next one with a date, if any. */
-export function nextMilestone(forecast: Forecast | undefined): { words: number; label: string; at: number } | null {
+export function nextMilestone(forecast: Forecast | undefined): { cards: number; label: string; at: number } | null {
   const next = forecast?.milestones.find((m) => m.at !== 'reached');
   return next && typeof next.at === 'number' ? { ...next, at: next.at } : null;
 }
@@ -101,7 +114,7 @@ export function forecastView(forecast: Forecast): HTMLElement {
         h(
           'li',
           null,
-          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.words.toLocaleString()}`)),
+          h('span', null, m.label, h('span', { class: 'muted' }, ` · ${m.cards.toLocaleString()} cards`)),
           h('strong', null, m.at === 'reached' ? 'Reached' : m.at === null ? '–' : `~${monthYear(m.at)}`),
         ),
       ),
@@ -144,7 +157,7 @@ export function growthChart(
     preserveAspectRatio: 'none',
     class: 'growth-svg',
     role: 'img',
-    'aria-label': `Words by strength over time: ${total(0)} on ${shortDate(times[0])}, ${total(last)} today.`,
+    'aria-label': `Cards by strength over time: ${total(0)} on ${shortDate(times[0])}, ${total(last)} today.`,
   });
   const backXs = [...xs].reverse();
   LAYERS.forEach((id, k) => {
@@ -169,7 +182,8 @@ export function growthChart(
     // The stream carries on as a hatched area, rising along the learner's curve from today towards the
     // milestone in the corner under its tag (its date on the axis), with the same outline dashed. The
     // milestone is off this scale, so it shows the direction and the tag the numbers.
-    const from = yOf(tops[tops.length - 1][last]);
+    // From today's cards that have stuck (the top of the firm layers), which the forecast counts.
+    const from = yOf(forecast!.known);
     const steps = Array.from({ length: 25 }, (_, i) => i / 24);
     const aheadXs = steps.map((u) => xs[last] + u * (W - xs[last]));
     const aheadYs = steps.map((u) => from + (8 - from) * projected(forecast!, next.at, times[last], u));
@@ -205,7 +219,13 @@ export function growthChart(
         class: 'growth-goal',
         'aria-expanded': 'false',
         'aria-controls': 'growth-forecast',
-        'aria-label': `${forecast!.early ? 'Early guess: about' : 'About'} ${next.words.toLocaleString()} words around ${monthYear(next.at)} at your recent pace. Show all milestones.`,
+        'aria-label': `${forecast!.early ? 'Early guess: ' : ''}${next.label} ${timeUntil(next.at, times[last])}, around ${monthYear(next.at)}, at your recent pace. Show all milestones.`,
+        // Its own tap, not a look along the chart; a mouse over it doesn't look either.
+        onpointerdown: (e: PointerEvent) => e.stopPropagation(),
+        onpointermove: (e: PointerEvent) => e.stopPropagation(),
+        onpointerenter: (e: PointerEvent) => {
+          if (e.pointerType === 'mouse') show(last);
+        },
         onclick: () => {
           ahead.hidden = !ahead.hidden;
           goal!.setAttribute('aria-expanded', String(!ahead.hidden));
@@ -213,7 +233,8 @@ export function growthChart(
           if (!ahead.hidden) ahead.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
         },
       },
-      `${next.words.toLocaleString()} words`,
+      h('strong', null, next.label),
+      h('span', null, timeUntil(next.at, times[last])),
     );
 
   function show(i: number): void {
@@ -228,11 +249,11 @@ export function growthChart(
   /** A point `u` of the way from today to the next milestone, read off the projection. */
   function showAhead(u: number): void {
     if (!next) return;
-    // From where the drawn projection starts, today's top of the stream.
-    const from = total(last);
-    value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.words - from))}`;
+    // From where the drawn projection starts: today's cards that have stuck.
+    const from = forecast!.known;
+    value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.cards - from))}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][last]);
-    when.textContent = ` words by ${monthYear(times[last] + u * (next.at - times[last]))}`;
+    when.textContent = ` cards by ${monthYear(times[last] + u * (next.at - times[last]))}`;
     lookAt(false, past + u * (1 - past));
   }
 
@@ -241,14 +262,6 @@ export function growthChart(
     marker.hidden = today;
     marker.style.left = `${x * 100}%`;
     back.hidden = today;
-    // One control in the caption's corner at a time; the list it opens closes with it.
-    if (goal && ahead) {
-      goal.hidden = !today;
-      if (!today) {
-        ahead.hidden = true;
-        goal.setAttribute('aria-expanded', 'false');
-      }
-    }
   }
 
   const frame = h(
@@ -256,9 +269,10 @@ export function growthChart(
     { class: 'growth-frame' },
     plot,
     marker,
+    goal,
     // In the first days the stream is a sliver at the edge; say what is coming.
     times[last] - history.since < 2 * DAY_MS &&
-      h('p', { class: 'growth-hint small', style: next ? { right: `${(1 - PAST) * 100 + 4}%` } : null }, 'Keep coming back and this fills in, day by day, as your cards settle.'),
+      h('p', { class: next ? 'growth-hint small under-goal' : 'growth-hint small', style: next ? { right: `${(1 - PAST) * 100 + 4}%` } : null }, 'This fills in day by day as your cards settle.'),
   );
   const pick = (e: PointerEvent) => {
     const box = frame.getBoundingClientRect();
@@ -300,7 +314,7 @@ export function growthChart(
   const el = h(
     'div',
     { class: 'growth' },
-    h('div', { class: 'growth-caption' }, value, when, back, goal),
+    h('div', { class: 'growth-caption' }, value, when, back),
     frame,
     h(
       'div',

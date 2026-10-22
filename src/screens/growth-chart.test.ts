@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type Forecast, type Strength } from '../memory';
 import { DAY_MS } from '../srs';
 import { h } from '../ui';
-import { curve, forecastView, growthChart, projected, smooth } from './growth-chart';
+import { curve, forecastView, growthChart, projected, smooth, timeUntil } from './growth-chart';
 
 describe('smooth', () => {
   it('softens steps but ends exactly on the last value', () => {
@@ -87,8 +87,8 @@ describe('forecast', () => {
     days: 28,
     curve: null,
     milestones: [
-      { words: 5, label: 'First', at: 'reached' },
-      { words: 500, label: 'Second', at },
+      { cards: 5, label: 'First', at: 'reached' },
+      { cards: 500, label: 'Second', at },
     ],
   });
 
@@ -96,7 +96,8 @@ describe('forecast', () => {
     const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
     expect(el.querySelector('.projection')).not.toBeNull();
     const goal = el.querySelector<HTMLButtonElement>('.growth-goal')!;
-    expect(goal.textContent).toBe('500 words');
+    expect(goal.textContent).toBe('Secondin about 13 months');
+    expect(goal.closest('.growth-frame')).not.toBeNull();
     expect(el.querySelector('.growth-axis-ahead')!.textContent).toMatch(/^~\w+ \d{4}$/);
     const panel = el.querySelector<HTMLElement>('.growth-forecast')!;
     expect(panel.hidden).toBe(true);
@@ -114,16 +115,40 @@ describe('forecast', () => {
     // Halfway from today (at 70%) to the milestone: halfway from 10 words to 500.
     tap(frame, 20);
     tap(frame, 255);
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 words by \w+ \d{4}/);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 cards by \w+ \d{4}/);
     // The legend is back on today, not the day looked at before.
     expect(counts.weeks.textContent).toBe('10');
     expect(el.querySelector<HTMLElement>('.growth-marker')!.style.left).toBe('85%');
     tap(frame, 20);
     expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^0 cards on /);
-    // The way back takes the tag's corner while looking at an earlier day, and the list closes.
-    expect(el.querySelector<HTMLElement>('.growth-forecast')!.hidden).toBe(true);
-    expect(el.querySelector<HTMLElement>('.growth-goal')!.hidden).toBe(true);
+    // The level's label stays, with its list, while looking along the chart.
+    expect(el.querySelector<HTMLElement>('.growth-forecast')!.hidden).toBe(false);
+    expect(el.querySelector<HTMLElement>('.growth-goal')!.hidden).toBe(false);
     expect(el.querySelector<HTMLElement>('.growth-back')!.hidden).toBe(false);
+  });
+
+  it('starts the projection from the cards that have stuck, the count the forecast runs on', () => {
+    // 10 cards today, 4 of them only days old: 6 have stuck.
+    const met = { ...history, counts: { new: [0, 0], days: [0, 4], weeks: [0, 6], long: [0, 0] } };
+    const el = growthChart(met, legend(), { ...ahead(0.5, now + 400 * DAY_MS), known: 6 });
+    const frame = el.querySelector<HTMLElement>('.growth-frame')!;
+    frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
+    tap(frame, 210.3);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~[6-8] cards by /);
+  });
+
+  it("opens the list from the level's label without looking along the chart", () => {
+    const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
+    el.querySelector<HTMLElement>('.growth-frame')!.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
+    const goal = el.querySelector<HTMLElement>('.growth-goal')!;
+    goal.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 20, pointerType: 'mouse' }));
+    goal.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 20, pointerType: 'mouse' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('cards today');
+    // A mouse moving onto it from the chart puts the chart back on today.
+    el.querySelector('.growth-frame')!.dispatchEvent(new PointerEvent('pointermove', { clientX: 20, pointerType: 'mouse' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^0 cards on /);
+    goal.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'mouse' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('cards today');
   });
 
   it('leaves a drag up or down to scroll the page, and follows one sideways', () => {
@@ -132,11 +157,11 @@ describe('forecast', () => {
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     const caption = () => el.querySelector('.growth-caption')!.textContent;
     frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 20, clientY: 50, pointerType: 'touch' }));
-    expect(caption()).toContain('today');
+    expect(caption()).toContain('cards today');
     frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 22, clientY: 90, pointerType: 'touch' }));
     frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 60, clientY: 90, pointerType: 'touch' }));
     frame.dispatchEvent(new PointerEvent('pointerup', { clientX: 60, clientY: 90, pointerType: 'touch' }));
-    expect(caption()).toContain('today');
+    expect(caption()).toContain('cards today');
     frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 200, clientY: 50, pointerType: 'touch' }));
     frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 20, clientY: 52, pointerType: 'touch' }));
     expect(caption()).toMatch(/^0 cards on /);
@@ -189,5 +214,19 @@ describe('projected', () => {
     expect(projected(f(0.7), at, now, 0)).toBeCloseTo(0);
     expect(projected(f(0.7), at, now, 1)).toBeCloseTo(1);
     expect(projected({ ...f(1), curve: null }, at, now, 0.3)).toBe(0.3);
+  });
+});
+
+describe('timeUntil', () => {
+  const now = Date.now();
+  it('says how long in weeks, then months, then years', () => {
+    expect(timeUntil(now + 2 * DAY_MS, now)).toBe('in a few days');
+    expect(timeUntil(now + 5 * DAY_MS, now)).toBe('in about a week');
+    expect(timeUntil(now + 10.4 * DAY_MS, now)).toBe('in about a week');
+    expect(timeUntil(now + 12 * DAY_MS, now)).toBe('in about 2 weeks');
+    expect(timeUntil(now + 30 * DAY_MS, now)).toBe('in about 4 weeks');
+    expect(timeUntil(now + 330 * DAY_MS, now)).toBe('in about 11 months');
+    expect(timeUntil(now + 365 * DAY_MS, now)).toBe('in about a year');
+    expect(timeUntil(now + 1000 * DAY_MS, now)).toBe('in about 2.5 years');
   });
 });

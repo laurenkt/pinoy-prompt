@@ -89,9 +89,26 @@ describe('loadPhoneModel', () => {
   it("never keeps a download that was cut short, so the next try starts afresh", async () => {
     vi.stubGlobal('fetch', serve(40_000_000));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
-    await expect(loadPhoneModel()).rejects.toThrow(/incomplete/);
+    const failure = loadPhoneModel();
+    await expect(failure).rejects.toThrow(/incomplete/);
+    await expect(failure).rejects.toBeInstanceOf((await import('./model-cache')).DownloadError);
     expect(await modelDownloaded()).toBe(false);
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it('counts no connection as a failed download', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Load failed'))));
+    const { loadPhoneModel } = await import('./phone-model');
+    const { DownloadError } = await import('./model-cache');
+    await expect(loadPhoneModel()).rejects.toBeInstanceOf(DownloadError);
+  });
+
+  it("doesn't count running out of memory as a failed download", async () => {
+    vi.stubGlobal('fetch', serve(MODEL_BYTES));
+    create.mockRejectedValueOnce(new RangeError('Out of memory'));
+    const { loadPhoneModel } = await import('./phone-model');
+    const { DownloadError } = await import('./model-cache');
+    await expect(loadPhoneModel()).rejects.not.toBeInstanceOf(DownloadError);
   });
 
   it("drops a stored model the runtime can't load", async () => {
@@ -123,11 +140,49 @@ describe('when the model can\'t be stored', () => {
     expect(await modelDownloaded()).toBe(false);
   });
 
+  it('still loads it when the stored copy is gone as soon as it was kept', async () => {
+    const download = serve(MODEL_BYTES);
+    vi.stubGlobal('fetch', download);
+    cache.match = async () => undefined;
+    const { loadPhoneModel } = await import('./phone-model');
+    await expect(loadPhoneModel()).resolves.toBeTruthy();
+    expect(download).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps a good stored model when the phone runs out of memory loading it", async () => {
     vi.stubGlobal('fetch', serve(MODEL_BYTES));
     create.mockRejectedValueOnce(new RangeError('Out of memory'));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');
     await expect(loadPhoneModel()).rejects.toThrow();
     expect(await modelDownloaded()).toBe(true);
+  });
+});
+
+describe('loadRuntime', () => {
+  function setup(controller: boolean, cached: boolean, status = 200) {
+    const download = vi.fn(async () => new Response('wasm', { status }));
+    vi.stubGlobal('fetch', download);
+    vi.stubGlobal('navigator', { serviceWorker: controller ? { controller: {} } : undefined });
+    vi.stubGlobal('caches', { match: async () => (cached ? new Response('wasm') : undefined) });
+    return download;
+  }
+
+  it("fetches the runtime's wasm so the service worker keeps it", async () => {
+    const download = setup(true, false);
+    await (await import('./phone-model')).loadRuntime();
+    expect(download).toHaveBeenCalledWith(expect.stringMatching(/\.wasm/));
+  });
+
+  it('leaves it when the worker already has it, or there is no worker to keep it', async () => {
+    for (const [controller, cached] of [[true, true], [false, false]]) {
+      const download = setup(controller, cached);
+      await (await import('./phone-model')).loadRuntime();
+      expect(download).not.toHaveBeenCalled();
+    }
+  });
+
+  it("says so when the runtime's wasm isn't there", async () => {
+    setup(true, false, 404);
+    await expect((await import('./phone-model')).loadRuntime()).rejects.toThrow(/404/);
   });
 });
