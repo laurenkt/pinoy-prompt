@@ -189,6 +189,13 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         say: (slow) => say(slow),
         silence: () => stop(true),
         onAttempt: (right) => {
+          // A right attempt moves on by itself, even after a miss: getting it right was the point.
+          // There's nothing to look back at on a speaking step, so it moves on without one.
+          if (right && !auto)
+            auto = countdown(root, () => {
+              autoMoved = true;
+              next();
+            });
           if (picked) return;
           picked = c.id;
           stats.practised++;
@@ -196,8 +203,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
           misses.set(c.id, (misses.get(c.id) ?? 0) + 1);
           struggled.add(c.id);
         },
+        counting: () => auto !== null,
         onNext: next,
         onReady: () => (speakReady = true),
+        autofocus: !autoMoved,
         deps,
       });
     } else if (format === 'remember' || format === 'hear' || format === 'produce') {

@@ -56,10 +56,10 @@ export function holdOnTap(root: HTMLElement, hold: () => void): void {
 }
 
 /** Continue, with a bar filling across it while the next question is on its way. */
-export function continueButton(onclick: () => void, counting: boolean, label = 'Continue'): HTMLButtonElement {
+export function continueButton(onclick: () => void, counting: boolean, label = 'Continue', big = true): HTMLButtonElement {
   return h(
     'button',
-    { class: `btn primary big continue ${counting ? 'counting' : ''}`, style: `--advance: ${ADVANCE_MS}ms`, 'data-autofocus': true, onclick },
+    { class: `btn primary ${big ? 'big ' : ''}continue ${counting ? 'counting' : ''}`, style: `--advance: ${ADVANCE_MS}ms`, 'data-autofocus': true, onclick },
     h('span', null, label),
   );
 }
