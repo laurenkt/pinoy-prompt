@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Decoded clips are kept between tests, so each test that counts fetches has its own word.
 vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
-const { KEEP_DECODED, loadClip } = await import('./audio-engine');
+const { IDLE_SUSPEND_MS, KEEP_DECODED, loadClip } = await import('./audio-engine');
 const { canPlay, clipUrl, lastStartDelay, play, preload, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
@@ -32,6 +32,10 @@ class FakeContext {
     contexts.push(this);
   }
   resume() {
+    return Promise.resolve();
+  }
+  suspend() {
+    this.state = 'suspended';
     return Promise.resolve();
   }
   close() {
@@ -94,7 +98,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  stop(true);
+  stop();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -235,30 +240,58 @@ describe('clips', () => {
     expect(speaking()).toBe(false);
   });
 
-  it('holds the silent track with a clip too, so it plays through the silent switch before iOS 17', async () => {
-    // The only test with media elements, so the track speech.ts keeps is made here.
-    const tracks: { paused: boolean }[] = [];
-    vi.stubGlobal(
-      'Audio',
-      class {
-        paused = true;
-        constructor() {
-          tracks.push(this);
-        }
-        play() {
-          this.paused = false;
-          return Promise.resolve();
-        }
-        pause() {
-          this.paused = true;
-        }
-      },
-    );
-    const playing = play({ tl: 'Salamat' });
-    // Started inside the tap, before the clip has loaded.
-    expect(tracks).toHaveLength(1);
-    expect(tracks[0].paused).toBe(false);
-    await playing;
+  it('lets go of the phone\'s audio once words stop, and takes it back on the next tap', async () => {
+    vi.useFakeTimers();
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    sources.at(-1)!.onended!();
+    await Promise.resolve();
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS - 1000);
+    expect(ctx.state).toBe('running');
+    // A word playing past the deadline keeps it.
+    await play({ tl: 'Salamat' });
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS * 2);
+    expect(ctx.state).toBe('running');
+    stop();
+    await Promise.resolve();
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS);
+    expect(ctx.state).toBe('suspended');
+    ctx.resume = () => ((ctx.state = 'running'), Promise.resolve());
+    await play({ tl: 'Salamat' });
+    expect(contexts.at(-1)).toBe(ctx);
+    expect(sources.at(-1)!.started).not.toBeNull();
+  });
+
+  it('still lets go once idle after a context closed mid-word', async () => {
+    vi.useFakeTimers();
+    const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } });
+    const { closeMicrophone, getMicrophone } = await import('./microphone');
+    const { playBuffer } = await import('./audio-engine');
+    // Playing outside speech.ts, as the pronunciation results do, so nothing stops it.
+    playBuffer({ duration: 1 } as AudioBuffer);
+    // The microphone opening replaces the context the sound was playing on.
+    await getMicrophone();
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    await Promise.resolve();
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS);
+    expect(ctx.state).toBe('suspended');
+    closeMicrophone();
+  });
+
+  it('makes a new context when iOS left the old one interrupted, rather than going quiet', async () => {
+    const speech = stubSpeech();
+    await play({ tl: 'Salamat' });
+    const before = contexts.at(-1)!;
+    before.state = 'interrupted';
+    await play({ tl: 'Salamat' });
+    expect(before.closed).toBe(true);
+    expect(contexts.at(-1)).not.toBe(before);
+    expect(sources.at(-1)!.started).not.toBeNull();
+    expect(speech.spoken).toHaveLength(0);
   });
 
   it('reports nothing for a word asked for in silent quiet mode', async () => {

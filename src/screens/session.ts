@@ -187,7 +187,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       phase = 'speak';
       speak = speakPanel(c, {
         say: (slow) => say(slow),
-        silence: () => stop(true),
+        silence: () => stop(),
         onAttempt: (right) => {
           // A right attempt moves on by itself, even after a miss: getting it right was the point.
           // There's nothing to look back at on a speaking step, so it moves on without one.

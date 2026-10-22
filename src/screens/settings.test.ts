@@ -7,7 +7,7 @@ import { settingsScreen } from './settings';
 import { fakeApp } from '../test/screen';
 
 afterEach(() => {
-  stop(true);
+  stop();
   vi.unstubAllGlobals();
 });
 
