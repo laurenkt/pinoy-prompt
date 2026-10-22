@@ -108,11 +108,12 @@ async function failure(response: Response): Promise<AiError> {
   return new AiError('other', message);
 }
 
-async function post(key: string, path: string, body: unknown, fetchFn: typeof fetch): Promise<Response> {
+async function post(key: string, path: string, body: unknown, fetchFn: typeof fetch, signal?: AbortSignal): Promise<Response> {
   let response: Response;
   try {
     response = await fetchFn(`${API}${path}`, {
       method: 'POST',
+      signal,
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -175,17 +176,26 @@ export function callSupported(): boolean {
   return typeof RTCPeerConnection !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 }
 
+/** Why a call given up while it was still connecting failed. Nobody is shown it. */
+const ABANDONED = 'The call was abandoned while connecting.';
+
 /**
  * Start a spoken conversation with GPT-Live over WebRTC. The browser sends its
  * offer straight to OpenAI with the learner's key, and audio then flows both
  * ways while transcripts arrive on the data channel.
+ *
+ * Aborting `signal` while the call is still connecting gives it up there and
+ * then: the request is cancelled, the connection closed and the microphone
+ * handed back, so nothing of it is left running when the next call starts.
+ * Once connected, a call is ended with `hangUp`.
  */
 export async function startCall(
   key: string,
-  { instructions, greeting }: { instructions: string; greeting: string },
+  { instructions, greeting, signal }: { instructions: string; greeting: string; signal?: AbortSignal },
   events: CallEvents,
   deps: CallDeps = browserCallDeps,
 ): Promise<Call> {
+  if (signal?.aborted) throw new AiError('other', ABANDONED);
   // Made inside the tap that started the call, so iOS lets it play.
   const speaker = deps.createSpeaker();
   let mic: MediaStream;
@@ -226,7 +236,18 @@ export async function startCall(
     events.onEnded(error);
   }
 
+  const abandon = () => {
+    ended = true;
+    release();
+  };
+  signal?.addEventListener('abort', abandon);
+  /** Between the steps of connecting: stop if the call was given up meanwhile. */
+  const still = () => {
+    if (ended || signal?.aborted) throw new AiError('other', ABANDONED);
+  };
+
   try {
+    still();
     peer = deps.createPeer();
     const pc = peer;
     pc.ontrack = (e) => {
@@ -249,7 +270,9 @@ export async function startCall(
     };
 
     const offer = await pc.createOffer();
+    still();
     await pc.setLocalDescription(offer);
+    still();
     const response = await post(key, '/live/sessions', {
       session: {
         model: VOICE_MODEL,
@@ -259,15 +282,20 @@ export async function startCall(
         input: [{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: greeting }] }],
       },
       transport: { type: 'webrtc', sdp: offer.sdp },
-    }, deps.fetch);
+    }, deps.fetch, signal);
     const body = (await response.json()) as { transport?: { sdp?: string } };
+    still();
     if (!body.transport?.sdp) throw new AiError('other', 'OpenAI started the call without an answer.');
     await pc.setRemoteDescription({ type: 'answer', sdp: body.transport.sdp });
-    if (!ended) events.onAudio?.('you', mic);
+    still();
+    events.onAudio?.('you', mic);
   } catch (e) {
     ended = true;
     release();
+    if (signal?.aborted) throw new AiError('other', ABANDONED);
     throw e instanceof AiError ? e : new AiError('other', e instanceof Error ? e.message : String(e));
+  } finally {
+    signal?.removeEventListener('abort', abandon);
   }
 
   function onEvent(data: string): void {
