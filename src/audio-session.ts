@@ -13,11 +13,6 @@ function session(): AudioSession | undefined {
   return typeof navigator === 'undefined' ? undefined : (navigator as { audioSession?: AudioSession }).audioSession;
 }
 
-/** Whether this browser lets the page choose its audio session (Safari on iOS 17 and later). */
-export function audioSessionSupported(): boolean {
-  return session() !== undefined;
-}
-
 const changeListeners: (() => void)[] = [];
 
 /** Called whenever the session type changes, as the audio hardware may be set up again then. */
