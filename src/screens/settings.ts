@@ -4,7 +4,7 @@ import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, getSpend, setApiKey } from '
 import { lastStartDelay, play, voiceQuality } from '../speech';
 import { applyAudioMode, isSilent } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
-import { h, icon, pageHeader } from '../ui';
+import { h, icon, pageHeader, settingsToggle } from '../ui';
 
 const DAILY_OPTIONS = [5, 8, 12, 15];
 
@@ -48,7 +48,7 @@ export function settingsScreen(app: App): HTMLElement {
     };
 
     root.replaceChildren(
-      ...pageHeader('Settings', () => app.navigate({ name: 'home' })),
+      ...pageHeader('Settings', () => app.navigate({ name: 'home' }), null, settingsToggle(app, true)),
       h(
         'section',
         { class: 'card' },

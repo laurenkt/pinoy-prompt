@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey, MAX_CALL_SECONDS, startCall, type Call, type CallDeps } from '../openai';
 import { play, stop } from '../speech';
 import { addPiece, findWords, talkGreeting, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
-import { chip, h, icon } from '../ui';
+import { chip, h, icon, iconButton } from '../ui';
 import { createVisualizer, type Visualizer } from '../visualizer';
 import { keyForm } from './settings';
 
@@ -186,7 +186,7 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     return h(
       'header',
       { class: 'session-header' },
-      h('button', { class: 'icon-btn', 'aria-label': 'Leave Chat', onclick: leave }, icon('close')),
+      iconButton('close', 'Leave Chat', leave),
       h('span', { class: 'session-count' }, title),
       extra,
     );
@@ -200,13 +200,13 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
     if (plan.known.length < MIN_WORDS) {
       return h(
         'div',
-        null,
+        { class: 'fill' },
         header('Chat'),
         h(
           'section',
-          { class: 'card center' },
+          { class: 'panel center' },
           h('p', null, `Learn at least ${MIN_WORDS} words first. Chat mixes the words you know into the conversation.`),
-          h('button', { class: 'btn primary', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
+          h('button', { class: 'btn primary big', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
         ),
       );
     }

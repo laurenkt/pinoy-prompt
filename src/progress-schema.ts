@@ -14,7 +14,7 @@
 // progress object into the new shape, and add a fixture for the new version
 // under src/test/fixtures/. The tests fail until both exist.
 
-import { MIN_EASE, START_EASE, type CardState } from './srs';
+import { DAY_MS, MIN_EASE, START_EASE, startOfDayAfter, type CardState } from './srs';
 
 export interface Settings {
   /** New cards introduced per day. */
@@ -211,6 +211,14 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
   const reviewed = time(value.reviewed);
   if (reviewed === undefined) delete card.reviewed;
   else card.reviewed = reviewed;
+  // Builds before reviews ran on elapsed time made a card due at local midnight
+  // of the day its interval landed on, so a batch fell due together just after
+  // midnight. Such a card comes due a whole interval after its review instead.
+  // Done on every read, as an older build still open elsewhere can write those
+  // due times back; where the two rules agree this changes nothing.
+  if (reviewed !== undefined && card.interval >= 1 && card.due === startOfDayAfter(reviewed, card.interval)) {
+    card.due = reviewed + card.interval * DAY_MS;
+  }
   // Keep only well-formed steps, in time order; the log is a nicety, never worth failing over.
   const log = Array.isArray(value.log)
     ? value.log

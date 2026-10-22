@@ -99,6 +99,18 @@ describe('holding the microphone for a screen', () => {
     expect(opened[0].track.readyState).toBe('ended');
   });
 
+  it('says the screen was left, rather than refused, when the learner says no after leaving', async () => {
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => Promise.reject(new DOMException('no', 'NotAllowedError')) } });
+    const asking = holdMicrophone();
+    endMicrophoneHold();
+    expect(await asking).toBe(false);
+  });
+
+  it('still says refused while the screen that asked is showing', async () => {
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => Promise.reject(new DOMException('no', 'NotAllowedError')) } });
+    await expect(holdMicrophone()).rejects.toThrow();
+  });
+
   it("isn't taken up by a screen left while the phone was asking", async () => {
     const asking = holdMicrophone();
     endMicrophoneHold();

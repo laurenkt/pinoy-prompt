@@ -186,7 +186,9 @@ p {
 .talk,
 .session,
 .session-body,
+.fill,
 .panel {
+  /* .fill is any other wrapper on the way, so the height reaches what is inside it. */
   display: flex;
   flex-direction: column;
   flex: 1 0 auto;
@@ -357,26 +359,9 @@ p {
   flex: none;
 }
 
-/* Quiet mode: one tap wherever studying starts. Teal when on, so it's clear at a glance. */
-.quiet-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 44px;
-  padding: 0 12px;
-  flex: none;
-  border: var(--outline);
-  border-radius: 14px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-weight: 800;
-  font-size: 0.9rem;
-  box-shadow: var(--shadow);
-}
-
-.quiet-toggle.on,
-.quiet-icon.on {
+/* A header toggle that's on (quiet mode, Settings while it's open): teal, so it's clear at a glance.
+   It stays where it is, lined up with the buttons beside it, and still presses in when tapped. */
+.icon-btn[aria-pressed='true'] {
   background: var(--teal);
   color: var(--on-accent);
 }
@@ -384,11 +369,6 @@ p {
 /* Silent quiet mode: nothing can play, so the play buttons go. */
 .silent .audio-btn {
   display: none;
-}
-
-.quiet-toggle:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--ink);
 }
 
 
@@ -788,7 +768,7 @@ p {
   margin-top: 0;
 }
 
-/* A summary or a topic's introduction is a card, so it sits in the middle rather than stretching. */
+/* A message with a way forward (a summary, a topic's introduction, "learn some words first") is a card, so it sits in the middle rather than stretching. */
 .panel.center {
   flex-grow: 0;
   margin: auto 0;
@@ -2534,8 +2514,11 @@ p {
   background: var(--cream);
 }
 
-/* Pages opened from Home (Library, Drills, Settings): the back arrow, then the title row. */
+/* Pages opened from Home (Library, Drills, Settings): the back arrow, then the title row.
+   Settings also keeps Home's settings toggle at the right, where it was. */
 .back-bar {
+  display: flex;
+  justify-content: space-between;
   margin-bottom: 20px;
 }
 

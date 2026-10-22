@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { play } from '../speech';
 import { emptyProgress } from '../store';
 import { ADVANCE_MS } from './auto-advance';
+import { homeScreen } from './home';
 import { practiceScreen } from './practice';
 import { applyAudioMode, quietToggle } from './quiet';
 import { sessionScreen } from './session';
@@ -50,6 +51,9 @@ afterEach(() => {
   applyAudioMode(emptyProgress(0).settings);
 });
 
+/** The quiet toggle in a screen's header: the same icon button on every screen. */
+const quietButton = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.icon-btn[aria-label^="Quiet mode"]')!;
+
 describe('quiet mode in study', () => {
   it('never asks to speak', async () => {
     // Always roll a speaking step, if speaking is allowed.
@@ -74,7 +78,7 @@ describe('quiet mode in study', () => {
     expect(speaking(root)).toBe(true);
     const before = structuredClone(app.progress.cards);
 
-    button(root, 'Quiet').click();
+    quietButton(root).click();
 
     expect(app.progress.settings.quiet).toBe(true);
     expect(app.progress.settings.headphones).toBe(false);
@@ -82,7 +86,7 @@ describe('quiet mode in study', () => {
     expect(root.querySelector('.choice')).not.toBeNull();
     expect(root.textContent).toContain('1 done');
     expect(app.progress.cards).toEqual(before);
-    expect(button(root, 'Silent').getAttribute('aria-label')).toBe('Quiet mode: silent');
+    expect(quietButton(root).getAttribute('aria-label')).toBe('Quiet mode: silent');
   });
 
   it('asks a speaking step that was already picked another way', async () => {
@@ -137,7 +141,7 @@ describe('silent quiet mode (no headphones)', () => {
     const root = sessionScreen(app, [{ kind: 'review', cardId: 'salamat', format: 'hear' }], undefined, micReady);
     expect(hearing(root)).toBe(true);
     const before = structuredClone(app.progress.cards);
-    button(root, 'Quiet').click();
+    quietButton(root).click();
     expect(hearing(root)).toBe(false);
     expect(root.textContent).toContain('Salamat');
     expect(app.progress.cards).toEqual(before);
@@ -158,6 +162,19 @@ describe('silent quiet mode (no headphones)', () => {
 
     toggle().click();
     expect(app.progress.settings).toMatchObject({ quiet: false, headphones: false });
+  });
+
+  it('shows as an icon button, pressed while quiet mode is on, on Home, Study and Drills alike', () => {
+    for (const [quiet, headphones] of [[false, false], [true, false], [true, true]] as const) {
+      const roots = [homeScreen(fakeApp(quiet, headphones)), sessionScreen(fakeApp(quiet, headphones), null, undefined, micReady), practiceScreen(fakeApp(quiet, headphones))];
+      const looks = roots.map((root) => {
+        const b = quietButton(root);
+        return { class: b.className, pressed: b.getAttribute('aria-pressed'), label: b.getAttribute('aria-label'), text: b.textContent };
+      });
+      expect(looks[0]).toEqual({ class: 'icon-btn', pressed: String(quiet), label: expect.stringMatching(/^Quiet mode/), text: '' });
+      expect(looks[1]).toEqual(looks[0]);
+      expect(looks[2]).toEqual(looks[0]);
+    }
   });
 });
 

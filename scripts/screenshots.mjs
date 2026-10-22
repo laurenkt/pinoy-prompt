@@ -92,6 +92,12 @@ const SCREENS = {
     await page.click('.hub-btn.big:not(.chat-btn)');
     await page.click('.panel .btn.big');
   },
+  // Drills and Chat before there are words for them: a message in the middle, as Study's are.
+  'first-drills': (page) => page.click('.drills-btn'),
+  'first-chat': async (page) => {
+    await page.evaluate(async () => (await import('/src/openai.ts')).setApiKey('sk-proj-screenshotsonly0123456789'));
+    await page.click('.chat-btn');
+  },
 };
 
 const [outDir, ...wanted] = process.argv.slice(2);
