@@ -46,6 +46,7 @@ describe('the kinds of question in a drill round', () => {
     const fresh = practiceScreen(fakeApp(KNOWN), noMic);
     expect(fresh.querySelector('.prompt')).not.toBeNull();
     expect(toggle(fresh).textContent).toBe('Mix');
+    expect(toggle(fresh).className).toBe('chip filter-toggle');
     expect(toggle(fresh).getAttribute('aria-expanded')).toBe('false');
     expect(fresh.querySelector<HTMLElement>('#drill-scope')!.hidden).toBe(true);
   });
@@ -62,6 +63,8 @@ describe('the kinds of question in a drill round', () => {
     drillScope(root, ['recall']);
     expect(kind(root)).toBe('recall');
     expect(toggle(root).textContent).toBe('Recall');
+    // The button looks the same in the mix or out of it; the chips say which kinds are in.
+    expect(toggle(root).className).toBe('chip filter-toggle');
     for (let i = 0; i < 12; i++) {
       next(root);
       expect(kind(root)).toBe('recall');

@@ -53,6 +53,27 @@ const SCREENS = {
     await page.click('.panel .btn.big');
   },
   library: (page) => page.click('.library-btn'),
+  // The filter chips, open on All, then open again with another filter chosen.
+  'library-filters': async (page) => {
+    await page.click('.library-btn');
+    await page.click('.filter-toggle');
+  },
+  'library-filtered': async (page) => {
+    await page.click('.library-btn');
+    await page.click('.filter-toggle');
+    await page.click('#library-filters .chip:nth-child(3)');
+    await page.click('.filter-toggle');
+  },
+  // The kinds of question, open on the mix, then with one kind left out.
+  'drills-scope': async (page) => {
+    await page.click('.drills-btn');
+    await page.click('.filter-toggle');
+  },
+  'drills-scoped': async (page) => {
+    await page.click('.drills-btn');
+    await page.click('.filter-toggle');
+    await page.click('#drill-scope .chip:not(:disabled)');
+  },
   settings: (page) => page.click('[aria-label="Settings"]'),
   chat: (page) => page.click('.chat-btn'),
   // A new learner's first Study: the topic's introduction, then the first word's.

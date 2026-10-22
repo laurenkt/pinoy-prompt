@@ -163,6 +163,16 @@ export function pageHeader(title: string, onBack: () => void, action?: Node | fa
   ];
 }
 
+/**
+ * A chip: one of a row of choices (Library's filters, the kinds of question in a drill round, Chat's topics).
+ * A chosen chip looks the same in every row, whichever it is. A chip in a `radiogroup` says so with
+ * `role: 'radio'` in `props` and is checked; any other is pressed.
+ */
+export function chip(label: string, selected: boolean, props: Props): HTMLButtonElement {
+  const state = props.role === 'radio' ? 'aria-checked' : 'aria-pressed';
+  return h('button', { ...props, class: selected ? 'chip selected' : 'chip', [state]: String(selected) }, label);
+}
+
 export function progressBar(value: number, max: number, label?: string): HTMLElement {
   const pct = max === 0 ? 0 : Math.round((value / max) * 100);
   return h(

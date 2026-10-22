@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { browserCallDeps, callSupported, CENTS_PER_MINUTE, errorText, getApiKey, MAX_CALL_SECONDS, startCall, type Call, type CallDeps } from '../openai';
 import { play, stop } from '../speech';
 import { addPiece, findWords, talkGreeting, talkInstructions, talkPlan, talkTopics, type SpokenTurn, type TalkPlan } from '../talk';
-import { h, icon } from '../ui';
+import { chip, h, icon } from '../ui';
 import { createVisualizer, type Visualizer } from '../visualizer';
 import { keyForm } from './settings';
 
@@ -225,20 +225,14 @@ export function talkScreen(app: App, deps: TalkDeps = defaultTalkDeps, start = f
         'div',
         { class: 'talk-topics', role: 'radiogroup', 'aria-label': 'Topic' },
         [{ id: null, title: 'Anything' }, ...talkTopics(app.progress)].map((t) =>
-          h(
-            'button',
-            {
-              role: 'radio',
-              'aria-checked': String(topicId === t.id),
-              class: `chip ${topicId === t.id ? 'selected' : ''}`,
-              onclick: () => {
-                topicId = t.id;
-                plan = talkPlan(app.progress, topicId);
-                draw();
-              },
+          chip(t.title, topicId === t.id, {
+            role: 'radio',
+            onclick: () => {
+              topicId = t.id;
+              plan = talkPlan(app.progress, topicId);
+              draw();
             },
-            t.title,
-          ),
+          }),
         ),
       ),
       plan.newWord && h('p', { class: 'muted small' }, 'New word this time: ', h('strong', { lang: 'fil' }, plan.newWord.tl), ` (${plan.newWord.en})`),
