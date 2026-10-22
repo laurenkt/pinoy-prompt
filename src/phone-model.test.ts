@@ -64,6 +64,18 @@ describe('loadPhoneModel', () => {
     expect(await modelDownloaded()).toBe(true);
   });
 
+  it('loads a kept model without downloading it or reporting download progress', async () => {
+    const { MODEL_URL } = await import('./model-cache');
+    cache.entries.set(MODEL_URL, new ArrayBuffer(MODEL_BYTES));
+    const download = serve(MODEL_BYTES);
+    vi.stubGlobal('fetch', download);
+    const { loadPhoneModel } = await import('./phone-model');
+    const progress: number[] = [];
+    await loadPhoneModel((p) => progress.push(p));
+    expect(download).not.toHaveBeenCalled();
+    expect(progress).toEqual([]);
+  });
+
   it("never keeps a download that was cut short, so the next try starts afresh", async () => {
     vi.stubGlobal('fetch', serve(40_000_000));
     const { loadPhoneModel, modelDownloaded } = await import('./phone-model');

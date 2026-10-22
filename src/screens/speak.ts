@@ -57,7 +57,8 @@ const PROBLEMS: Record<Problem, string> = {
 type State =
   | { name: 'checking' }
   | { name: 'offer' }
-  | { name: 'loading'; progress: number }
+  /** progress is null until a download reports any: loading a model kept on the device reports none. */
+  | { name: 'loading'; progress: number | null }
   | { name: 'ready' }
   | { name: 'recording'; speech: boolean }
   | { name: 'analysing' }
@@ -159,10 +160,12 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   }
 
   async function load(): Promise<void> {
-    set({ name: 'loading', progress: 0 });
+    // Not "Downloading" until bytes arrive: a model already on the device loads without any.
+    set({ name: 'loading', progress: null });
     try {
       model = await deps.loadPhoneModel((progress) => {
         if (state.name !== 'loading') return;
+        if (state.progress === null) return set({ name: 'loading', progress });
         state = { name: 'loading', progress };
         updateProgress();
       });
@@ -214,7 +217,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   }
 
   function updateProgress(): void {
-    if (state.name !== 'loading') return;
+    if (state.name !== 'loading' || state.progress === null) return;
     const pct = Math.round(state.progress * 100);
     const fill = el.querySelector<HTMLElement>('.bar-fill');
     if (fill) fill.style.width = `${pct}%`;
@@ -263,6 +266,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           ),
         ];
       case 'loading':
+        if (state.progress === null) return [h('p', { class: 'listen-status center', role: 'status' }, 'Getting ready…')];
         return [
           h('div', { class: 'bar download-bar', role: 'progressbar', 'aria-label': 'Download progress' }, h('div', { class: 'bar-fill', style: { width: `${Math.round(state.progress * 100)}%` } })),
           h('p', { class: 'listen-status center', role: 'status' }, state.progress >= 1 ? 'Getting ready…' : `Downloading… ${Math.round(state.progress * 100)}%`),
