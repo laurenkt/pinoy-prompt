@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Decoded clips are kept between tests, so each test that counts fetches has its own word.
 vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
 
-const { IDLE_SUSPEND_MS, KEEP_DECODED, loadClip } = await import('./audio-engine');
+const { audioBusy, IDLE_SUSPEND_MS, KEEP_DECODED, loadClip, playLive } = await import('./audio-engine');
 const { canPlay, chime, clickSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
@@ -52,8 +52,8 @@ class FakeContext {
     return { sampleRate, duration: length / sampleRate, getChannelData: () => data };
   }
   createGain() {
-    const param = { setValueAtTime() {}, linearRampToValueAtTime() {} };
-    return { gain: param, connect: (to: unknown) => to };
+    const param = { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} };
+    return { gain: param, connect: (to: unknown) => to, disconnect() {} };
   }
   createBufferSource() {
     const source: FakeSource & Record<string, unknown> = {
@@ -421,5 +421,29 @@ describe('the tap sounds', () => {
     // It's inlined in the app, so it plays offline without a file of its own.
     expect(fetched.at(-1)).toMatch(/^data:audio\/mpeg;base64,/);
     expect(ramps).toHaveLength(0);
+  });
+});
+
+describe('sounds made as they play', () => {
+  it('play through the shared context, count as playing until stopped, then stop their sources after a fade', async () => {
+    vi.useFakeTimers();
+    const ended: number[] = [];
+    const sound = playLive((ctx, t0) => {
+      expect(ctx).toBe(contexts.at(-1));
+      expect(t0).toBeGreaterThanOrEqual(ctx.currentTime);
+      return { out: ctx.createGain() as unknown as AudioNode, end: (at) => ended.push(at) };
+    });
+    const ctx = contexts.at(-1)!;
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS * 2);
+    expect(audioBusy(0)).toBe(true);
+    expect(ctx.state).toBe('running');
+    sound.stop();
+    sound.stop();
+    await sound.done;
+    expect(ended).toHaveLength(1);
+    expect(ended[0]).toBeGreaterThan(ctx.currentTime);
+    expect(audioBusy(0)).toBe(false);
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS);
+    expect(ctx.state).toBe('suspended');
   });
 });

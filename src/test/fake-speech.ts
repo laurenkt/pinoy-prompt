@@ -2,7 +2,8 @@
 
 import { NUM_MEL_BINS } from '../fbank';
 import type { Recognition } from '../phone-model';
-import type { Player } from '../player';
+import { canSynthesize } from '../phone-synth';
+import type { Held, Player } from '../player';
 
 /** What the recogniser would return for these sounds: one every 100 ms from 0.2 s, over a 1 s recording. */
 export function fakeRecognition(sounds: string[]): Recognition {
@@ -16,15 +17,24 @@ export function fakeRecognition(sounds: string[]): Recognition {
 
 /** A player that remembers what it was asked to play and finishes straight away. */
 export class FakePlayer implements Player {
-  calls: ({ kind: 'slice'; from: number; to: number } | { kind: 'url'; url: string })[] = [];
+  calls: ({ kind: 'slice'; from: number; to: number } | { kind: 'hold'; from: string; to: string; mix: number })[] = [];
   stopped = 0;
+  /** The sound being held, if any: where it has been moved to, and whether it was let go. */
+  held: { mixes: number[]; released: boolean } | null = null;
   playSlice(_samples: Float32Array, _rate: number, from: number, to: number) {
     this.calls.push({ kind: 'slice', from, to });
     return { done: Promise.resolve() };
   }
-  playUrl(url: string) {
-    this.calls.push({ kind: 'url', url });
-    return { done: Promise.resolve() };
+  hold(from: string, to: string, mix: number): Held | null {
+    if (!canSynthesize(from) || !canSynthesize(to)) return null;
+    this.calls.push({ kind: 'hold', from, to, mix });
+    const held = { mixes: [mix], released: false };
+    this.held = held;
+    return {
+      done: Promise.resolve(),
+      setMix: (m) => held.mixes.push(m),
+      release: () => (held.released = true),
+    };
   }
   stop() {
     this.stopped++;

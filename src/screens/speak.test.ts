@@ -211,10 +211,13 @@ describe('an attempt', () => {
     expect(text('.mark-off .mark-heard')).toBe('n');
     expect(text('.sound-detail .detail-letters')).toBe('“ng”');
     expect(text('.sound-detail')).toContain('sing');
-    // The whole word, yours and the target, from the result card.
+    // The whole word, yours and the target, at the bottom over the way on, not in the result card.
     expect(panel.el.classList).toContain('has-breakdown');
-    const card = panel.el.querySelector('.result-card')!;
-    const wordButton = (label: string) => [...card.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label || b.getAttribute('aria-label') === label)!;
+    expect(panel.el.querySelector('.result-card button')).toBeNull();
+    const row = panel.el.querySelector('.word-actions')!;
+    expect(row.nextElementSibling?.classList).toContain('result-actions');
+    expect(row.previousElementSibling?.classList).toContain('sound-results');
+    const wordButton = (label: string) => [...row.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label || b.getAttribute('aria-label') === label)!;
     wordButton('▶ Yours').click();
     expect(player.calls.at(-1)).toMatchObject({ kind: 'slice' });
     wordButton('▶ Target').click();

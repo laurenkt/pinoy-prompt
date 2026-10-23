@@ -1,15 +1,18 @@
 // The results of a spoken attempt, sound by sound: the recording drawn as a
 // ribbon with each sound marked on it (the sound aimed for above, what was
-// heard below; tap one to open it and hear it), and for the chosen sound a map
-// of where it's made in the mouth, with the learner's version and the target.
+// heard below; tap one to open it), and for the chosen sound a map of where
+// it's made in the mouth, with what the learner said and the target. Holding
+// the slider under the map plays either, made in code rather than cut from the
+// recording, and sliding moves from one to the other, the mark on the map
+// following.
 
 import type { Tip } from '../coach';
 import type { Comparison, SoundResult, SoundVerdict } from '../phonetics';
-import type { Player } from '../player';
-import REFERENCES from '../reference-sounds.json';
+import { canSynthesize } from '../phone-synth';
+import type { Held, Player } from '../player';
 import { MANNERS, PLACES, placeOf, soundName, type Place } from '../sound-map';
 import { createSpectrogram, type Segment, type Spectrogram } from '../spectrogram';
-import { h, svg } from '../ui';
+import { h, icon, svg } from '../ui';
 
 export interface Attempt {
   /** The card text (or accepted variant) the attempt was judged against. */
@@ -33,15 +36,6 @@ const COLORS: Record<SoundVerdict | 'extra', string> = {
   extra: '#ff6b92',
 };
 const VERDICT_LABEL: Record<SoundVerdict, string> = { good: 'Spot on', close: 'Nearly', off: 'Off', missing: 'Missing' };
-
-const references = REFERENCES as Record<string, { file: string; syllable: string; word: string }>;
-
-/** A native speaker saying the sound, if we have one. Allophones share a clip. */
-export function referenceFor(ipa: string): { url: string; syllable: string; word: string } | null {
-  const key = ({ e: 'ɛ', ɔ: 'o', r: 'ɾ' } as Record<string, string>)[ipa] ?? ipa;
-  const ref = references[key];
-  return ref ? { url: `${import.meta.env.BASE_URL}sounds/${ref.file}`, syllable: ref.syllable, word: ref.word } : null;
-}
 
 /** The stretch of the recording that holds heard sound i: halfway to its neighbours, at least 120 ms. */
 export function spanOf(timing: Attempt['timing'], i: number, duration: number): { start: number; end: number } {
@@ -96,7 +90,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   const list = pairs(attempt);
   const span = (i: number) => spanOf(attempt.timing, i, duration);
 
-  // Where to listen for an expected sound nobody said: the gap between its neighbours.
+  // Where an expected sound nobody said would have been: the gap between its neighbours.
   const gapFor = (index: number) => {
     const before = list.slice(0, index).reverse().find((p) => p.heardAt !== undefined);
     const after = list.slice(index + 1).find((p) => p.heardAt !== undefined);
@@ -104,14 +98,9 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const end = after?.heardAt !== undefined ? span(after.heardAt).end : duration;
     return { start, end };
   };
-  const yoursFor = (index: number) => {
-    const p = list[index];
-    return p.heardAt !== undefined ? span(p.heardAt) : gapFor(index);
-  };
-
   // --- The ribbon -----------------------------------------------------------
   // The recording, with each sound marked along it: the sound aimed for above,
-  // what was heard below. Tapping a mark opens that sound and plays your part.
+  // what was heard below. Tapping a mark opens that sound.
   const segments: Segment[] = list
     .filter((p) => p.heardAt !== undefined)
     .map((p) => ({ ...span(p.heardAt!), color: p.extraCounts === false ? '#4a4290' : COLORS[verdictOf(p)] }));
@@ -130,10 +119,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   }
   const playhead = (t: number | null) => ribbon?.setPlayhead(t);
 
-  // Counts playbacks started (and dispose), so a sequence can tell it was interrupted.
-  let plays = 0;
   const playMine = (range: { start: number; end: number }) => {
-    plays++;
     const playback = player.playSlice(attempt.samples, SAMPLE_RATE, range.start, range.end, playhead);
     void playback.done.then(() => playhead(null));
     return playback;
@@ -142,14 +128,6 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   const target = (p: Pair) => p.result?.phone.ipa;
   const letters = (p: Pair) => (p.result ? attempt.text.slice(p.result.phone.from, p.result.phone.to).toLowerCase() : '');
   let selected = -1;
-
-  const playTarget = (index: number): Promise<void> => {
-    const ipa = target(list[index]);
-    const ref = ipa ? referenceFor(ipa) : null;
-    if (!ref) return Promise.resolve();
-    plays++;
-    return player.playUrl(ref.url).done;
-  };
 
   const marks = list.map((p, index) => {
     const ipa = target(p);
@@ -184,10 +162,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
         style,
         'aria-label': label,
         'aria-pressed': 'false',
-        onclick: () => {
-          select(index);
-          playMine(yoursFor(index));
-        },
+        onclick: () => select(index),
       },
       h('span', { class: 'mark-target', lang: 'und-fonipa' }, ipa ?? '+'),
       h('span', { class: 'mark-heard', lang: 'und-fonipa' }, heard ?? '–'),
@@ -203,11 +178,11 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 
   // --- Detail for one sound --------------------------------------------------
   const detail = h('div', { class: 'sound-detail', 'aria-live': 'polite' });
-  let chart: { heard: SVGGElement | null; moveTo: (p: { x: number; y: number }, ms: number) => void; reset: () => void } | null = null;
 
   function select(index: number): void {
     if (index === selected) return;
     selected = index;
+    letGo();
     marks.forEach((m, i) => {
       m.classList.toggle('selected', i === index);
       m.setAttribute('aria-pressed', String(i === index));
@@ -235,39 +210,11 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const ipa = target(p);
     const heard = p.heardAt !== undefined ? attempt.heard[p.heardAt] : null;
     const verdict = verdictOf(p);
-    const ref = ipa ? referenceFor(ipa) : null;
     const closeness = p.result?.closeness ?? 0;
     const tip = tipFor(index) ?? (!ipa ? (p.extraCounts ? 'This sound isn’t in the word. Try leaving it out.' : 'A small extra sound like this is a natural part of speech. No need to change it.') : undefined);
     const drawn = drawChart(ipa ?? null, heard);
-    chart = drawn;
-
-    const yours = h('button', { class: 'btn secondary small', onclick: () => playMine(yoursFor(index)) }, '▶ Yours');
-    const theirs = ref && h('button', { class: 'btn secondary small', onclick: () => void playTarget(index) }, '▶ Target');
-    const both =
-      ref &&
-      heard &&
-      h(
-        'button',
-        {
-          class: 'btn primary small',
-          'aria-label': 'Yours, then the target',
-          onclick: async () => {
-            drawn.reset();
-            drawn.heard?.classList.add('speaking');
-            const mine = playMine(yoursFor(index));
-            const turn = plays;
-            await mine.done;
-            drawn.heard?.classList.remove('speaking');
-            // Something else was played, or the screen closed: don't carry on.
-            if (plays !== turn) return;
-            const goal = ipa ? chartPoint(placeOf(ipa)) : null;
-            if (goal) drawn.moveTo(goal, 700);
-            await playTarget(index);
-            setTimeout(() => chart === drawn && drawn.reset(), 1600);
-          },
-        },
-        '▶ Both',
-      );
+    // Right, even if the recogniser wrote it another way (an accepted variant): nothing to slide between.
+    const said = p.result?.verdict === 'good';
 
     detail.replaceChildren(
       ...([
@@ -290,17 +237,164 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
               h('span', { style: { width: `${Math.round(closeness * 100)}%` } }),
             ),
         ),
-        h(
-          'dl',
-          { class: 'detail-sounds' },
-          ipa && [h('dt', null, 'Aim for'), h('dd', null, h('strong', { lang: 'und-fonipa' }, ipa), ' ', soundName(ipa), ref && h('span', { class: 'muted' }, ` (from “${ref.word}”)`))],
-          [h('dt', null, 'You said'), h('dd', null, heard ? [h('strong', { lang: 'und-fonipa' }, heard), ' ', soundName(heard)] : 'nothing here')],
-        ),
-        drawn.el,
         tip && h('p', { class: 'detail-tip' }, tip),
-        h('div', { class: 'row detail-actions' }, yours, theirs, both),
+        drawn.el,
+        h(
+          'div',
+          { class: 'sound-ends' },
+          // The symbols themselves are on the slider's ends below.
+          // Said as aimed for: once is enough.
+          !said && h('p', { class: 'end-heard' }, h('span', { class: 'end-label' }, 'You said'), heard ? soundName(heard) : 'nothing here'),
+          h('p', { class: 'end-target' }, h('span', { class: 'end-label' }, 'Aim for'), ipa ? soundName(ipa) : 'leave it out'),
+        ),
+        listener(said ? null : heard, ipa ?? null, drawn),
       ].filter(Boolean) as Node[]),
     );
+  }
+
+  /** The sound held now, so a new one, a redraw or leaving lets it go. */
+  let holding: Held | null = null;
+  const letGo = () => {
+    holding?.release();
+    holding = null;
+  };
+
+  /**
+   * How the open sound is heard: a slider from what was said to what to aim for when they differ and both can be
+   * made, held to hear and slid to move between them; otherwise a button held to hear the one sound there is.
+   */
+  function listener(heard: string | null, ipa: string | null, drawn: Chart): HTMLElement | null {
+    const from = heard && canSynthesize(heard) ? heard : null;
+    const to = ipa && canSynthesize(ipa) ? ipa : null;
+    if (from && to && from !== to) return slider(from, to, drawn);
+    const only = to ?? from;
+    return only ? holdButton(only) : null;
+  }
+
+  function holdButton(sound: string): HTMLElement {
+    const press = () => {
+      letGo();
+      holding = player.hold(sound, sound, 0);
+      button.classList.toggle('holding', holding !== null);
+    };
+    const lift = () => {
+      letGo();
+      button.classList.remove('holding');
+    };
+    const button = h(
+      'button',
+      {
+        class: 'btn secondary hold-btn',
+        // It makes its own sound.
+        'data-no-tap': true,
+        onpointerdown: (e: PointerEvent) => {
+          button.setPointerCapture?.(e.pointerId);
+          press();
+        },
+        onpointerup: lift,
+        onpointercancel: lift,
+        // From the keyboard, a press is a tap.
+        onclick: (e: MouseEvent) => {
+          if (e.detail !== 0) return;
+          press();
+          lift();
+        },
+        oncontextmenu: (e: Event) => e.preventDefault(),
+      },
+      icon('speaker'),
+      ' Hold to hear ',
+      h('strong', { lang: 'und-fonipa' }, sound),
+    );
+    return button;
+  }
+
+  function slider(from: string, to: string, drawn: Chart): HTMLElement {
+    let mix = 0;
+    const thumb = h('span', { class: 'slider-thumb' }, icon('speaker'));
+    const track = h(
+      'div',
+      {
+        class: 'sound-slider',
+        role: 'slider',
+        tabindex: '0',
+        'aria-label': 'Hold to hear. Slide from what you said to what to aim for',
+        'aria-valuemin': '0',
+        'aria-valuemax': '100',
+      },
+      h('span', { class: 'slider-cap cap-heard', lang: 'und-fonipa', 'aria-hidden': 'true' }, from),
+      h('span', { class: 'slider-rail', 'aria-hidden': 'true' }, h('span', { class: 'slider-hint' }, 'Hold and slide'), thumb),
+      h('span', { class: 'slider-cap cap-target', lang: 'und-fonipa', 'aria-hidden': 'true' }, to),
+    );
+    const show = () => {
+      track.style.setProperty('--mix', String(mix));
+      track.setAttribute('aria-valuenow', String(Math.round(mix * 100)));
+      track.setAttribute('aria-valuetext', mix === 0 ? `What you said, ${from}` : mix === 1 ? `What to aim for, ${to}` : `${Math.round(mix * 100)}% of the way to ${to}`);
+      drawn.setMix(mix);
+    };
+    const moveTo = (next: number) => {
+      mix = next;
+      holding?.setMix(mix);
+      show();
+    };
+    const press = () => {
+      letGo();
+      holding = player.hold(from, to, mix);
+      track.classList.add('holding');
+      drawn.heard?.classList.add('speaking');
+    };
+    const lift = () => {
+      letGo();
+      track.classList.remove('holding');
+      drawn.heard?.classList.remove('speaking');
+    };
+    /** Where a finger is along the rail, 0–1, snapping to either end near it. */
+    const mixAt = (x: number) => {
+      const rail = track.querySelector('.slider-rail')!.getBoundingClientRect();
+      const inner = rail.width - thumb.offsetWidth;
+      const t = inner > 0 ? (x - rail.left - thumb.offsetWidth / 2) / inner : 0;
+      return t < SNAP ? 0 : t > 1 - SNAP ? 1 : t;
+    };
+    let finger: number | null = null;
+    track.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      finger = e.pointerId;
+      track.setPointerCapture?.(e.pointerId);
+      mix = mixAt(e.clientX);
+      show();
+      press();
+    });
+    track.addEventListener('pointermove', (e) => {
+      if (e.pointerId === finger) moveTo(mixAt(e.clientX));
+    });
+    const up = (e: PointerEvent) => {
+      if (e.pointerId !== finger) return;
+      finger = null;
+      lift();
+    };
+    track.addEventListener('pointerup', up);
+    track.addEventListener('pointercancel', up);
+    track.addEventListener('contextmenu', (e) => e.preventDefault());
+    track.addEventListener('keydown', (e) => {
+      const step = ({ ArrowLeft: -0.1, ArrowDown: -0.1, ArrowRight: 0.1, ArrowUp: 0.1, Home: -1, End: 1 } as Record<string, number>)[e.key];
+      if (step !== undefined) {
+        e.preventDefault();
+        moveTo(Math.min(1, Math.max(0, Math.round((mix + step) * 10) / 10)));
+        // Not held: a step plays where it landed, as a tap.
+        if (!holding) {
+          press();
+          lift();
+        }
+      } else if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
+        e.preventDefault();
+        press();
+      }
+    });
+    track.addEventListener('keyup', (e) => {
+      if (e.key === ' ' || e.key === 'Enter') lift();
+    });
+    track.addEventListener('blur', lift);
+    show();
+    return track;
   }
 
   // Start on the first sound that needs work (an added sound counts), or the first sound.
@@ -317,7 +411,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     el,
     playWhole: () => void playMine(whole()),
     dispose: () => {
-      plays++;
+      letGo();
       player.stop();
       ribbon?.dispose();
     },
@@ -325,6 +419,17 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 }
 
 // --- Charts -------------------------------------------------------------------
+
+/** How close to either end of the slider counts as that end, as a share of its length. */
+const SNAP = 0.06;
+
+interface Chart {
+  el: SVGSVGElement;
+  /** The mark for what was heard, if it's on this chart. */
+  heard: SVGGElement | null;
+  /** Put the heard mark `mix` of the way to the target (0 is where it was heard). */
+  setMix(mix: number): void;
+}
 
 const W = 300;
 const H = 126;
@@ -348,7 +453,7 @@ function chartPoint(place: Place): { x: number; y: number } | null {
   return null;
 }
 
-function drawChart(target: string | null, heard: string | null) {
+function drawChart(target: string | null, heard: string | null): Chart {
   const targetPlace = target ? placeOf(target) : heard ? placeOf(heard) : ({ chart: 'none' } as Place);
   const kind = targetPlace.chart;
   const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: `sound-chart chart-${kind}`, role: 'img' });
@@ -418,19 +523,13 @@ function drawChart(target: string | null, heard: string | null) {
   return {
     el: root,
     heard: heardMark,
-    moveTo(p: { x: number; y: number }, ms: number) {
-      if (!heardMark) return;
-      heardMark.style.transition = `transform ${ms}ms cubic-bezier(.5,0,.2,1)`;
-      heardMark.setAttribute('transform', `translate(${p.x} ${p.y})`);
-      heardMark.style.transform = `translate(${p.x}px, ${p.y}px)`;
-      heardMark.classList.add('arrived');
-    },
-    reset() {
-      if (!heardMark || !start) return;
-      heardMark.style.transition = 'none';
-      heardMark.setAttribute('transform', `translate(${start.x} ${start.y})`);
-      heardMark.style.transform = `translate(${start.x}px, ${start.y}px)`;
-      heardMark.classList.remove('arrived');
+    setMix(mix) {
+      if (!heardMark || !start || !goal) return;
+      const x = start.x + (goal.x - start.x) * mix;
+      const y = start.y + (goal.y - start.y) * mix;
+      heardMark.setAttribute('transform', `translate(${x} ${y})`);
+      heardMark.style.transform = `translate(${x}px, ${y}px)`;
+      heardMark.classList.toggle('arrived', mix > 0.9);
     },
   };
 }

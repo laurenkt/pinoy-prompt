@@ -32,7 +32,7 @@ export interface SpeakDeps {
   record: typeof record;
   modelDownloaded(): Promise<boolean>;
   loadPhoneModel(onProgress?: (fraction: number) => void): Promise<PhoneModel>;
-  /** Plays back pieces of the recording and reference sounds. */
+  /** Plays back pieces of the recording, and single sounds made in code. */
   player(): Player;
   /** Whether the model was on the device when last checked, for a screen deciding as it's drawn. */
   modelKnownDownloaded?(): boolean;
@@ -407,23 +407,24 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     const lettersEl = heard.length > 0 && h('p', { class: `letters${text.length > 16 ? ' long' : ''}`, lang: 'fil' }, markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)));
     if (breakdown) {
       // The breakdown takes the card's place: the word, coloured by how each sound came
-      // out, with the whole word to play back. Each sound's tip is in the breakdown.
+      // out. Each sound's tip is in the breakdown. The whole word to play back sits at
+      // the bottom with the way on, under the thumb.
       const whole = breakdown;
       return [
         h(
           'div',
           { class: `feedback result-card ${right ? 'good' : 'bad'}`, role: 'status' },
           h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title), ' ', h('span', { class: 'result-meaning' }, card.en)), lettersEl), dial(comparison.score, `${pct}% of the way there`)),
-          h(
-            'div',
-            { class: 'word-actions' },
-            h('span', { class: 'word-actions-label' }, 'Whole word'),
-            h('button', { class: 'btn secondary small', onclick: () => whole.playWhole() }, '▶ Yours'),
-            h('button', { class: 'btn secondary small', onclick: () => options.say() }, '▶ Target'),
-            audioButton(() => options.say(true), 'Target, slowly', 'slow small'),
-          ),
         ),
         breakdown.el,
+        h(
+          'div',
+          { class: 'word-actions' },
+          h('span', { class: 'word-actions-label' }, 'Whole word'),
+          h('button', { class: 'btn secondary small', onclick: () => whole.playWhole() }, '▶ Yours'),
+          h('button', { class: 'btn secondary small', onclick: () => options.say() }, '▶ Target'),
+          audioButton(() => options.say(true), 'Target, slowly', 'slow small'),
+        ),
         actions(right),
       ];
     }
