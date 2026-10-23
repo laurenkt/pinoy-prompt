@@ -16,7 +16,7 @@ import {
   type Format,
   type Step,
 } from '../session';
-import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
+import { formatInterval, nextInterval, newCardState, type CardState, type Rating } from '../srs';
 import { canPlay, play, preload, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
 import { audioPair, choiceList, h, hookView, iconButton, progressBar } from '../ui';
@@ -37,6 +37,8 @@ const PRAISE = ['Magaling!', 'Galing!', 'Tama!', 'Ayos!'];
 
 /** Phases where the current card hasn't been answered yet, so the one before it can still be looked back at. */
 const UNANSWERED: Phase[] = ['topic-intro', 'intro', 'quiz', 'front', 'caught-up', 'done'];
+/** Phases a card is left in once answered, which it can be looked back at in from the next one. */
+const ANSWERED: Phase[] = ['feedback', 'back', 'missed'];
 
 /**
  * A study session. With a list of steps it works through them and finishes;
@@ -68,7 +70,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   let praise = PRAISE[0];
   /** Counting down to the next card after a right answer. */
   let auto: Countdown | null = null;
-  /** The card that moved on by itself, as it was left, so the learner can look back at it. */
+  /** The card answered before this one, as it was left, so the learner can look back at it. */
   let previous: Shown | null = null;
   /** Set as a card moves on by itself, so the next one doesn't take focus: an Enter meant for Continue would answer it. */
   let autoMoved = false;
@@ -107,11 +109,12 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     return nextStudyStep(app.progress, app.now(), recent, { listen: canListen() }) ?? undefined;
   }
 
+  /** Go to the next step, keeping the card on screen to look back at once it's been answered. */
   function next(): void {
-    moveOn(null);
+    moveOn(card && ANSWERED.includes(phase) ? snapshot() : null);
   }
 
-  /** Go to the next step, keeping `back` as the card to look back at, if it moved on by itself. */
+  /** Go to the next step, keeping `back` as the card to look back at. */
   function moveOn(back: Shown | null): void {
     hold();
     previous = back;
@@ -127,6 +130,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     guide = null;
     if (card) recent.push(card.id);
     if (card && isVocab(card)) preload(card);
+    // A missed card asked again straight away can't offer its own answer to look back at.
+    if (previous && previous.card?.id === card?.id) previous = null;
     if (!step || !card) {
       // Open-ended study runs until it's caught up, then points on to Drills.
       phase = open ? 'caught-up' : 'done';
@@ -239,7 +244,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     if (right && firstGo)
       auto = countdown(root, () => {
         autoMoved = true;
-        moveOn(snapshot());
+        next();
       });
     draw();
   }
@@ -331,8 +336,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
         quietToggle(app, quietChanged),
       );
     }
-    // On the missed screen the card is already back in the queue.
-    const remaining = queue.length + (phase === 'done' || phase === 'missed' ? 0 : 1);
+    // On the missed screen the card is already back in the queue. Looking back counts from the card being asked.
+    const at = reviewing?.phase ?? phase;
+    const remaining = queue.length + (at === 'done' || at === 'missed' ? 0 : 1);
     return h(
       'header',
       { class: 'session-header' },
@@ -526,25 +532,32 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
           { class: 'answer' },
           reverse ? tagalog(c) : h('p', { class: 'meaning' }, c.en),
           c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
-          hookShown
+          hookShown || reviewing
             ? hookView(c)
             : h('button', { class: 'btn hook-btn', onclick: showHook }, 'Show memory hook', h('span', { class: 'key', 'aria-hidden': 'true' }, 'H')),
-          h('p', { class: 'muted small center' }, 'How well did you remember?'),
-          h(
-            'div',
-            { class: 'ratings' },
-            RATINGS.map(({ rating, label }, i) =>
-              h(
-                'button',
-                { class: `rate rate-${rating}`, onclick: () => rate(rating), 'data-autofocus': rating === 'good' || undefined },
-                h('span', { class: 'rate-label' }, label),
-                h('span', { class: 'rate-when' }, formatInterval(nextInterval(state, rating))),
-                h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
-              ),
-            ),
-          ),
+          reviewing ? proceed() : ratings(state),
         ),
     );
+  }
+
+  /** How well the card was remembered, which sets when it comes back. A card looked back at has been rated already, so it shows none. */
+  function ratings(state: CardState): HTMLElement[] {
+    return [
+      h('p', { class: 'muted small center' }, 'How well did you remember?'),
+      h(
+        'div',
+        { class: 'ratings' },
+        RATINGS.map(({ rating, label }, i) =>
+          h(
+            'button',
+            { class: `rate rate-${rating}`, onclick: () => rate(rating), 'data-autofocus': rating === 'good' || undefined },
+            h('span', { class: 'rate-label' }, label),
+            h('span', { class: 'rate-when' }, formatInterval(nextInterval(state, rating))),
+            h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
+          ),
+        ),
+      ),
+    ];
   }
 
   function missedView(c: Card): HTMLElement {
@@ -555,7 +568,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       h('p', { class: 'meaning' }, c.en),
       c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),
       hookView(c),
-      h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
+      proceed(),
     );
   }
 
@@ -622,23 +635,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
           'div',
           { class: 'answer' },
           !d.tl && h('p', { class: 'meaning' }, d.answer),
-          hookShown
+          hookShown || reviewing
             ? h('div', null, guideBody(c), hookView(c))
             : h('button', { class: 'btn hook-btn', onclick: showHook }, 'Show the explanation', h('span', { class: 'key', 'aria-hidden': 'true' }, 'H')),
-          h('p', { class: 'muted small center' }, 'How well did you remember?'),
-          h(
-            'div',
-            { class: 'ratings' },
-            RATINGS.map(({ rating, label }, i) =>
-              h(
-                'button',
-                { class: `rate rate-${rating}`, onclick: () => rate(rating), 'data-autofocus': rating === 'good' || undefined },
-                h('span', { class: 'rate-label' }, label),
-                h('span', { class: 'rate-when' }, formatInterval(nextInterval(state, rating))),
-                h('span', { class: 'key', 'aria-hidden': 'true' }, i + 1),
-              ),
-            ),
-          ),
+          reviewing ? proceed() : ratings(state),
         ),
     );
   }
@@ -651,7 +651,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       drill?.tl ? gapLine(drill, true, say) : drill && h('p', { class: 'meaning' }, drill.answer),
       guideBody(c),
       hookView(c),
-      h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
+      proceed(),
     );
   }
 
@@ -669,6 +669,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       hold();
       return say();
     }
+    // A card looked back at has been answered already.
+    if (reviewing) return;
     // Enter and Space activate the focused primary button natively.
     const n = Number(e.key);
     if (phase === 'quiz' && card && !isVocab(card)) {

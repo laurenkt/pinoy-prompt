@@ -134,7 +134,7 @@ export function practiceScreen(
   let spokenRight = false;
   /** Counting down to the next question after a right answer. */
   let auto: Countdown | null = null;
-  /** What was picked on the question before, when it moved on by itself; null when there's nothing to look back at. */
+  /** What was picked on the question before; null when there's nothing to look back at (a spoken question has no pick). */
   let previousPick: string | null = null;
   let lookingBack = false;
   /** Set as a question moves on by itself, so the next one doesn't take focus: an Enter meant for Next would answer it. */
@@ -425,7 +425,7 @@ export function practiceScreen(
     if (right)
       auto = countdown(root, () => {
         autoMoved = true;
-        advance(pick);
+        advance();
       });
     draw();
   }
@@ -453,14 +453,14 @@ export function practiceScreen(
     draw();
   }
 
-  /** Next question; `back` is this one's pick, when it moved on by itself, so it can be looked back at. */
-  function advance(back: string | null = null): void {
+  /** Next question, keeping this one and its pick to look back at. */
+  function advance(): void {
     hold();
     stopListening();
     settle(spokenRight);
     done++;
     previous = current;
-    previousPick = back;
+    previousPick = picked;
     // Picked before quiet or silent mode may have come on, or the scope changed.
     current = upcoming && modes().includes(upcoming.mode) ? upcoming : nextQuestion();
     upcoming = null;
@@ -521,7 +521,7 @@ export function practiceScreen(
     if (!current) root.replaceChildren(tooFew());
     // An answer can be said into the box only on a listening or recall question, and with a way to hear it.
     else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting((modes().includes('listen') || modes().includes('recall')) && hearMeaning() !== null)));
-    else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
+    else if (lookingBack && previous && previousPick !== null) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
     autoMoved = false;
@@ -615,7 +615,7 @@ export function practiceScreen(
     const onward = () =>
       reviewing ? continueButton(() => setLookingBack(false), false, 'Back to the current card') : continueButton(() => advance(), auto !== null, 'Next');
     const back =
-      previousPick && !answered && !checking && !listening && !hearing && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true));
+      previousPick !== null && !answered && !checking && !listening && !hearing && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true));
 
     if (q.guide) {
       const d = q.guide.drill;
