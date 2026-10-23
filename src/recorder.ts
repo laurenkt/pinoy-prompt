@@ -9,7 +9,7 @@ import { getMicrophone, dropMicrophone, releaseMicrophone } from './microphone';
 const SPEECH_LEVEL = 0.02;
 /** Stop this long after speech ends. */
 const TRAILING_SILENCE_MS = 900;
-/** Never record longer than this. */
+/** Never record longer than this, counted from when the microphone gave sound (it may be reopened first: SIGNAL_WAIT_MS). */
 export const MAX_RECORDING_MS = 7000;
 /**
  * A working microphone never gives exact silence: there's always some hiss. iOS can hand back a stream
@@ -20,6 +20,8 @@ export const MAX_RECORDING_MS = 7000;
  */
 export const SIGNAL_LEVEL = 1e-6;
 export const SIGNAL_WAIT_MS = 1200;
+/** Exact silence for this long before the learner stops counts as a dead microphone too; any less is too soon to tell. */
+const DEAD_AFTER_MS = 500;
 
 export type RecordProblem = 'denied' | 'no-mic' | 'unsupported' | 'silent';
 
@@ -34,6 +36,8 @@ export interface RecorderEvents {
   onLevel?: (level: number) => void;
   /** Called once when speech is first detected. */
   onSpeech?: () => void;
+  /** The microphone gave no sound and has been opened afresh, so anything said so far wasn't heard. */
+  onRestart?: () => void;
 }
 
 export interface Take {
@@ -88,7 +92,7 @@ export function resample(input: Float32Array, fromRate: number): Float32Array {
 }
 
 /** Start recording. Asks for the microphone if it hasn't been allowed yet. */
-export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
+export function record({ onLevel, onSpeech, onRestart }: RecorderEvents = {}): Recording {
   let finish: () => void = () => {};
   let cancelled = false;
   // stop() can come before the microphone is open (e.g. during the permission prompt).
@@ -121,6 +125,8 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
     let elapsedMs = 0;
     /** Whether the microphone has given anything but exact silence (SIGNAL_LEVEL). */
     let signal = false;
+    /** When the current stream was wired up, by Date.now(); a context that never starts gives no blocks to count. */
+    let listeningSince = Date.now();
 
     return new Promise<Take>((resolve, reject) => {
       let done = false;
@@ -142,7 +148,11 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
       finish = () => {
         if (done) return;
         end();
-        releaseMicrophone(stream);
+        // Stopped over a stream giving exact silence: it's dead, not a learner who said nothing.
+        const dead = !signal && !cancelled;
+        if (dead) dropMicrophone(stream);
+        else releaseMicrophone(stream);
+        if (dead && Date.now() - listeningSince >= DEAD_AFTER_MS) return reject(new RecordError('silent'));
         const total = chunks.reduce((n, c) => n + c.length, 0);
         const all = new Float32Array(total);
         let offset = 0;
@@ -173,12 +183,15 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
           }
           if (done) return releaseMicrophone(stream);
           if (context.state !== 'running') await context.resume().catch(() => {});
+          if (done) return;
           // What came before was silence, so the learner gets the whole time from here.
           chunks = [];
           elapsedMs = 0;
           startLimit();
           source = context.createMediaStreamSource(stream);
           source.connect(processor);
+          listeningSince = Date.now();
+          onRestart?.();
           watch(true);
         }, SIGNAL_WAIT_MS);
       };

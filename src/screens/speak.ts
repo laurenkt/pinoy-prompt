@@ -244,6 +244,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         el.querySelector('.listen-status')!.textContent = 'Hearing you…';
         el.classList.replace('phase-mic-on', 'phase-sound');
       },
+      onRestart: () => {
+        if (recording !== current || state.name !== 'recording' || state.speech) return;
+        el.querySelector('.listen-status')!.textContent = 'Mic restarted. Say it again.';
+      },
     });
     recording = current;
     try {

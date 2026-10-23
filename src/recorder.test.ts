@@ -128,6 +128,66 @@ describe('a microphone that gives no sound', () => {
     expect(opened[1].track.readyState).toBe('ended');
   });
 
+  it("counts a stop over exact silence as a dead microphone, not as the learner saying nothing", async () => {
+    const recording = record();
+    const failed = expect(recording.audio).rejects.toEqual(new RecordError('silent'));
+    await started();
+    FakeRecorderContext.last.feed(0);
+    await vi.advanceTimersByTimeAsync(600);
+    recording.stop();
+    await failed;
+    // Closed, so the next take doesn't land on the same dead stream.
+    expect(opened[0].track.readyState).toBe('ended');
+  });
+
+  it('tells the learner to say it again once the microphone is reopened', async () => {
+    const onRestart = vi.fn();
+    const recording = record({ onRestart });
+    await started();
+    await vi.advanceTimersByTimeAsync(SIGNAL_WAIT_MS);
+    expect(onRestart).toHaveBeenCalledOnce();
+    recording.cancel();
+  });
+
+  it('lets the learner stop while the microphone is being reopened, and lets the new stream go', async () => {
+    const recording = record();
+    await started();
+    FakeRecorderContext.last.feed(0);
+    // The fresh stream takes a while, and the context needs resuming once it comes.
+    let open: () => void = () => {};
+    const getUserMedia = vi.fn(() => new Promise<MediaStream>((resolve) => (open = () => {
+      const s = fakeStream();
+      opened.push(s);
+      resolve(s.stream);
+    })));
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia } });
+    FakeRecorderContext.last.state = 'interrupted';
+    FakeRecorderContext.last.resume = () => new Promise(() => {});
+    await vi.advanceTimersByTimeAsync(SIGNAL_WAIT_MS);
+    recording.stop();
+    await expect(recording.audio).rejects.toEqual(new RecordError('silent'));
+    open();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(opened[1].track.enabled).toBe(false);
+  });
+
+  it('stops without waiting on a context that never resumes after the reopen', async () => {
+    const recording = record();
+    await started();
+    const ctx = FakeRecorderContext.last;
+    ctx.state = 'interrupted';
+    let resumed: () => void = () => {};
+    ctx.resume = () => new Promise<void>((r) => (resumed = r));
+    const made = vi.spyOn(ctx, 'createMediaStreamSource');
+    await vi.advanceTimersByTimeAsync(SIGNAL_WAIT_MS);
+    recording.cancel();
+    await recording.audio;
+    resumed();
+    await vi.advanceTimersByTimeAsync(0);
+    // Nothing is wired up on the closed context.
+    expect(made).not.toHaveBeenCalled();
+  });
+
   it("doesn't reopen anything once the learner has stopped", async () => {
     const recording = record();
     await started();
