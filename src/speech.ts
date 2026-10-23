@@ -313,6 +313,16 @@ export function detents(): (step: string | null) => void {
 }
 
 /**
+ * Gets the shared context going when a finger touches something it may then
+ * scrub across, so the first detent of the drag can tick: once the finger
+ * moves it's a drag, and iOS won't start audio from one. Plays nothing.
+ */
+export function readyDetents(): void {
+  if (!tapSounds || muted || !clipsSupported() || microphoneInUse() || speaking()) return;
+  audioContext(true);
+}
+
+/**
  * The click for pills and small controls, made in code: a very short burst of
  * dull noise (the contact) ringing two heavily damped resonances, with no
  * pitch to it, so it reads as a light switch rather than a bell.
