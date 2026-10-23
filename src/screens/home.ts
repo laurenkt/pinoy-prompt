@@ -11,6 +11,7 @@ import {
   type Strength,
 } from '../memory';
 import { MAX_LEARNING, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards } from '../session';
+import { formatInterval } from '../srs';
 import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
 import { quietToggle } from './quiet';
@@ -92,13 +93,13 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
-/** A short wait, e.g. "25m", "3h", "2d": rounded up under an hour, so it never says "0m". */
+/** A short wait, e.g. "25m", "3h", "2d", "2mo": rounded up, so the learner never comes back to find nothing yet. */
 function waitLabel(ms: number): string {
   const minutes = Math.max(1, Math.ceil(ms / 60_000));
   if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round(minutes / 60);
+  const hours = Math.ceil(minutes / 60);
   if (hours < 24) return `${hours}h`;
-  return `${Math.round(hours / 24)}d`;
+  return formatInterval(Math.ceil(hours / 24));
 }
 
 /**

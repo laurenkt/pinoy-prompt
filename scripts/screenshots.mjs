@@ -41,7 +41,7 @@ const SCREENS = {
     await page.touchscreen.tap(past.x + past.width, frame.y + frame.height * 0.8);
   },
   // Nothing due and today's new cards in: the Study button says when there's more.
-  'home-caught-up': (page) => caughtUp(page),
+  'home-caught-up': (page) => caughtUp(page, 3),
   drills: (page) => page.click('.drills-btn'),
   // With the speech model on the device (a stand-in for it), Drills asks for the microphone as it opens,
   // here a question never answered, so the holding screen stays up.
@@ -75,7 +75,7 @@ const SCREENS = {
   study: (page) => page.click('.hub-btn.big:not(.chat-btn)'),
   // Nothing due and today's new cards in: Study says so and points to Drills.
   'study-caught-up': async (page) => {
-    await caughtUp(page);
+    await caughtUp(page, 24);
     await page.click('.hub-btn.big:not(.chat-btn)');
   },
   'study-next': async (page) => {
@@ -284,15 +284,15 @@ async function drillGuide(page, mode) {
   }
 }
 
-/** Nothing due for a few hours, and today's new cards in. */
-async function caughtUp(page) {
-  await page.evaluate(async () => {
+/** Nothing due for `hours`, and today's new cards in. */
+async function caughtUp(page, hours) {
+  await page.evaluate(async (hours) => {
     const { load, save } = await import('/src/store.ts');
     const progress = load(Date.now());
-    for (const state of Object.values(progress.cards)) state.due = Date.now() + 3 * 3_600_000;
+    for (const state of Object.values(progress.cards)) state.due = Date.now() + hours * 3_600_000;
     progress.today.newCount = progress.settings.dailyNew;
     save(progress, { replace: true });
-  });
+  }, hours);
   await page.reload();
   await page.waitForSelector('.home');
 }
