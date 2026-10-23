@@ -289,6 +289,24 @@ describe('saying the meaning out loud', () => {
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
   });
 
+  it("doesn't take what was typed once the meaning is being said instead", async () => {
+    vi.useFakeTimers();
+    try {
+      // A recording that goes on until it's stopped.
+      const record = vi.fn(() => ({ audio: new Promise<Take>(() => {}), stop: () => {}, cancel: () => {} }));
+      const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record } as unknown as SpeakDeps;
+      const root = speaking(learner(true), async () => '', deps);
+      box(root)!.value = 'thank you';
+      box(root)!.dispatchEvent(new Event('input'));
+      micButton(root)!.click();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      expect(micButton(root)!.disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('says so when nothing was heard, and leaves the box to type in', async () => {
     const { deps } = mic(false);
     const hearer = vi.fn<MeaningHearer>(async () => '');

@@ -77,8 +77,7 @@ it('tries again after the phone refused the number', async () => {
   const { progress, now } = learner(true);
   nav.setAppBadge.mockRejectedValueOnce(new DOMException('denied', 'NotAllowedError'));
   showDueBadge(progress, now, nav);
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   showDueBadge(progress, now, nav);
   expect(nav.setAppBadge).toHaveBeenCalledTimes(2);
 });
