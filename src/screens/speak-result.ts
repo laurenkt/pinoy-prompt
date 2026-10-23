@@ -258,7 +258,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     'aria-valuemin': '1',
     'aria-valuemax': String(list.length),
   });
-  /** Where each letter sat as the drag began: read once, as opening a sound redraws the detail below. */
+  /** Where each letter sat as the drag began: read once, rather than at every move. */
   let boxes: DOMRect[] = [];
   /** The letter nearest a point: on its line first, then along it. */
   const letterAt = (x: number, y: number) => {
@@ -325,13 +325,19 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   // Every sound's page is made up front and stacked in one place, only the open one showing, so the panel is as tall
   // as its tallest page and each piece keeps one row for all of them (see .sound-detail): moving between sounds moves
   // nothing on the screen.
+  /** How to put each page's slider or button back at rest, as a finger still on it is let go when another opens. */
+  const resets = new WeakMap<HTMLElement, () => void>();
   const pages = list.map((p) => page(p));
-  const detail = h('div', { class: 'sound-detail', 'aria-live': 'polite' }, pages);
+  const detail = h('div', { class: 'sound-detail' }, pages);
+  // Showing a page that was already there isn't read out, so the open sound is said here.
+  const announce = h('p', { class: 'sr-only', 'aria-live': 'polite' });
 
   function select(index: number): void {
     if (index === selected) return;
-    selected = index;
     letGo();
+    const control = pages[selected]?.querySelector<HTMLElement>('.sound-slider, .hold-btn');
+    if (control) resets.get(control)?.();
+    selected = index;
     marks.forEach((m, i) => {
       m.classList.toggle('selected', i === index);
       m.setAttribute('aria-pressed', String(i === index));
@@ -342,10 +348,11 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const p = list[index];
     if (p.heardAt !== undefined) ribbon?.setFocus(span(p.heardAt));
     else ribbon?.setFocus(gapFor(index));
-    pages.forEach((page, i) => {
-      page.classList.toggle('open', i === index);
-      page.inert = i !== index;
+    pages.forEach((el, i) => {
+      el.classList.toggle('open', i === index);
+      el.inert = i !== index;
     });
+    announce.textContent = [pages[index].querySelector('.verdict-chip')?.textContent, marks[index].getAttribute('aria-label'), tipFor(p)].filter(Boolean).join('. ');
   }
 
   /**
@@ -427,14 +434,21 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   }
 
   function holdButton(sound: string): HTMLElement {
+    /** Whether this button is pressed, so lifting a finger from it after another sound opened stops nothing. */
+    let down = false;
     const press = () => {
       letGo();
+      down = true;
       holding = player.hold(sound, BUTTON_VOLUME);
       button.classList.toggle('holding', holding !== null);
     };
-    const lift = () => {
-      letGo();
+    const reset = () => {
+      down = false;
       button.classList.remove('holding');
+    };
+    const lift = () => {
+      if (down) letGo();
+      reset();
     };
     const button = h(
       'button',
@@ -460,6 +474,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       ' Hold to hear ',
       h('strong', { lang: 'und-fonipa' }, sound),
     );
+    resets.set(button, reset);
     return button;
   }
 
@@ -578,6 +593,14 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       sound(false);
     });
     show(false);
+    // Another sound opened under a finger: back to the middle, silent, and later moves and lifts left alone.
+    resets.set(track, () => {
+      finger = null;
+      keyed = false;
+      at = 0.5;
+      playing = null;
+      show(false);
+    });
     return track;
   }
 
@@ -588,6 +611,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     { class: 'sound-results' },
     ribbonEl,
     detail,
+    announce,
   );
   if (list.length > 0) select(firstProblem >= 0 ? firstProblem : 0);
 

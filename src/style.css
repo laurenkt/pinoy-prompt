@@ -1884,25 +1884,27 @@ p {
   visibility: hidden;
 }
 
-.detail-head {
+.detail-page > .detail-head {
   grid-row: 1;
 }
 
-.detail-tip {
+.detail-page > .detail-tip {
   grid-row: 2;
 }
 
-.sound-chart {
+.detail-page > .sound-chart {
   grid-row: 3;
 }
 
-.sound-ends {
+.detail-page > .sound-ends {
   grid-row: 4;
 }
 
-.sound-slider,
-.hold-btn {
+/* The button keeps its own height where other sounds have the taller slider. */
+.detail-page > .sound-slider,
+.detail-page > .hold-btn {
   grid-row: 5;
+  align-self: start;
 }
 
 .detail-head {

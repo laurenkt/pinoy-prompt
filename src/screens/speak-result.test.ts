@@ -220,6 +220,33 @@ describe('the breakdown', () => {
     });
   });
 
+  it('lets go of a finger left on a sound when another opens, so it stops nothing later', () => {
+    show(attempt('po', ['p', 'u']));
+    layOut();
+    const slider = q('.sound-slider');
+    pointer(slider, 'pointerdown', 0);
+    expect(player.held!.released).toBe(false);
+    // A second finger opens the p, and holds it.
+    q<HTMLButtonElement>('.mark-good').click();
+    pointer(q('.hold-btn'), 'pointerdown');
+    const p = player.held!;
+    const calls = player.calls.length;
+    // The first finger, still on the o's hidden slider, moves and lifts.
+    pointer(slider, 'pointermove', 240);
+    pointer(slider, 'pointerup', 240);
+    expect(player.calls.length).toBe(calls);
+    expect(p.released).toBe(false);
+    expect(slider.classList).not.toContain('holding');
+  });
+
+  it('says which sound opened, as the pages are only shown and hidden', () => {
+    show(attempt('po', ['p', 'u']));
+    const live = q('.sound-results [aria-live]');
+    expect(live.textContent).toContain('Aim for o');
+    q<HTMLButtonElement>('.mark-good').click();
+    expect(live.textContent).toMatch(/^Spot on\. Aim for /);
+  });
+
   it('has one sound to hold when it was spot on, with no slider', () => {
     show(attempt('po', ['p', 'u']));
     q<HTMLButtonElement>('.mark-good').click();

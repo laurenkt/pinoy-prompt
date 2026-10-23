@@ -104,10 +104,10 @@ describe('the tap sound', () => {
     );
     root.append(view.el);
     // The slider for the o said as u, then the single button for the p said right.
-    press(root.querySelector<HTMLElement>('.sound-slider')!);
+    press(root.querySelector<HTMLElement>('.detail-page.open .sound-slider')!);
     press(root.querySelector<HTMLElement>('.mark-good')!);
     const ticked = ticks.count;
-    press(root.querySelector<HTMLElement>('.hold-btn')!);
+    press(root.querySelector<HTMLElement>('.detail-page.open .hold-btn')!);
     expect(ticks.count).toBe(ticked);
     view.dispose();
   });
