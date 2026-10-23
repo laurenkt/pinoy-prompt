@@ -370,6 +370,7 @@ p {
 /* Silent quiet mode: nothing can play, so the play buttons go, and so do the results screen's ways to hear a sound. */
 .silent .audio-btn,
 .silent .word-actions,
+.silent .hear-slowly,
 .silent .hold-btn,
 .silent .sound-slider {
   display: none;
