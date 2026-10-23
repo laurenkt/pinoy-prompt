@@ -3,7 +3,7 @@
 
 import { LEARN_ORDER, VOCAB, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
 import { recallChance } from './memory';
-import { DAY_MS, isDue, type CardState } from './srs';
+import { DAY_MS, isDue, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
 
 export type StepKind = 'new' | 'review';
@@ -162,6 +162,19 @@ export function studyQueue(progress: Progress, now: number): string[] {
     .map(([id, state]) => ({ id, early: !isDue(state, now), recall: recallChance(state, now) }))
     .sort((a, b) => Number(a.early) - Number(b.early) || a.recall - b.recall)
     .map(({ id }) => id);
+}
+
+/**
+ * When Study next has something to ask, once it's caught up: the next review
+ * falling due, or tomorrow's new cards if today's rate is what holds them back.
+ * Null when nothing ever comes back (no cards met, and none left to meet).
+ */
+export function nextStudyAt(progress: Progress, now: number): number | null {
+  const dues = Object.entries(progress.cards)
+    .filter(([id, state]) => state.due > now && getCard(id))
+    .map(([, state]) => state.due);
+  if (progress.settings.dailyNew > 0 && upcomingNewCards(progress, 1).length) dues.push(startOfDayAfter(now, 1));
+  return dues.length ? Math.min(...dues) : null;
 }
 
 /**

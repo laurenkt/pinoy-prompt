@@ -14,6 +14,7 @@ import {
   dueCards,
   learningCount,
   newCardsLeftToday,
+  nextStudyAt,
   nextStudyStep,
   pickDrillCard,
   pickFormat,
@@ -21,7 +22,7 @@ import {
   studyQueue,
   upcomingNewCards,
 } from './session';
-import { DAY_MS, newCardState } from './srs';
+import { DAY_MS, newCardState, startOfDayAfter } from './srs';
 import { emptyProgress, recordAnswer } from './store';
 
 const NOW = Date.UTC(2026, 0, 1, 12);
@@ -112,6 +113,34 @@ describe('nextStudyStep', () => {
       const first = nextStudyStep(progress, NOW, [], CAN)!.cardId;
       expect(nextStudyStep(progress, NOW, [first], CAN)!.cardId).not.toBe(first);
     }
+  });
+});
+
+describe('nextStudyAt', () => {
+  it('is when the next review falls due, once today\'s new cards are in', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, ALL_CARDS.slice(0, 8).map((c) => c.id));
+    progress.cards[ALL_CARDS[3].id].due = NOW + 3 * 60 * 60 * 1000;
+    expect(nextStudyAt(progress, NOW)).toBe(NOW + 3 * 60 * 60 * 1000);
+  });
+
+  it('is tomorrow, when the daily new-card rate holds back the next new card sooner than any review', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, ALL_CARDS.slice(0, 8).map((c) => c.id), 5);
+    expect(nextStudyAt(progress, NOW)).toBe(startOfDayAfter(NOW, 1));
+  });
+
+  it('waits only for reviews when new cards are turned off', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, ALL_CARDS.slice(0, 8).map((c) => c.id), 5);
+    progress.settings.dailyNew = 0;
+    expect(nextStudyAt(progress, NOW)).toBe(NOW + 5 * DAY_MS);
+  });
+
+  it('is null with nothing met and nothing to meet', () => {
+    const progress = emptyProgress(NOW);
+    progress.settings.dailyNew = 0;
+    expect(nextStudyAt(progress, NOW)).toBeNull();
   });
 });
 

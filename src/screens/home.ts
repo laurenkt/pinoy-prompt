@@ -10,7 +10,7 @@ import {
   type MemorySummary,
   type Strength,
 } from '../memory';
-import { MAX_LEARNING, learningCount, newCardsLeftToday, studyQueue, upcomingNewCards } from '../session';
+import { MAX_LEARNING, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards } from '../session';
 import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
 import { quietToggle } from './quiet';
@@ -92,21 +92,35 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+/** A short wait, e.g. "25m", "3h", "2d": rounded up under an hour, so it never says "0m". */
+function waitLabel(ms: number): string {
+  const minutes = Math.max(1, Math.ceil(ms / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
 /**
  * Study does one of two things, and the button says which: review what's due,
- * or learn new cards. Once caught up it says so (Study then points to Drills).
+ * or learn new cards. Once caught up it says how long until there's more
+ * (Study then points to Drills).
  * Each looks different, so it's clear at a glance.
  */
 function studyButton(app: App, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
+  const now = app.now();
   // The same checks Study makes for its next step, so the button never promises something else.
-  const reviews = studyQueue(progress, app.now()).length;
+  const reviews = studyQueue(progress, now).length;
   const fresh = learningCount(progress) < MAX_LEARNING ? Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length) : 0;
   let mode: { kind: string; icon: 'cards' | 'plus'; kicker: string; title: string };
   if (isFirstRun) mode = { kind: 'learn', icon: 'plus', kicker: 'Start here', title: 'Learn' };
   else if (reviews > 0) mode = { kind: 'review', icon: 'cards', kicker: `${plural(reviews, 'card')} due`, title: 'Review' };
   else if (fresh > 0) mode = { kind: 'learn', icon: 'plus', kicker: plural(fresh, 'new card'), title: 'Learn' };
-  else mode = { kind: 'caught-up', icon: 'cards', kicker: 'All caught up', title: 'Study' };
+  else {
+    const next = nextStudyAt(progress, now);
+    mode = { kind: 'caught-up', icon: 'cards', kicker: next === null ? 'All caught up' : `Next in ${waitLabel(next - now)}`, title: 'Study' };
+  }
   return h(
     'button',
     { class: `hub-btn big study-btn study-${mode.kind}`, onclick: () => app.navigate({ name: 'study' }) },
