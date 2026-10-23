@@ -392,8 +392,8 @@ const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
  * Tap for every control pressed under `root`. Two marks change that:
  * - `data-no-tap`: silent, for a control that starts recording, which would catch the tap.
  * - `data-tap="before"`: tapped before its own handler runs, for one that may open the microphone inside the press
- *   (starting a Chat call, opening Drills, choosing Speak, quiet mode going off), after which nothing would tap.
- *   What follows takes long enough to start (a call's audio, the phone asking) that the tap is over long before it.
+ *   (starting a Chat call, opening Drills, choosing Speak or turning quiet mode off in a round), after which nothing
+ *   would tap. It reads the mute from before the press, so it's only for presses that don't change it to silent.
  */
 export function tickOnPress(root: Node): void {
   if (clipsSupported()) void loadThock().catch(() => {});
