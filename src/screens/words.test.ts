@@ -58,10 +58,16 @@ describe('the Library', () => {
     const [a, b] = unit.cards;
     const app = fakeApp([a.id, b.id]);
     app.progress.cards[b.id].interval = 30;
-    const strip = wordsScreen(app).querySelector('.unit-list summary .memory-strip')!;
-    expect([...strip.children].map((s) => s.className)).toEqual(['s-long', 's-days']);
-    expect(parseFloat((strip.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / unit.cards.length);
-    expect(strip.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: Long-term 1, Days 1`);
-    expect(wordsScreen(fakeApp()).querySelector('.memory-strip')!.getAttribute('aria-label')).toBe(`None of ${unit.cards.length} met yet`);
+    const meter = wordsScreen(app).querySelector('.unit-list summary .memory-meter')!;
+    expect([...meter.querySelector('.memory-bar')!.children].map((s) => s.className)).toEqual(['s-long', 's-days']);
+    expect(parseFloat((meter.querySelector('.memory-bar')!.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / unit.cards.length);
+    expect(meter.querySelector('.memory-count')!.textContent).toBe(`2/${unit.cards.length}`);
+    expect(meter.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: Long-term 1, Days 1`);
+    // Over the bar beside a topic's two lines; beside it by a guide kind's one.
+    expect(meter.classList.contains('inline')).toBe(false);
+    const root = wordsScreen(fakeApp());
+    expect(root.querySelectorAll('.unit-list:not(:has(.unit-tl)) .memory-meter:not(.inline)').length).toBe(0);
+    expect(root.querySelectorAll('.memory-meter.inline').length).toBe(4);
+    expect(wordsScreen(fakeApp()).querySelector('.memory-meter')!.getAttribute('aria-label')).toBe(`None of ${unit.cards.length} met yet`);
   });
 });

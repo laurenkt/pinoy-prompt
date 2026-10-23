@@ -2247,7 +2247,6 @@ p {
 }
 
 .unit-list summary {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -2282,22 +2281,55 @@ p {
   color: var(--muted);
 }
 
-/* The group's cards by memory strength, in the heading's bottom padding so the heading keeps its height: clear of the rounded corners and above the focus ring. Unmet cards are the empty track. */
-.memory-strip {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 7px;
-  height: 8px;
+/* The group's cards by memory strength, at the right of its heading, so the heading keeps its height: the count over a short bar beside a title and its Tagalog, beside the bar when the title is alone. Unmet cards are the empty track. */
+.memory-meter {
+  flex: none;
   display: flex;
-  overflow: hidden;
-  background: var(--line);
-  border: 2px solid var(--ink);
-  border-radius: 99px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
-.memory-strip > span {
+.memory-meter.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.memory-count {
+  font-size: 0.8rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.memory-count strong {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.unit-list[open] .memory-count,
+.unit-list[open] .memory-count strong {
+  color: var(--on-accent);
+}
+
+.memory-bar {
+  display: flex;
+  width: 64px;
+  height: 14px;
+  overflow: hidden;
+  background: var(--surface-dim);
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+}
+
+.memory-bar > span {
   height: 100%;
+}
+
+.memory-bar > span + span {
+  border-left: 2px solid var(--ink);
 }
 
 .word-list {

@@ -69,11 +69,12 @@ export function wordsScreen(app: App): HTMLElement {
   }
 
   /**
-   * A strip along the bottom of a group's heading: its cards by strength, as
-   * on Home's memory chart, firmest first, with the rest left empty. It sits in
-   * the heading's padding, so a group takes no more room than without it.
+   * At the right of a group's heading: how many of its cards are met, with a
+   * short bar of them by strength, as on Home's memory chart, firmest first,
+   * and the rest left empty. Over the bar beside a two-line heading, beside
+   * it (`inline`) by a one-line one, so the heading is no taller for it.
    */
-  function memoryStrip(cards: Card[]): HTMLElement {
+  function memoryMeter(cards: Card[], inline: boolean): HTMLElement {
     const met = cards.flatMap((card) => app.progress.cards[card.id] ?? []);
     const counts = strengthCounts(met);
     const firmest = [...STRENGTHS].reverse().filter((s) => counts[s.id]);
@@ -82,8 +83,13 @@ export function wordsScreen(app: App): HTMLElement {
       : `None of ${cards.length} met yet`;
     return h(
       'span',
-      { class: 'memory-strip', role: 'img', 'aria-label': label },
-      firmest.map((s) => h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } })),
+      { class: `memory-meter${inline ? ' inline' : ''}`, role: 'img', 'aria-label': label },
+      h('span', { class: 'memory-count', 'aria-hidden': 'true' }, h('strong', null, met.length), `/${cards.length}`),
+      h(
+        'span',
+        { class: 'memory-bar', 'aria-hidden': 'true' },
+        firmest.map((s) => h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } })),
+      ),
     );
   }
 
@@ -92,7 +98,7 @@ export function wordsScreen(app: App): HTMLElement {
       'details',
       // Narrowed to one kind of guide, there is only one group, so it opens straight away.
       { class: 'card unit-list', open: filter !== 'all' && filter !== 'vocab' },
-      h('summary', null, h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub)), memoryStrip(cards)),
+      h('summary', null, h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub)), memoryMeter(cards, !sub)),
       h('ul', { class: 'word-list' }, cards.map(item)),
     );
   }
