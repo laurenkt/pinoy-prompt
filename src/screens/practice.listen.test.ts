@@ -209,6 +209,34 @@ describe('accepting a typed meaning as it is typed', () => {
     }
   });
 
+  it('still takes it when the screen is redrawn during the pause', async () => {
+    vi.useFakeTimers();
+    try {
+      const root = listen(learner(true));
+      typing(root, 'thank you');
+      await vi.advanceTimersByTimeAsync(300);
+      root.querySelector<HTMLButtonElement>('.filter-toggle')!.click();
+      await vi.advanceTimersByTimeAsync(700);
+      expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("doesn't send it after going to the choices", async () => {
+    vi.useFakeTimers();
+    try {
+      const root = listen(learner(true));
+      typing(root, 'thank you');
+      button(root, 'Show choices').click();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      expect(root.querySelector('.choice')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('never sends part of a longer meaning, or a wrong one, by itself', async () => {
     vi.useFakeTimers();
     try {

@@ -28,6 +28,8 @@ export function hapticTick(): void {
     input.id = 'haptic-switch';
     // Not a control anyone presses, so it makes no tap sound (speech.ts).
     input.setAttribute('data-no-tap', '');
+    // Hidden from screen readers, so it mustn't take focus either.
+    input.tabIndex = -1;
     toggle = document.createElement('label');
     toggle.htmlFor = input.id;
     toggle.setAttribute('aria-hidden', 'true');

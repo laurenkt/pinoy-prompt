@@ -73,6 +73,16 @@ it('sets the icon again when the app is opened or left', () => {
   expect(nav.setAppBadge).toHaveBeenCalledWith(3);
 });
 
+it('tries again after the phone refused the number', async () => {
+  const { progress, now } = learner(true);
+  nav.setAppBadge.mockRejectedValueOnce(new DOMException('denied', 'NotAllowedError'));
+  showDueBadge(progress, now, nav);
+  await Promise.resolve();
+  await Promise.resolve();
+  showDueBadge(progress, now, nav);
+  expect(nav.setAppBadge).toHaveBeenCalledTimes(2);
+});
+
 it("doesn't touch the icon again while the number stays the same", () => {
   const { progress, now } = learner(false);
   showDueBadge(progress, now, nav);
