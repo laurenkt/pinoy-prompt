@@ -63,11 +63,6 @@ describe('the Library', () => {
     expect(parseFloat((meter.querySelector('.memory-bar')!.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / unit.cards.length);
     expect(meter.querySelector('.memory-count')!.textContent).toBe(`2/${unit.cards.length}`);
     expect(meter.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: Long-term 1, Days 1`);
-    // Over the bar beside a topic's two lines; beside it by a guide kind's one.
-    expect(meter.classList.contains('inline')).toBe(false);
-    const root = wordsScreen(fakeApp());
-    expect(root.querySelectorAll('.unit-list:not(:has(.unit-tl)) .memory-meter:not(.inline)').length).toBe(0);
-    expect(root.querySelectorAll('.memory-meter.inline').length).toBe(4);
     expect(wordsScreen(fakeApp()).querySelector('.memory-meter')!.getAttribute('aria-label')).toBe(`None of ${unit.cards.length} met yet`);
   });
 });

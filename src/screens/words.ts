@@ -71,10 +71,10 @@ export function wordsScreen(app: App): HTMLElement {
   /**
    * At the right of a group's heading: how many of its cards are met, with a
    * short bar of them by strength, as on Home's memory chart, firmest first,
-   * and the rest left empty. Over the bar beside a two-line heading, beside
-   * it (`inline`) by a one-line one, so the heading is no taller for it.
+   * and the rest left empty. It is laid out to be no taller than the heading
+   * (see .memory-meter in style.css).
    */
-  function memoryMeter(cards: Card[], inline: boolean): HTMLElement {
+  function memoryMeter(cards: Card[]): HTMLElement {
     const met = cards.flatMap((card) => app.progress.cards[card.id] ?? []);
     const counts = strengthCounts(met);
     const firmest = [...STRENGTHS].reverse().filter((s) => counts[s.id]);
@@ -83,7 +83,7 @@ export function wordsScreen(app: App): HTMLElement {
       : `None of ${cards.length} met yet`;
     return h(
       'span',
-      { class: `memory-meter${inline ? ' inline' : ''}`, role: 'img', 'aria-label': label },
+      { class: 'memory-meter', role: 'img', 'aria-label': label },
       h('span', { class: 'memory-count', 'aria-hidden': 'true' }, h('strong', null, met.length), `/${cards.length}`),
       h(
         'span',
@@ -98,7 +98,7 @@ export function wordsScreen(app: App): HTMLElement {
       'details',
       // Narrowed to one kind of guide, there is only one group, so it opens straight away.
       { class: 'card unit-list', open: filter !== 'all' && filter !== 'vocab' },
-      h('summary', null, h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub)), memoryMeter(cards, !sub)),
+      h('summary', null, h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub)), memoryMeter(cards)),
       h('ul', { class: 'word-list' }, cards.map(item)),
     );
   }

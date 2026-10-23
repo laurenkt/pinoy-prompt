@@ -2281,7 +2281,7 @@ p {
   color: var(--muted);
 }
 
-/* The group's cards by memory strength, at the right of its heading, so the heading keeps its height: the count over a short bar beside a title and its Tagalog, beside the bar when the title is alone. Unmet cards are the empty track. */
+/* The group's cards by memory strength, at the right of its heading, so the heading keeps its height: the count over a short bar beside a title and its Tagalog, beside the bar when the title is alone (the bar is as wide either way, so they line up). Unmet cards are the empty track. */
 .memory-meter {
   flex: none;
   display: flex;
@@ -2290,7 +2290,7 @@ p {
   gap: 4px;
 }
 
-.memory-meter.inline {
+.unit-list summary:not(:has(.unit-tl)) .memory-meter {
   flex-direction: row;
   align-items: center;
   gap: 8px;
@@ -2305,7 +2305,7 @@ p {
 
 .memory-count strong {
   font-size: 1rem;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--text);
 }
 
@@ -2321,15 +2321,13 @@ p {
   overflow: hidden;
   background: var(--surface-dim);
   border: 2px solid var(--ink);
-  border-radius: 6px;
+  border-radius: 99px;
 }
 
+/* A single card still shows its colour, however big the group. The bar is as wide as fits beside the longest title at 360px without wrapping it. */
 .memory-bar > span {
   height: 100%;
-}
-
-.memory-bar > span + span {
-  border-left: 2px solid var(--ink);
+  min-width: 4px;
 }
 
 .word-list {
