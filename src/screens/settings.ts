@@ -212,7 +212,7 @@ export function keyForm(onChange: () => void): HTMLElement {
     return h(
       'div',
       { class: 'key-form' },
-      h('p', { class: 'muted small' }, 'Your OpenAI API key is saved on this device. Chat uses it to talk with you, and Drills to check a meaning you type; OpenAI bills that account.'),
+      h('p', { class: 'muted small' }, 'Your OpenAI API key is saved on this device. Chat uses it to talk with you, and Drills to check a meaning you type or say; OpenAI bills that account.'),
       h(
         'div',
         { class: 'stats key-spend' },

@@ -346,6 +346,44 @@ describe('checking a typed meaning', () => {
     await expect(checkMeaning(KEY, CARD, (async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
     await expect(checkMeaning(KEY, CARD, (async () => json(200, { output: [] })) as unknown as typeof fetch)).rejects.toBeInstanceOf(AiError);
   });
+
+  it('gives up on an answer that stalls, as a lost connection, and leaves no time limit behind', async () => {
+    vi.useFakeTimers();
+    try {
+      // Headers in, then the body never comes: the body breaks off when the request is given up, as fetch's does.
+      const stalling = vi.fn(async (_url: string, init: RequestInit) => ({
+        ok: true,
+        status: 200,
+        json: () => new Promise((_, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))),
+      }));
+      const checked = expect(checkMeaning(KEY, CARD, stalling as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+      await vi.advanceTimersByTimeAsync(8000);
+      await checked;
+
+      const heard = expect(transcribe(KEY, new Blob(), stalling as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+      await vi.advanceTimersByTimeAsync(19000);
+      expect(stalling).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1000);
+      await heard;
+
+      await checkMeaning(KEY, CARD, (async () => verdict(true)) as unknown as typeof fetch);
+      await transcribe(KEY, new Blob(), (async () => json(200, { text: 'hi' })) as unknown as typeof fetch);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails as a lost connection when the answer breaks off', async () => {
+    const broken = { ok: true, status: 200, json: () => Promise.reject(new DOMException('Aborted', 'AbortError')) } as unknown as Response;
+    await expect(checkMeaning(KEY, CARD, (async () => broken) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+    await expect(transcribe(KEY, new Blob(), (async () => broken) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+  });
+
+  it("doesn't blame the connection for an answer that isn't JSON", async () => {
+    const page = new Response('<html>Sign in to the Wi-Fi</html>', { status: 200 });
+    await expect(checkMeaning(KEY, CARD, (async () => page) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'other' });
+  });
 });
 
 describe('the spend estimate', () => {

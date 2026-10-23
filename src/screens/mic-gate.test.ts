@@ -53,6 +53,34 @@ describe('asking for the microphone in Drills', () => {
     expect(root.querySelector('.choice, .speak')).not.toBeNull();
   });
 
+  it('says where a spoken answer goes: on the phone, or to OpenAI for a meaning said into the box', () => {
+    const local = practiceScreen(fakeApp(), micNotYet().deps, null, () => null);
+    expect(local.querySelector('.mic-waiting')!.textContent).toContain('checked on this phone');
+    expect(local.querySelector('.mic-waiting')!.textContent).not.toContain('OpenAI');
+    // A voice, so listening questions (where the box is) are on offer.
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {} });
+    try {
+      const withKey = practiceScreen(fakeApp(), micNotYet().deps, null, () => async () => '');
+      expect(withKey.querySelector('.mic-waiting')!.textContent).toContain('goes to OpenAI');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("doesn't mention the answer box when the round has no listening questions to type into", () => {
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {} });
+    const scoped = practiceScreen(fakeApp(), micNotYet({ microphoneAllowed: () => true }).deps);
+    try {
+      drillScope(scoped, ['read', 'speak']);
+      const root = practiceScreen(fakeApp(), micNotYet().deps, null, () => async () => '');
+      expect(root.querySelector('.mic-waiting')!.textContent).not.toContain('OpenAI');
+    } finally {
+      // The scope is kept across visits, so the rest get the whole mix back.
+      drillScope(scoped, ['listen', 'read', 'recall', 'speak']);
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('leaves speaking out for the visit when refused', async () => {
     const mic = micNotYet();
     const root = practiceScreen(fakeApp(), mic.deps);

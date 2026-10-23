@@ -130,14 +130,19 @@ export async function askForMicrophone(deps: SpeakDeps): Promise<'on' | 'refused
   }
 }
 
-/** What shows while the phone asks for the microphone. */
-export function micWaiting(): HTMLElement {
+/** What shows while the phone asks for the microphone. `dictation`: a meaning said into Drills' box goes to OpenAI. */
+export function micWaiting(dictation = false): HTMLElement {
   return h(
     'div',
     { class: 'panel center mic-waiting', role: 'status' },
     h('p', { class: 'eyebrow' }, 'Speaking'),
     h('h2', null, 'Allow the microphone'),
-    h('p', null, 'Some questions ask you to say a word out loud, so your phone asks now rather than in the middle of one. Your voice stays on this phone.'),
+    h(
+      'p',
+      null,
+      'Some questions ask you to say a word out loud, so your phone asks now rather than in the middle of one. Those are checked on this phone.',
+      dictation ? ' A meaning you say into the answer box goes to OpenAI to be written out.' : null,
+    ),
   );
 }
 

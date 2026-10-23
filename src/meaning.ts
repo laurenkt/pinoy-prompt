@@ -16,6 +16,7 @@ const SAME: [RegExp, string][] = [
   [/\b(thanks|thx|ty)\b/g, 'thank you'],
   [/\bok\b/g, 'okay'],
   [/\b(hi|hey)\b/g, 'hello'],
+  [/\bhow do you do\b/g, 'hello'],
   [/\b(bye|good bye)\b/g, 'goodbye'],
   [/\bo ?clock\b/g, 'oclock'],
   [/\bcannot\b/g, 'can not'],
@@ -33,6 +34,31 @@ const SAME: [RegExp, string][] = [
 
 /** Words that carry no meaning of their own here. */
 const FILLER = new Set(['a', 'an', 'the', 'is', 'are', 'am', 'do', 'does', 'please']);
+
+/**
+ * The helping verb a wording leans on, if any: "are" and "do" are filler on
+ * their own, but "how do you" asks something else than "how are you", so an
+ * answer using one can't match a meaning using the other.
+ */
+function helper(list: string[]): 'be' | 'do' | null {
+  for (const w of list) {
+    if (w === 'is' || w === 'are' || w === 'am') return 'be';
+    if (w === 'do' || w === 'does') return 'do';
+  }
+  return null;
+}
+
+/** A wording's meaningful words, with the helping verb it leans on. */
+interface Wording {
+  words: string[];
+  helper: 'be' | 'do' | null;
+}
+
+function wording(text: string): Wording {
+  // A helping verb counts only when it's written out: "what's this mean" is "what does this mean" as often as "what is".
+  const written = text.replace(/['’]s\b/gi, '').replace(/\b(what|where|that|there|it)s\b/gi, '$1');
+  return { words: meaningful(words(text)), helper: helper(words(written)) };
+}
 
 /** Lower case words, with contractions, digits and common shorthands spelled out. */
 export function words(text: string): string[] {
@@ -69,10 +95,21 @@ function meaningful(list: string[]): string[] {
  * so "(makes a yes/no question)" has no meaning to type.
  */
 export function meanings(card: Card): string[][] {
+  return wordings(card).map((alt) => alt.words);
+}
+
+/** Each card's wordings, worked out once: the deck doesn't change. */
+const cardWordings = new WeakMap<Card, Wording[]>();
+
+function wordings(card: Card): Wording[] {
+  let found = cardWordings.get(card);
+  if (!found) cardWordings.set(card, (found = wordingsOf(card)));
+  return found;
+}
+
+function wordingsOf(card: Card): Wording[] {
   const numbers = [...card.en.matchAll(/\(([\d,]+)\)/g)].map((m) => m[1]);
-  return [...card.en.replace(/\([^)]*\)/g, ' ').split('/'), ...numbers]
-    .map((alt) => meaningful(words(alt)))
-    .filter((alt) => alt.length > 0);
+  return [...card.en.replace(/\([^)]*\)/g, ' ').split('/'), ...numbers].map(wording).filter((alt) => alt.words.length > 0);
 }
 
 /** Whether a card can be answered by typing its meaning. Not one that only has a note, like "(makes a word plural)". */
@@ -131,11 +168,16 @@ function sameWord(typed: string, word: string): boolean {
  */
 export function matchesMeaning(answer: string, card: Card): boolean {
   // "He or she", "house / home": every meaning given has to be one of the card's.
-  const parts = answer.replace(/\([^)]*\)/g, ' ').split(/\/|\bor\b/i).map((part) => meaningful(words(part))).filter((part) => part.length > 0);
+  const parts = answer.replace(/\([^)]*\)/g, ' ').split(/\/|\bor\b/i).map(wording).filter((part) => part.words.length > 0);
   if (parts.length === 0) return false;
-  const alts = meanings(card);
+  const alts = wordings(card);
   return parts.every((given) =>
-    alts.some((alt) => alt.every((w) => given.some((g) => sameWord(g, w))) && given.every((g) => alt.some((w) => sameWord(g, w)))),
+    alts.some(
+      (alt) =>
+        !(given.helper && alt.helper && given.helper !== alt.helper) &&
+        alt.words.every((w) => given.words.some((g) => sameWord(g, w))) &&
+        given.words.every((g) => alt.words.some((w) => sameWord(g, w))),
+    ),
   );
 }
 

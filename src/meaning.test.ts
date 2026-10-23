@@ -38,6 +38,12 @@ describe('matching a typed meaning on the device', () => {
     ['sumakay', 'to ride'],
     ['sumakay', 'get on'],
     ['isang-daan', 'a hundred'],
+    ['gaano-katagal', 'how long it takes'],
+    ['ano-ibig-sabihin', 'what this means'],
+    ['meron-ba-kayong', 'you have bread?'],
+    ['ano-ibig-sabihin', "what's this mean"],
+    ['ano-ibig-sabihin', 'whats this mean'],
+    ['kumusta', 'how do you do'],
   ])('%s: "%s" is right', (id, answer) => {
     expect(matchesMeaning(answer, card(id))).toBe(true);
   });
@@ -57,6 +63,8 @@ describe('matching a typed meaning on the device', () => {
     ['siya', 'he or they'],
     ['apat', 'fourth'],
     ['dalawampu', '21'],
+    ['kumusta', 'how do you'],
+    ['paano-sabihin', 'how are you say this in tagalog'],
   ])('%s: "%s" is not matched', (id, answer) => {
     expect(matchesMeaning(answer, card(id))).toBe(false);
   });
