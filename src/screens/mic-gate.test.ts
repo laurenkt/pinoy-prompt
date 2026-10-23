@@ -33,7 +33,7 @@ function micNotYet(overrides: Partial<SpeakDeps> = {}) {
   return { deps, holdMicrophone, answer: (allow: boolean) => answer(allow) };
 }
 
-const fakeApp = (quiet = false) => knowing(KNOWN, { dailyNew: KNOWN.length, quiet, headphones: true });
+const fakeApp = (quiet = false) => knowing(KNOWN, { dailyNew: KNOWN.length, mic: !quiet });
 const waiting = (root: HTMLElement) => root.querySelector('.mic-waiting') !== null;
 const speaking = (root: HTMLElement) => root.textContent?.includes('Say this out loud') ?? false;
 
@@ -106,7 +106,7 @@ describe('asking for the microphone in Drills', () => {
     expect(waiting(root)).toBe(true);
   });
 
-  it("doesn't ask in quiet mode, or when the round can't ask to speak", () => {
+  it("doesn't ask with the mic off, or when the round can't ask to speak", () => {
     const quiet = micNotYet();
     practiceScreen(fakeApp(true), quiet.deps);
     expect(quiet.holdMicrophone).not.toHaveBeenCalled();
@@ -192,20 +192,23 @@ describe('asking for the microphone in Drills', () => {
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
   });
 
-  it('taps before turning Speak on or quiet mode off, as either may open the microphone, and only then', () => {
+  it('taps before turning Speak or the mic on, as either may open the microphone, and only then', () => {
     const root = practiceScreen(fakeApp(), micNotYet({ microphoneAllowed: () => true }).deps);
     const tapsFirst = (selector: string) => root.querySelector(selector)!.getAttribute('data-tap') === 'before';
-    // Speak is on, so the chip would turn it off; quiet mode is off, so the toggle would turn silent mode on.
+    // Speak is on, so the chip would turn it off; the mic is on, so its switch would turn it off.
     expect(tapsFirst('[data-mode="speak"]')).toBe(false);
-    expect(tapsFirst('[aria-label^="Quiet mode"]')).toBe(false);
+    expect(tapsFirst('[aria-label="Mic off"]')).toBe(false);
+    expect(tapsFirst('[aria-label="Sound off"]')).toBe(false);
     drillScope(root, ['read']);
     expect(tapsFirst('[data-mode="speak"]')).toBe(true);
     expect(tapsFirst('[data-mode="listen"]')).toBe(false);
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
-    const headphones = practiceScreen(knowing(KNOWN, { dailyNew: KNOWN.length, quiet: true, headphones: true }), micNotYet().deps);
-    expect(headphones.querySelector('[aria-label^="Quiet mode"]')!.getAttribute('data-tap')).toBe('before');
+    const quiet = practiceScreen(knowing(KNOWN, { dailyNew: KNOWN.length, mic: false, sound: false }), micNotYet().deps);
+    expect(quiet.querySelector('[aria-label="Mic off"]')!.getAttribute('data-tap')).toBe('before');
+    // Sound going on never opens the microphone, so it taps after the change, and is heard.
+    expect(quiet.querySelector('[aria-label="Sound off"]')!.hasAttribute('data-tap')).toBe(false);
     // Elsewhere (Home, Study) it never opens the microphone, so it taps after, as other controls do.
-    expect(quietToggle(knowing(KNOWN, { quiet: true, headphones: true }), () => {}).hasAttribute('data-tap')).toBe(false);
+    expect(quietToggle(knowing(KNOWN, { mic: false }), () => {}).querySelector('[data-tap]')).toBeNull();
   });
 
   it('asks when Speak is chosen again mid-round', async () => {
@@ -224,7 +227,7 @@ describe('asking for the microphone in Drills', () => {
 });
 
 describe('asking for the microphone around a typed meaning', () => {
-  /** Words settled in Study, so a listening question asks for the meaning typed; quiet with headphones, so quiet mode going off asks. */
+  /** Words settled in Study, so a listening question asks for the meaning typed; the mic off, so its going on asks. */
   function typedRound(judge: () => Promise<boolean | null>) {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {} });
@@ -238,8 +241,8 @@ describe('asking for the microphone around a typed meaning', () => {
       box().value = text;
       root.querySelector('form.meaning-form')!.dispatchEvent(new Event('submit', { cancelable: true }));
     };
-    const quietOff = () => root.querySelector<HTMLButtonElement>('.icon-btn[aria-label^="Quiet mode"]')!.click();
-    return { root, mic, box, send, quietOff };
+    const micOn = () => root.querySelector<HTMLButtonElement>('[aria-label="Mic off"]')!.click();
+    return { root, mic, box, send, micOn };
   }
 
   afterEach(() => {
@@ -248,10 +251,10 @@ describe('asking for the microphone around a typed meaning', () => {
   });
 
   it('shows a wrong typed meaning again as it was once the phone has asked', async () => {
-    const { root, mic, box, send, quietOff } = typedRound(async () => false);
+    const { root, mic, box, send, micOn } = typedRound(async () => false);
     send('good night');
     await flush();
-    quietOff();
+    micOn();
     expect(waiting(root)).toBe(true);
     mic.answer(true);
     await flush();
@@ -260,9 +263,9 @@ describe('asking for the microphone around a typed meaning', () => {
   });
 
   it("doesn't cover a meaning being checked with the holding screen", async () => {
-    const { root, mic, send, quietOff } = typedRound(() => new Promise(() => {}));
+    const { root, mic, send, micOn } = typedRound(() => new Promise(() => {}));
     send('thanks a lot');
-    quietOff();
+    micOn();
     expect(waiting(root)).toBe(false);
     expect(mic.holdMicrophone).not.toHaveBeenCalled();
   });

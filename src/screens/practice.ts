@@ -8,7 +8,7 @@ import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
-import { isSilent, quietToggle } from './quiet';
+import { quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, PROBLEMS, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
@@ -150,12 +150,12 @@ export function practiceScreen(
 
   holdOnTap(root, hold);
 
-  /** Why a kind of question can't be asked right now, if it can't: quiet or silent mode may have come on mid-round, here or in another tab. */
+  /** Why a kind of question can't be asked right now, if it can't: the mic or sound may have gone off mid-round, here or in another tab. */
   function unavailable(mode: Mode): string | null {
     if (mode === 'listen' && !canListen) return 'Listen needs a voice, and this device has none.';
-    if (mode === 'listen' && isSilent(app.progress.settings)) return 'Listen is off in silent mode.';
+    if (mode === 'listen' && !app.progress.settings.sound) return 'Listen is off while the sound is off.';
     if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
-    if (mode === 'speak' && app.progress.settings.quiet) return 'Speak is off in quiet mode.';
+    if (mode === 'speak' && !app.progress.settings.mic) return 'Speak is off while the mic is off.';
     if (mode === 'speak' && speakSkipped) return 'Speak needs the microphone. Allow it, then open Drills again.';
     return null;
   }
@@ -168,7 +168,7 @@ export function practiceScreen(
   /**
    * The kinds of question the next one can be: those in scope that can be asked right now. Speaking waits for the model
    * to be on the device, so a round never stops for a download, unless Speak is all that's chosen: then it asks for it.
-   * When nothing in scope can be asked (only Listen, then silent mode), it falls back to everything that can.
+   * When nothing in scope can be asked (only Listen, then the sound goes off), it falls back to everything that can.
    */
   function modes(): Mode[] {
     const picks = chosen();
@@ -214,7 +214,7 @@ export function practiceScreen(
   }
 
   /**
-   * From a tap that may let the round ask to speak (opening Drills, the Speak chip, quiet mode going off): the
+   * From a tap that may let the round ask to speak (opening Drills, the Speak chip, the mic going on): the
    * microphone is held for the rest of the visit, so the phone never asks over a speaking question. If the browser
    * would ask, it asks now, over a holding screen.
    */
@@ -378,7 +378,7 @@ export function practiceScreen(
         try {
           text = await hearer(toWav(take.samples), answerLanguage(q));
         } catch (e) {
-          // Dropped (quiet mode came on, or the question went) while it was being heard.
+          // Dropped (the mic went off, or the question went) while it was being heard.
           if (hearing !== recording) return;
           return unheard(failedKey(e) ? errorText(e) : "Couldn't hear it through OpenAI. Type it instead.");
         }
@@ -461,7 +461,7 @@ export function practiceScreen(
     done++;
     previous = current;
     previousPick = picked;
-    // Picked before quiet or silent mode may have come on, or the scope changed.
+    // Picked before the mic or sound may have gone off, or the scope changed.
     current = upcoming && modes().includes(upcoming.mode) ? upcoming : nextQuestion();
     upcoming = null;
     picked = null;
@@ -472,12 +472,12 @@ export function practiceScreen(
   const home = () => app.navigate({ name: 'home' });
 
   /**
-   * The scope or quiet mode changed: a question waiting to be asked that can't be any more is picked again, and so is
+   * The scope, the mic or the sound changed: a question waiting to be asked that can't be any more is picked again, and so is
    * the one showing, while it's unanswered, so the change shows straight away.
    */
   function rescope(): void {
-    // Quiet mode means nothing listens.
-    if (app.progress.settings.quiet) stopListening();
+    // With the mic off nothing listens.
+    if (!app.progress.settings.mic) stopListening();
     askForMicrophoneIfNeeded();
     if (waiting) return draw();
     const ways = modes();
@@ -512,7 +512,7 @@ export function practiceScreen(
   function setLookingBack(on: boolean): void {
     stop();
     lookingBack = on;
-    // Quiet mode or the scope may have changed while looking back.
+    // The mic, the sound or the scope may have changed while looking back.
     if (!on) rescope();
     else draw();
   }
@@ -577,7 +577,7 @@ export function practiceScreen(
             'data-mode': m.id,
             // Choosing Speak may open the microphone, after which the tap sound would be held back.
             'data-tap': m.id === 'speak' && !on ? 'before' : undefined,
-            // One that can't be asked right now keeps its place, for when quiet mode goes off.
+            // One that can't be asked right now keeps its place, for when the mic or sound goes back on.
             disabled: unavailable(m.id) !== null,
             // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
             'aria-disabled': String(on && picks.length === 1 && picks[0] === m.id),
@@ -731,7 +731,7 @@ export function practiceScreen(
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
    * wrong. An answer the device can tell is right is taken as it's typed, without Check. With a key for OpenAI, and
-   * outside quiet mode, a microphone button beside it records the answer said out loud instead.
+   * with the mic on, a microphone button beside it records the answer said out loud instead.
    */
   function typedAnswer(q: Question, picked: string | null): HTMLElement {
     const answered = picked !== null;
@@ -770,7 +770,7 @@ export function practiceScreen(
     q.offered = true;
     const mic =
       !answered &&
-      !app.progress.settings.quiet &&
+      app.progress.settings.mic &&
       canSpeak &&
       !speakSkipped &&
       hearMeaning() !== null &&

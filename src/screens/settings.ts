@@ -3,7 +3,7 @@ import { allowBadge, badgePermission, badgeSupported } from '../badge';
 import { getCard } from '../deck';
 import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, getSpend, setApiKey } from '../openai';
 import { lastStartDelay, play, voiceQuality } from '../speech';
-import { applyAudioMode, isSilent } from './quiet';
+import { applyAudioMode } from './quiet';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon, pageHeader, settingsToggle } from '../ui';
 
@@ -152,8 +152,8 @@ export function settingsScreen(app: App): HTMLElement {
           h('span', null, 'Tap sounds'),
         ),
         h('p', { class: 'muted small' }, voiceText),
-        isSilent(settings)
-          ? h('p', { class: 'muted small' }, 'Quiet mode is on without headphones, so nothing plays. Tap the quiet button on Home to change it.')
+        !settings.sound
+          ? h('p', { class: 'muted small' }, 'Sound is off, so nothing plays. Tap the sound button on Home to turn it on.')
           : h('button', { class: 'btn secondary', onclick: testVoice }, icon('speaker'), ' Test voice'),
         lag,
       ),

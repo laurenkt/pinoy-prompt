@@ -366,11 +366,10 @@ describe('saying the meaning out loud', () => {
     expect(box(root)!.disabled).toBe(false);
   });
 
-  it('has no microphone without a way to hear it, or in quiet mode', () => {
+  it('has no microphone without a way to hear it, or with the mic off', () => {
     expect(micButton(speaking(learner(true), null, mic().deps))).toBeNull();
     const quiet = learner(true);
-    quiet.progress.settings.quiet = true;
-    quiet.progress.settings.headphones = true;
+    quiet.progress.settings.mic = false;
     expect(micButton(speaking(quiet, async () => '', mic().deps))).toBeNull();
     expect(micButton(speaking(learner(true), async () => '', mic().deps))).not.toBeNull();
   });

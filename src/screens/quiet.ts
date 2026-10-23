@@ -1,65 +1,73 @@
 import type { App } from '../app';
 import type { Settings } from '../store';
 import { setMuted, setTapSounds } from '../speech';
-import { iconButton, type IconName } from '../ui';
+import { h, icon, type IconName } from '../ui';
 
 /**
- * Quiet mode, for the tube or anywhere speaking out loud won't do. It has two
- * settings, because a web app can't tell headphones from the phone speaker:
- * - Quiet, no headphones: silent. No audio plays and nothing asks to be heard or said.
- * - Quiet, headphones in: listening is fine, but nothing asks the learner to speak.
- * The toggle sits where studying starts, so it's a tap or two rather than a trip to Settings.
+ * Quiet mode, for the tube or anywhere a phone can't talk or be talked to. It's two switches side by side, because a
+ * web app can't tell headphones from the phone speaker, or a busy room from an empty one:
+ * - Mic off: nothing asks the learner to speak (Drills' Speak, saying a typed answer).
+ * - Sound off: no audio plays, no play buttons show, and nothing asks to be heard (Listen, autoplay).
+ * Any of the four ways works; with both off, every question is seen and answered by tapping or typing.
+ * The toggle sits where studying starts, so it's a tap rather than a trip to Settings.
  */
-type Mode = 'off' | 'silent' | 'headphones';
+type Switch = 'mic' | 'sound';
 
-const MODES: Record<Mode, { icon: IconName; label: string; title: string; next: Mode }> = {
-  off: { icon: 'mic', label: 'Quiet mode: off', title: 'Quiet mode is off. Tap for silent: no sound and no speaking.', next: 'silent' },
-  silent: { icon: 'quiet', label: 'Quiet mode: silent', title: 'Silent: no sound and no speaking. Tap if your headphones are in.', next: 'headphones' },
-  headphones: { icon: 'headphones', label: 'Quiet mode: headphones in', title: 'Quiet with headphones: listening, but no speaking. Tap to turn quiet mode off.', next: 'off' },
+const SWITCHES: Record<Switch, { on: IconName; off: IconName; label: string; whenOn: string; whenOff: string }> = {
+  mic: {
+    on: 'mic',
+    off: 'micOff',
+    label: 'Mic off',
+    whenOn: 'Mic on: Drills may ask you to say things. Tap to turn it off.',
+    whenOff: 'Mic off: nothing asks you to speak. Tap to turn it on.',
+  },
+  sound: {
+    on: 'speaker',
+    off: 'soundOff',
+    label: 'Sound off',
+    whenOn: 'Sound on: words play and Drills may ask you to listen. Tap to turn it off.',
+    whenOff: 'Sound off: nothing plays and nothing asks you to listen. Tap to turn it on.',
+  },
 };
-
-function mode(settings: Settings): Mode {
-  if (!settings.quiet) return 'off';
-  return settings.headphones ? 'headphones' : 'silent';
-}
-
-/** Quiet mode without headphones: nothing plays, and nothing that needs listening is asked. */
-export function isSilent(settings: Settings): boolean {
-  return mode(settings) === 'silent';
-}
 
 /** Mute or unmute card audio, and hide the play buttons when nothing can play. Also takes up the Tap sounds switch. */
 export function applyAudioMode(settings: Settings): void {
-  const silent = isSilent(settings);
-  setMuted(silent);
+  setMuted(!settings.sound);
   setTapSounds(settings.tapSounds);
-  document.documentElement.classList.toggle('silent', silent);
+  document.documentElement.classList.toggle('silent', !settings.sound);
 }
 
 /**
- * One button that steps through off, silent, and quiet with headphones: the same icon toggle on every screen.
- * `mayOpenMicrophone` is for a screen whose onChange opens the microphone when quiet mode goes off (Drills).
+ * The mic and sound switches as one split button, the same on every screen. Each half is pressed (teal) while it's
+ * off, as quiet mode is something turned on. `mayOpenMicrophone` is for a screen whose onChange opens the microphone
+ * when the mic goes back on (Drills).
  */
-export function quietToggle(app: App, onChange: () => void, { mayOpenMicrophone = false } = {}): HTMLButtonElement {
+export function quietToggle(app: App, onChange: () => void, { mayOpenMicrophone = false } = {}): HTMLElement {
   const settings = app.progress.settings;
-  const current = MODES[mode(settings)];
-  const button = iconButton(
-    current.icon,
-    current.label,
-    () => {
-      // Another tab's save may have replaced the settings object since this was drawn.
-      const settings = app.progress.settings;
-      const next = current.next;
-      settings.quiet = next !== 'off';
-      settings.headphones = next === 'headphones';
-      app.commit();
-      applyAudioMode(settings);
-      onChange();
-    },
-    { pressed: settings.quiet, title: current.title },
-  );
-  // Quiet mode going off may then open the microphone, after which the tap sound would be held back. Only then: tapping
-  // first reads the mute from before the press, and in Study it would sound over a word the change plays.
-  if (mayOpenMicrophone && current.next === 'off') button.dataset.tap = 'before';
-  return button;
+  const half = (which: Switch) => {
+    const s = SWITCHES[which];
+    const on = settings[which];
+    return h(
+      'button',
+      {
+        class: `split-half ${which}`,
+        'aria-label': s.label,
+        'aria-pressed': String(!on),
+        title: on ? s.whenOn : s.whenOff,
+        // The mic going on may then open the microphone, after which the tap sound would be held back. Only then:
+        // otherwise it taps after the change, so sound going on is heard and going off is not.
+        'data-tap': mayOpenMicrophone && which === 'mic' && !on ? 'before' : undefined,
+        onclick: () => {
+          // Another tab's save may have replaced the settings object since this was drawn.
+          const settings = app.progress.settings;
+          settings[which] = !on;
+          app.commit();
+          applyAudioMode(settings);
+          onChange();
+        },
+      },
+      icon(on ? s.on : s.off),
+    );
+  };
+  return h('div', { class: 'split-toggle', role: 'group', 'aria-label': 'Quiet mode' }, half('mic'), half('sound'));
 }

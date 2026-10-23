@@ -162,14 +162,28 @@ describe('damaged saved progress', () => {
     expect(progress.history).toEqual({ '2026-10-17': { reviews: 4, missed: 4 }, '2026-10-19': { reviews: 2, missed: 0 } });
   });
 
-  it('keeps audio for quiet mode saved before the headphones setting', () => {
-    const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 8, autoplay: true, quiet: true } }));
-    expect(progress.settings.headphones).toBe(true);
+  it('turns quiet mode and headphones into the mic and sound switches', () => {
+    const settingsFrom = (old: object) => decodeOk(JSON.stringify({ schema: 3, progress: { ...emptyProgress(NOW), settings: { dailyNew: 8, autoplay: true, ...old } } })).progress.settings;
+    expect(settingsFrom({ quiet: false, headphones: false })).toMatchObject({ mic: true, sound: true });
+    expect(settingsFrom({ quiet: true, headphones: false })).toMatchObject({ mic: false, sound: false });
+    expect(settingsFrom({ quiet: true, headphones: true })).toMatchObject({ mic: false, sound: true });
+    // Quiet mode from before the headphones setting kept its audio.
+    expect(settingsFrom({ quiet: true })).toMatchObject({ mic: false, sound: true });
+    expect(settingsFrom({})).toMatchObject({ mic: true, sound: true });
+    const settings = settingsFrom({ quiet: true, headphones: false, later: 'kept' });
+    expect(settings).not.toHaveProperty('quiet');
+    expect(settings).not.toHaveProperty('headphones');
+    expect(settings).toHaveProperty('later', 'kept');
+  });
+
+  it('keeps the mic and sound switches a schema 3 copy carries from a newer build', () => {
+    const { progress } = decodeOk(JSON.stringify({ schema: 3, progress: { ...emptyProgress(NOW), settings: { quiet: false, headphones: false, mic: false, sound: false } } }));
+    expect(progress.settings).toMatchObject({ mic: false, sound: false });
   });
 
   it('falls back to defaults for out-of-range settings', () => {
-    const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 0, autoplay: 'yes', quiet: 1 } }));
-    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true, iconBadge: false });
+    const { progress } = decodeOk(JSON.stringify({ ...emptyProgress(NOW), settings: { dailyNew: 0, autoplay: 'yes', mic: 1, sound: 'no' } }));
+    expect(progress.settings).toEqual({ dailyNew: 8, autoplay: true, mic: true, sound: true, tapSounds: true, iconBadge: false });
   });
 
   it('never throws and always yields valid progress, whatever is stored', () => {

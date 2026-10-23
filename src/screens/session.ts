@@ -22,7 +22,7 @@ import { recordAnswer, rollDay } from '../store';
 import { audioPair, choiceList, h, hookView, iconButton, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { drillPrompt, gapLine, guideAnswer, guideBody, guideFeedback, guideQuestion, guideQuestionView, sentenceClip, type GuideQuestion } from './guide-question';
-import { isSilent, quietToggle } from './quiet';
+import { quietToggle } from './quiet';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'caught-up' | 'done';
 
@@ -88,8 +88,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   holdOnTap(root, hold);
 
-  /** Listening needs a voice, and quiet mode with headphones in, if it's on. */
-  const canListen = () => canPlay() && !isSilent(app.progress.settings);
+  /** Listening needs a voice, and the sound on. */
+  const canListen = () => canPlay() && app.progress.settings.sound;
 
   /** Play the card. A guide plays the sentence it is asking about, if there is one, but only once answered: the sentence is the answer. */
   const say = (slow = false) => {
@@ -156,7 +156,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   function ask(c: Card, s: Step): void {
     const state = app.progress.cards[c.id] ?? newCardState(app.now());
     format = s.format ?? pickFormat(state, { listen: canListen() }, Math.random, c.kind);
-    // A step picked before silent mode was turned on is asked another way: the same check, by reading instead of hearing.
+    // A step picked before the sound went off is asked another way: the same check, by reading instead of hearing.
     if (format === 'listen' && !canListen()) format = 'read';
     if (format === 'hear' && !canListen()) format = 'remember';
     if (!isVocab(c)) {
@@ -303,7 +303,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     draw();
   }
 
-  /** Going silent mid-step asks an unanswered listening step again by reading, so the card's review still counts. */
+  /** The sound going off mid-step asks an unanswered listening step again by reading, so the card's review still counts. */
   function quietChanged(): void {
     const listening = format === 'listen' || format === 'hear';
     if (listening && !canListen() && card && step && (phase === 'front' || (phase === 'quiz' && !picked))) ask(card, step);
@@ -440,8 +440,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   }
 
   function introAdvice(): string {
-    if (isSilent(app.progress.settings)) return 'Say it in your head a couple of times.';
-    return app.progress.settings.quiet ? 'Listen, then say it in your head a couple of times.' : 'Listen, then say it out loud a couple of times.';
+    const { mic, sound } = app.progress.settings;
+    if (sound) return mic ? 'Listen, then say it out loud a couple of times.' : 'Listen, then say it in your head a couple of times.';
+    return mic ? 'Say it out loud a couple of times.' : 'Say it in your head a couple of times.';
   }
 
   function introView(c: Card): HTMLElement {

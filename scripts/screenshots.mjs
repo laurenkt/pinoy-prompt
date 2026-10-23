@@ -46,6 +46,12 @@ async function lookBack(page) {
   await page.click('.prev-btn');
 }
 
+/** Turn the mic and the sound off from Home's split button. */
+async function quiet(page) {
+  await page.click('.split-toggle [aria-label="Mic off"]');
+  await page.click('.split-toggle [aria-label="Sound off"]');
+}
+
 /** How to reach each screen from Home. */
 const SCREENS = {
   home: async () => {},
@@ -57,7 +63,14 @@ const SCREENS = {
   },
   // Nothing due and today's new cards in: the Study button says when there's more.
   'home-caught-up': (page) => caughtUp(page, 3),
+  // Quiet mode with the mic and the sound both off: both halves of the split button pressed.
+  'home-quiet': (page) => quiet(page),
   drills: (page) => page.click('.drills-btn'),
+  // A round with the mic and the sound off: only questions seen and answered by tapping or typing.
+  'drills-quiet': async (page) => {
+    await quiet(page);
+    await page.click('.drills-btn');
+  },
   // With the speech model on the device (a stand-in for it), Drills asks for the microphone as it opens,
   // here a question never answered, so the holding screen stays up.
   'drills-mic': async (page) => {

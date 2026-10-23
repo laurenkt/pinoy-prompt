@@ -21,10 +21,10 @@ export interface Settings {
   dailyNew: number;
   /** Play audio automatically when a card is shown. */
   autoplay: boolean;
-  /** Quiet mode, for public places: nothing asks the learner to speak. */
-  quiet: boolean;
-  /** With quiet mode: headphones are in, so audio can still play. Without them, quiet mode is silent. */
-  headphones: boolean;
+  /** The microphone may be used: off, nothing asks the learner to speak (quiet mode, screens/quiet.ts). */
+  mic: boolean;
+  /** Audio may play: off, nothing plays and nothing asks to be heard. */
+  sound: boolean;
   /** A soft tick when a button is pressed. */
   tapSounds: boolean;
   /** Show how many cards are due on the Home Screen icon (badge.ts). */
@@ -61,7 +61,7 @@ export interface Envelope {
 }
 
 /** The schema this build writes. */
-export const SCHEMA = 3;
+export const SCHEMA = 4;
 
 type Data = Record<string, unknown>;
 
@@ -72,9 +72,18 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   1: ({ streak: _streak, ...rest }) => rest,
   // 2 → 3: review results are tallied by day. Nothing earlier was recorded, so it starts empty.
   2: (data) => ({ history: {}, ...data }),
+  // 3 → 4: quiet mode (no speaking) and headphones (audio still plays in quiet mode) became two switches, mic and
+  // sound, so any mix of the two is possible. A quiet copy from before the headphones setting kept its audio.
+  3: (data) => {
+    if (!isObject(data.settings)) return data;
+    const { quiet, headphones, ...settings } = data.settings;
+    const wasQuiet = quiet === true;
+    const keptAudio = typeof headphones === 'boolean' ? headphones : wasQuiet;
+    return { ...data, settings: { mic: !wasQuiet, sound: !wasQuiet || keptAudio, ...settings } };
+  },
 };
 
-export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true, iconBadge: false };
+export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, mic: true, sound: true, tapSounds: true, iconBadge: false };
 
 /** Local calendar day as YYYY-MM-DD. */
 export function dayKey(time: number): string {
@@ -183,9 +192,8 @@ export function sanitize(data: Data, now: number): Progress {
     ...s,
     dailyNew: isWhole(s.dailyNew) && s.dailyNew >= 1 && s.dailyNew <= 100 ? s.dailyNew : DEFAULT_SETTINGS.dailyNew,
     autoplay: typeof s.autoplay === 'boolean' ? s.autoplay : DEFAULT_SETTINGS.autoplay,
-    quiet: typeof s.quiet === 'boolean' ? s.quiet : DEFAULT_SETTINGS.quiet,
-    // Quiet mode used to keep audio playing, so a quiet copy saved before this setting keeps it.
-    headphones: typeof s.headphones === 'boolean' ? s.headphones : s.quiet === true,
+    mic: typeof s.mic === 'boolean' ? s.mic : DEFAULT_SETTINGS.mic,
+    sound: typeof s.sound === 'boolean' ? s.sound : DEFAULT_SETTINGS.sound,
     tapSounds: typeof s.tapSounds === 'boolean' ? s.tapSounds : DEFAULT_SETTINGS.tapSounds,
     iconBadge: typeof s.iconBadge === 'boolean' ? s.iconBadge : DEFAULT_SETTINGS.iconBadge,
   };

@@ -101,10 +101,10 @@ let reportStart: (ms: number | null) => void = () => {};
 export function lastStartDelay(): Promise<number | null> {
   return started;
 }
-/** Set by quiet mode without headphones: nothing plays at all. */
+/** Set while the sound is off (quiet mode): nothing plays at all. */
 let muted = false;
 
-/** Whether quiet mode without headphones has muted everything, for other players to follow. */
+/** Whether the sound being off has muted everything, for other players to follow. */
 export function audioMuted(): boolean {
   return muted;
 }
@@ -392,7 +392,7 @@ const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
  * Tap for every control pressed under `root`. Two marks change that:
  * - `data-no-tap`: silent, for a control that starts recording, which would catch the tap.
  * - `data-tap="before"`: tapped before its own handler runs, for one that may open the microphone inside the press
- *   (starting a Chat call, opening Drills, choosing Speak or turning quiet mode off in a round), after which nothing
+ *   (starting a Chat call, opening Drills, choosing Speak or turning the mic on in a round), after which nothing
  *   would tap. It reads the mute from before the press, so it's only for presses that don't change it to silent.
  */
 export function tickOnPress(root: Node): void {

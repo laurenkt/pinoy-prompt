@@ -335,12 +335,21 @@ p {
 
 /* Home */
 
+/* Settings and quiet mode float at the right, one under the other, and the greeting flows around them. */
 .home-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  display: flow-root;
   margin-bottom: 18px;
+}
+
+.home-header > .icon-btn,
+.home-header > .split-toggle {
+  float: right;
+  clear: right;
+  margin-left: 12px;
+}
+
+.home-header > .split-toggle {
+  margin-top: 10px;
 }
 
 .greeting {
@@ -353,21 +362,46 @@ p {
   margin: 6px 0 0;
 }
 
-.home-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: none;
-}
-
-/* A header toggle that's on (quiet mode, Settings while it's open): teal, so it's clear at a glance.
+/* A header toggle that's on (Settings while it's open, the mic or sound turned off): teal, so it's clear at a glance.
    It stays where it is, lined up with the buttons beside it, and still presses in when tapped. */
-.icon-btn[aria-pressed='true'] {
+.icon-btn[aria-pressed='true'],
+.split-half[aria-pressed='true'] {
   background: var(--teal);
   color: var(--on-accent);
 }
 
-/* Silent quiet mode: nothing can play, so the play buttons go, and so do the results screen's ways to hear a sound. */
+/* Quiet mode: the mic and sound switches as one split button, each half a header button's size, sharing the outline between them. */
+.split-toggle {
+  display: flex;
+  flex: none;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+
+.split-half {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 1.1rem;
+  background: var(--cream);
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: 14px 0 0 14px;
+}
+
+.split-half + .split-half {
+  margin-left: -3px;
+  border-radius: 0 14px 14px 0;
+}
+
+.split-toggle:has(.split-half:active) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink);
+}
+
+/* Sound off: nothing can play, so the play buttons go, and so do the results screen's ways to hear a sound. */
 .silent .audio-btn,
 .silent .word-actions,
 .silent .hear-slowly,
