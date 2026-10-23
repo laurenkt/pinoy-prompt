@@ -339,6 +339,15 @@ describe('checking a typed meaning', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it('checks Tagalog given for the English as Tagalog, and turns down the English said back', async () => {
+    const fetchFn = vi.fn(async () => verdict(true));
+    await checkMeaning(KEY, { ...CARD, answer: 'salamat nang marami', language: 'tl' }, fetchFn as unknown as typeof fetch);
+    const body = JSON.parse(String((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body.input).toBe('Tagalog: Maraming salamat\nMeaning: Thank you very much\nAnswer: salamat nang marami');
+    expect(body.instructions).toMatch(/how to say it in Tagalog/);
+    expect(body.instructions).toMatch(/has to be in Tagalog.*repeat the English/s);
+  });
+
   it('reads a wrong verdict', async () => {
     expect(await checkMeaning(KEY, CARD, (async () => verdict(false)) as unknown as typeof fetch)).toBe(false);
   });
@@ -362,14 +371,14 @@ describe('checking a typed meaning', () => {
       await vi.advanceTimersByTimeAsync(8000);
       await checked;
 
-      const heard = expect(transcribe(KEY, new Blob(), stalling as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+      const heard = expect(transcribe(KEY, new Blob(), 'en', stalling as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
       await vi.advanceTimersByTimeAsync(19000);
       expect(stalling).toHaveBeenCalledTimes(2);
       await vi.advanceTimersByTimeAsync(1000);
       await heard;
 
       await checkMeaning(KEY, CARD, (async () => verdict(true)) as unknown as typeof fetch);
-      await transcribe(KEY, new Blob(), (async () => json(200, { text: 'hi' })) as unknown as typeof fetch);
+      await transcribe(KEY, new Blob(), 'en', (async () => json(200, { text: 'hi' })) as unknown as typeof fetch);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
@@ -379,7 +388,7 @@ describe('checking a typed meaning', () => {
   it('fails as a lost connection when the answer breaks off', async () => {
     const broken = { ok: true, status: 200, json: () => Promise.reject(new DOMException('Aborted', 'AbortError')) } as unknown as Response;
     await expect(checkMeaning(KEY, CARD, (async () => broken) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
-    await expect(transcribe(KEY, new Blob(), (async () => broken) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+    await expect(transcribe(KEY, new Blob(), 'en', (async () => broken) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
   });
 
   it("doesn't blame the connection for an answer that isn't JSON", async () => {
@@ -477,7 +486,7 @@ describe('the spend estimate', () => {
 describe('hearing a spoken answer', () => {
   it('sends only the recording, in English, and reads back the text', async () => {
     const fetchFn = vi.fn(async () => json(200, { text: ' Thanks a lot. ' }));
-    expect(await transcribe(KEY, new Blob(['x'], { type: 'audio/wav' }), fetchFn as unknown as typeof fetch)).toBe('Thanks a lot.');
+    expect(await transcribe(KEY, new Blob(['x'], { type: 'audio/wav' }), 'en', fetchFn as unknown as typeof fetch)).toBe('Thanks a lot.');
     const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://api.openai.com/v1/audio/transcriptions');
     const form = init.body as FormData;
@@ -486,18 +495,26 @@ describe('hearing a spoken answer', () => {
     expect(form.get('file')).toBeInstanceOf(Blob);
   });
 
+  it('hears Tagalog as Tagalog, without being told the answer', async () => {
+    const fetchFn = vi.fn(async () => json(200, { text: 'Salamat po.' }));
+    expect(await transcribe(KEY, new Blob(['x']), 'tl', fetchFn as unknown as typeof fetch)).toBe('Salamat po.');
+    const form = (fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData;
+    expect(form.get('language')).toBe('tl');
+    expect(form.get('prompt')).toBe('Someone saying a Tagalog word or phrase.');
+  });
+
   it('counts what it cost, audio and text at their own rates', async () => {
     localStorage.clear();
     const usage = { input_tokens: 1e6, input_token_details: { audio_tokens: 0.8e6, text_tokens: 0.2e6 }, output_tokens: 1e6 };
     const cost = 0.8 * TRANSCRIBE_PRICES.audioInput + 0.2 * TRANSCRIBE_PRICES.textInput + TRANSCRIBE_PRICES.output;
     expect(transcriptionCost(usage)).toBeCloseTo(cost);
     expect(transcriptionCost(undefined)).toBe(0);
-    await transcribe(KEY, new Blob(), (async () => json(200, { text: 'hi', usage })) as unknown as typeof fetch);
+    await transcribe(KEY, new Blob(), 'en', (async () => json(200, { text: 'hi', usage })) as unknown as typeof fetch);
     expect(getSpend().total).toBeCloseTo(cost);
   });
 
   it('fails on a bad key or a lost connection', async () => {
-    await expect(transcribe(KEY, new Blob(), (async () => json(401, { error: { message: 'bad key' } })) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'key' });
-    await expect(transcribe(KEY, new Blob(), (async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+    await expect(transcribe(KEY, new Blob(), 'en', (async () => json(401, { error: { message: 'bad key' } })) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'key' });
+    await expect(transcribe(KEY, new Blob(), 'en', (async () => Promise.reject(new TypeError('offline'))) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
   });
 });

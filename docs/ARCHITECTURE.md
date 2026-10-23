@@ -18,7 +18,7 @@ Each system has one owner module. Anything else that needs it calls that module.
 | Shared UI | `src/ui.ts` | `h`, `svg`, `icon`, and the plain pieces used on three or more screens. A shared piece with its own behaviour gets its own file in `src/screens/` (the quiet toggle in `quiet.ts`). |
 | Look | `src/style.css` | Colour, outline, shadow and radius tokens on `:root`; one section per screen. |
 | Saved progress | `src/store.ts`, `src/progress-schema.ts`, `src/progress-mirror.ts` | Everything in `localStorage` under `pinoy-prompt:progress`, and its IndexedDB mirror. Settings live inside progress. |
-| Learning | `src/deck.ts`, `src/guides.ts`, `src/srs.ts`, `src/session.ts`, `src/memory.ts`, `src/meaning.ts` | Content, the schedule, what Study asks next (only what the schedule wants), what a drill round asks next (`pickDrillCard`: all practice beyond the schedule), memory stats, judging a typed meaning. No DOM. |
+| Learning | `src/deck.ts`, `src/guides.ts`, `src/srs.ts`, `src/session.ts`, `src/memory.ts`, `src/meaning.ts` | Content, the schedule, what Study asks next (only what the schedule wants), what a drill round asks next (`pickDrillCard`: all practice beyond the schedule), memory stats, judging a typed answer (a meaning, or the Tagalog for recall). No DOM. |
 | Audio out | `src/audio-engine.ts` | The one shared `AudioContext`, decoding and playing buffers. |
 | Card audio | `src/speech.ts`, `src/spoken.ts`, `src/clips.json`, `scripts/generate-audio.mjs` | Playing a card's recorded clip (`play`, `stop`, `preload`), the built-in voice as fallback, the right-answer `chime` and the button `tick`, mute for quiet mode. |
 | Microphone | `src/microphone.ts`, `src/recorder.ts` | The one shared mic stream; recording a take. |

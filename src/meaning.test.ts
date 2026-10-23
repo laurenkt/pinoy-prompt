@@ -2,8 +2,8 @@
 // says the same thing are right, a different meaning isn't.
 
 import { describe, expect, it, vi } from 'vitest';
-import { VOCAB, getCard } from './deck';
-import { canTypeMeaning, judgeMeaning, matchesMeaning, meanings, repeatsTagalog, words } from './meaning';
+import { VOCAB, getCard, type Card } from './deck';
+import { canTypeMeaning, judgeMeaning, matchesMeaning, matchesTagalog, meanings, repeatsTagalog, words } from './meaning';
 
 const card = (id: string) => getCard(id)!;
 
@@ -110,7 +110,7 @@ describe('judging a typed meaning', () => {
   it('asks OpenAI about other wording', async () => {
     const ask = vi.fn(async () => true);
     expect(await judgeMeaning('thanks a lot', card('maraming-salamat'), ask)).toEqual({ right: true });
-    expect(ask).toHaveBeenCalledWith('thanks a lot', card('maraming-salamat'));
+    expect(ask).toHaveBeenCalledWith('thanks a lot', card('maraming-salamat'), 'en');
   });
 
   it("goes by the device's check without OpenAI, or when it fails, and says when it failed", async () => {
@@ -162,7 +162,62 @@ describe('telling the Tagalog said back from an answer', () => {
     // Not matched on the device, but English, so OpenAI is asked.
     const ask = vi.fn(async () => true);
     expect(await judgeMeaning('okay', card('okay-lang-ako'), ask)).toEqual({ right: true });
-    expect(ask).toHaveBeenCalledWith('okay', card('okay-lang-ako'));
+    expect(ask).toHaveBeenCalledWith('okay', card('okay-lang-ako'), 'en');
     expect(repeatsTagalog('Okay lang ako', card('okay-lang-ako'))).toBe(true);
   });
 });
+
+describe('checking typed Tagalog', () => {
+  it.each([
+    ['salamat', 'salamat'],
+    ['salamat', 'Salamat po!'],
+    ['maraming-salamat', 'maraming salamat po'],
+    ['maraming-salamat', 'Maraming slamat'],
+    ['kumusta', 'kamusta'],
+    ['kumusta', 'Kumusta po?'],
+    ['dahan-dahan', 'dahan dahan lang po'],
+    ['dahan-dahan', 'dahandahan lang ho'],
+    ['salamat-po', 'Salamat po'],
+    ['taga-saan', 'tagasaan ka'],
+    ['po', 'po'],
+  ])('%s: "%s" is the Tagalog', (id, answer) => {
+    expect(matchesTagalog(answer, card(id))).toBe(true);
+  });
+
+  it.each([
+    ['salamat', 'thank you'],
+    ['salamat', ''],
+    ['salamat', 'po'],
+    ['salamat-po', 'salamat'],
+    ['dahan-dahan', 'dahan-dahan lang'],
+    ['maraming-salamat', 'salamat'],
+    ['kumusta', 'salamat'],
+  ])('%s: "%s" is not, or not for sure', (id, answer) => {
+    expect(matchesTagalog(answer, card(id))).toBe(false);
+  });
+
+  it("takes every word's own Tagalog, and never another word's", () => {
+    for (const c of VOCAB) expect(matchesTagalog(c.tl, c), c.tl).toBe(true);
+    for (const target of VOCAB) {
+      for (const other of VOCAB) {
+        if (other.id === target.id || tagalogOf(other) === tagalogOf(target)) continue;
+        expect(matchesTagalog(other.tl, target), `${other.tl} for ${target.tl}`).toBe(false);
+      }
+    }
+  });
+
+  it('judges it as Tagalog, and turns down the English said back without asking OpenAI', async () => {
+    const ask = vi.fn(async () => true);
+    expect(await judgeMeaning('salamat po', card('salamat'), ask, 'tl')).toEqual({ right: true });
+    expect(await judgeMeaning('thank you', card('salamat'), ask, 'tl')).toEqual({ right: false });
+    expect(await judgeMeaning('Thanks!', card('salamat'), ask, 'tl')).toEqual({ right: false });
+    expect(ask).not.toHaveBeenCalled();
+    expect(await judgeMeaning('salamat nang marami', card('maraming-salamat'), ask, 'tl')).toEqual({ right: true });
+    expect(ask).toHaveBeenCalledWith('salamat nang marami', card('maraming-salamat'), 'tl');
+  });
+});
+
+/** A card's Tagalog without its "po", so a card that only adds one ("Salamat po" for "Salamat") can be told apart from one that says something else. */
+function tagalogOf(c: Card): string {
+  return c.tl.toLowerCase().replace(/\b(po|ho|pong|hong)\b/g, '').replace(/[^a-z]/g, '');
+}

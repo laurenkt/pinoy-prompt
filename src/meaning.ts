@@ -1,14 +1,20 @@
-// Checking a meaning the learner typed (or dictated) against a card's English.
-// It's judged on meaning, not spelling: typos, word order, contractions, "a"
-// and "the", and digits for numbers don't matter. Anything this can't match
-// may still be right in other words, so it goes to OpenAI when the learner has
-// a key, and the learner can always say they had it. The answer has to be in
-// English: saying the Tagalog back means the same, but isn't an answer.
+// Checking an answer the learner typed (or dictated) against a card: its
+// English meaning, from the Tagalog, or its Tagalog, from the English.
+// A meaning is judged on meaning, not spelling: typos, word order,
+// contractions, "a" and "the", and digits for numbers don't matter. Tagalog is
+// judged on the card's own wording, give or take a typo and a "po". Anything
+// this can't match may still be right in other words, so it goes to OpenAI
+// when the learner has a key, and the learner can always say they had it. The
+// answer has to be in the language asked for: saying the prompt back means the
+// same, but isn't an answer.
 
 import { VOCAB, type Card } from './deck';
 
-/** Asks whether `answer` means the same as the card, or null when it can't be asked. */
-export type MeaningJudge = (answer: string, card: Card) => Promise<boolean | null>;
+/** The language an answer is asked for in: the card's English meaning, or its Tagalog. */
+export type AnswerLanguage = 'en' | 'tl';
+
+/** Asks whether `answer` says the card in `language`, or null when it can't be asked. */
+export type MeaningJudge = (answer: string, card: Card, language: AnswerLanguage) => Promise<boolean | null>;
 
 const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 
@@ -211,19 +217,82 @@ export function repeatsTagalog(answer: string, card: Card): boolean {
   return list.length > 0 && list.every((w) => tagalog.has(w)) && list.some((w) => !knownWords().has(w));
 }
 
+/** A Tagalog wording's words: lower case, without accents or punctuation. */
+function tagalogWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/['’‘`]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+let deckTagalog: Set<string> | undefined;
+
+/** Every word the deck's Tagalog uses. One of these is meant as written, not a typo for another. */
+function knownTagalog(): Set<string> {
+  deckTagalog ??= new Set(VOCAB.flatMap((card) => [card.tl, ...(card.accept ?? [])].flatMap(tagalogWords)));
+  return deckTagalog;
+}
+
 /**
- * Judge a typed meaning: on the device first, then by `ask` when that can't
- * match it. Without an answer from `ask` (no key, offline, an error), the
- * device's answer stands; a failed ask is noted, so the learner knows why.
+ * Whether a typed Tagalog word is the card's: the same, or a typo (one letter
+ * wrong, missing, extra or swapped in a word of five letters or more, two from
+ * nine). Short words are left alone, since one letter makes another word ("ito",
+ * "iyo"), and so is any word the deck uses elsewhere ("kain" isn't "kanin").
  */
-export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge | null): Promise<Verdict> {
+function sameTagalogWord(typed: string, word: string): boolean {
+  if (typed === word) return true;
+  if (typed[0] !== word[0] || knownTagalog().has(typed)) return false;
+  const shorter = Math.min(typed.length, word.length);
+  const allowed = shorter >= 9 ? 2 : shorter >= 5 ? 1 : 0;
+  return allowed > 0 && distance(typed, word) <= allowed;
+}
+
+/**
+ * Whether the answer is the card's Tagalog, checked on the device: its own
+ * wording or an accepted spelling, in any case or punctuation, give or take a
+ * typo, joined up or hyphenated alike ("dahan-dahan", "dahandahan"). A "po"
+ * may be added, but not left out where the card has one: it's what makes
+ * "Salamat po" polite. False means "not sure", not "wrong": Tagalog has other
+ * ways of saying most things.
+ */
+export function matchesTagalog(answer: string, card: Card): boolean {
+  const given = tagalogWords(answer);
+  if (given.length === 0) return false;
+  const polite = (list: string[]) => list.some((w) => RESPECT.includes(w));
+  // Unless that's all there is ("po" itself).
+  const bare = (list: string[]) => (list.every((w) => RESPECT.includes(w)) ? list : list.filter((w) => !RESPECT.includes(w)));
+  return [card.tl, ...(card.accept ?? [])].some((wording) => {
+    const want = tagalogWords(wording);
+    if (want.length === 0 || (polite(want) && !polite(given))) return false;
+    const [g, w] = [bare(given), bare(want)];
+    if (g.join('') === w.join('')) return true;
+    return g.length === w.length && g.every((typed, i) => sameTagalogWord(typed, w[i]));
+  });
+}
+
+/** Whether the answer plainly says the card in `language`, checked on the device. */
+export function matchesAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
+  return language === 'tl' ? matchesTagalog(answer, card) : matchesMeaning(answer, card);
+}
+
+/**
+ * Judge a typed answer in `language`: on the device first, then by `ask` when
+ * that can't match it. The prompt said back in its own language (the Tagalog
+ * for its meaning, the English for its Tagalog) is wrong without asking.
+ * Without an answer from `ask` (no key, offline, an error), the device's
+ * answer stands; a failed ask is noted, so the learner knows why.
+ */
+export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge | null, language: AnswerLanguage = 'en'): Promise<Verdict> {
   if (!answer.trim()) return { right: false };
-  if (matchesMeaning(answer, card)) return { right: true };
+  if (matchesAnswer(answer, card, language)) return { right: true };
   // Not asked: OpenAI would see that it means the same.
-  if (repeatsTagalog(answer, card)) return { right: false };
+  if (language === 'en' ? repeatsTagalog(answer, card) : matchesMeaning(answer, card)) return { right: false };
   if (!ask) return { right: false };
   try {
-    return { right: (await ask(answer, card)) ?? false };
+    return { right: (await ask(answer, card, language)) ?? false };
   } catch (e) {
     return { right: false, failure: e };
   }

@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
-import { canTypeMeaning, judgeMeaning, matchesMeaning, type MeaningJudge } from '../meaning';
+import { canTypeMeaning, judgeMeaning, matchesAnswer, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, pickDrillCard, settled, shuffle } from '../session';
@@ -36,7 +36,10 @@ interface Question {
   /** For a guide, its question as it's asked; `choices` is then empty. */
   guide?: GuideQuestion;
   choices: Card[];
-  /** Listening to a word that has settled in Study: the meaning is typed (or dictated), not picked. */
+  /**
+   * A word that has settled in Study, listened to or recalled: the answer (its meaning, or for recall its Tagalog) is
+   * typed (or dictated), not picked.
+   */
   typed: boolean;
   /** What's typed so far, kept while the screen is redrawn. */
   draft?: string;
@@ -54,23 +57,26 @@ interface Question {
   thinkingSince?: number;
 }
 
-/** Turns a spoken answer into text. */
-export type MeaningHearer = (audio: Blob) => Promise<string>;
+/** Turns a spoken answer, in the language asked for, into text. */
+export type MeaningHearer = (audio: Blob, language: AnswerLanguage) => Promise<string>;
 
 /** OpenAI's speech-to-text, when the learner has given a key for Chat; without one, answers are typed. */
 const hearWithOpenAi = (): MeaningHearer | null => {
   const key = getApiKey();
-  return key ? (audio) => transcribe(key, audio) : null;
+  return key ? (audio, language) => transcribe(key, audio, language) : null;
 };
 
 /** What `picked` holds for a typed meaning that wasn't right. */
 const MISSED = '';
 
 /** Asks OpenAI, when the learner has given a key for Chat. */
-const askOpenAi: MeaningJudge = async (answer, card) => {
+const askOpenAi: MeaningJudge = async (answer, card, language) => {
   const key = getApiKey();
-  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer }) : null;
+  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language }) : null;
 };
+
+/** What a typed answer to the question is given in: the meaning when listening, the Tagalog when recalling. */
+const answerLanguage = (q: Question): AnswerLanguage => (q.mode === 'recall' ? 'tl' : 'en');
 
 /** The kinds of question a card can be asked as. */
 function modesFor(card: Card): Mode[] {
@@ -189,7 +195,7 @@ export function practiceScreen(
     }
     const field = mode === 'recall' ? 'tl' : 'en';
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
-    const typed = mode === 'listen' && settled(app.progress, card.id) && canTypeMeaning(card);
+    const typed = settled(app.progress, card.id) && (mode === 'recall' || (mode === 'listen' && canTypeMeaning(card)));
     return { card, mode, choices, typed };
   }
 
@@ -293,6 +299,8 @@ export function practiceScreen(
   function sayCard(q: Question, slow = false, answered = picked !== null): void {
     // Nor while the meaning is being said into the microphone, which would record it.
     if ((speak && !speak.mayPlay()) || listening) return;
+    // Recalling a word, the word is the answer.
+    if (q.mode === 'recall' && !answered) return;
     if (!q.guide) void play(q.card, slow);
     else if (answered) {
       const clip = sentenceClip(q.guide.drill);
@@ -317,7 +325,7 @@ export function practiceScreen(
     if (!spoken) q.wave = undefined;
     checking = true;
     draw();
-    void judgeMeaning(q.answer, q.card, askMeaning).then(({ right, failure }) => {
+    void judgeMeaning(q.answer, q.card, askMeaning, answerLanguage(q)).then(({ right, failure }) => {
       // Left the question (or the drill), or went to the choices, while it was being checked.
       if (current !== q || !q.typed || !root.isConnected) return;
       checking = false;
@@ -367,7 +375,7 @@ export function practiceScreen(
         draw();
         let text: string;
         try {
-          text = await hearer(toWav(take.samples));
+          text = await hearer(toWav(take.samples), answerLanguage(q));
         } catch (e) {
           // Dropped (quiet mode came on, or the question went) while it was being heard.
           if (hearing !== recording) return;
@@ -510,8 +518,8 @@ export function practiceScreen(
 
   function draw(): void {
     if (!current) root.replaceChildren(tooFew());
-    // A meaning can be said into the box only on a listening question, and with a way to hear it.
-    else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting(modes().includes('listen') && hearMeaning() !== null)));
+    // An answer can be said into the box only on a listening or recall question, and with a way to hear it.
+    else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting((modes().includes('listen') || modes().includes('recall')) && hearMeaning() !== null)));
     else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
@@ -691,7 +699,7 @@ export function practiceScreen(
     );
   }
 
-  /** Records the meaning said out loud; a second tap stops. Silent itself, since its tap would be recorded. */
+  /** Records the answer said out loud; a second tap stops. Silent itself, since its tap would be recorded. */
   function micButton(q: Question): HTMLButtonElement {
     const button = iconButton('mic', listening ? 'Stop recording' : 'Say it out loud', () => sayMeaning(q), { pressed: listening !== null });
     button.type = 'button';
@@ -720,18 +728,24 @@ export function practiceScreen(
   }
 
   /**
-   * A box to type the meaning in; it keeps what was sent, marked right or wrong. A meaning the device can tell is
-   * right is taken as it's typed, without Check. With a key for OpenAI, and outside quiet mode, a microphone button
-   * beside it records the meaning said out loud instead.
+   * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
+   * wrong. An answer the device can tell is right is taken as it's typed, without Check. With a key for OpenAI, and
+   * outside quiet mode, a microphone button beside it records the answer said out loud instead.
    */
   function typedAnswer(q: Question, picked: string | null): HTMLElement {
     const answered = picked !== null;
     const busy = checking || hearing !== null || listening !== null;
+    const tagalog = answerLanguage(q) === 'tl';
     const input = h('input', {
       class: `meaning-input ${answered ? (picked === q.card.id ? 'correct' : 'wrong') : ''}`,
       type: 'text',
-      'aria-label': 'What it means, in English',
-      placeholder: 'Type it in English',
+      'aria-label': tagalog ? 'How you say it, in Tagalog' : 'What it means, in English',
+      placeholder: tagalog ? 'Type it in Tagalog' : 'Type it in English',
+      lang: tagalog ? 'fil' : undefined,
+      // The phone's English autocorrect would turn Tagalog into English words.
+      autocorrect: tagalog ? 'off' : undefined,
+      autocapitalize: tagalog ? 'off' : undefined,
+      spellcheck: tagalog ? 'false' : undefined,
       autocomplete: 'off',
       enterkeyhint: 'done',
       disabled: answered || busy,
@@ -745,7 +759,7 @@ export function practiceScreen(
         typingPause = setTimeout(() => {
           // Not while it's being said instead, or behind the microphone's holding screen.
           const busy = listening !== null || hearing !== null || waiting || lookingBack;
-          if (current === q && q.typed && !busy && root.isConnected && q.draft && matchesMeaning(q.draft, q.card)) send(q.draft);
+          if (current === q && q.typed && !busy && root.isConnected && q.draft && matchesAnswer(q.draft, q.card, answerLanguage(q))) send(q.draft);
         }, TYPING_PAUSE_MS);
       },
       // The keyboard takes the bottom of the screen; keep the box in sight above it.
@@ -761,7 +775,9 @@ export function practiceScreen(
       hearMeaning() !== null &&
       micButton(q);
     const status = listening
-      ? 'Listening… say what it means.'
+      ? tagalog
+        ? 'Listening… say it in Tagalog.'
+        : 'Listening… say what it means.'
       : hearing
         ? 'Hearing what you said…'
         : checking && q.wave

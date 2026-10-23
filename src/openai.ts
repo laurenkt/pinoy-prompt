@@ -3,6 +3,7 @@
 // sent only to api.openai.com. There is no server of ours in between.
 
 import { getMicrophone, releaseMicrophone } from './microphone';
+import type { AnswerLanguage } from './meaning';
 import { dayKey } from './progress-schema';
 
 const KEY_STORAGE = 'pinoy-prompt:openai-key';
@@ -256,18 +257,25 @@ export const CHECK_MODEL = 'gpt-5.4-mini';
 /** A check slower than this isn't worth the wait; the learner can judge it themselves. */
 const CHECK_TIMEOUT_MS = 8000;
 
-const CHECK_INSTRUCTIONS = `You check a beginner's answer in a Tagalog listening drill. They heard a Tagalog word or phrase and wrote what they think it means in English, possibly with a phone's dictation.
+const CHECK_INSTRUCTIONS: Record<AnswerLanguage, string> = {
+  en: `You check a beginner's answer in a Tagalog listening drill. They heard a Tagalog word or phrase and wrote what they think it means in English, possibly with a phone's dictation.
 Judge only whether they understood the meaning. Spelling, grammar, word order and wording don't matter; synonyms, paraphrases and a missing "please" or "very" are still right, and so is any one of the meanings separated by "/".
 It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.
-The answer has to be in English. It's wrong if they just repeat the Tagalog or answer in Tagalog (or any other language), even though that means the same thing. English that uses a word Tagalog borrows or English borrows from Tagalog (okay, bill, adobo, jeepney) is still English.`;
+The answer has to be in English. It's wrong if they just repeat the Tagalog or answer in Tagalog (or any other language), even though that means the same thing. English that uses a word Tagalog borrows or English borrows from Tagalog (okay, bill, adobo, jeepney) is still English.`,
+  tl: `You check a beginner's answer in a Tagalog recall drill. They were shown an English meaning and wrote how to say it in Tagalog, possibly with a phone's dictation.
+Judge whether it's a right way to say that meaning in everyday Tagalog, as the given Tagalog is. Spelling doesn't matter: common spellings (kamusta, ganun, dyan), o for u, e for i, typos and how dictation spells what was said are still right, and so are an added "po" or "ho", "ho" for "po", and other natural wordings that mean the same.
+Leaving out a "po" or "ho" that the given Tagalog has is wrong: it's what makes it polite.
+It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.
+The answer has to be in Tagalog. It's wrong if they just repeat the English or answer in English (or any other language), even though that means the same thing. Tagalog that uses a word borrowed from English or Spanish, as Filipinos say it (okay, bill, dyip), is still Tagalog.`,
+};
 
 /**
- * Ask OpenAI whether `answer` means the same as the card's English. Sends
- * only the card and the typed answer.
+ * Ask OpenAI whether `answer` says the card in `language`: its meaning in
+ * English, or its Tagalog. Sends only the card and the typed answer.
  */
 export async function checkMeaning(
   key: string,
-  { tl, en, answer }: { tl: string; en: string; answer: string },
+  { tl, en, answer, language = 'en' }: { tl: string; en: string; answer: string; language?: AnswerLanguage },
   fetchFn: typeof fetch = (...args) => fetch(...args),
 ): Promise<boolean> {
   type Answer = { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
@@ -279,7 +287,7 @@ export async function checkMeaning(
         {
           model: CHECK_MODEL,
           reasoning: { effort: 'none' },
-          instructions: CHECK_INSTRUCTIONS,
+          instructions: CHECK_INSTRUCTIONS[language],
           input: `Tagalog: ${tl}\nMeaning: ${en}\nAnswer: ${answer.slice(0, 200)}`,
           text: {
             format: {
@@ -312,12 +320,23 @@ export const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
 /** Longer than a check: a few seconds of audio go up first, over a phone's connection. */
 const TRANSCRIBE_TIMEOUT_MS = 20000;
 
-/** What the learner said, as English text. Sends only the recording. */
-export async function transcribe(key: string, audio: Blob, fetchFn: typeof fetch = (...args) => fetch(...args)): Promise<string> {
+/** What the learner was asked to say, to help the transcription: never the answer itself. */
+const TRANSCRIBE_PROMPTS: Record<AnswerLanguage, string> = {
+  en: 'Someone saying in English what a Tagalog word or phrase means.',
+  tl: 'Someone saying a Tagalog word or phrase.',
+};
+
+/** What the learner said, as text in `language` (English or Tagalog). Sends only the recording. */
+export async function transcribe(
+  key: string,
+  audio: Blob,
+  language: AnswerLanguage = 'en',
+  fetchFn: typeof fetch = (...args) => fetch(...args),
+): Promise<string> {
   const form = new FormData();
   form.append('model', TRANSCRIBE_MODEL);
-  form.append('language', 'en');
-  form.append('prompt', 'Someone saying in English what a Tagalog word or phrase means.');
+  form.append('language', language);
+  form.append('prompt', TRANSCRIBE_PROMPTS[language]);
   form.append('file', audio, 'answer.wav');
   const body = await timed(TRANSCRIBE_TIMEOUT_MS, async (signal) => {
     let response: Response;
