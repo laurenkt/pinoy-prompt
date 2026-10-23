@@ -1366,8 +1366,8 @@ p {
   order: 0;
 }
 
-/* Check takes the room; Show choices keeps to one line. */
-.meaning-form .row .btn.secondary {
+/* Check (or Cancel, in its place while a meaning is said) takes the room; Show choices keeps to one line. */
+.meaning-form .row .btn.secondary:first-child {
   flex: 0 0 auto;
   white-space: nowrap;
 }
@@ -1404,9 +1404,9 @@ p {
 /*
  * Ready to listen, listening and checking (.speak.listening): the speaking question takes the panel's spare height
  * itself, rather than the spacer, and puts one big button in the middle of it, where a resting thumb reaches it, in
- * the same place to start and to stop. What the microphone hears (and the hint) stays above it; the space below
- * matches it so the button is centred, and gives way first on a short phone. The meter and status keep their room
- * while ready, so the button doesn't move when listening starts.
+ * the same place to start and to stop. What the microphone hears (and the hint) stays above it; the space below,
+ * which Cancel sits at the top of, matches it so the button is centred, and gives way first on a short phone. The
+ * meter, status and Cancel keep their room while ready, so the button doesn't move when listening starts.
  */
 .panel:has(> .speak.listening)::after {
   content: none;
@@ -1418,9 +1418,10 @@ p {
   flex-direction: column;
 }
 
-.speak.listening::after {
-  content: '';
+.speak.listening > .speak-cancel {
   flex: 1 0 0;
+  align-items: flex-start;
+  align-content: flex-start;
 }
 
 .speak-cue {
@@ -1461,7 +1462,7 @@ p {
   opacity: 0.6;
 }
 
-/* Only there while listening; ready and checking keep its room so the big button stays put. */
+/* Only there while listening; ready and checking keep its room (see .speak.listening). */
 .speak:not(.recording) .speak-cancel {
   visibility: hidden;
 }

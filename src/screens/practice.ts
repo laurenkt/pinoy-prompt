@@ -726,11 +726,11 @@ export function practiceScreen(
         h(
           'div',
           { class: 'row' },
-          // While a meaning is being said, this place throws it away instead, so it can be said again or typed.
+          h('button', { class: 'btn secondary', type: 'button', onclick: showChoices }, 'Show choices'),
+          // While a meaning is being said there's nothing to check yet, so this place throws it away instead.
           listening
             ? h('button', { class: 'btn secondary', type: 'button', onclick: () => cancelSaying(q) }, 'Cancel')
-            : h('button', { class: 'btn secondary', type: 'button', onclick: showChoices }, 'Show choices'),
-          h('button', { class: 'btn primary', type: 'submit', disabled: busy }, checking ? 'Checking…' : 'Check'),
+            : h('button', { class: 'btn primary', type: 'submit', disabled: busy }, checking ? 'Checking…' : 'Check'),
         ),
     );
   }
