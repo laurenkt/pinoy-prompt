@@ -53,16 +53,24 @@ describe('the Library', () => {
     expect(toggle(root)).toBe(button);
   });
 
-  it('shows how much of each group is in memory, firmest first, in the heading it already has', () => {
+  it('fills each heading with its cards by memory strength, firmest first, the title in ink over the fill', () => {
     const unit = UNITS[0];
     const [a, b] = unit.cards;
     const app = fakeApp([a.id, b.id]);
     app.progress.cards[b.id].interval = 30;
-    const meter = wordsScreen(app).querySelector('.unit-list summary .memory-meter')!;
-    expect([...meter.querySelector('.memory-bar')!.children].map((s) => s.className)).toEqual(['s-long', 's-days']);
-    expect(parseFloat((meter.querySelector('.memory-bar')!.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / unit.cards.length);
-    expect(meter.querySelector('.memory-count')!.textContent).toBe(`2/${unit.cards.length}`);
-    expect(meter.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: Long-term 1, Days 1`);
-    expect(wordsScreen(fakeApp()).querySelector('.memory-meter')!.getAttribute('aria-label')).toBe(`None of ${unit.cards.length} met yet`);
+    const summary = wordsScreen(app).querySelector('.unit-list summary')!;
+    const fill = summary.querySelector('.memory-fill')!;
+    expect([...fill.children].map((s) => s.className)).toEqual(['s-long', 's-days']);
+    expect(parseFloat((fill.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / unit.cards.length);
+    expect(fill.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: Long-term 1, Days 1`);
+    // The ink copy of the title is for the eye only, and covers just the fill.
+    const ink = summary.querySelector<HTMLElement>('.memory-ink')!;
+    expect(ink.getAttribute('aria-hidden')).toBe('true');
+    expect(ink.textContent).toBe(summary.querySelector(':scope > .unit-body')!.textContent);
+    expect(parseFloat(ink.style.clipPath.match(/inset\(0(?:px)? ([\d.]+)%/)![1])).toBeCloseTo(100 - (200 / unit.cards.length));
+
+    const none = wordsScreen(fakeApp()).querySelector('.unit-list summary')!;
+    expect(none.querySelector('.memory-fill')!.getAttribute('aria-label')).toBe(`None of ${unit.cards.length} met yet`);
+    expect(none.querySelector('.memory-ink')).toBeNull();
   });
 });

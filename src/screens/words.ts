@@ -69,28 +69,28 @@ export function wordsScreen(app: App): HTMLElement {
   }
 
   /**
-   * At the right of a group's heading: how many of its cards are met, with a
-   * short bar of them by strength, as on Home's memory chart, firmest first,
-   * and the rest left empty. It is laid out to be no taller than the heading
-   * (see .memory-meter in style.css).
+   * A group's heading is its own memory bar: its cards by strength fill it from
+   * the left in the colours of Home's memory chart, firmest first, and the rest,
+   * cards not met yet, stay the plain card. The title is drawn again in dark
+   * ink over the fill, so it reads on both.
    */
-  function memoryMeter(cards: Card[]): HTMLElement {
+  function memoryFill(cards: Card[], body: () => HTMLElement): HTMLElement[] {
     const met = cards.flatMap((card) => app.progress.cards[card.id] ?? []);
     const counts = strengthCounts(met);
     const firmest = [...STRENGTHS].reverse().filter((s) => counts[s.id]);
     const label = met.length
       ? `${met.length} of ${cards.length} met: ${firmest.map((s) => `${s.label} ${counts[s.id]}`).join(', ')}`
       : `None of ${cards.length} met yet`;
-    return h(
-      'span',
-      { class: 'memory-meter', role: 'img', 'aria-label': label },
-      h('span', { class: 'memory-count', 'aria-hidden': 'true' }, h('strong', null, met.length), `/${cards.length}`),
+    const filled = (met.length / cards.length) * 100;
+    return [
       h(
         'span',
-        { class: 'memory-bar', 'aria-hidden': 'true' },
+        { class: `memory-fill${met.length === cards.length ? ' full' : ''}`, role: 'img', 'aria-label': label },
         firmest.map((s) => h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } })),
       ),
-    );
+      body(),
+      met.length ? h('span', { class: 'memory-ink', 'aria-hidden': 'true', style: { clipPath: `inset(0 ${100 - filled}% 0 0)` } }, body()) : null,
+    ].filter((el): el is HTMLElement => !!el);
   }
 
   function group(title: string, sub: string | null, cards: Card[], item: (card: Card) => HTMLElement): HTMLElement {
@@ -98,7 +98,7 @@ export function wordsScreen(app: App): HTMLElement {
       'details',
       // Narrowed to one kind of guide, there is only one group, so it opens straight away.
       { class: 'card unit-list', open: filter !== 'all' && filter !== 'vocab' },
-      h('summary', null, h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub)), memoryMeter(cards)),
+      h('summary', null, memoryFill(cards, () => h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub)))),
       h('ul', { class: 'word-list' }, cards.map(item)),
     );
   }

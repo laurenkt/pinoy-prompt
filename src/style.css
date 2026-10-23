@@ -2247,6 +2247,8 @@ p {
 }
 
 .unit-list summary {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -2281,53 +2283,36 @@ p {
   color: var(--muted);
 }
 
-/* The group's cards by memory strength, at the right of its heading, so the heading keeps its height: the count over a short bar beside a title and its Tagalog, beside the bar when the title is alone (the bar is as wide either way, so they line up). Unmet cards are the empty track. */
-.memory-meter {
-  flex: none;
+/* The heading is the group's memory bar: its cards by strength fill it from the left, behind the title, and an ink edge ends the fill. The title is repeated in ink over the fill (.memory-ink, clipped to it). Open, the rest of the heading turns saffron as before, with ink text throughout. */
+.memory-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
+  pointer-events: none;
 }
 
-.unit-list summary:not(:has(.unit-tl)) .memory-meter {
-  flex-direction: row;
+.memory-fill > span {
+  min-width: 6px;
+}
+
+.memory-fill:not(.full) > span:last-child {
+  border-right: 3px solid var(--ink);
+}
+
+.memory-ink {
+  position: absolute;
+  inset: 0;
+  display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.memory-count {
-  font-size: 0.8rem;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-
-.memory-count strong {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.unit-list[open] .memory-count,
-.unit-list[open] .memory-count strong {
+  padding: inherit;
   color: var(--on-accent);
+  pointer-events: none;
 }
 
-.memory-bar {
-  display: flex;
-  width: 64px;
-  height: 14px;
-  overflow: hidden;
-  background: var(--surface-dim);
-  border: 2px solid var(--ink);
-  border-radius: 99px;
-}
-
-/* A single card still shows its colour, however big the group. The bar is as wide as fits beside the longest title at 360px without wrapping it. */
-.memory-bar > span {
-  height: 100%;
-  min-width: 4px;
+.memory-ink .unit-tl,
+.unit-list[open] .memory-ink {
+  color: var(--on-accent);
 }
 
 .word-list {
