@@ -342,7 +342,11 @@ async function drillGuide(page, mode) {
   }
   await page.click('.filter-toggle');
   for (let i = 0; i < 40 && !(await page.locator('.drill-q').count()); i++) {
-    if (!(await page.locator('.feedback').count())) await page.locator('.choice').first().click();
+    if (!(await page.locator('.feedback').count())) {
+      // A settled word is typed, so ask for its choices.
+      if (await page.locator('.meaning-input').count()) await page.click('text=Show choices');
+      await page.locator('.choice').first().click();
+    }
     await page.click('text=Next');
   }
 }

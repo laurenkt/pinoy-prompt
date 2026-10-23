@@ -88,16 +88,23 @@ export const UNITS: Unit[] = [
     tlTitle: 'Pagbati',
     intro: 'Start with the words you will use every single day. Filipinos greet warmly, so these go a long way.',
     cards: [
-      { id: 'kumusta', tl: 'Kumusta?', accept: ['Kamusta?'], en: 'How are you? / Hello', kind: 'phrase', hint: 'koo-moos-TAH', note: 'The everyday "hello".', hook: 'From the Spanish "¿cómo está?". Say "como está" fast and it squashes into "kumusta".' },
-      { id: 'mabuti', tl: 'Mabuti naman.', en: "I'm fine.", kind: 'phrase', hint: 'mah-BOO-tee nah-MAHN', note: 'The usual answer to "Kumusta?". "Naman" softens it, like "fine, thanks".', hook: '"Buti" (good) is the root, as in "Buti na lang!", "Good thing!". "Naman" just softens it.' },
+      { id: 'kumusta', tl: 'Kumusta?', accept: ['Kamusta?', 'Musta?'], en: 'How are you? / Hello', kind: 'phrase', hint: 'koo-moos-TAH', note: 'Friends shorten it to "Musta?", and after time apart ask "Kumusta ka na?", how have you been? For a quick hello in passing, "Uy!" or just "Hi!" is more usual.', hook: 'From the Spanish "¿cómo está?". Say "como está" fast and it squashes into "kumusta".' },
+      { id: 'mabuti', tl: 'Mabuti naman.', en: "I'm fine.", kind: 'phrase', hint: 'mah-BOO-tee nah-MAHN', note: 'A polite answer to "Kumusta?", nice with elders. Between friends, "Okay lang!" or "Ayos lang!" is more usual. "Naman" softens it, like "fine, thanks".', hook: '"Buti" (good) is the root, as in "Buti na lang!", "Good thing!". "Naman" just softens it.' },
       { id: 'salamat', tl: 'Salamat', en: 'Thank you', kind: 'word', hint: 'sah-LAH-maht', hook: 'A cousin of Arabic "salaam" (peace), which reached Tagalog through Malay "selamat". Thanking someone is wishing them well.' },
       { id: 'maraming-salamat', tl: 'Maraming salamat', en: 'Thank you very much', kind: 'phrase', hint: 'mah-RAH-ming sah-LAH-maht', hook: '"Marami" (many) + "salamat": literally "many thanks", just like Spanish "muchas gracias".' },
-      { id: 'walang-anuman', tl: 'Walang anuman', en: "You're welcome", kind: 'phrase', hint: 'wah-LAHNG ah-noo-MAHN', hook: '"Wala" (none) + "anuman" (anything): "it\'s nothing at all", like Spanish "de nada".' },
-      { id: 'magandang-umaga', tl: 'Magandang umaga', en: 'Good morning', kind: 'phrase', hint: 'mah-gahn-DAHNG oo-MAH-gah', hook: '"Maganda" means "beautiful", so it is literally "beautiful morning". You will also hear "Ang ganda!", "How beautiful!".' },
-      { id: 'magandang-hapon', tl: 'Magandang hapon', en: 'Good afternoon', kind: 'phrase', hint: 'mah-gahn-DAHNG HAH-pon', hook: 'Fun coincidence: "Hapon" is also the word for Japan, from Spanish "Japón". Picture a sunny afternoon in Japan.' },
-      { id: 'magandang-gabi', tl: 'Magandang gabi', en: 'Good evening', kind: 'phrase', hint: 'mah-gahn-DAHNG gah-BEE', hook: 'Stress the end, "gah-BEE", and it means night. Stress the start, "GAH-bee", and it is taro root. Wish people a beautiful night, not a beautiful taro.' },
-      { id: 'paalam', tl: 'Paalam', en: 'Goodbye', kind: 'word', hint: 'pah-AH-lahm', note: 'A little formal. Friends often just say "Ingat!" or "Bye!".', hook: 'Built on "alam" (to know). Saying goodbye is letting someone know you are leaving. You will meet "alam" again in "Hindi ko alam".' },
-      { id: 'ingat', tl: 'Ingat!', en: 'Take care!', kind: 'word', hint: 'EE-ngaht', hook: 'Short for "Mag-ingat ka!", "Be careful!". Sounds a bit like "in gut": trust your gut and take care.' },
+      { id: 'walang-anuman', tl: 'Walang anuman', en: "You're welcome", kind: 'phrase', hint: 'wah-LAHNG ah-noo-MAHN', note: 'Polite, and right anywhere, like a shop. Between friends, "Wala \'yon!" (it was nothing) is more usual.', hook: '"Wala" (none) + "anuman" (anything): "it\'s nothing at all", like Spanish "de nada".' },
+      { id: 'wala-yon', tl: "Wala 'yon.", accept: ['Wala iyon.', 'Wala yun.'], en: 'No worries. / It was nothing.', kind: 'phrase', hint: 'wah-LAH yon', note: 'What friends say back to "Salamat!". Often said "Wala \'yun".', hook: '"Wala" (nothing) + "\'yon", short for "iyon" (that): "that was nothing".' },
+      { id: 'magandang-umaga', tl: 'Magandang umaga', en: 'Good morning', kind: 'phrase', hint: 'mah-gahn-DAHNG oo-MAH-gah', note: 'Day to day, most people just say "Good morning!" in English, with "po" for elders: "Good morning po!". "Magandang umaga" is warmer and a bit more formal, for elders, a speech or the radio.', hook: '"Maganda" means "beautiful", so it is literally "beautiful morning". You will also hear "Ang ganda!", "How beautiful!".' },
+      { id: 'magandang-hapon', tl: 'Magandang hapon', en: 'Good afternoon', kind: 'phrase', hint: 'mah-gahn-DAHNG HAH-pon', note: 'Like "Magandang umaga", often just said in English: "Good afternoon po!".', hook: 'Fun coincidence: "Hapon" is also the word for Japan, from Spanish "Japón". Picture a sunny afternoon in Japan.' },
+      { id: 'magandang-gabi', tl: 'Magandang gabi', en: 'Good evening', kind: 'phrase', hint: 'mah-gahn-DAHNG gah-BEE', note: 'Like "Magandang umaga", often just said in English: "Good evening po!".', hook: 'Stress the end, "gah-BEE", and it means night. Stress the start, "GAH-bee", and it is taro root. Wish people a beautiful night, not a beautiful taro.' },
+      { id: 'paalam', tl: 'Paalam', en: 'Goodbye', kind: 'word', hint: 'pah-AH-lahm', note: 'A big, heartfelt goodbye, for when you won\'t meet again for a long time (and in songs). Day to day, people say "Sige!", "Bye!" or "Ingat!".', hook: 'Built on "alam" (to know). Saying goodbye is letting someone know you are leaving. You will meet "alam" again in "Hindi ko alam".' },
+      { id: 'ingat', tl: 'Ingat!', en: 'Take care!', kind: 'word', hint: 'EE-ngaht', note: 'The everyday goodbye, often as "Sige, ingat!", okay, take care!', hook: 'Short for "Mag-ingat ka!", "Be careful!". Sounds a bit like "in gut": trust your gut and take care.' },
+      { id: 'uy', tl: 'Uy!', accept: ['Oy!'], en: 'Hey! / Hi!', kind: 'word', hint: 'OOY', note: 'How you greet a friend you bump into, often followed by "Musta?". It also catches someone\'s attention: "Uy, tingnan mo!", hey, look!', hook: 'Sounds just like a British "oi!", and works the same way, only friendlier.' },
+      { id: 'ikaw-pala', tl: 'Ikaw pala!', en: "Oh, it's you!", kind: 'phrase', hint: 'ee-KAW pah-LAH', note: 'When you spot someone you know. "Pala" adds a little surprise, something you\'ve just realised.', hook: '"Pala" is the light-bulb word: "oh, so it\'s you!". You\'ll hear it all the time: "Ganun pala!", oh, so that\'s how it is!' },
+      { id: 'saan-ka-galing', tl: 'Saan ka galing?', accept: ['San ka galing?'], en: 'Where have you been?', kind: 'phrase', hint: 'sah-AHN kah GAH-ling', note: 'A friendly hello as much as a question, so nobody expects a full answer. Said fast, it\'s "San ka galing?".', hook: '"Galing" means "came from". The same "saan ka" as "Saan ka pupunta?", where are you going, which is a greeting too.' },
+      { id: 'diyan-lang', tl: 'Diyan lang.', accept: ['Dyan lang.'], en: 'Just over there. / Nowhere special.', kind: 'phrase', hint: 'dyahn lahng', note: 'The easy answer to "Saan ka galing?" or "Saan ka pupunta?" when there\'s nothing to tell.', hook: '"Diyan" (there) + "lang" (just): "just there". Vague on purpose, and that\'s fine.' },
+      { id: 'mauna-na-ako', tl: 'Mauna na ako.', accept: ['Una na ako.', "Una na 'ko."], en: "I'll head off first.", kind: 'phrase', hint: 'mah-OO-nah nah ah-KOH', note: 'The polite way to leave before everyone else, at work or with friends. Said fast, it\'s "Una na \'ko!".', hook: '"Una" means first, as in "Ikaw muna", you first. You\'re the first to go.' },
+      { id: 'anong-meron', tl: 'Anong meron?', accept: ['Anong mayroon?'], en: "What's going on?", kind: 'phrase', hint: 'ah-NONG MEH-ron', note: 'Asked when something\'s up: a crowd, a party, a friend dressed up. Also a casual "what\'s up?".', hook: '"Ano" (what) + "meron" (there is), the "Meron" that answers "May kape ba?": "what is there?"' },
     ],
   },
   {
@@ -111,10 +118,11 @@ export const UNITS: Unit[] = [
       { id: 'hindi', tl: 'Hindi', en: 'No / not', kind: 'word', hint: 'hin-DEE', hook: 'Spelled like the language of India. Picture shaking your head: "No, not Hindi!"' },
       { id: 'po', tl: 'po', en: '(word that adds respect)', kind: 'word', hint: 'poh', note: 'Drop it into a sentence to be polite: "Salamat po" means "Thank you, sir/ma\'am".', hook: '"Po" is the start of "polite". Tuck it in and you sound respectful.' },
       { id: 'salamat-po', tl: 'Salamat po', en: 'Thank you (polite)', kind: 'phrase', hint: 'sah-LAH-maht poh', hook: '"Salamat" plus "po": the respect word just slots in after, like adding "sir" or "ma\'am".' },
-      { id: 'pasensya-na', tl: 'Pasensya na', en: "Sorry / I'm sorry", kind: 'phrase', hint: 'pah-SEN-shah nah', note: 'Used for small apologies, like bumping into someone.', hook: 'From Spanish "paciencia", patience. You are asking them to bear with you.' },
+      { id: 'pasensya-na', tl: 'Pasensya na', en: "Sorry / I'm sorry", kind: 'phrase', hint: 'pah-SEN-shah nah', note: 'Used for small apologies, like bumping into someone. A plain "Sorry!" in English is just as common.', hook: 'From Spanish "paciencia", patience. You are asking them to bear with you.' },
       { id: 'makikiraan-po', tl: 'Makikiraan po', en: 'Excuse me (to pass by)', kind: 'phrase', hint: 'mah-kee-kee-rah-AHN poh', hook: 'Built on "daan" (road, path), with the d softened to r. Roughly "may I share your path?"' },
       { id: 'sige', tl: 'Sige', en: 'Okay / Go ahead', kind: 'word', hint: 'SEE-geh', note: 'Very common. "Sige, salamat!" is a friendly way to end a chat.', hook: 'From Spanish "sigue", "go on, carry on". That is why it means both "okay" and "go ahead".' },
-      { id: 'tuloy-po-kayo', tl: 'Tuloy po kayo.', en: 'Come in, please.', kind: 'phrase', hint: 'too-LOY poh kah-YOH', note: 'What a host says at the door.', hook: '"Tuloy" means carry on, as in "Tuloy ba tayo?": carry on in, you (polite).' },
+      { id: 'tuloy-po-kayo', tl: 'Tuloy po kayo.', en: 'Come in, please.', kind: 'phrase', hint: 'too-LOY poh kah-YOH', note: 'What a host says at the door, often to answer "Tao po!".', hook: '"Tuloy" means carry on, as in "Tuloy ba tayo?": carry on in, you (polite).' },
+      { id: 'tao-po', tl: 'Tao po!', en: 'Hello, anyone home?', kind: 'phrase', hint: 'tah-OH poh', note: 'Called out at someone\'s gate or door, as many homes have no doorbell.', hook: '"Tao" means person: "a person is here, po!". You\'re announcing yourself.' },
     ],
   },
   {
@@ -123,18 +131,18 @@ export const UNITS: Unit[] = [
     tlTitle: 'Pagpapakilala',
     intro: 'Introduce yourself and get through your first conversation, even if you only understand a little.',
     cards: [
-      { id: 'ano-pangalan', tl: 'Ano ang pangalan mo?', en: 'What is your name?', kind: 'phrase', hint: 'ah-NOH ahng pah-NGAH-lahn moh', hook: 'Word for word "what the name your?". "Pangalan" hides an English name inside: pang-ALAN.' },
+      { id: 'ano-pangalan', tl: 'Anong pangalan mo?', accept: ['Ano ang pangalan mo?'], en: 'What is your name?', kind: 'phrase', hint: 'ah-NONG pah-NGAH-lahn moh', hook: '"Anong" is "ano ang" (what the) squeezed together, which is how everyone says it: "what the name your?". "Pangalan" hides an English name inside: pang-ALAN.' },
       { id: 'ako-si', tl: 'Ako si Ana.', en: 'I am Ana.', kind: 'phrase', hint: 'ah-KOH see AH-nah', note: 'Put your own name after "si".', hook: 'Word for word "I, si Ana". Think of "si" as a name tag you pin on: si Ana, si Ben.' },
-      { id: 'ikinagagalak', tl: 'Ikinagagalak kitang makilala.', en: 'Nice to meet you.', kind: 'phrase', hint: 'ee-kee-nah-gah-GAH-lahk kee-TAHNG mah-kee-LAH-lah', note: 'A mouthful! Many people simply say "Nice to meet you" in English.', hook: 'Two roots do the work: "galak" (joy) and "kilala" (to know someone). Literally "it gives me joy to get to know you".' },
+      { id: 'ikinagagalak', tl: 'Ikinagagalak kitang makilala.', en: 'Nice to meet you. (formal)', kind: 'phrase', hint: 'ee-kee-nah-gah-GAH-lahk kee-TAHNG mah-kee-LAH-lah', note: 'For a speech or a letter. Face to face, Filipinos nearly always just say "Nice to meet you!" in English, so it\'s here to recognise more than to say.', hook: 'Two roots do the work: "galak" (joy) and "kilala" (to know someone). Literally "it gives me joy to get to know you".' },
       { id: 'taga-saan', tl: 'Taga-saan ka?', en: 'Where are you from?', kind: 'phrase', hint: 'tah-gah-sah-AHN kah', hook: '"Taga-" means "from", "saan" means "where": literally "from-where you?"' },
       { id: 'taga-ako', tl: 'Taga-Amerika ako.', en: "I'm from America.", kind: 'phrase', hint: 'tah-gah-ah-MEH-ree-kah ah-KOH', hook: 'The same "taga-" (from) as in "Taga-saan ka?". Answer by swapping "saan" for your country.' },
-      { id: 'ingles', tl: 'Marunong ka bang mag-Ingles?', en: 'Can you speak English?', kind: 'phrase', hint: 'mah-ROO-nong kah bahng mahg-ing-GLES', note: '"Ba" (here "bang") turns a sentence into a yes/no question.', hook: '"Marunong" means "knows how". "Mag-Ingles" is "to do English", from Spanish "inglés".' },
-      { id: 'kaunti-lang', tl: 'Kaunti lang.', en: 'Just a little.', kind: 'phrase', hint: 'kah-OON-tee lahng', hook: '"Lang" means "just" and turns up everywhere: "sandali lang", "dahan-dahan lang". People often shorten "kaunti" to "konti".' },
-      { id: 'hindi-maintindihan', tl: 'Hindi ko maintindihan.', en: "I don't understand.", kind: 'phrase', hint: 'hin-DEE koh mah-in-tin-dee-HAHN', hook: 'The root "intindi" comes from Spanish "entender", to understand. Literally "not I can understand".' },
+      { id: 'ingles', tl: 'Marunong ka bang mag-English?', accept: ['Marunong ka bang mag-Ingles?', 'Marunong ka bang mag-Inglis?'], en: 'Can you speak English?', kind: 'phrase', hint: 'mah-ROO-nong kah bahng mahg-ING-glish', note: '"Ba" (here "bang") turns a sentence into a yes/no question. Most people say "English" for the language; "Ingles" is the more formal word.', hook: '"Marunong" means "knows how". "Mag-English" is "to do English": put "mag-" on almost anything and it becomes a verb.' },
+      { id: 'kaunti-lang', tl: 'Konti lang.', accept: ['Kaunti lang.'], en: 'Just a little.', kind: 'phrase', hint: 'KON-tee lahng', note: '"Konti" is how everyone says "kaunti" (a little), which you\'ll see written.', hook: '"Lang" means "just" and turns up everywhere: "sandali lang", "dahan-dahan lang".' },
+      { id: 'hindi-maintindihan', tl: 'Hindi ko maintindihan.', en: "I don't understand.", kind: 'phrase', hint: 'hin-DEE koh mah-in-tin-dee-HAHN', note: 'Friends also say "Di ko gets", Taglish for "I don\'t get it".', hook: 'The root "intindi" comes from Spanish "entender", to understand. Literally "not I can understand".' },
       { id: 'pakiulit', tl: 'Pakiulit po.', en: 'Please repeat that.', kind: 'phrase', hint: 'pah-kee-OO-lit poh', hook: '"Paki-" (please) + "ulit" (again): literally "please, again". Put "paki-" on any verb to make a polite request.' },
       { id: 'dahan-dahan', tl: 'Dahan-dahan lang po.', en: 'Slowly, please.', kind: 'phrase', hint: 'dah-HAHN dah-HAHN lahng poh', hook: 'Doubling a word stretches it out: "dahan" is slow, "dahan-dahan" is slowly and gently. The word itself takes its time.' },
       { id: 'saan-ka-nakatira', tl: 'Saan ka nakatira?', en: 'Where do you live?', kind: 'phrase', hint: 'sah-AHN kah nah-kah-tee-RAH', hook: '"Tira" means stay or live, and "naka-" means being that way: where, you, living?' },
-      { id: 'ano-trabaho-mo', tl: 'Ano ang trabaho mo?', en: 'What do you do for work?', kind: 'phrase', hint: 'ah-NOH ahng trah-BAH-hoh moh', hook: 'The same shape as "Ano ang pangalan mo?", with "trabaho", from Spanish "trabajo", work.' },
+      { id: 'ano-trabaho-mo', tl: 'Anong trabaho mo?', accept: ['Ano ang trabaho mo?'], en: 'What do you do for work?', kind: 'phrase', hint: 'ah-NONG trah-BAH-hoh moh', hook: 'The same shape as "Anong pangalan mo?", with "trabaho", from Spanish "trabajo", work.' },
       { id: 'ilang-taon-ka-na', tl: 'Ilang taon ka na?', en: 'How old are you?', kind: 'phrase', hint: 'ee-LAHNG tah-ON kah nah', note: 'Not a rude question here: it tells people whether to call you Ate or Kuya.', hook: '"Ilan" (how many) + "taon" (year) + "na" (already): how many years already, you?' },
       { id: 'may-asawa-ka-na-ba', tl: 'May asawa ka na ba?', en: 'Are you married?', kind: 'phrase', hint: 'mai ah-SAH-wah kah nah bah', note: 'A friendly question, often asked soon after meeting. "Wala pa" (not yet) is a fine answer.', hook: '"May" (have) + "asawa" (spouse) + "na ba" (already?): have a spouse already, you?' },
     ],
@@ -188,7 +196,7 @@ export const UNITS: Unit[] = [
       { id: 'gaano-kalayo', tl: 'Gaano kalayo?', en: 'How far is it?', kind: 'phrase', hint: 'gah-AH-noh kah-LAH-yoh', hook: '"Layo" is distance, as in "malayo" (far). Same "gaano ka-" pattern as "Gaano katagal?".' },
       { id: 'anong-ginagawa-mo', tl: 'Anong ginagawa mo?', en: 'What are you doing?', kind: 'phrase', hint: 'ah-NONG gee-nah-GAH-wah moh', hook: '"Gawa" means do or make. In "gi-na-gawa" the doubled "ga" marks it as happening right now.' },
       { id: 'para-saan', tl: 'Para saan ito?', en: 'What is this for?', kind: 'phrase', hint: 'PAH-rah sah-AHN ee-TOH', hook: '"Para" is Spanish for "for", so "para saan" is literally "for where?", meaning "for what purpose?".' },
-      { id: 'ano-ibig-sabihin', tl: 'Ano ang ibig sabihin nito?', en: 'What does this mean?', kind: 'phrase', hint: 'ah-NOH ahng EE-big sah-bee-HIN nee-TOH', hook: '"Ibig" is want and "sabihin" is to say: "what does it want to say?", just like French "qu\'est-ce que ça veut dire?".' },
+      { id: 'ano-ibig-sabihin', tl: 'Anong ibig sabihin nito?', accept: ['Ano ang ibig sabihin nito?'], en: 'What does this mean?', kind: 'phrase', hint: 'ah-NONG EE-big sah-bee-HIN nee-TOH', hook: '"Ibig" is want and "sabihin" is to say: "what does it want to say?", just like French "qu\'est-ce que ça veut dire?".' },
       { id: 'paano-sabihin', tl: 'Paano sabihin ito sa Tagalog?', en: 'How do you say this in Tagalog?', kind: 'phrase', hint: 'pah-AH-noh sah-bee-HIN ee-TOH sah tah-GAH-log', hook: '"Paano" (how) + "sabihin" (to say). Point at anything and ask: the most useful learning question there is.' },
       { id: 'okay-lang-ba', tl: 'Okay lang ba?', en: 'Is that okay?', kind: 'phrase', hint: 'oh-KAY lahng bah', hook: '"Ba" turns a sentence into a question: "Okay lang" (it\'s fine) becomes "Okay lang ba?" (is it fine?).' },
     ],
@@ -203,7 +211,7 @@ export const UNITS: Unit[] = [
       { id: 'ikaw', tl: 'ikaw', en: 'you', kind: 'word', hint: 'ee-KAOW', note: 'After another word it usually shrinks to "ka": "Taga-saan ka?".', hook: '"Ikaw?" on its own is the bounce-back: "Mabuti naman. Ikaw?", "Fine. And you?"' },
       { id: 'ka', tl: 'ka', en: 'you (after a word)', kind: 'word', hint: 'kah', note: 'The short "ikaw". It never starts a sentence.', hook: '"Ikaw" shrunk to fit after another word: "Taga-saan ka?", from where, you?' },
       { id: 'ko', tl: 'ko', en: 'my', kind: 'word', hint: 'koh', note: 'After a doing word it means "I": "Gusto ko ito", I want this.', hook: 'It comes after what it owns: "bag ko", my bag. Its partner is "mo", your: k for me, m for you.' },
-      { id: 'mo', tl: 'mo', en: 'your', kind: 'word', hint: 'moh', note: 'After a doing word it means "you": "Hintayin mo ako", wait for me.', hook: '"Ano ang pangalan mo?" is "what is the name, yours?". Swap in "ko" and it is "my name".' },
+      { id: 'mo', tl: 'mo', en: 'your', kind: 'word', hint: 'moh', note: 'After a doing word it means "you": "Hintayin mo ako", wait for me.', hook: '"Anong pangalan mo?" is "what is the name, yours?". Swap in "ko" and it is "my name".' },
       { id: 'ang', tl: 'ang', en: 'the', kind: 'word', hint: 'ahng', note: 'It points at what the sentence is about, so you will hear it everywhere.', hook: '"Nasaan ang banyo?", where is the bathroom? Where English says "the", Tagalog usually says "ang".' },
       { id: 'ito', tl: 'ito', en: 'this', kind: 'word', hint: 'ee-TOH', hook: 'Point and ask: "Ano ito?", what is this? "Magkano ito?", how much is this?' },
       { id: 'na', tl: 'na', en: 'already / now', kind: 'word', hint: 'nah', hook: 'It marks a change: "Tara na!", let\'s go now; "Gutom na ako", I\'m hungry already.' },
@@ -353,7 +361,7 @@ export const UNITS: Unit[] = [
     intro: 'Set a time, pick a place, and say yes or "maybe later". Plans are flexible here, so "mamaya" does a lot of work.',
     cards: [
       { id: 'libre-ka-ba', tl: 'Libre ka ba?', en: 'Are you free?', kind: 'phrase', hint: 'LEE-breh kah bah', note: '"Libre" also means free of charge: "Libre ko!" is "my treat!".', hook: 'Spanish "libre", free. One word for free time and a free meal.' },
-      { id: 'ano-ang-plano', tl: 'Ano ang plano?', en: "What's the plan?", kind: 'phrase', hint: 'ah-NOH ahng PLAH-noh', hook: '"Plano" is Spanish for plan. A freebie.' },
+      { id: 'ano-ang-plano', tl: 'Anong plano?', accept: ['Ano ang plano?'], en: "What's the plan?", kind: 'phrase', hint: 'ah-NONG PLAH-noh', hook: '"Plano" is Spanish for plan. A freebie.' },
       { id: 'saan-tayo-magkikita', tl: 'Saan tayo magkikita?', en: 'Where shall we meet?', kind: 'phrase', hint: 'sah-AHN tah-YOH mahg-kee-KEE-tah', hook: '"Kita" is see, "mag-" makes it each other, and the doubled "ki" makes it future: where will we see each other?' },
       { id: 'anong-oras-magkikita', tl: 'Anong oras tayo magkikita?', en: 'What time shall we meet?', kind: 'phrase', hint: 'ah-NONG OH-rahs tah-YOH mahg-kee-KEE-tah', hook: 'Swap "saan" for "anong oras" in "Saan tayo magkikita?". The same sentence, now asking the time.' },
       { id: 'kita-tayo-bukas', tl: 'Kita tayo bukas.', en: 'See you tomorrow.', kind: 'phrase', hint: 'KEE-tah tah-YOH BOO-kahs', hook: '"Kita" (see) + "tayo" (we) + "bukas" (tomorrow): we see each other tomorrow.' },
@@ -405,7 +413,7 @@ export const UNITS: Unit[] = [
     cards: [
       { id: 'isa-pong-adobo', tl: 'Isa pong adobo.', en: 'One adobo, please.', kind: 'phrase', hint: 'ee-SAH pong ah-DOH-boh', hook: '"Isa" (one) + "po" (respect), joined by "-ng". Swap in any dish: "Isa pong sinigang".' },
       { id: 'pahingi-tubig', tl: 'Pahingi po ng tubig.', en: 'Some water, please.', kind: 'phrase', hint: 'pah-HEE-ngee poh nahng TOO-big', hook: '"Hingi" means ask for, and "pa-" makes it a polite request. The little "ng" is said "nang".' },
-      { id: 'ano-masarap-dito', tl: 'Ano ang masarap dito?', en: "What's good here?", kind: 'phrase', hint: 'ah-NOH ahng mah-SAH-rahp DEE-toh', hook: '"Masarap" (delicious) + "dito" (here): what is delicious here? Staff love this question.' },
+      { id: 'ano-masarap-dito', tl: 'Anong masarap dito?', accept: ['Ano ang masarap dito?'], en: "What's good here?", kind: 'phrase', hint: 'ah-NONG mah-SAH-rahp DEE-toh', hook: '"Masarap" (delicious) + "dito" (here): what is delicious here? Staff love this question.' },
       { id: 'maanghang', tl: 'maanghang', en: 'spicy', kind: 'word', hint: 'mah-AHNG-hahng', hook: '"Anghang" is the heat in food, and "ma-" makes it a describing word, as in "masarap".' },
       { id: 'huwag-maanghang', tl: 'Huwag pong maanghang.', en: 'Not spicy, please.', kind: 'phrase', hint: 'hoo-WAG pong mah-AHNG-hahng', hook: '"Huwag" means don\'t, and "po" joins on with "-ng": "don\'t make it spicy, please".' },
       { id: 'ulam', tl: 'ulam', en: 'dish eaten with rice', kind: 'word', hint: 'OO-lahm', hook: 'Anything you eat with rice is "ulam". "Anong ulam?" (what\'s for dinner?) is asked in every Filipino home.' },
@@ -514,7 +522,7 @@ export const UNITS: Unit[] = [
       { id: 'tama', tl: 'Tama.', en: "That's right.", kind: 'word', hint: 'TAH-mah', hook: '"Tama" means correct. It is what a teacher says, and "Tama na!" (that\'s enough!) builds on it.' },
       { id: 'siguro', tl: 'Siguro.', en: 'Probably. / I guess.', kind: 'word', hint: 'see-GOO-roh', hook: 'From Spanish "seguro", sure. In Tagalog it lost its certainty and became "probably".' },
       { id: 'ewan-ko', tl: 'Ewan ko.', en: 'Dunno.', kind: 'phrase', hint: 'eh-WAHN koh', hook: 'The shrug version of "Hindi ko alam". Casual: maybe not with your boss.' },
-      { id: 'ganoon-ba', tl: 'Ganoon ba?', accept: ['Ganun ba?'], en: 'Is that so?', kind: 'phrase', hint: 'gah-noh-ON bah', note: 'Usually said, and texted, "Ganun ba?".', hook: '"Ganoon" means "like that": "like that, is it?"' },
+      { id: 'ganoon-ba', tl: 'Ganun ba?', accept: ['Ganoon ba?'], en: 'Is that so?', kind: 'phrase', hint: 'gah-NOON bah', note: 'Written "Ganoon ba?" in books, but said, and texted, "Ganun ba?".', hook: '"Ganun" means "like that": "like that, is it?"' },
       { id: 'grabe', tl: 'Grabe!', en: "Wow! / That's intense!", kind: 'word', hint: 'GRAH-beh', hook: 'From Spanish "grave", serious. Used for anything extreme: the heat, the traffic, a great meal.' },
       { id: 'ayos-lang', tl: 'Ayos lang.', en: "It's all good.", kind: 'phrase', hint: 'AH-yos lahng', hook: '"Ayos" means in order, arranged. Everything is in order, just fine.' },
       { id: 'hindi-naman', tl: 'Hindi naman.', en: 'Not really.', kind: 'phrase', hint: 'hin-DEE nah-MAHN', hook: '"Naman" softens again, as in "Mabuti naman". A gentle no.' },
@@ -564,7 +572,7 @@ export const UNITS: Unit[] = [
       { id: 'bumili', tl: 'bumili', en: 'to buy', kind: 'word', hint: 'boo-mee-LEE', hook: '"Bili" (buy) from "Pabili po", with the "-um-" trick: b-um-ili.' },
       { id: 'magbayad', tl: 'magbayad', en: 'to pay', kind: 'word', hint: 'mahg-BAH-yahd', hook: '"Bayad" (payment) from "Bayad po", with "mag-" to make it a doing word.' },
       { id: 'magluto', tl: 'magluto', en: 'to cook', kind: 'word', hint: 'mahg-LOO-toh', hook: '"Luto" is cooking. A sign saying "lutong bahay" promises home cooking.' },
-      { id: 'magtrabaho', tl: 'magtrabaho', en: 'to work', kind: 'word', hint: 'mahg-trah-BAH-hoh', hook: '"Mag-" + Spanish "trabajo" (work). "Mag-" turns plenty of borrowed words into doing words, as in "mag-Ingles".' },
+      { id: 'magtrabaho', tl: 'magtrabaho', en: 'to work', kind: 'word', hint: 'mahg-trah-BAH-hoh', hook: '"Mag-" + Spanish "trabajo" (work). "Mag-" turns plenty of borrowed words into doing words, as in "mag-English".' },
       { id: 'maglakad', tl: 'maglakad', en: 'to walk', kind: 'word', hint: 'mahg-LAH-kahd', hook: '"Lakad" is a walk, and also an errand: "May lakad ako" is "I have somewhere to be".' },
       { id: 'magsalita', tl: 'magsalita', en: 'to speak', kind: 'word', hint: 'mahg-sah-lee-TAH', hook: '"Salita" is a word. "Mag-" + "salita": to make words, to speak.' },
       { id: 'makinig', tl: 'makinig', en: 'to listen', kind: 'word', hint: 'mah-kee-NIG', hook: '"Makinig ka!" is "Listen!", heard from every teacher and every lola.' },
@@ -638,7 +646,7 @@ export const UNITS: Unit[] = [
       { id: 'i-text-mo-ako', tl: 'I-text mo ako.', en: 'Text me.', kind: 'phrase', hint: 'ee-TEKST moh ah-KOH', hook: 'English "text" with "i-" to make it a Tagalog doing word, then "mo ako": you, me.' },
       { id: 'tawagan-mo-ako', tl: 'Tawagan mo ako.', en: 'Call me.', kind: 'phrase', hint: 'tah-WAH-gahn moh ah-KOH', hook: '"Tawag" (call), from "Tumawag ka ng pulis!", with "-an": call me up.' },
       { id: 'sino-ito', tl: 'Sino ito?', en: 'Who is this?', kind: 'phrase', hint: 'SEE-noh ee-TOH', hook: '"Sino" (who) + "ito" (this): the reply to a text from a number you don\'t know.' },
-      { id: 'ano-numero-mo', tl: 'Ano ang numero mo?', en: "What's your number?", kind: 'phrase', hint: 'ah-NOH ahng NOO-meh-roh moh', hook: '"Numero" as in "Mga Numero", in the shape of "Ano ang pangalan mo?".' },
+      { id: 'ano-numero-mo', tl: 'Anong number mo?', accept: ['Ano ang numero mo?', 'Anong numero mo?', 'Anong namber mo?'], en: "What's your number?", kind: 'phrase', hint: 'ah-NONG NUM-ber moh', note: 'Phone numbers are nearly always said in English, so the word is too.', hook: 'English "number" in the shape of "Anong pangalan mo?". Taglish at work.' },
       { id: 'walang-signal', tl: 'Walang signal.', en: "There's no signal.", kind: 'phrase', hint: 'wah-LAHNG SIG-nahl', hook: '"Wala" (none) + "-ng" + English "signal". The excuse for every missed call.' },
     ],
   },
@@ -683,11 +691,13 @@ export const CORE_WORDS: readonly string[] = [
  * Cards close enough in meaning that one is never offered as a wrong answer
  * for another: "ko" can mean "I", "mo" and "kayo" can mean "you", "na" can mean
  * "now", a "bata" may be someone's "anak", "luma" and "matanda" are both "old",
- * Ate and Kuya are each a "kapatid", and "No problem" is a way to say "You're welcome".
+ * Ate and Kuya are each a "kapatid", "No problem" and "No worries" are ways to say "You're welcome",
+ * and a hello, a goodbye or a "what's up?" can each be said several ways.
  */
 export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
   ['ako', 'ko'], ['ikaw', 'ka', 'mo', 'kayo'], ['na', 'ngayon'], ['anak', 'bata'], ['luma', 'matanda'],
-  ['kapatid', 'ate', 'kuya'], ['walang-problema', 'walang-anuman', 'ayos-lang'], ['maghintay', 'teka'], ['tumulong', 'tulong'],
+  ['kapatid', 'ate', 'kuya'], ['walang-problema', 'walang-anuman', 'wala-yon', 'ayos-lang'],
+  ['mauna-na-ako', 'aalis-na-ako'], ['uy', 'kumusta', 'ikaw-pala'], ['anong-meron', 'anong-balita'], ['maghintay', 'teka'], ['tumulong', 'tulong'],
 ];
 
 /**
@@ -700,10 +710,10 @@ export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
 export const LEARN_ORDER: readonly string[] = [
   // Hello, thanks, yes, no, and getting through a conversation you barely follow. The little words a phrase
   // is built from (I, you, my, the, already) come just before it, so each phrase brings one new thing.
-  'kumusta', 'mabuti', 'salamat', 'oo', 'hindi', 'po', 'opo', 'salamat-po', 'walang-anuman', 'ano', 'sige',
-  'ako', 'ikaw', 'ako-si', 'taga-ako', 'ka', 'taga-saan', 'mo', 'ang', 'ano-pangalan', 'paalam', 'ingat',
-  'na', 'pasensya-na', 'ko', 'hindi-ko-alam', 'hindi-maintindihan', 'pakiulit', 'ito', 'sa', 'paano-sabihin',
-  'ano-ibig-sabihin', 'lang', 'dahan-dahan', 'kaunti-lang', 'ba', 'ingles',
+  'kumusta', 'uy', 'mabuti', 'salamat', 'oo', 'hindi', 'po', 'opo', 'salamat-po', 'walang-anuman', 'wala-yon',
+  'ano', 'sige', 'ako', 'ikaw', 'ako-si', 'taga-ako', 'ka', 'taga-saan', 'mo', 'ang', 'ano-pangalan', 'paalam',
+  'ingat', 'na', 'mauna-na-ako', 'pasensya-na', 'ko', 'hindi-ko-alam', 'hindi-maintindihan', 'pakiulit', 'ito',
+  'sa', 'paano-sabihin', 'ano-ibig-sabihin', 'lang', 'dahan-dahan', 'kaunti-lang', 'ba', 'ingles',
   // Guides (guides.ts) wait for the cards they build on and come in slowly (session.ts), so they sit
   // roughly where they would first be useful.
   'k-psst', 's-letters', 'p-po', 't-ha',
@@ -713,14 +723,14 @@ export const LEARN_ORDER: readonly string[] = [
   'walo', 'siyam', 'sampu', 'tara-na', 'sandali-lang',
   'p-ba', 'p-hindi', 'p-may', 'k-eyebrows',
   // Where you are and when: on my way, here, almost there, now, later, tomorrow.
-  'nasaan-ka', 'saan-ka-pupunta', 'papunta-na-ako', 'nandito-na-ako', 'malapit-na-ako', 'kailan', 'ngayon',
+  'nasaan-ka', 'saan-ka-pupunta', 'saan-ka-galing', 'diyan-lang', 'papunta-na-ako', 'nandito-na-ako', 'malapit-na-ako', 'kailan', 'ngayon',
   'mamaya', 'kanina', 'mamaya-na-lang', 'bukas', 'anong-oras-na', 'sino', 'bakit', 'paano',
   'p-si', 's-ng',
   // Thanks and greetings, eating together, and the small replies that keep a chat going.
   'maraming-salamat', 'magandang-umaga', 'magandang-hapon', 'magandang-gabi', 'tayo', 'kain-tayo', 'tubig',
   'masarap', 'busog-na-ako', 'gutom-na-ako', 'okay-lang-ba', 'okay-lang-ako', 'ayos-lang', 'talaga', 'oo-nga',
-  'ako-rin', 'tama',
-  'p-first', 't-rise', 't-soft', 's-stress', 'k-kain', 's-r',
+  'ako-rin', 'tama', 'ikaw-pala', 'anong-meron',
+  'k-taglish', 'p-first', 't-rise', 't-soft', 's-stress', 'k-kain', 's-r',
   // Directions and getting a ride, and running late.
   'kaliwa', 'kanan', 'diretso', 'diyan', 'doon', 'malapit', 'malayo', 'paano-pumunta', 'ate', 'kuya',
   'para-po', 'bayad-po', 'aalis-na-ako', 'pauwi-na-ako', 'nasaan-ka-na', 'mahuhuli-ako', 'hintayin-mo-ako',
@@ -740,7 +750,7 @@ export const LEARN_ORDER: readonly string[] = [
   'p-paki',
   // How you feel, getting help, home and family.
   'pagod-na-ako', 'mainit', 'masakit', 'may-sakit-ako', 'tulong', 'pakitulungan', 'naliligaw-ako', 'bahay',
-  'nasa-bahay-ako', 'kaibigan', 'nanay', 'tatay', 'anak', 'mahal-kita', 'anong-balita', 'ikinagagalak',
+  'nasa-bahay-ako', 'kaibigan', 'nanay', 'tatay', 'anak', 'mahal-kita', 'anong-balita',
   'p-glue', 'p-ang',
   // More questions and reactions.
   'alin', 'gaano-katagal', 'gaano-kalayo', 'anong-ginagawa-mo', 'trapik', 'sayang', 'tama-na', 'makikiraan-po',
@@ -763,8 +773,10 @@ export const LEARN_ORDER: readonly string[] = [
   // Rarer places, dates and emergencies.
   'simbahan', 'opisina', 'bangko', 'paliparan', 'buwan', 'taon', 'lunes', 'biyernes', 'sabado', 'hatinggabi',
   'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',
+  // The formal "nice to meet you", there to recognise: people say it in English.
+  'ikinagagalak',
   // Have you eaten? Small talk about home, work and family, and the replies that go with it.
-  'pa', 'kumain-ka-na-ba', 'kumain-na-ako', 'hindi-pa', 'kayo', 'tuloy-po-kayo', 'saan-ka-nakatira', 'ano-trabaho-mo',
+  'pa', 'kumain-ka-na-ba', 'kumain-na-ako', 'hindi-pa', 'kayo', 'tao-po', 'tuloy-po-kayo', 'saan-ka-nakatira', 'ano-trabaho-mo',
   'ilang-taon-ka-na', 'asawa', 'may-asawa-ka-na-ba', 'pamilya', 'lalaki', 'babae', 'kapatid', 'bata',
   'walang-problema', 'ikaw-ang-bahala', 'sigurado-ka-ba', 'sana',
   // Doing words for an ordinary day.
