@@ -211,6 +211,19 @@ describe('asking for the microphone in Drills', () => {
     expect(quietToggle(knowing(KNOWN, { mic: false }), () => {}).querySelector('[data-tap]')).toBeNull();
   });
 
+  it("doesn't ask when the sound goes on or off, which can't let the round ask to speak", async () => {
+    // The Allow has lapsed since the round opened, so a tap that may let it speak would ask again.
+    const mic = micNotYet({ microphoneAllowed: () => false });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    mic.answer(true);
+    await flush();
+    const sound = () => root.querySelector<HTMLButtonElement>('[aria-label="Sound off"]')!;
+    sound().click();
+    sound().click();
+    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(waiting(root)).toBe(false);
+  });
+
   it('asks when Speak is chosen again mid-round', async () => {
     const off = micNotYet({ microphoneAllowed: () => true });
     const root = practiceScreen(fakeApp(), off.deps);

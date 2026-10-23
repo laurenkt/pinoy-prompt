@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import type { Settings } from '../store';
 import { setMuted, setTapSounds } from '../speech';
-import { h, icon, type IconName } from '../ui';
+import { h, iconButton, type IconName } from '../ui';
 
 /**
  * Quiet mode, for the tube or anywhere a phone can't talk or be talked to. It's two switches side by side, because a
@@ -11,7 +11,7 @@ import { h, icon, type IconName } from '../ui';
  * Any of the four ways works; with both off, every question is seen and answered by tapping or typing.
  * The toggle sits where studying starts, so it's a tap rather than a trip to Settings.
  */
-type Switch = 'mic' | 'sound';
+export type Switch = 'mic' | 'sound';
 
 const SWITCHES: Record<Switch, { on: IconName; off: IconName; label: string; whenOn: string; whenOff: string }> = {
   mic: {
@@ -38,36 +38,33 @@ export function applyAudioMode(settings: Settings): void {
 }
 
 /**
- * The mic and sound switches as one split button, the same on every screen. Each half is pressed (teal) while it's
- * off, as quiet mode is something turned on. `mayOpenMicrophone` is for a screen whose onChange opens the microphone
- * when the mic goes back on (Drills).
+ * The mic and sound switches as one split button, the same on every screen: two header icon buttons sharing an
+ * outline, each pressed (teal) while it's off, as quiet mode is something turned on. `onChange` is told which changed.
+ * `mayOpenMicrophone` is for a screen whose onChange opens the microphone when the mic goes back on (Drills).
  */
-export function quietToggle(app: App, onChange: () => void, { mayOpenMicrophone = false } = {}): HTMLElement {
-  const settings = app.progress.settings;
+export function quietToggle(app: App, onChange: (which: Switch) => void, { mayOpenMicrophone = false } = {}): HTMLElement {
   const half = (which: Switch) => {
     const s = SWITCHES[which];
-    const on = settings[which];
-    return h(
-      'button',
-      {
-        class: `split-half ${which}`,
-        'aria-label': s.label,
-        'aria-pressed': String(!on),
-        title: on ? s.whenOn : s.whenOff,
-        // The mic going on may then open the microphone, after which the tap sound would be held back. Only then:
-        // otherwise it taps after the change, so sound going on is heard and going off is not.
-        'data-tap': mayOpenMicrophone && which === 'mic' && !on ? 'before' : undefined,
-        onclick: () => {
-          // Another tab's save may have replaced the settings object since this was drawn.
-          const settings = app.progress.settings;
-          settings[which] = !on;
-          app.commit();
-          applyAudioMode(settings);
-          onChange();
-        },
+    const on = app.progress.settings[which];
+    const button = iconButton(
+      on ? s.on : s.off,
+      s.label,
+      () => {
+        // Another tab's save may have replaced the settings object since this was drawn. Set what the tap asked for,
+        // the opposite of what showed, even if another tab got there first.
+        const settings = app.progress.settings;
+        settings[which] = !on;
+        app.commit();
+        applyAudioMode(settings);
+        onChange(which);
       },
-      icon(on ? s.on : s.off),
+      { pressed: !on, title: on ? s.whenOn : s.whenOff },
     );
+    button.classList.add('split-half');
+    // The mic going on may then open the microphone, after which the tap sound would be held back. Only then:
+    // otherwise it taps after the change, so sound going on is heard and going off is not.
+    if (mayOpenMicrophone && which === 'mic' && !on) button.dataset.tap = 'before';
+    return button;
   };
   return h('div', { class: 'split-toggle', role: 'group', 'aria-label': 'Quiet mode' }, half('mic'), half('sound'));
 }

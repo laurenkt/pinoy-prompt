@@ -475,10 +475,11 @@ export function practiceScreen(
    * The scope, the mic or the sound changed: a question waiting to be asked that can't be any more is picked again, and so is
    * the one showing, while it's unanswered, so the change shows straight away.
    */
-  function rescope(): void {
+  function rescope({ mayAsk = true } = {}): void {
     // With the mic off nothing listens.
     if (!app.progress.settings.mic) stopListening();
-    askForMicrophoneIfNeeded();
+    // Only a tap that may let the round ask to speak asks for the microphone, and only that one taps first (quiet.ts).
+    if (mayAsk) askForMicrophoneIfNeeded();
     if (waiting) return draw();
     const ways = modes();
     if (upcoming && !ways.includes(upcoming.mode)) upcoming = null;
@@ -599,7 +600,7 @@ export function practiceScreen(
         iconButton('close', 'End drill', home),
         h('span', { class: 'session-count' }, `${done} done`),
         scopeToggle,
-        quietToggle(app, rescope, { mayOpenMicrophone: true }),
+        quietToggle(app, (which) => rescope({ mayAsk: which === 'mic' }), { mayOpenMicrophone: true }),
       ),
       scopeChips,
     ];

@@ -364,13 +364,13 @@ p {
 
 /* A header toggle that's on (Settings while it's open, the mic or sound turned off): teal, so it's clear at a glance.
    It stays where it is, lined up with the buttons beside it, and still presses in when tapped. */
-.icon-btn[aria-pressed='true'],
-.split-half[aria-pressed='true'] {
+.icon-btn[aria-pressed='true'] {
   background: var(--teal);
   color: var(--on-accent);
 }
 
-/* Quiet mode: the mic and sound switches as one split button, each half a header button's size, sharing the outline between them. */
+/* Quiet mode: the mic and sound switches as one split button, two header icon buttons sharing the outline between
+   them, with one shadow under both that presses in as either is tapped. */
 .split-toggle {
   display: flex;
   flex: none;
@@ -378,20 +378,14 @@ p {
   box-shadow: var(--shadow);
 }
 
-.split-half {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  font-size: 1.1rem;
-  background: var(--cream);
-  color: var(--on-accent);
-  border: var(--outline);
+.icon-btn.split-half,
+.icon-btn.split-half:active {
   border-radius: 14px 0 0 14px;
+  box-shadow: none;
+  transform: none;
 }
 
-.split-half + .split-half {
+.icon-btn.split-half + .split-half {
   margin-left: -3px;
   border-radius: 0 14px 14px 0;
 }

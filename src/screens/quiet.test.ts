@@ -124,6 +124,11 @@ describe('the quiet toggle', () => {
     }
   });
 
+  it('is made of header icon buttons, so it looks and taps like the buttons beside it', () => {
+    const halves = quietToggle(fakeApp(true, true), () => {}).querySelectorAll('button');
+    expect([...halves].map((b) => b.className)).toEqual(['icon-btn split-half', 'icon-btn split-half']);
+  });
+
   it('shows a struck-out icon for a switch that is off', () => {
     const on = quietToggle(fakeApp(true, true), () => {});
     const off = quietToggle(fakeApp(false, false), () => {});

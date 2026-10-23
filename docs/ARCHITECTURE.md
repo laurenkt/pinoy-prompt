@@ -69,7 +69,7 @@ Every recorded sound the app plays goes through `audio-engine.ts`'s shared conte
 
 ### Saved progress and settings
 
-Progress is the one thing the app can't lose; the README's "Saved progress" section and REVIEW.md are the rules. In short: change its shape only with a `SCHEMA` bump, a migration and a fixture, or add an optional field with a default. Settings are part of progress. The OpenAI key is kept outside it, on purpose, so it never goes into a backup, and with it the estimate of what OpenAI has cost on this device (`pinoy-prompt:openai-spend`): it belongs to the key and this device, not to learning, so Reset leaves it and a backup restored elsewhere does not carry it.
+Progress is the one thing the app can't lose; the README's "Saved progress" section and REVIEW.md are the rules. In short: change its shape only with a `SCHEMA` bump, a migration and a fixture, or add an optional field with a default. Settings are part of progress. Quiet mode is two settings, `mic` and `sound`; builds before them kept `quiet` and `headphones`, which are read into the two when they're missing and written beside them on every save (`encode`), so an older build still open in another tab or as an installed app keeps quiet too. The OpenAI key is kept outside it, on purpose, so it never goes into a backup, and with it the estimate of what OpenAI has cost on this device (`pinoy-prompt:openai-spend`): it belongs to the key and this device, not to learning, so Reset leaves it and a backup restored elsewhere does not carry it.
 
 ### Tests and CI as one system
 

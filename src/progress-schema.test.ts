@@ -162,8 +162,9 @@ describe('damaged saved progress', () => {
     expect(progress.history).toEqual({ '2026-10-17': { reviews: 4, missed: 4 }, '2026-10-19': { reviews: 2, missed: 0 } });
   });
 
-  it('turns quiet mode and headphones into the mic and sound switches', () => {
-    const settingsFrom = (old: object) => decodeOk(JSON.stringify({ schema: 3, progress: { ...emptyProgress(NOW), settings: { dailyNew: 8, autoplay: true, ...old } } })).progress.settings;
+  it('reads quiet mode and headphones, as older builds save them, into the mic and sound switches', () => {
+    // At this schema too: a build from before the switches, still open alongside this one, saves it.
+    const settingsFrom = (old: object) => decodeOk(JSON.stringify({ schema: SCHEMA, progress: { ...emptyProgress(NOW), settings: { dailyNew: 8, autoplay: true, ...old } } })).progress.settings;
     expect(settingsFrom({ quiet: false, headphones: false })).toMatchObject({ mic: true, sound: true });
     expect(settingsFrom({ quiet: true, headphones: false })).toMatchObject({ mic: false, sound: false });
     expect(settingsFrom({ quiet: true, headphones: true })).toMatchObject({ mic: false, sound: true });
@@ -176,9 +177,25 @@ describe('damaged saved progress', () => {
     expect(settings).toHaveProperty('later', 'kept');
   });
 
-  it('keeps the mic and sound switches a schema 3 copy carries from a newer build', () => {
-    const { progress } = decodeOk(JSON.stringify({ schema: 3, progress: { ...emptyProgress(NOW), settings: { quiet: false, headphones: false, mic: false, sound: false } } }));
+  it('goes by the mic and sound switches over quiet mode where a copy has both', () => {
+    const { progress } = decodeOk(JSON.stringify({ schema: SCHEMA, progress: { ...emptyProgress(NOW), settings: { quiet: false, headphones: false, mic: false, sound: false } } }));
     expect(progress.settings).toMatchObject({ mic: false, sound: false });
+  });
+
+  it('saves quiet mode beside the switches, so an older build still open keeps quiet', () => {
+    const saved = (mic: boolean, sound: boolean) => {
+      const envelope = { schema: SCHEMA, rev: 1, savedAt: NOW, resetAt: 0, progress: { ...emptyProgress(NOW), settings: { ...DEFAULT_SETTINGS, mic, sound } } };
+      return JSON.parse(encode(envelope)).progress.settings;
+    };
+    expect(saved(true, true)).toMatchObject({ quiet: false, headphones: true });
+    expect(saved(false, true)).toMatchObject({ quiet: true, headphones: true });
+    expect(saved(false, false)).toMatchObject({ quiet: true, headphones: false });
+    // Older builds can't have sound off with the mic on: they get both off, which stays quiet.
+    expect(saved(true, false)).toMatchObject({ quiet: true, headphones: false });
+    for (const [mic, sound] of [[true, true], [false, true], [false, false], [true, false]]) {
+      const envelope = { schema: SCHEMA, rev: 1, savedAt: NOW, resetAt: 0, progress: { ...emptyProgress(NOW), settings: { ...DEFAULT_SETTINGS, mic, sound } } };
+      expect(decodeOk(encode(envelope)).progress.settings).toEqual({ ...DEFAULT_SETTINGS, mic, sound });
+    }
   });
 
   it('falls back to defaults for out-of-range settings', () => {

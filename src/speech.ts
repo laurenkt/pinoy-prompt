@@ -190,7 +190,7 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
 
 /**
  * A soft two-note chime for a right answer. It's short and quiet, as praise
- * should stay small, and goes quiet with the words in silent mode. A word
+ * should stay small, and goes quiet with the words while the sound is off. A word
  * played with it (the answer, said back) starts once it's done, not over it.
  */
 export async function chime(): Promise<void> {
@@ -205,7 +205,7 @@ export async function chime(): Promise<void> {
 }
 
 let chimeBuffer: AudioBuffer | null = null;
-/** Stopped by silent mode, but not by a word starting, which waits for it instead. */
+/** Stopped by the sound going off, but not by a word starting, which waits for it instead. */
 let currentChime: Sound | null = null;
 /** When the last chime ends, in its context's time. */
 let lastChime: { ctx: AudioContext; ends: number } | null = null;
@@ -311,7 +311,7 @@ export const DETENT_GAP_MS = 45;
  * chart's days), like a picker wheel: the click at half its level, and a light
  * haptic tick where the phone allows one. Call the returned function with the
  * step under the finger as it moves, and with null when the drag ends.
- * Follows the Tap sounds switch; silent mode leaves only the haptic.
+ * Follows the Tap sounds switch; the sound off leaves only the haptic.
  */
 export function detents(): (step: string | null) => void {
   let at: string | null = null;
