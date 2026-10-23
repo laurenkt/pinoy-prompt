@@ -98,7 +98,16 @@ export function meanings(card: Card): string[][] {
   return wordings(card).map((alt) => alt.words);
 }
 
+/** Each card's wordings, worked out once: the deck doesn't change. */
+const cardWordings = new WeakMap<Card, Wording[]>();
+
 function wordings(card: Card): Wording[] {
+  let found = cardWordings.get(card);
+  if (!found) cardWordings.set(card, (found = wordingsOf(card)));
+  return found;
+}
+
+function wordingsOf(card: Card): Wording[] {
   const numbers = [...card.en.matchAll(/\(([\d,]+)\)/g)].map((m) => m[1]);
   return [...card.en.replace(/\([^)]*\)/g, ' ').split('/'), ...numbers].map(wording).filter((alt) => alt.words.length > 0);
 }
