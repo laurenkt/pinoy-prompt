@@ -1070,7 +1070,7 @@ p {
   height: 6px;
   background: var(--ink);
   transform-origin: left;
-  animation: advance var(--advance, 2s) linear forwards;
+  animation: advance var(--advance, 1.7s) linear forwards;
 }
 
 @keyframes advance {

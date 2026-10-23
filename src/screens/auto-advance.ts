@@ -5,7 +5,7 @@ import { speaking } from '../speech';
 import { h, icon } from '../ui';
 
 /** How long a right answer stays up before the next question. */
-export const ADVANCE_MS = 2000;
+export const ADVANCE_MS = 1700;
 /** The longest to wait beyond that for the answer's audio to finish. */
 const AUDIO_WAIT_MS = 4000;
 const POLL_MS = 200;
