@@ -322,7 +322,11 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   });
 
   // --- Detail for one sound --------------------------------------------------
-  const detail = h('div', { class: 'sound-detail', 'aria-live': 'polite' });
+  // Every sound's page is made up front and stacked in one place, only the open one showing, so the panel is as tall
+  // as its tallest page and each piece keeps one row for all of them (see .sound-detail): moving between sounds moves
+  // nothing on the screen.
+  const pages = list.map((p) => page(p));
+  const detail = h('div', { class: 'sound-detail', 'aria-live': 'polite' }, pages);
 
   function select(index: number): void {
     if (index === selected) return;
@@ -338,7 +342,10 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const p = list[index];
     if (p.heardAt !== undefined) ribbon?.setFocus(span(p.heardAt));
     else ribbon?.setFocus(gapFor(index));
-    renderDetail(p);
+    pages.forEach((page, i) => {
+      page.classList.toggle('open', i === index);
+      page.inert = i !== index;
+    });
   }
 
   /**
@@ -352,7 +359,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     return attempt.tips.find((t) => t.at.includes(at) && !t.plain)?.text;
   }
 
-  function renderDetail(p: Pair): void {
+  function page(p: Pair): HTMLElement {
     const ipa = target(p);
     const heard = p.heardAt !== undefined ? attempt.heard[p.heardAt] : null;
     const verdict = verdictOf(p);
@@ -362,7 +369,9 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     // Right, even if the recogniser wrote it another way (an accepted variant): nothing to slide between.
     const said = p.result?.verdict === 'good';
 
-    detail.replaceChildren(
+    return h(
+      'div',
+      { class: 'detail-page' },
       ...([
         h(
           'div',
