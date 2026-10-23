@@ -158,6 +158,41 @@ describe('asking for the microphone in Drills', () => {
     }
   });
 
+  it("leaves speaking out when the model is only found after the round opened and the phone would ask", async () => {
+    const mic = micNotYet({ modelKnownDownloaded: () => false });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    document.body.append(root);
+    await flush();
+    for (let i = 0; i < 20; i++) {
+      expect(speaking(root)).toBe(false);
+      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      button(root, 'Next').click();
+    }
+    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+  });
+
+  it('lets speaking in when the model is found late but the phone would let the microphone straight through', async () => {
+    const mic = micNotYet({ modelKnownDownloaded: () => false, microphoneAllowed: () => true });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    document.body.append(root);
+    await flush();
+    let spoke = false;
+    for (let i = 0; i < 40 && !spoke; i++) {
+      spoke = speaking(root);
+      if (spoke) break;
+      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      button(root, 'Next').click();
+    }
+    expect(spoke).toBe(true);
+  });
+
+  it('taps before the Speak chip and the quiet toggle run, as either may open the microphone', () => {
+    const root = practiceScreen(fakeApp(), micNotYet({ microphoneAllowed: () => true }).deps);
+    expect(root.querySelector('[data-mode="speak"]')!.getAttribute('data-tap')).toBe('before');
+    expect(root.querySelector('[data-mode="read"]')!.hasAttribute('data-tap')).toBe(false);
+    expect(root.querySelector('[aria-label^="Quiet mode"]')!.getAttribute('data-tap')).toBe('before');
+  });
+
   it('asks when Speak is chosen again mid-round', async () => {
     const off = micNotYet({ microphoneAllowed: () => true });
     const root = practiceScreen(fakeApp(), off.deps);

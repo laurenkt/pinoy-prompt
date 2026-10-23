@@ -391,9 +391,9 @@ const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
 /**
  * Tap for every control pressed under `root`. Two marks change that:
  * - `data-no-tap`: silent, for a control that starts recording, which would catch the tap.
- * - `data-tap="before"`: tapped before its own handler runs, for one that starts a Chat call. The call opens the
- *   microphone inside the press, after which nothing would tap; the call's audio takes seconds to connect, so the
- *   tap is over long before it.
+ * - `data-tap="before"`: tapped before its own handler runs, for one that may open the microphone inside the press
+ *   (starting a Chat call, opening Drills, choosing Speak, quiet mode going off), after which nothing would tap.
+ *   What follows takes long enough to start (a call's audio, the phone asking) that the tap is over long before it.
  */
 export function tickOnPress(root: Node): void {
   if (clipsSupported()) void loadThock().catch(() => {});

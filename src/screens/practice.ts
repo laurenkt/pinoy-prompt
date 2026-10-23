@@ -89,8 +89,10 @@ export function practiceScreen(
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
   let speakReady = deps.modelKnownDownloaded?.() ?? false;
   if (canSpeak) {
+    // Found only after the round opened (the app's own check hadn't finished), it's too late to ask for the
+    // microphone from the opening tap, so speaking joins only if the phone wouldn't ask over a speaking question.
     deps.modelDownloaded().then(
-      (ready) => (speakReady ||= ready),
+      (ready) => (speakReady ||= ready && !needsMicrophone(deps)),
       () => {},
     );
   }
@@ -561,6 +563,8 @@ export function practiceScreen(
           const on = scope.has(m.id);
           return chip(m.title, on, {
             'data-mode': m.id,
+            // Choosing Speak may open the microphone, after which the tap sound would be held back.
+            'data-tap': m.id === 'speak' ? 'before' : undefined,
             // One that can't be asked right now keeps its place, for when quiet mode goes off.
             disabled: unavailable(m.id) !== null,
             // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.

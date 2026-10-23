@@ -40,7 +40,7 @@ export function applyAudioMode(settings: Settings): void {
 export function quietToggle(app: App, onChange: () => void): HTMLButtonElement {
   const settings = app.progress.settings;
   const current = MODES[mode(settings)];
-  return iconButton(
+  const button = iconButton(
     current.icon,
     current.label,
     () => {
@@ -55,4 +55,7 @@ export function quietToggle(app: App, onChange: () => void): HTMLButtonElement {
     },
     { pressed: settings.quiet, title: current.title },
   );
+  // Quiet mode going off may open the microphone (see askForMicrophone), after which the tap sound would be held back.
+  button.dataset.tap = 'before';
+  return button;
 }
