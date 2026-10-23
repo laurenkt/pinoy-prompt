@@ -344,7 +344,7 @@ export const GUIDES: Card[] = [
     hook: 'Tap, don\'t growl.',
     examples: [
       { tl: 'Maraming salamat', en: 'Thank you very much' },
-      { tl: 'Marunong ka bang mag-Ingles?', en: 'Can you speak English?' },
+      { tl: 'Marunong ka bang mag-English?', en: 'Can you speak English?' },
     ],
     needs: ['maraming-salamat'],
     drills: [
@@ -510,6 +510,24 @@ export const GUIDES: Card[] = [
     drills: [
       { q: "You're eating lunch and a coworker walks past. The polite thing to say is…", answer: '"Kain tayo!"', wrong: ['"Busog na ako."', '"Paalam."'] },
       { q: 'Someone says "Kain tayo!" but you won\'t join. You say…', answer: '"Sige, salamat."', wrong: ['"Ayoko."', '"Hindi."'] },
+    ],
+  },
+  {
+    id: 'k-taglish',
+    kind: 'knowhow',
+    tl: 'Good morning po!',
+    en: 'Mixing in English',
+    note: 'Filipinos switch between Tagalog and English all the time, often in the same sentence. It\'s called Taglish, and it\'s how most people really talk. Plenty of everyday greetings are just English with a Tagalog touch: "Good morning po!", "Thank you po!", "Sorry!", "Bye!", "Nice to meet you!". So if the English word comes to you first, use it.',
+    hook: 'English words, Tagalog glue.',
+    examples: [
+      { tl: 'Good morning po!', en: 'Good morning! (to an elder)' },
+      { tl: 'Thank you po!', en: 'Thank you! (politely)' },
+      { tl: 'Sorry, trapik!', en: 'Sorry, traffic!' },
+    ],
+    needs: ['po', 'magandang-umaga'],
+    drills: [
+      { q: 'You pass an older neighbour in the morning. The everyday greeting is…', answer: '"Good morning po!"', wrong: ['"Paalam po!"', '"Ikinagagalak kitang makilala."'] },
+      { q: 'Mixing English words into Tagalog is…', answer: 'normal: most people do it', wrong: ['rude', 'only for tourists'] },
     ],
   },
 ];

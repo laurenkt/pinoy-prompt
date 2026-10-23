@@ -181,6 +181,13 @@ describe('checking typed Tagalog', () => {
     ['taga-saan', 'tagasaan ka'],
     ['dahan-dahan', 'dahandahn lang po'],
     ['po', 'po'],
+    // Reworded the way people say it, with the textbook wording still right.
+    ['ano-pangalan', 'Anong pangalan mo?'],
+    ['ano-pangalan', 'ano ang pangalan mo'],
+    ['kaunti-lang', 'kaunti lang'],
+    ['ano-numero-mo', 'Ano ang numero mo?'],
+    ['wala-yon', 'wala yon'],
+    ['mauna-na-ako', "una na 'ko"],
   ])('%s: "%s" is the Tagalog', (id, answer) => {
     expect(matchesTagalog(answer, card(id))).toBe(true);
   });
