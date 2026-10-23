@@ -259,17 +259,25 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     'aria-valuemin': '1',
     'aria-valuemax': String(list.length),
   });
-  /** Where each letter or mark sat as the drag began: read once, rather than at every move. */
-  let boxes: DOMRect[] = [];
-  /** The box nearest a point: on its line first, then along it, and the narrowest of those it's in (a missing sound's slim mark over its neighbour's). */
-  const nearest = (x: number, y: number) => {
-    let best = -1;
-    let far = Infinity;
-    boxes.forEach((r, i) => {
-      const d = Math.max(r.top - y, 0, y - r.bottom) * 1000 + Math.max(r.left - x, 0, x - r.right);
-      if (d < far || (d === far && r.width < boxes[best].width)) [best, far] = [i, d];
-    });
-    return best;
+  /**
+   * Finds the one of `els` nearest a point, by where each sat as the drag began (read once, rather than at every
+   * move): on its line first, then along it. Of several under the point, a missing sound's mark wins, as it sits on
+   * top of its neighbours'.
+   */
+  const finder = (els: HTMLElement[]) => {
+    let boxes: DOMRect[] = [];
+    return {
+      start: () => (boxes = els.map((el) => el.getBoundingClientRect())),
+      nearest: (e: PointerEvent) => {
+        let best = -1;
+        let far = Infinity;
+        boxes.forEach((r, i) => {
+          const d = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom) * 1000 + Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+          if (d < far || (d === far && els[i].classList.contains('mark-gap'))) [best, far] = [i, d];
+        });
+        return best;
+      },
+    };
   };
   /** Opens a sound, and says which it is, for the ticks. */
   const open = (index: number): string | null => {
@@ -279,15 +287,11 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   };
   // Like the memory chart: a drag sideways along the word's letters, or along the recording's marks, opens each sound
   // in turn. A tap on a letter opens its sound; a tap on a mark is the mark's own press.
-  scrubbable(word, {
-    start: () => (boxes = letterEls.map((el) => el.getBoundingClientRect())),
-    pick: (e) => open(markAt(nearest(e.clientX, e.clientY))),
-    tap: (e) => open(markAt(nearest(e.clientX, e.clientY))),
-  });
-  scrubbable(ribbonEl, {
-    start: () => (boxes = marks.map((el) => el.getBoundingClientRect())),
-    pick: (e) => open(nearest(e.clientX, e.clientY)),
-  });
+  const letterFinder = finder(letterEls);
+  const letterPick = (e: PointerEvent) => open(markAt(letterFinder.nearest(e)));
+  scrubbable(word, { start: letterFinder.start, pick: letterPick, tap: letterPick });
+  const markFinder = finder(marks);
+  scrubbable(ribbonEl, { start: markFinder.start, pick: (e) => open(markFinder.nearest(e)) });
   word.addEventListener('keydown', (e) => {
     const to = ({ ArrowLeft: selected - 1, ArrowDown: selected - 1, ArrowRight: selected + 1, ArrowUp: selected + 1, Home: 0, End: list.length - 1 } as Record<string, number>)[e.key];
     if (to === undefined || list.length === 0) return;

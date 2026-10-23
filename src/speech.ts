@@ -361,6 +361,11 @@ export function scrubbable(el: HTMLElement, options: ScrubOptions): void {
   });
   el.addEventListener('pointermove', (e) => {
     if (!touch || skip(e)) return;
+    // A mouse let go off it, so its lift never came here: nothing is held now.
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      touch = null;
+      return;
+    }
     const dx = Math.abs(e.clientX - touch.x);
     const dy = Math.abs(e.clientY - touch.y);
     if (!touch.scrub && dy > 8 && dy >= dx) touch = null;

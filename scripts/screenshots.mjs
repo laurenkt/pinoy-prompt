@@ -367,17 +367,20 @@ async function scrubAlong(page, name, selector) {
   const first = await where();
   const moved = new Set();
   const opened = new Set();
+  let left = false;
   await page.mouse.move(box.x + 4, y);
   await page.mouse.down();
   for (let i = 1; i <= 20; i++) {
     await page.mouse.move(box.x + 4 + ((box.width - 8) * i) / 20, y);
     const now = await where();
-    opened.add(now.open);
+    if (now.open !== first.open) left = true;
+    if (left) opened.add(now.open);
     for (const [sel, at] of Object.entries(now.at)) if (at !== first.at[sel]) moved.add(sel);
   }
   await page.mouse.up();
   const width = page.viewportSize().width;
   const marks = await page.locator('.ribbon-mark').count();
+  // Counting the sound open before the drag only if the drag came back to it.
   console.log(`${name} at ${width} wide: opened ${opened.size} of ${marks} sounds`);
   if (moved.size) console.log(`${name} at ${width} wide: ${[...moved].join(', ')} moved between sounds`);
 }
