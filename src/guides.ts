@@ -526,7 +526,7 @@ export const GUIDES: Card[] = [
     ],
     needs: ['po', 'magandang-umaga'],
     drills: [
-      { q: 'You pass an older neighbour in the morning. The everyday greeting is…', answer: '"Good morning po!"', wrong: ['"Paalam po!"', '"Ikinagagalak kitang makilala."'] },
+      { q: 'You pass an older neighbour in the morning. The everyday greeting is…', answer: '"Good morning po!"', wrong: ['"Paalam po!"', '"Tuloy po kayo!"'] },
       { q: 'Mixing English words into Tagalog is…', answer: 'normal: most people do it', wrong: ['rude', 'only for tourists'] },
     ],
   },
