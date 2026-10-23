@@ -2200,6 +2200,7 @@ p {
 }
 
 .unit-list summary {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -2232,6 +2233,24 @@ p {
 
 .unit-list .unit-tl {
   color: var(--muted);
+}
+
+/* The group's cards by memory strength, in the heading's bottom padding so the heading keeps its height: clear of the rounded corners and above the focus ring. Unmet cards are the empty track. */
+.memory-strip {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 7px;
+  height: 8px;
+  display: flex;
+  overflow: hidden;
+  background: var(--line);
+  border: 2px solid var(--ink);
+  border-radius: 99px;
+}
+
+.memory-strip > span {
+  height: 100%;
 }
 
 .word-list {
