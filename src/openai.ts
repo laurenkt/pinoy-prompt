@@ -266,7 +266,7 @@ The answer has to be in English. It's wrong if they just repeat the Tagalog or a
 Judge whether it's a right way to say that meaning in everyday Tagalog, as the given Tagalog is. Spelling doesn't matter: common spellings (kamusta, ganun, dyan), o for u, e for i, typos and how dictation spells what was said are still right, and so are an added "po" or "ho", "ho" for "po", and other natural wordings that mean the same.
 Leaving out a "po" or "ho" that the given Tagalog has is wrong: it's what makes it polite.
 It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.
-The answer has to be in Tagalog. It's wrong if they just repeat the English or answer in English (or any other language), even though that means the same thing. Tagalog that uses a word borrowed from English or Spanish, as Filipinos say it (okay, bill, dyip), is still Tagalog.`,
+The answer has to be in Tagalog. It's wrong if they just repeat the English or answer in English (or any other language), even though that means the same thing. Tagalog that uses a word borrowed from English or Spanish, as Filipinos say it (okay, bill, dyip, traffic for trapik), is still Tagalog, and so is a Tagalog number that dictation wrote as digits.`,
 };
 
 /**

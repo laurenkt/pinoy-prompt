@@ -179,6 +179,7 @@ describe('checking typed Tagalog', () => {
     ['dahan-dahan', 'dahandahan lang ho'],
     ['salamat-po', 'Salamat po'],
     ['taga-saan', 'tagasaan ka'],
+    ['dahan-dahan', 'dahandahn lang po'],
     ['po', 'po'],
   ])('%s: "%s" is the Tagalog', (id, answer) => {
     expect(matchesTagalog(answer, card(id))).toBe(true);
@@ -206,12 +207,14 @@ describe('checking typed Tagalog', () => {
     }
   });
 
-  it('judges it as Tagalog, and turns down the English said back without asking OpenAI', async () => {
+  it('judges it as Tagalog, leaving English to OpenAI, which is told to turn it down', async () => {
     const ask = vi.fn(async () => true);
     expect(await judgeMeaning('salamat po', card('salamat'), ask, 'tl')).toEqual({ right: true });
-    expect(await judgeMeaning('thank you', card('salamat'), ask, 'tl')).toEqual({ right: false });
-    expect(await judgeMeaning('Thanks!', card('salamat'), ask, 'tl')).toEqual({ right: false });
     expect(ask).not.toHaveBeenCalled();
+    expect(await judgeMeaning('thank you', card('salamat'), null, 'tl')).toEqual({ right: false });
+    // Could be a word Tagalog borrows, or a number dictated as digits, so the device can't turn it down.
+    await judgeMeaning('traffic', card('trapik'), ask, 'tl');
+    expect(ask).toHaveBeenCalledWith('traffic', card('trapik'), 'tl');
     expect(await judgeMeaning('salamat nang marami', card('maraming-salamat'), ask, 'tl')).toEqual({ right: true });
     expect(ask).toHaveBeenCalledWith('salamat nang marami', card('maraming-salamat'), 'tl');
   });

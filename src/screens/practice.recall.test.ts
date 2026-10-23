@@ -90,14 +90,15 @@ describe('recalling words that have settled', () => {
     expect(play).not.toHaveBeenCalled();
   });
 
-  it('turns the English said back down without asking OpenAI', async () => {
-    const judge = vi.fn<MeaningJudge>(async () => true);
+  it('turns the English said back down', async () => {
+    // OpenAI, told the answer has to be in Tagalog.
+    const judge = vi.fn<MeaningJudge>(async () => false);
     const root = (last = recall(learner(true), judge));
     type(root, 'thank you');
     await flush();
     expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
     expect(root.querySelector('.feedback')?.textContent).toContain('Salamat');
-    expect(judge).not.toHaveBeenCalled();
+    expect(judge).toHaveBeenCalledWith('thank you', expect.objectContaining<Partial<Card>>({ id: 'salamat' }), 'tl');
   });
 
   it('checks other wording with OpenAI, as Tagalog', async () => {

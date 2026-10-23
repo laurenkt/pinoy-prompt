@@ -230,9 +230,12 @@ function tagalogWords(text: string): string[] {
 
 let deckTagalog: Set<string> | undefined;
 
-/** Every word the deck's Tagalog uses. One of these is meant as written, not a typo for another. */
+/**
+ * Every word the deck's Tagalog uses, and each wording joined up without its "po". One of these is meant as written,
+ * not a typo for another: "alasdose" isn't "alasdos".
+ */
 function knownTagalog(): Set<string> {
-  deckTagalog ??= new Set(VOCAB.flatMap((card) => [card.tl, ...(card.accept ?? [])].flatMap(tagalogWords)));
+  deckTagalog ??= new Set(VOCAB.flatMap((card) => cardWords(card).flatMap((list) => [...list, bare(list).join('')])));
   return deckTagalog;
 }
 
@@ -261,16 +264,27 @@ function sameTagalogWord(typed: string, word: string): boolean {
 export function matchesTagalog(answer: string, card: Card): boolean {
   const given = tagalogWords(answer);
   if (given.length === 0) return false;
-  const polite = (list: string[]) => list.some((w) => RESPECT.includes(w));
-  // Unless that's all there is ("po" itself).
-  const bare = (list: string[]) => (list.every((w) => RESPECT.includes(w)) ? list : list.filter((w) => !RESPECT.includes(w)));
-  return [card.tl, ...(card.accept ?? [])].some((wording) => {
-    const want = tagalogWords(wording);
+  const g = bare(given);
+  return cardWords(card).some((want) => {
     if (want.length === 0 || (polite(want) && !polite(given))) return false;
-    const [g, w] = [bare(given), bare(want)];
-    if (g.join('') === w.join('')) return true;
+    const w = bare(want);
+    // Joined up, a typo still counts: "dahandahn lang" for "dahan-dahan lang".
+    if (sameTagalogWord(g.join(''), w.join(''))) return true;
     return g.length === w.length && g.every((typed, i) => sameTagalogWord(typed, w[i]));
   });
+}
+
+const polite = (list: string[]) => list.some((w) => RESPECT.includes(w));
+/** Without respect words, unless that's all there is ("po" itself). */
+const bare = (list: string[]) => (list.every((w) => RESPECT.includes(w)) ? list : list.filter((w) => !RESPECT.includes(w)));
+
+/** Each card's Tagalog wordings, as words, worked out once. */
+const cardTagalogWords = new WeakMap<Card, string[][]>();
+
+function cardWords(card: Card): string[][] {
+  let found = cardTagalogWords.get(card);
+  if (!found) cardTagalogWords.set(card, (found = [card.tl, ...(card.accept ?? [])].map(tagalogWords)));
+  return found;
 }
 
 /** Whether the answer plainly says the card in `language`, checked on the device. */
@@ -280,16 +294,17 @@ export function matchesAnswer(answer: string, card: Card, language: AnswerLangua
 
 /**
  * Judge a typed answer in `language`: on the device first, then by `ask` when
- * that can't match it. The prompt said back in its own language (the Tagalog
- * for its meaning, the English for its Tagalog) is wrong without asking.
- * Without an answer from `ask` (no key, offline, an error), the device's
+ * that can't match it. The Tagalog said back for its meaning is wrong without
+ * asking. The English said back for its Tagalog is left to `ask`, which is
+ * told it's wrong: on the device it can't be told from a word Tagalog
+ * borrows ("traffic" for "trapik") or a number dictated as digits. Without an answer from `ask` (no key, offline, an error), the device's
  * answer stands; a failed ask is noted, so the learner knows why.
  */
 export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge | null, language: AnswerLanguage = 'en'): Promise<Verdict> {
   if (!answer.trim()) return { right: false };
   if (matchesAnswer(answer, card, language)) return { right: true };
   // Not asked: OpenAI would see that it means the same.
-  if (language === 'en' ? repeatsTagalog(answer, card) : matchesMeaning(answer, card)) return { right: false };
+  if (language === 'en' && repeatsTagalog(answer, card)) return { right: false };
   if (!ask) return { right: false };
   try {
     return { right: (await ask(answer, card, language)) ?? false };

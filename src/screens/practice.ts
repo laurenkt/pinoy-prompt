@@ -76,7 +76,8 @@ const askOpenAi: MeaningJudge = async (answer, card, language) => {
 };
 
 /** What a typed answer to the question is given in: the meaning when listening, the Tagalog when recalling. */
-const answerLanguage = (q: Question): AnswerLanguage => (q.mode === 'recall' ? 'tl' : 'en');
+const languageOf = (mode: Mode): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
+const answerLanguage = (q: Question): AnswerLanguage => languageOf(q.mode);
 
 /** The kinds of question a card can be asked as. */
 function modesFor(card: Card): Mode[] {
@@ -193,7 +194,7 @@ export function practiceScreen(
       lastDrill.set(card.id, guide.drill);
       return { card, mode, guide, choices: [], typed: false };
     }
-    const field = mode === 'recall' ? 'tl' : 'en';
+    const field = languageOf(mode);
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
     const typed = settled(app.progress, card.id) && (mode === 'recall' || (mode === 'listen' && canTypeMeaning(card)));
     return { card, mode, choices, typed };
@@ -609,7 +610,7 @@ export function practiceScreen(
     const reviewing = q !== current;
     const answered = picked !== null;
     const right = picked === answerOf(q);
-    const field = q.mode === 'recall' ? 'tl' : 'en';
+    const field = answerLanguage(q);
     const say = (slow = false) => sayCard(q, slow, answered);
     const onward = () =>
       reviewing ? continueButton(() => setLookingBack(false), false, 'Back to the current card') : continueButton(() => advance(), auto !== null, 'Next');
