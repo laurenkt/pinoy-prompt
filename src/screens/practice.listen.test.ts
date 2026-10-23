@@ -354,7 +354,59 @@ describe('saying the meaning out loud', () => {
     replies[0]('Thank you.');
     await flush();
     expect(root.querySelector('.meaning-status')?.textContent).toContain('Hearing');
-    expect(box(root)!.disabled).toBe(true);
+    expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
     expect(root.querySelector('.feedback')).toBeNull();
+  });
+
+  it('draws what the microphone hears in the box, and runs along it while that is heard and checked', async () => {
+    let onLevel: ((level: number) => void) | undefined;
+    let finish: (t: Take) => void = () => {};
+    const record = vi.fn((events?: { onLevel?: (level: number) => void }) => {
+      onLevel = events?.onLevel;
+      return { audio: new Promise<Take>((r) => (finish = r)), stop: () => {}, cancel: () => {} };
+    });
+    const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record } as unknown as SpeakDeps;
+    let heard: (text: string) => void = () => {};
+    let judged: (right: boolean) => void = () => {};
+    const root = practiceScreen(learner(true), deps, () => new Promise<boolean>((r) => (judged = r)), () => () => new Promise<string>((r) => (heard = r)));
+    document.body.replaceChildren(root);
+    const bars = () => [...root.querySelectorAll<HTMLElement>('.meaning-wave span')].map((b) => Number(b.style.getPropertyValue('--level')));
+    micButton(root)!.click();
+    // The box gives way to a flat line, which fills from the right as the level comes in.
+    expect(box(root)).toBeNull();
+    expect(root.querySelector('.meaning-wave.thinking')).toBeNull();
+    expect(bars().every((v) => v === 0)).toBe(true);
+    onLevel!(0.5);
+    onLevel!(0.25);
+    expect(bars().slice(-2)).toEqual([0.5, 0.25]);
+    finish({ samples: new Float32Array(160), speech: true });
+    await flush();
+    // Hearing it: the same wave, kept across the redraw, with the beat running along it.
+    expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
+    expect(bars().slice(-2)).toEqual([0.5, 0.25]);
+    heard('Many thanks.');
+    await flush();
+    expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
+    expect(root.querySelector('.meaning-status')?.textContent).toContain('Heard “Many thanks.”. Checking');
+    judged(true);
+    await flush();
+    expect(root.querySelector('.meaning-wave')).toBeNull();
+    expect(box(root)!.value).toBe('Many thanks.');
+  });
+
+  it('puts the box back when nothing was heard, and checks a typed meaning without the wave', async () => {
+    const { deps } = mic(false);
+    let judged: (right: boolean) => void = () => {};
+    const root = practiceScreen(learner(true), deps, () => new Promise<boolean>((r) => (judged = r)), () => async () => '');
+    document.body.replaceChildren(root);
+    micButton(root)!.click();
+    expect(root.querySelector('.meaning-wave')).not.toBeNull();
+    await flush();
+    expect(root.querySelector('.meaning-wave')).toBeNull();
+    box(root)!.value = 'many thanks';
+    button(root, 'Check').click();
+    expect(root.querySelector('.meaning-wave')).toBeNull();
+    expect(box(root)!.value).toBe('many thanks');
+    judged(true);
   });
 });

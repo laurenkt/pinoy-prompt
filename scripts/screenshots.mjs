@@ -110,6 +110,14 @@ const SCREENS = {
     await page.click('.speak .btn.mic');
     await page.waitForSelector('.sound-results');
   },
+  // Listen only, on settled words, with a key for OpenAI: the meaning said into the box, as a wave of levels from a
+  // stand-in microphone, then being heard (OpenAI never answers here).
+  'drills-saying': (page) => sayMeaning(page),
+  'drills-hearing': async (page) => {
+    await sayMeaning(page);
+    await page.click('.meaning-mic');
+    await page.waitForSelector('.meaning-wave.thinking');
+  },
   library: (page) => page.click('.library-btn'),
   // The filter chips, open on All, then open again with another filter chosen.
   'library-filters': async (page) => {
@@ -238,6 +246,50 @@ async function drillOnlySpeak(page) {
   await page.click('.filter-toggle');
   for (const mode of ['listen', 'read', 'recall']) await page.click(`#drill-scope [data-mode="${mode}"]`);
   await page.click('.filter-toggle');
+}
+
+/** Drills, asking only Listen on words settled in Study, saying the meaning into the box. */
+async function sayMeaning(page) {
+  await page.route('https://api.openai.com/**', () => {});
+  await page.evaluate(async () => {
+    const { load, recordAnswer, save } = await import('/src/store.ts');
+    const progress = load(Date.now());
+    // A second good answer, a day on, settles each word (settled in session.ts).
+    for (const id of Object.keys(progress.cards)) recordAnswer(progress, id, 'good', Date.now() - 2 * 86_400_000);
+    save(progress, { replace: true });
+    (await import('/src/openai.ts')).setApiKey('sk-proj-screenshotsonly0123456789');
+  });
+  await page.reload();
+  await page.waitForSelector('.home');
+  await page.evaluate(async () => {
+    const { defaultDeps } = await import('/src/screens/speak.ts');
+    // A voice that rises and falls, a dozen levels a second, until it's stopped.
+    defaultDeps.recordingSupported = () => true;
+    defaultDeps.microphoneAllowed = () => true;
+    defaultDeps.record = ({ onLevel } = {}) => {
+      let finish = () => {};
+      const audio = new Promise((resolve) => (finish = () => resolve({ samples: new Float32Array(16000), speech: true })));
+      let n = 0;
+      const timer = setInterval(() => {
+        n++;
+        onLevel?.(n < 6 ? 0.02 : Math.abs(Math.sin(n / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(n / 7))));
+      }, 85);
+      const end = () => {
+        clearInterval(timer);
+        finish();
+      };
+      return { audio, stop: end, cancel: end };
+    };
+  });
+  await page.click('.drills-btn');
+  await page.click('.filter-toggle');
+  for (const mode of ['read', 'recall', 'speak']) {
+    const chip = page.locator(`#drill-scope [data-mode="${mode}"]`);
+    if (await chip.isEnabled()) await chip.click();
+  }
+  await page.click('.filter-toggle');
+  await page.click('.meaning-mic');
+  await page.waitForTimeout(3200);
 }
 
 /** Drills, asking only Speak, ready to listen. */

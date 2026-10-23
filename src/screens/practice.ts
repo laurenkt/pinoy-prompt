@@ -43,6 +43,8 @@ interface Question {
   offered?: boolean;
   /** Why a spoken answer didn't come through, to say under the box. */
   unheard?: string;
+  /** The microphone's level as the meaning was said, oldest first, drawn in the box until the answer is checked. */
+  wave?: number[];
 }
 
 /** Turns a spoken answer into text. */
@@ -269,11 +271,13 @@ export function practiceScreen(
   }
 
   /** Check a typed meaning: on the device, then with OpenAI when there's a key. */
-  function send(text: string): void {
+  function send(text: string, spoken = false): void {
     const q = current;
     // Nothing typed (an Enter meant for Next, say) isn't an answer; "Show choices" is there for not knowing.
     if (!q || picked !== null || checking || !text.trim()) return;
     q.answer = text.trim();
+    // A said meaning keeps its wave in the box while it's checked; a typed one shows what was typed.
+    if (!spoken) q.wave = undefined;
     checking = true;
     draw();
     void judgeMeaning(q.answer, q.card, askMeaning).then(({ right, failure }) => {
@@ -293,13 +297,25 @@ export function practiceScreen(
     // The word playing would be recorded too.
     stop();
     q.unheard = undefined;
-    const recording = deps.record();
+    // Starts flat and fills from the right as the level comes in.
+    const wave = (q.wave = new Array<number>(WAVE_BARS).fill(0));
+    const recording = deps.record({
+      onLevel: (level) => {
+        if (listening !== recording) return;
+        wave.push(level);
+        wave.shift();
+        const bars = root.querySelectorAll<HTMLElement>('.meaning-wave span');
+        // Move each bar's height one along rather than redraw the box, a dozen times a second.
+        bars.forEach((bar, i) => bar.style.setProperty('--level', String(wave[i])));
+      },
+    });
     listening = recording;
     draw();
     const unheard = (why: string) => {
       if (hearing === recording) hearing = null;
       if (current !== q || !root.isConnected) return;
       q.unheard = why;
+      q.wave = undefined;
       draw();
     };
     recording.audio.then(
@@ -323,7 +339,7 @@ export function practiceScreen(
         if (current !== q || !q.typed || !root.isConnected || picked !== null) return;
         if (!text) return unheard("Didn't catch that. Tap the microphone and say it again, or type it.");
         q.draft = text;
-        send(text);
+        send(text, true);
       },
       (e) => {
         if (listening !== recording) return;
@@ -617,6 +633,18 @@ export function practiceScreen(
   }
 
   /**
+   * What the microphone heard, as bars, in place of the box while the meaning is said; they run across while what
+   * was said is heard and checked.
+   */
+  function waveBox(levels: number[], thinking: boolean): HTMLElement {
+    return h(
+      'div',
+      { class: `meaning-wave${thinking ? ' thinking' : ''}`, 'aria-hidden': 'true' },
+      levels.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` })),
+    );
+  }
+
+  /**
    * A box to type the meaning in; it keeps what was sent, marked right or wrong. A meaning the device can tell is
    * right is taken as it's typed, without Check. With a key for OpenAI, and outside quiet mode, a microphone button
    * beside it records the meaning said out loud instead.
@@ -657,7 +685,14 @@ export function practiceScreen(
       !speakSkipped &&
       hearMeaning() !== null &&
       micButton(q);
-    const status = listening ? 'Listening… say what it means.' : hearing ? 'Hearing what you said…' : (!answered && q.unheard) || null;
+    const status = listening
+      ? 'Listening… say what it means.'
+      : hearing
+        ? 'Hearing what you said…'
+        : checking && q.wave
+          ? `Heard “${q.answer}”. Checking…`
+          : (!answered && q.unheard) || null;
+    const wave = !answered && q.wave && (listening || hearing || checking) ? waveBox(q.wave, !listening) : null;
     return h(
       'form',
       {
@@ -667,7 +702,7 @@ export function practiceScreen(
           send(input.value);
         },
       },
-      h('div', { class: 'meaning-row' }, input, mic),
+      h('div', { class: 'meaning-row' }, wave ?? input, mic),
       status && h('p', { class: 'muted meaning-status', role: 'status' }, status),
       !answered &&
         h(
@@ -702,6 +737,9 @@ export function practiceScreen(
   ask();
   return root;
 }
+
+/** Bars in the box while a meaning is said: enough to cross it on a wide phone, at about twelve levels a second. */
+const WAVE_BARS = 48;
 
 /** How long typing has to pause before a meaning the device can tell is right is taken without Check. */
 const TYPING_PAUSE_MS = 700;
