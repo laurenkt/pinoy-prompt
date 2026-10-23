@@ -31,6 +31,15 @@ const MODEL_FILE = 'node_modules/.cache/pinoy-prompt/model.int8.onnx';
 /** The speech model, read once. */
 let model;
 
+/** Answer what's asked (a choice, or a flashcard rated Good) and move on, until the way back shows, then take it. */
+async function lookBack(page) {
+  for (let i = 0; i < 8 && !(await page.$('.prev-btn')); i++) {
+    const next = (await page.$('.choice:not(:disabled)')) ?? (await page.$('.rate-good')) ?? (await page.$('.panel .btn.big'));
+    await next.click();
+  }
+  await page.click('.prev-btn');
+}
+
 /** How to reach each screen from Home. */
 const SCREENS = {
   home: async () => {},
@@ -159,6 +168,15 @@ const SCREENS = {
     await sayMeaning(page);
     await page.click('.meaning-mic');
     await page.waitForSelector('.meaning-wave.thinking');
+  },
+  // A question answered and moved on from with Next, then looked back at from the next one.
+  'drills-previous': async (page) => {
+    await page.click('.drills-btn');
+    await lookBack(page);
+  },
+  'study-previous': async (page) => {
+    await page.click('.hub-btn.big:not(.chat-btn)');
+    await lookBack(page);
   },
   library: (page) => page.click('.library-btn'),
   // The filter chips, open on All, then open again with another filter chosen.

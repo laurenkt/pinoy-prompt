@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-// A right first answer moves on by itself after a couple of seconds, with a
-// way back to it; a miss, or a card missed earlier, waits for Continue.
+// A right first answer moves on by itself after a couple of seconds; a miss,
+// or a card missed earlier, waits for Continue. Either way the card just
+// answered can be looked back at from the next one.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VOCAB, getCard } from '../deck';
@@ -62,7 +63,9 @@ describe('moving on after a right answer in a session', () => {
     vi.advanceTimersByTime(ADVANCE_MS * 5);
     expect(shownCard(root).id).toBe('salamat');
     button(root, 'Continue').click();
-    expect(has(root, 'Previous card')).toBe(false);
+    button(root, 'Previous card').click();
+    expect(shownCard(root).id).toBe('salamat');
+    expect(root.querySelector('.feedback.bad')).not.toBeNull();
   });
 
   it('keeps the hook up when a card missed earlier is got right', () => {
@@ -85,13 +88,50 @@ describe('moving on after a right answer in a session', () => {
     expect(shownCard(root).id).toBe('salamat');
   });
 
-  it('moves on straight away from Continue, without offering the way back', () => {
+  it('moves on straight away from Continue, still offering the way back', () => {
     const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo')));
     answer(root, true);
     button(root, 'Continue').click();
     expect(shownCard(root).id).toBe('oo');
-    expect(has(root, 'Previous card')).toBe(false);
     vi.advanceTimersByTime(ADVANCE_MS * 5);
+    expect(shownCard(root).id).toBe('oo');
+    button(root, 'Previous card').click();
+    expect(shownCard(root).id).toBe('salamat');
+    expect(root.querySelector('.feedback.good')).not.toBeNull();
+  });
+
+  it('shows a rated card again without its ratings, so looking back never rates it twice', () => {
+    const app = fakeApp(KNOWN);
+    let onKey: (e: KeyboardEvent) => void = () => {};
+    app.onKey = (fn) => void (onKey = fn ?? onKey);
+    const steps: Step[] = [{ kind: 'review', cardId: 'salamat', format: 'remember' }, ...reads('oo')];
+    const root = mount(sessionScreen(app, steps));
+    button(root, 'Show the meaning').click();
+    button(root, 'Good').click();
+    const rated = structuredClone(app.progress.cards.salamat);
+
+    button(root, 'Previous card').click();
+    expect(shownCard(root).id).toBe('salamat');
+    expect(root.querySelector('.answer .meaning')?.textContent).toBe(getCard('salamat')!.en);
+    expect(root.querySelector('.hook')?.textContent).toContain(getCard('salamat')!.hook);
+    expect(root.querySelector('.rate')).toBeNull();
+    onKey(new KeyboardEvent('keydown', { key: '1' }));
+    expect(app.progress.cards.salamat).toEqual(rated);
+
+    button(root, 'Back to the current card').click();
+    expect(shownCard(root).id).toBe('oo');
+  });
+
+  it('looks back at a card missed on its flashcard', () => {
+    const steps: Step[] = [{ kind: 'review', cardId: 'salamat', format: 'remember' }, ...reads('oo')];
+    const root = mount(sessionScreen(fakeApp(KNOWN), steps));
+    button(root, 'Show the meaning').click();
+    button(root, 'Again').click();
+    button(root, 'Continue').click();
+    expect(shownCard(root).id).toBe('oo');
+    button(root, 'Previous card').click();
+    expect(root.querySelector('.eyebrow')?.textContent).toBe('Coming back shortly');
+    button(root, 'Back to the current card').click();
     expect(shownCard(root).id).toBe('oo');
   });
 
@@ -151,7 +191,12 @@ describe('moving on after a right answer in a drill', () => {
     answer(root, false);
     vi.advanceTimersByTime(ADVANCE_MS * 5);
     expect(root.querySelector('.choice:disabled')).not.toBeNull();
+    const missed = root.querySelector('.choice.wrong')?.textContent;
     button(root, 'Next').click();
-    expect(has(root, 'Previous card')).toBe(false);
+    button(root, 'Previous card').click();
+    expect(root.querySelector('.feedback.bad')).not.toBeNull();
+    expect(root.querySelector('.choice.wrong')?.textContent).toBe(missed);
+    button(root, 'Back to the current card').click();
+    expect(root.querySelector('.choice:disabled')).toBeNull();
   });
 });
