@@ -31,8 +31,8 @@ const SAME: [RegExp, string][] = [
   [/\bu\b/g, 'you'],
 ];
 
-/** Words that carry no meaning of their own here. */
-const FILLER = new Set(['a', 'an', 'the', 'is', 'are', 'am', 'do', 'does', 'please']);
+/** Words that carry no meaning of their own here. Not "do": "how do you" is a different question from "how are you". */
+const FILLER = new Set(['a', 'an', 'the', 'is', 'are', 'am', 'please']);
 
 /** Lower case words, with contractions, digits and common shorthands spelled out. */
 export function words(text: string): string[] {

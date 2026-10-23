@@ -206,11 +206,27 @@ async function failure(response: Response): Promise<AiError> {
   return new AiError('other', message);
 }
 
-/** A signal that aborts after `ms`. AbortSignal.timeout would do, but iOS only has it from 16. */
-function timeout(ms: number): AbortSignal {
+/**
+ * Send a request that's given up if OpenAI hasn't started answering after `ms`. Once it has, the limit is lifted, so
+ * the answer is read in full and what it used is counted. AbortSignal.timeout wouldn't lift, and iOS only has it from 16.
+ */
+async function timed(ms: number, send: (signal: AbortSignal) => Promise<Response>): Promise<Response> {
   const controller = new AbortController();
-  setTimeout(() => controller.abort(), ms);
-  return controller.signal;
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await send(controller.signal);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** An answer's body; the connection dropping while it's read is a network failure like any other. */
+async function readJson<T>(response: Response): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch (e) {
+    throw new AiError('network', e instanceof Error ? e.message : String(e));
+  }
 }
 
 async function post(key: string, path: string, body: unknown, fetchFn: typeof fetch, signal?: AbortSignal): Promise<Response> {
@@ -247,28 +263,30 @@ export async function checkMeaning(
   { tl, en, answer }: { tl: string; en: string; answer: string },
   fetchFn: typeof fetch = (...args) => fetch(...args),
 ): Promise<boolean> {
-  const response = await post(
-    key,
-    '/responses',
-    {
-      model: CHECK_MODEL,
-      reasoning: { effort: 'none' },
-      instructions: CHECK_INSTRUCTIONS,
-      input: `Tagalog: ${tl}\nMeaning: ${en}\nAnswer: ${answer.slice(0, 200)}`,
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'verdict',
-          strict: true,
-          schema: { type: 'object', properties: { right: { type: 'boolean' } }, required: ['right'], additionalProperties: false },
+  const response = await timed(CHECK_TIMEOUT_MS, (signal) =>
+    post(
+      key,
+      '/responses',
+      {
+        model: CHECK_MODEL,
+        reasoning: { effort: 'none' },
+        instructions: CHECK_INSTRUCTIONS,
+        input: `Tagalog: ${tl}\nMeaning: ${en}\nAnswer: ${answer.slice(0, 200)}`,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'verdict',
+            strict: true,
+            schema: { type: 'object', properties: { right: { type: 'boolean' } }, required: ['right'], additionalProperties: false },
+          },
         },
+        store: false,
       },
-      store: false,
-    },
-    fetchFn,
-    timeout(CHECK_TIMEOUT_MS),
+      fetchFn,
+      signal,
+    ),
   );
-  const body = (await response.json()) as { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
+  const body = await readJson<{ output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage }>(response);
   addSpend(tokenCost(CHECK_MODEL, body.usage));
   const text = body.output?.find((o) => o.type === 'message')?.content?.find((c) => c.type === 'output_text')?.text;
   try {
@@ -294,17 +312,14 @@ export async function transcribe(key: string, audio: Blob, fetchFn: typeof fetch
   form.append('file', audio, 'answer.wav');
   let response: Response;
   try {
-    response = await fetchFn(`${API}/audio/transcriptions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}` },
-      body: form,
-      signal: timeout(TRANSCRIBE_TIMEOUT_MS),
-    });
+    response = await timed(TRANSCRIBE_TIMEOUT_MS, (signal) =>
+      fetchFn(`${API}/audio/transcriptions`, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form, signal }),
+    );
   } catch (e) {
     throw new AiError('network', e instanceof Error ? e.message : String(e));
   }
   if (!response.ok) throw await failure(response);
-  const body = (await response.json()) as { text?: unknown; usage?: TranscriptionUsage };
+  const body = await readJson<{ text?: unknown; usage?: TranscriptionUsage }>(response);
   addSpend(transcriptionCost(body.usage));
   return typeof body.text === 'string' ? body.text.trim() : '';
 }
@@ -485,7 +500,7 @@ export async function startCall(
       },
       transport: { type: 'webrtc', sdp: offer.sdp },
     }, deps.fetch, signal);
-    const body = (await response.json()) as { transport?: { sdp?: string } };
+    const body = await readJson<{ transport?: { sdp?: string } }>(response);
     still();
     if (!body.transport?.sdp) throw new AiError('other', 'OpenAI started the call without an answer.');
     await pc.setRemoteDescription({ type: 'answer', sdp: body.transport.sdp });

@@ -57,6 +57,7 @@ describe('matching a typed meaning on the device', () => {
     ['siya', 'he or they'],
     ['apat', 'fourth'],
     ['dalawampu', '21'],
+    ['kumusta', 'how do you'],
   ])('%s: "%s" is not matched', (id, answer) => {
     expect(matchesMeaning(answer, card(id))).toBe(false);
   });
