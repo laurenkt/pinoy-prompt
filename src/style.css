@@ -1746,7 +1746,7 @@ p {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .word-actions .btn.small {
