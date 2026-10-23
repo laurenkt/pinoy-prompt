@@ -89,7 +89,7 @@ describe('listening to words that have settled', () => {
     button(root, 'Next').click();
     type(root, 'thanks a lot');
     expect(button(root, 'Checking').disabled).toBe(true);
-    expect(judge).toHaveBeenCalledWith('thanks a lot', expect.objectContaining<Partial<Card>>({ id: 'maraming-salamat' }));
+    expect(judge).toHaveBeenCalledWith('thanks a lot', expect.objectContaining<Partial<Card>>({ id: 'maraming-salamat' }), 'en');
     answer(true);
     await flush();
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
@@ -284,7 +284,7 @@ describe('saying the meaning out loud', () => {
     expect(root.querySelector('.meaning-status')?.textContent).toContain('Listening');
     await flush();
     await flush();
-    expect(hearer).toHaveBeenCalledWith(expect.any(Blob));
+    expect(hearer).toHaveBeenCalledWith(expect.any(Blob), 'en');
     expect(box(root)!.value).toBe('Thank you.');
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
   });

@@ -132,6 +132,19 @@ const SCREENS = {
   // Listen only, on settled words, with a key for OpenAI: the meaning said into the box, as a wave of levels from a
   // stand-in microphone, then being heard (OpenAI never answers here).
   'drills-saying': (page) => sayMeaning(page),
+  // Recall only, on settled words, with a key for OpenAI: the Tagalog to type (or say), then typed right.
+  'drills-recall': (page) => typedOnly(page, 'recall'),
+  'drills-recall-answered': async (page) => {
+    await typedOnly(page, 'recall');
+    const tl = await page.evaluate(async () => {
+      const { VOCAB } = await import('/src/deck.ts');
+      const en = document.querySelector('.prompt-en').textContent;
+      return VOCAB.find((c) => c.en === en).tl;
+    });
+    await page.fill('.meaning-input', tl);
+    await page.press('.meaning-input', 'Enter');
+    await page.waitForSelector('.feedback');
+  },
   'drills-hearing': async (page) => {
     await sayMeaning(page);
     await page.click('.meaning-mic');
@@ -307,6 +320,16 @@ async function drillOnlySpeak(page) {
 
 /** Drills, asking only Listen on words settled in Study, saying the meaning into the box. */
 async function sayMeaning(page) {
+  await typedOnly(page, 'listen');
+  await page.click('.meaning-mic');
+  await page.waitForTimeout(3200);
+}
+
+/**
+ * Drills, asking only `mode` (Listen or Recall) on words settled in Study, so the answer is typed, with a key for
+ * OpenAI (which never answers here) and a stand-in microphone, so the box offers to hear it said.
+ */
+async function typedOnly(page, mode) {
   await page.route('https://api.openai.com/**', () => {});
   await page.evaluate(async () => {
     const { load, recordAnswer, save } = await import('/src/store.ts');
@@ -340,13 +363,11 @@ async function sayMeaning(page) {
   });
   await page.click('.drills-btn');
   await page.click('.filter-toggle');
-  for (const mode of ['read', 'recall', 'speak']) {
-    const chip = page.locator(`#drill-scope [data-mode="${mode}"]`);
-    if (await chip.isEnabled()) await chip.click();
+  for (const other of ['listen', 'read', 'recall', 'speak']) {
+    const chip = page.locator(`#drill-scope [data-mode="${other}"]`);
+    if (other !== mode && (await chip.getAttribute('aria-pressed')) === 'true' && (await chip.isEnabled())) await chip.click();
   }
   await page.click('.filter-toggle');
-  await page.click('.meaning-mic');
-  await page.waitForTimeout(3200);
 }
 
 /** Drills, asking only Speak, ready to listen. */

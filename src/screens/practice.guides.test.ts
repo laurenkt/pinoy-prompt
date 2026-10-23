@@ -24,6 +24,8 @@ const drillOf = (root: HTMLElement) => getCard('p-gusto')!.drills!.find((d) => d
 /** Move on through the round until the pattern is asked. */
 function untilGuide(root: HTMLElement, eyebrow: string): void {
   for (let i = 0; i < 40 && !root.textContent?.includes(eyebrow); i++) {
+    // Words settled in Study are typed; picking from choices is quicker here.
+    if (root.querySelector('.meaning-input')) button(root, 'Show choices').click();
     if (!root.querySelector('.feedback')) root.querySelector<HTMLButtonElement>('.choice')!.click();
     button(root, 'Next').click();
   }
