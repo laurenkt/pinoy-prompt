@@ -23,9 +23,16 @@ export interface GuideQuestion {
   placed: number[];
 }
 
-/** Whether a guide has a sentence to build (patterns only, as Study asks them). */
-export function canBuildGuide(card: Card): boolean {
-  return card.kind === 'pattern' && (card.drills ?? []).some(canBuild);
+/** The ways a guide can be asked: a gap if it has any drill, and for a pattern with a sentence long enough, a build too (as Study asks them). */
+export function guideFormats(card: Card): GuideFormat[] {
+  const drills = card.drills ?? [];
+  if (drills.length === 0) return [];
+  return card.kind === 'pattern' && drills.some(canBuild) ? ['gap', 'build'] : ['gap'];
+}
+
+/** A drill's whole sentence, to load and, once answered, play; null for a question without one. */
+export function sentenceClip(d: Drill): { tl: string } | null {
+  return d.tl ? { tl: drillSentence(d) } : null;
 }
 
 /** One of the guide's drills, asked as `format`; null when it has none that can be. `last` is kept out, if there's another. */
@@ -96,6 +103,21 @@ export function guideBody(c: Card): (HTMLElement | null)[] {
         )
       : null,
   ];
+}
+
+/**
+ * How a guide's question went: `praise` or `miss` in bold, then on a miss the answer, `after` it (say, that it comes
+ * back), and the guide's rule; on a right answer, `right` if anything.
+ */
+export function guideFeedback(c: Card, d: Drill, ok: boolean, words: { praise: string; miss: string; right?: string; after?: string }): HTMLElement {
+  return h(
+    'div',
+    { class: `feedback ${ok ? 'good' : 'bad'}`, role: 'status' },
+    h('strong', null, ok ? words.praise : words.miss),
+    ' ',
+    ok ? (words.right ?? '') : `The answer is ${answerText(d)}${words.after ? ` ${words.after}` : ''}`,
+    !ok && c.note && h('p', { class: 'feedback-note' }, c.note),
+  );
 }
 
 export interface GuideViewOptions {

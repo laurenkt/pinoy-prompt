@@ -3,25 +3,22 @@ import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
 import { canTypeMeaning, judgeMeaning, matchesMeaning, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { distractors, drillSentence, pickDrillCard, settled, shuffle } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
-import { answerText, canBuildGuide, guideAnswer, guideQuestion, guideQuestionView, type GuideFormat, type GuideQuestion } from './guide-question';
+import { guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
 import { isSilent, quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, PROBLEMS, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
 
-const MIN_CARDS = 4;
-/** How many of the last questions' words are kept out of the next one, so nothing comes straight back. */
-const RECENT = 3;
 
 /**
- * How a guide is asked under each kind of question: filling a sentence's gap is reading it, building a sentence from
- * the English is recalling it. Guides aren't heard or said.
+ * The kind of question each way of asking a guide counts as: filling a sentence's gap is reading it, building a
+ * sentence from the English is recalling it. Guides aren't heard or said.
  */
-const GUIDE_FORMATS: Partial<Record<Mode, GuideFormat>> = { read: 'gap', recall: 'build' };
+const GUIDE_MODES: Record<GuideFormat, Mode> = { gap: 'read', build: 'recall' };
 
 const MODES: { id: Mode; title: string }[] = [
   { id: 'listen', title: 'Listen' },
@@ -77,9 +74,7 @@ const askOpenAi: MeaningJudge = async (answer, card) => {
 
 /** The kinds of question a card can be asked as. */
 function modesFor(card: Card): Mode[] {
-  if (isVocab(card)) return MODES.map((m) => m.id);
-  if (!card.drills?.length) return [];
-  return canBuildGuide(card) ? ['read', 'recall'] : ['read'];
+  return isVocab(card) ? MODES.map((m) => m.id) : guideFormats(card).map((f) => GUIDE_MODES[f]);
 }
 
 export function practiceScreen(
@@ -89,7 +84,6 @@ export function practiceScreen(
   hearMeaning: () => MeaningHearer | null = hearWithOpenAi,
 ): HTMLElement {
   const root = h('div', { class: 'practice' });
-  const learned = Object.keys(app.progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length;
   const canListen = canPlay();
   const canSpeak = deps.recordingSupported();
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
@@ -176,11 +170,14 @@ export function practiceScreen(
     const ways = modes();
     const card = pickDrillCard(app.progress, app.now(), recent, missed, (c) => modesFor(c).some((m) => ways.includes(m)));
     if (!card) return null;
-    recent = [...recent.slice(-RECENT), card.id];
+    recent = [...recent.slice(-DRILL_GAP), card.id];
     const fits = modesFor(card).filter((m) => ways.includes(m));
     const mode = fits[Math.floor(Math.random() * fits.length)];
     if (!isVocab(card)) {
-      const guide = guideQuestion(card, app.progress, GUIDE_FORMATS[mode]!, lastDrill.get(card.id))!;
+      const format = guideFormats(card).find((f) => GUIDE_MODES[f] === mode)!;
+      const guide = guideQuestion(card, app.progress, format, lastDrill.get(card.id));
+      // modesFor only offers ways the guide has a drill for, so this is never null.
+      if (!guide) return null;
       lastDrill.set(card.id, guide.drill);
       return { card, mode, guide, choices: [], typed: false };
     }
@@ -197,7 +194,10 @@ export function practiceScreen(
   function load(q: Question | null): void {
     if (!q) return;
     if (!q.guide) preload(q.card);
-    else if (q.guide.drill.tl) preload({ tl: drillSentence(q.guide.drill) });
+    else {
+      const clip = sentenceClip(q.guide.drill);
+      if (clip) preload(clip);
+    }
   }
 
   /**
@@ -278,7 +278,10 @@ export function practiceScreen(
     // Nor while the meaning is being said into the microphone, which would record it.
     if ((speak && !speak.mayPlay()) || listening) return;
     if (!q.guide) void play(q.card, slow);
-    else if (answered && q.guide.drill.tl) void play({ tl: drillSentence(q.guide.drill) }, slow);
+    else if (answered) {
+      const clip = sentenceClip(q.guide.drill);
+      if (clip) void play(clip, slow);
+    }
   }
 
   /** A choice picked: a card, or for a guide, the answer's text (or the sentence built). */
@@ -499,7 +502,7 @@ export function practiceScreen(
       h(
         'section',
         { class: 'panel center' },
-        h('p', null, `Learn at least ${MIN_CARDS} words first, then come back here to drill them.`),
+        h('p', null, `Learn at least ${DRILL_MIN_WORDS} words first, then come back here to drill them.`),
         h('button', { class: 'btn primary big', onclick: () => app.navigate({ name: 'study' }) }, 'Go to Study'),
       ),
     );
@@ -589,14 +592,7 @@ export function practiceScreen(
           say,
           onPick: choose,
           onChange: draw,
-          feedback: (right) =>
-            h(
-              'div',
-              { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
-              h('strong', null, right ? 'Tama!' : 'Mali.'),
-              !right && ` The answer is ${answerText(d)}`,
-              !right && q.card.note && h('p', { class: 'feedback-note' }, q.card.note),
-            ),
+          feedback: (right) => guideFeedback(q.card, d, right, { praise: 'Tama!', miss: 'Mali.' }),
           after: [onward()],
         }),
       );
@@ -781,7 +777,7 @@ export function practiceScreen(
   // Drills open straight into a round; closing it, or going back, goes Home.
   const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
   distractorPool = known.length >= 6 ? known : VOCAB;
-  if (learned >= MIN_CARDS) {
+  if (canDrill(app.progress)) {
     current = nextQuestion();
     load(current);
     // Still inside the tap that opened Drills.

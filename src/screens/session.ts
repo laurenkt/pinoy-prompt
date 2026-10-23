@@ -2,9 +2,10 @@ import type { App } from '../app';
 import { VOCAB, getCard, isVocab, unitOf, type Card, type Drill } from '../deck';
 import { KIND_INFO } from '../guides';
 import {
+  DRILL_MIN_WORDS,
   buildExtraSession,
+  canDrill,
   distractors,
-  drillSentence,
   isIntroduced,
   nextStudyStep,
   pickDrill,
@@ -20,7 +21,7 @@ import { canPlay, play, preload, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
 import { audioPair, choiceList, h, hookView, iconButton, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
-import { answerText, drillPrompt, gapLine, guideAnswer, guideBody, guideQuestion, guideQuestionView, type GuideQuestion } from './guide-question';
+import { drillPrompt, gapLine, guideAnswer, guideBody, guideFeedback, guideQuestion, guideQuestionView, sentenceClip, type GuideQuestion } from './guide-question';
 import { isSilent, quietToggle } from './quiet';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'caught-up' | 'done';
@@ -92,7 +93,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   const say = (slow = false) => {
     if (!card) return;
     if (isVocab(card)) void play(card, slow);
-    else if (drill?.tl && (phase === 'feedback' || phase === 'back' || phase === 'missed')) void play({ tl: drillSentence(drill) }, slow);
+    else if (drill && (phase === 'feedback' || phase === 'back' || phase === 'missed')) {
+      const clip = sentenceClip(drill);
+      if (clip) void play(clip, slow);
+    }
   };
   const autoplay = () => app.progress.settings.autoplay && say();
 
@@ -192,7 +196,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     // Skip a guide with nothing to ask, still offering the card that moved on before it.
     if (!drill) return moveOn(previous);
     lastDrill.set(c.id, drill);
-    if (drill.tl) preload({ tl: drillSentence(drill) });
+    const clip = sentenceClip(drill);
+    if (clip) preload(clip);
     phase = guide ? 'quiz' : 'front';
     draw();
   }
@@ -368,6 +373,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   function caughtUpView(): HTMLElement {
     const unmet = unmetCount(app.progress) > 0;
+    // Drills wait for a few words; until then, learning more is the way on.
+    const drills = canDrill(app.progress);
     return h(
       'div',
       { class: 'panel center' },
@@ -377,16 +384,23 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
         'p',
         null,
         unmet ? "No reviews are due, and today's new cards are in." : "No reviews are due, and you've met every card.",
-        ' You can keep practising in Drills, which leans on your weakest cards. It won\'t change when they come back.',
+        drills
+          ? ' You can keep practising in Drills, which leans on your weakest cards. It won\'t change when they come back.'
+          : ` Drills open once you know ${DRILL_MIN_WORDS} words.`,
       ),
       h(
         'div',
         { class: 'stack' },
-        h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: () => app.navigate({ name: 'practice' }) }, 'Keep practising in Drills'),
+        drills &&
+          h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: () => app.navigate({ name: 'practice' }) }, 'Keep practising in Drills'),
         unmet &&
           h(
             'button',
-            { class: 'btn secondary', onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'Something new' }) },
+            {
+              class: drills ? 'btn secondary' : 'btn primary big',
+              'data-autofocus': !drills || undefined,
+              onclick: () => app.navigate({ name: 'session', steps: buildExtraSession(app.progress), title: 'Something new' }),
+            },
             'Learn something new',
           ),
         h('button', { class: 'btn secondary', onclick: close }, 'Stop'),
@@ -579,17 +593,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     );
   }
 
-  function drillFeedback(c: Card, d: Drill, right: boolean): HTMLElement {
-    return h(
-      'div',
-      { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
-      h('strong', null, right ? praise : 'Not quite.'),
-      ' ',
-      right ? (step?.kind === 'new' ? 'That one is yours now.' : '') : `The answer is ${answerText(d)} It will come back shortly.`,
-      !right && c.note && h('p', { class: 'feedback-note' }, c.note),
-    );
-  }
-
   /** A gap to fill or a sentence to build. */
   function guideQuizView(c: Card): HTMLElement {
     const q = guide!;
@@ -598,7 +601,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       say,
       onPick: pickAnswer,
       onChange: draw,
-      feedback: (right) => drillFeedback(c, q.drill, right),
+      feedback: (right) =>
+        guideFeedback(c, q.drill, right, { praise, miss: 'Not quite.', right: step?.kind === 'new' ? 'That one is yours now.' : undefined, after: 'It will come back shortly.' }),
       after: [right && lookAgain(c) && hookView(c), proceed()],
     });
   }

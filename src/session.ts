@@ -186,11 +186,20 @@ export function nextStudyStep(progress: Progress, now: number, recent: string[],
     if (fresh) return { cardId: fresh, kind: 'new', format: isVocab(getCard(fresh)!) ? 'read' : 'gap' };
   }
   // Nothing else to ask: the card just shown again, rather than calling Study caught up while it's still being learned.
-  return queue.length > 0 ? reviewOf(queue[0]) : null;
+  // Not a guide with nothing to ask, which Study skips: it would come straight back.
+  const again = queue[0] && getCard(queue[0])!;
+  return again && (isVocab(again) || again.drills?.length) ? reviewOf(again.id) : null;
 }
 
 /** How many of the last cards drilled are kept out of the next pick, so nothing comes straight back. */
-const DRILL_GAP = 3;
+export const DRILL_GAP = 3;
+/** A drill round waits until this many words are met, so its questions aren't the same few over and over. */
+export const DRILL_MIN_WORDS = 4;
+
+/** Whether there are words enough for a drill round. */
+export function canDrill(progress: Progress): boolean {
+  return Object.keys(progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length >= DRILL_MIN_WORDS;
+}
 /** Cards met within this long count as new in a drill round, and come up more. */
 const FRESH_MS = 7 * DAY_MS;
 

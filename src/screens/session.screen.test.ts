@@ -87,6 +87,15 @@ describe('open-ended study', () => {
     expect(navigate).toHaveBeenCalledWith({ name: 'practice' });
   });
 
+  it('offers new words instead of Drills while there are too few words to drill', () => {
+    const app = fakeApp(['salamat', 'kumusta']);
+    app.progress.settings.dailyNew = 2;
+    const root = sessionScreen(app, null);
+    expect(root.textContent).toContain("You're caught up");
+    expect(root.textContent).not.toContain('Keep practising in Drills');
+    expect(button(root, 'Learn something new').classList).toContain('primary');
+  });
+
   it('is caught up once the last due card is answered, and still shows what was done on stopping', () => {
     const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
     app.progress.settings.dailyNew = 4;
