@@ -638,8 +638,11 @@ export function practiceScreen(
         // Only a meaning the device is sure of, once typing pauses: "no" is right for Hindi, but not on the way to "now".
         // Anything else waits for Check, so a wrong answer is never sent.
         clearTimeout(typingPause);
+        // Goes by the question, not this box: a redraw meanwhile (the filter opening, say) replaces the box.
         typingPause = setTimeout(() => {
-          if (input.isConnected && matchesMeaning(input.value, q.card)) send(input.value);
+          // Not while it's being said instead, or behind the microphone's holding screen.
+          const busy = listening !== null || hearing !== null || waiting || lookingBack;
+          if (current === q && q.typed && !busy && root.isConnected && q.draft && matchesMeaning(q.draft, q.card)) send(q.draft);
         }, TYPING_PAUSE_MS);
       },
       // The keyboard takes the bottom of the screen; keep the box in sight above it.

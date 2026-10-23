@@ -209,6 +209,34 @@ describe('accepting a typed meaning as it is typed', () => {
     }
   });
 
+  it('still takes it when the screen is redrawn during the pause', async () => {
+    vi.useFakeTimers();
+    try {
+      const root = listen(learner(true));
+      typing(root, 'thank you');
+      await vi.advanceTimersByTimeAsync(300);
+      root.querySelector<HTMLButtonElement>('.filter-toggle')!.click();
+      await vi.advanceTimersByTimeAsync(700);
+      expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("doesn't send it after going to the choices", async () => {
+    vi.useFakeTimers();
+    try {
+      const root = listen(learner(true));
+      typing(root, 'thank you');
+      button(root, 'Show choices').click();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      expect(root.querySelector('.choice')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('never sends part of a longer meaning, or a wrong one, by itself', async () => {
     vi.useFakeTimers();
     try {
@@ -259,6 +287,24 @@ describe('saying the meaning out loud', () => {
     expect(hearer).toHaveBeenCalledWith(expect.any(Blob));
     expect(box(root)!.value).toBe('Thank you.');
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+
+  it("doesn't take what was typed once the meaning is being said instead", async () => {
+    vi.useFakeTimers();
+    try {
+      // A recording that goes on until it's stopped.
+      const record = vi.fn(() => ({ audio: new Promise<Take>(() => {}), stop: () => {}, cancel: () => {} }));
+      const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record } as unknown as SpeakDeps;
+      const root = speaking(learner(true), async () => '', deps);
+      box(root)!.value = 'thank you';
+      box(root)!.dispatchEvent(new Event('input'));
+      micButton(root)!.click();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      expect(micButton(root)!.disabled).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('says so when nothing was heard, and leaves the box to type in', async () => {

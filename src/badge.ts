@@ -29,8 +29,10 @@ export function showDueBadge(progress: Progress, now: number, nav: BadgeNavigato
   const due = progress.settings.iconBadge ? studyQueue(progress, now).length : 0;
   if (shown.get(nav) === due) return;
   shown.set(nav, due);
-  // A refused badge (notifications turned off since) just doesn't show.
-  void (due > 0 ? nav.setAppBadge!(due) : nav.clearAppBadge!()).catch(() => {});
+  // A refused badge (notifications turned off) just doesn't show, and is tried again next time.
+  void (due > 0 ? nav.setAppBadge!(due) : nav.clearAppBadge!()).catch(() => {
+    if (shown.get(nav) === due) shown.delete(nav);
+  });
 }
 
 /**

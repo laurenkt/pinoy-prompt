@@ -79,14 +79,16 @@ export interface TokenUsage {
   input_tokens_details?: { cached_tokens?: number };
 }
 
+/** A count or amount from OpenAI or storage, or 0 when it isn't a positive number. */
+const positive = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
+
 /** What a token-billed request cost, in US dollars, from the usage OpenAI reported. */
 export function tokenCost(model: string, usage: TokenUsage | undefined): number {
   const price = PRICES[model];
   if (!price || !usage) return 0;
-  const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
-  const input = count(usage.input_tokens);
-  const cached = Math.min(count(usage.input_tokens_details?.cached_tokens), input);
-  return ((input - cached) * price.input + cached * price.cachedInput + count(usage.output_tokens) * price.output) / 1e6;
+  const input = positive(usage.input_tokens);
+  const cached = Math.min(positive(usage.input_tokens_details?.cached_tokens), input);
+  return ((input - cached) * price.input + cached * price.cachedInput + positive(usage.output_tokens) * price.output) / 1e6;
 }
 
 /** Speech-to-text's list prices, in US dollars per million tokens: it bills audio and text in differently. */
@@ -102,11 +104,10 @@ export interface TranscriptionUsage {
 /** What a transcription cost, in US dollars, from the usage OpenAI reported. Input not split out is priced as audio. */
 export function transcriptionCost(usage: TranscriptionUsage | undefined): number {
   if (!usage) return 0;
-  const count = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : 0);
-  const text = Math.min(count(usage.input_token_details?.text_tokens), count(usage.input_tokens));
-  const audio = count(usage.input_tokens) - text;
+  const text = Math.min(positive(usage.input_token_details?.text_tokens), positive(usage.input_tokens));
+  const audio = positive(usage.input_tokens) - text;
   const p = TRANSCRIBE_PRICES;
-  return (audio * p.audioInput + text * p.textInput + count(usage.output_tokens) * p.output) / 1e6;
+  return (audio * p.audioInput + text * p.textInput + positive(usage.output_tokens) * p.output) / 1e6;
 }
 
 /** What `seconds` of a GPT-Live call cost, in US dollars. */
@@ -124,11 +125,10 @@ function readSpend(): Spend {
   const spend: Spend = { total: 0, months: {} };
   try {
     const saved = JSON.parse(localStorage.getItem(SPEND_STORAGE) ?? 'null') as { total?: unknown; months?: unknown } | null;
-    const amount = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
-    spend.total = amount(saved?.total);
+    spend.total = positive(saved?.total);
     if (saved?.months && typeof saved.months === 'object') {
       for (const [month, value] of Object.entries(saved.months)) {
-        if (/^\d{4}-\d{2}$/.test(month) && amount(value)) spend.months[month] = amount(value);
+        if (/^\d{4}-\d{2}$/.test(month) && positive(value)) spend.months[month] = positive(value);
       }
     }
   } catch {
