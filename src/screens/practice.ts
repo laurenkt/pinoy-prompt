@@ -45,6 +45,8 @@ interface Question {
   unheard?: string;
   /** The microphone's level as the meaning was said, oldest first, drawn in the box until the answer is checked. */
   wave?: number[];
+  /** When the wave began running while what was said is heard and checked, by Date.now(). */
+  thinkingSince?: number;
 }
 
 /** Turns a spoken answer into text. */
@@ -299,6 +301,7 @@ export function practiceScreen(
     q.unheard = undefined;
     // Starts flat and fills from the right as the level comes in.
     const wave = (q.wave = new Array<number>(WAVE_BARS).fill(0));
+    q.thinkingSince = undefined;
     const recording = deps.record({
       onLevel: (level) => {
         if (listening !== recording) return;
@@ -325,6 +328,7 @@ export function practiceScreen(
         if (current !== q || !q.typed || !root.isConnected || picked !== null) return draw();
         if (!take.speech) return unheard("Didn't hear anything. Tap the microphone and say it again, or type it.");
         hearing = recording;
+        q.thinkingSince = Date.now();
         draw();
         let text: string;
         try {
@@ -636,10 +640,15 @@ export function practiceScreen(
    * What the microphone heard, as bars, in place of the box while the meaning is said; they run across while what
    * was said is heard and checked.
    */
-  function waveBox(levels: number[], thinking: boolean): HTMLElement {
+  function waveBox(levels: number[], thinkingSince: number | undefined): HTMLElement {
+    const thinking = thinkingSince !== undefined;
     return h(
       'div',
-      { class: `meaning-wave${thinking ? ' thinking' : ''}`, 'aria-hidden': 'true' },
+      {
+        class: `meaning-wave${thinking ? ' thinking' : ''}`,
+        'aria-hidden': 'true',
+        style: thinking ? `--since: ${Date.now() - thinkingSince}ms` : undefined,
+      },
       levels.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` })),
     );
   }
@@ -690,9 +699,9 @@ export function practiceScreen(
       : hearing
         ? 'Hearing what you said…'
         : checking && q.wave
-          ? `Heard “${q.answer}”. Checking…`
+          ? `Heard “${q.answer?.replace(/[.!?]+$/, '')}”. Checking…`
           : (!answered && q.unheard) || null;
-    const wave = !answered && q.wave && (listening || hearing || checking) ? waveBox(q.wave, !listening) : null;
+    const wave = !answered && q.wave && (listening || hearing || checking) ? waveBox(q.wave, listening ? undefined : (q.thinkingSince ?? Date.now())) : null;
     return h(
       'form',
       {
@@ -738,7 +747,7 @@ export function practiceScreen(
   return root;
 }
 
-/** Bars in the box while a meaning is said: enough to cross it on a wide phone, at about twelve levels a second. */
+/** Bars in the box while a meaning is said, sharing its width: four seconds at about twelve levels a second. */
 const WAVE_BARS = 48;
 
 /** How long typing has to pause before a meaning the device can tell is right is taken without Check. */

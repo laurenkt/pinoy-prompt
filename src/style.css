@@ -1283,15 +1283,13 @@ p {
   min-width: 0;
 }
 
-/* While the meaning is said, the box shows the microphone's level as bars coming in from the right. */
+/* While the meaning is said, the box shows the microphone's level as bars coming in from the right, sharing its width. */
 .meaning-wave {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 2px;
-  overflow: hidden;
   background: var(--cream);
   border: var(--outline);
   border-radius: 16px;
@@ -1301,24 +1299,30 @@ p {
 }
 
 .meaning-wave span {
-  flex: 0 0 4px;
-  height: calc(4px + var(--level, 0) * 34px);
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 5px;
+  /* At most 34px, and 44px as the beat passes, inside the box's 50px. */
+  height: calc(4px + var(--level, 0) * 30px);
   border-radius: 2px;
   background: var(--on-accent);
   transition: height 0.08s linear;
 }
 
-/* Hearing and checking what was said: a magenta beat runs along the bars, left to right. */
+/*
+ * Hearing and checking what was said: a magenta beat runs along the bars, left to right. --since (how long it's
+ * been running) keeps it in step across a redraw, as the transcription comes back.
+ */
 .meaning-wave.thinking span {
   animation: wave-think 1.2s linear infinite;
-  animation-delay: calc(var(--i) * 20ms);
+  animation-delay: calc(var(--i) * 20ms - var(--since, 0ms));
 }
 
 @keyframes wave-think {
   0%,
   10% {
     background: var(--magenta);
-    transform: scaleY(1.5);
+    transform: scaleY(1.3);
   }
   10.01%,
   100% {

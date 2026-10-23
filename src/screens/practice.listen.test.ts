@@ -387,7 +387,7 @@ describe('saying the meaning out loud', () => {
     heard('Many thanks.');
     await flush();
     expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
-    expect(root.querySelector('.meaning-status')?.textContent).toContain('Heard “Many thanks.”. Checking');
+    expect(root.querySelector('.meaning-status')?.textContent).toContain('Heard “Many thanks”. Checking');
     judged(true);
     await flush();
     expect(root.querySelector('.meaning-wave')).toBeNull();
