@@ -334,6 +334,8 @@ describe('checking a typed meaning', () => {
     expect(body.model).toBe(CHECK_MODEL);
     expect(body.store).toBe(false);
     expect(body.input).toBe('Tagalog: Maraming salamat\nMeaning: Thank you very much\nAnswer: thanks a lot');
+    // Saying the Tagalog back means the same, but the answer has to be in English.
+    expect(body.instructions).toMatch(/has to be in English.*repeat the Tagalog/s);
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 

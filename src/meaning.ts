@@ -2,7 +2,8 @@
 // It's judged on meaning, not spelling: typos, word order, contractions, "a"
 // and "the", and digits for numbers don't matter. Anything this can't match
 // may still be right in other words, so it goes to OpenAI when the learner has
-// a key, and the learner can always say they had it.
+// a key, and the learner can always say they had it. The answer has to be in
+// English: saying the Tagalog back means the same, but isn't an answer.
 
 import { VOCAB, type Card } from './deck';
 
@@ -181,6 +182,31 @@ export function matchesMeaning(answer: string, card: Card): boolean {
   );
 }
 
+/** Lower case words, without accents or punctuation: how Tagalog is compared. */
+function plainWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+/** Respect words that can go with any Tagalog said back. */
+const RESPECT = ['po', 'ho', 'pong', 'hong'];
+
+/**
+ * Whether the answer is the card's Tagalog said back ("salamat", "Salamat po",
+ * an accepted spelling), not its meaning in English. It means the same, but
+ * the question asks for the English, so it's never right. A loanword the card
+ * shares with its English ("bill") still matches that first.
+ */
+export function repeatsTagalog(answer: string, card: Card): boolean {
+  const tagalog = new Set([card.tl, ...(card.accept ?? [])].flatMap(plainWords));
+  const list = plainWords(answer).filter((w) => !RESPECT.includes(w));
+  return list.length > 0 && list.every((w) => tagalog.has(w));
+}
+
 /**
  * Judge a typed meaning: on the device first, then by `ask` when that can't
  * match it. Without an answer from `ask` (no key, offline, an error), the
@@ -189,6 +215,8 @@ export function matchesMeaning(answer: string, card: Card): boolean {
 export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge | null): Promise<Verdict> {
   if (!answer.trim()) return { right: false };
   if (matchesMeaning(answer, card)) return { right: true };
+  // Not asked: OpenAI would see that it means the same.
+  if (repeatsTagalog(answer, card)) return { right: false };
   if (!ask) return { right: false };
   try {
     return { right: (await ask(answer, card)) ?? false };
