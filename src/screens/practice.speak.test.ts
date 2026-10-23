@@ -69,7 +69,7 @@ describe('Speak mode', () => {
     await flush();
     drillScope(root, ['speak']);
     await flush();
-    // The panel's middle row (see .speak.ready in style.css): the cue above it, then the button.
+    // One layout while listening (.speak.listening in style.css): the cue, then the button below it.
     const layout = () => [...document.querySelector('.panel > .speak')!.children].map((c) => c.className);
     expect(layout()).toEqual(['speak-cue', 'btn mic huge']);
     button('Tap and speak').click();

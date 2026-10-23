@@ -1384,7 +1384,7 @@ p {
   min-height: 1lh;
 }
 
-/* As big as Drills' play button (.audio-btn.huge), full width. */
+/* Home's big buttons' title size (.hub-btn.big) and Drills' play button's radius (.audio-btn.huge), full width. */
 .btn.mic.huge {
   flex-direction: column;
   gap: 8px;
@@ -1392,7 +1392,7 @@ p {
   /* Under a typical thumb's width on the shortest phones, so listening still fits; taller from there. */
   min-height: clamp(112px, (var(--fill) - 640px) * 0.5 + 112px, 176px);
   border-radius: 24px;
-  font-size: 1.35rem;
+  font-size: 1.6rem;
   box-shadow: var(--shadow-big);
 }
 
