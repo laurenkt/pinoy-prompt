@@ -403,19 +403,11 @@ p {
   white-space: nowrap;
 }
 
-.growth-caption > button {
-  flex-shrink: 0;
-}
-
 .growth-total {
   font-size: 1.5rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   margin-right: 6px;
-}
-
-.growth-back {
-  margin-left: auto;
 }
 
 /* The forecast: the stream carried on in hard stripes, its outline dashed. */
@@ -586,7 +578,6 @@ p {
   top: 52px;
 }
 
-.growth-back[hidden],
 .growth-goal[hidden],
 .growth-forecast[hidden],
 .growth-marker[hidden] {

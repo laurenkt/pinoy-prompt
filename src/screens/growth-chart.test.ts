@@ -51,7 +51,7 @@ describe('growthChart', () => {
     expect(el.querySelector('.growth-hint')).toBeNull();
   });
 
-  it('shows an earlier day when touched, and comes back to today', () => {
+  it('shows an earlier day when tapped, and comes back to today with another tap', () => {
     const counts = legend();
     const el = growthChart(history, counts);
     const frame = el.querySelector<HTMLElement>('.growth-frame')!;
@@ -60,9 +60,14 @@ describe('growthChart', () => {
     expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^4 cards on /);
     expect(counts.days.textContent).toBe('3');
     expect(el.querySelector<HTMLElement>('.growth-marker')!.hidden).toBe(false);
-    el.querySelector<HTMLButtonElement>('.growth-back')!.click();
+    expect(el.querySelector('.growth-caption button')).toBeNull();
+    tap(frame, 140);
     expect(el.querySelector('.growth-caption')!.textContent).toContain('7 cards today');
     expect(counts.days.textContent).toBe('1');
+    expect(el.querySelector<HTMLElement>('.growth-marker')!.hidden).toBe(true);
+    // Done looking, so the next tap looks again.
+    tap(frame, 0);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^2 cards on /);
   });
 
   it('explains itself in the first days', () => {
@@ -114,17 +119,18 @@ describe('forecast', () => {
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     // Halfway from today (at 70%) to the milestone: halfway from 10 words to 500.
     tap(frame, 20);
+    tap(frame, 20);
     tap(frame, 255);
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~255 cards(Back to today)?$/);
+    expect(el.querySelector('.growth-caption')!.textContent).toBe('~255 cards');
     // The legend is back on today, not the day looked at before.
     expect(counts.weeks.textContent).toBe('10');
     expect(el.querySelector<HTMLElement>('.growth-marker')!.style.left).toBe('85%');
+    tap(frame, 20);
     tap(frame, 20);
     expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^0 cards on /);
     // The level's label stays, with its list, while looking along the chart.
     expect(el.querySelector<HTMLElement>('.growth-forecast')!.hidden).toBe(false);
     expect(el.querySelector<HTMLElement>('.growth-goal')!.hidden).toBe(false);
-    expect(el.querySelector<HTMLElement>('.growth-back')!.hidden).toBe(false);
   });
 
   it('starts the projection from the cards that have stuck, the count the forecast runs on', () => {
@@ -134,7 +140,7 @@ describe('forecast', () => {
     const frame = el.querySelector<HTMLElement>('.growth-frame')!;
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     tap(frame, 210.3);
-    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~[6-8] cards(Back to today)?$/);
+    expect(el.querySelector('.growth-caption')!.textContent).toMatch(/^~[6-8] cards$/);
   });
 
   it("opens the list from the level's label without looking along the chart", () => {
@@ -193,6 +199,20 @@ describe('forecast', () => {
     }
     expect(vibrate).toHaveBeenCalledTimes(scrubbed);
     vi.unstubAllGlobals();
+  });
+
+  it('keeps the marker on today, where the past meets the projection', () => {
+    const el = growthChart(history, legend(), ahead(0.5, now + 400 * DAY_MS));
+    const frame = el.querySelector<HTMLElement>('.growth-frame')!;
+    frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
+    const marker = el.querySelector<HTMLElement>('.growth-marker')!;
+    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 150, clientY: 50, pointerType: 'touch' }));
+    frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 210, clientY: 50, pointerType: 'touch' }));
+    expect(el.querySelector('.growth-caption')!.textContent).toContain('cards today');
+    expect(marker.hidden).toBe(false);
+    expect(marker.style.left).toBe('70%');
+    frame.dispatchEvent(new PointerEvent('pointerup', { clientX: 210, clientY: 50, pointerType: 'touch' }));
+    expect(marker.hidden).toBe(false);
   });
 
   it('draws no projection without a date ahead', () => {

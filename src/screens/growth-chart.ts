@@ -1,10 +1,10 @@
 // A stacked stream of how many words are held at each strength over time:
 // the height shows how many words you know, the colors how firmly. Drag across
-// it to see any earlier day. With a forecast, the stream carries on hatched from
+// it, or tap it, to see any earlier day; tap it again to put it back on today. With a forecast, the stream carries on hatched from
 // today towards the next milestone, with roughly when it might be reached.
 
 import { STRENGTHS, curveAt, type Forecast, type MemoryHistory, type Strength } from '../memory';
-import { detents } from '../speech';
+import { detents, readyDetents, tick } from '../speech';
 import { DAY_MS } from '../srs';
 import { h, svg } from '../ui';
 
@@ -207,7 +207,6 @@ export function growthChart(
 
   const value = h('strong', { class: 'growth-total' });
   const when = h('span', { class: 'muted' });
-  const back = h('button', { class: 'link-btn growth-back', hidden: true, onclick: () => show(last) }, 'Back to today');
   const marker = h('div', { class: 'growth-marker', hidden: true, 'aria-hidden': 'true' });
   const ahead = next && forecast && forecastView(forecast);
   if (ahead) ahead.hidden = true;
@@ -225,7 +224,7 @@ export function growthChart(
         onpointerdown: (e: PointerEvent) => e.stopPropagation(),
         onpointermove: (e: PointerEvent) => e.stopPropagation(),
         onpointerenter: (e: PointerEvent) => {
-          if (e.pointerType === 'mouse') show(last);
+          if (e.pointerType === 'mouse') rest();
         },
         onclick: () => {
           ahead.hidden = !ahead.hidden;
@@ -238,13 +237,19 @@ export function growthChart(
       h('span', null, timeUntil(next.at, times[last])),
     );
 
+  /** Today, with no point picked out: as the chart opens, and once the learner is done looking. */
+  function rest(): void {
+    show(last);
+    marker.hidden = true;
+  }
+
   function show(i: number): void {
     const today = i === last;
     const n = total(i);
     value.textContent = String(n);
     when.textContent = ` ${n === 1 ? 'card' : 'cards'} ${today ? 'today' : `on ${shortDate(times[i])}`}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][i]);
-    lookAt(today, (i / last) * past);
+    lookAt((i / last) * past);
   }
 
   /** A point `u` of the way from today to the next milestone, read off the projection. */
@@ -255,14 +260,13 @@ export function growthChart(
     value.textContent = `~${Math.round(from + projected(forecast!, next.at, times[last], u) * (next.cards - from))}`;
     for (const id of LAYERS) legendCounts[id].textContent = String(raw[id][last]);
     when.textContent = ' cards';
-    lookAt(false, past + u * (1 - past));
+    lookAt(past + u * (1 - past));
   }
 
-  /** The marker and the caption's corner, for any point but today. */
-  function lookAt(today: boolean, x: number): void {
-    marker.hidden = today;
+  /** The marker on the point being looked at, today included (where the past meets the projection). */
+  function lookAt(x: number): void {
+    marker.hidden = false;
     marker.style.left = `${x * 100}%`;
-    back.hidden = today;
   }
 
   const frame = h(
@@ -291,12 +295,13 @@ export function growthChart(
   };
   // A finger scrubbing across the days ticks at each one, like a picker wheel.
   const detent = detents();
-  // A mouse looks by hovering. A finger looks by dragging sideways or tapping;
-  // a drag that starts up or down is left to scroll the page.
+  // A mouse looks by hovering. A finger looks by dragging sideways or tapping,
+  // and a tap while looking puts the chart back on today; a drag that starts
+  // up or down is left to scroll the page.
   let touch: { x: number; y: number; scrub: boolean } | null = null;
   frame.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') pick(e);
-    else touch = { x: e.clientX, y: e.clientY, scrub: false };
+    if (e.pointerType === 'mouse') return pick(e);
+    touch = { x: e.clientX, y: e.clientY, scrub: false };
   });
   frame.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') return pick(e);
@@ -305,12 +310,19 @@ export function growthChart(
     const dy = Math.abs(e.clientY - touch.y);
     if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
     else if (touch.scrub || (dx > 8 && dx > dy)) {
+      // Audio is got going as the scrub begins (not for a touch that scrolls), so its next step ticks.
+      if (!touch.scrub) readyDetents();
       touch.scrub = true;
       detent(pick(e));
     }
   });
   frame.addEventListener('pointerup', (e) => {
-    if (touch && !touch.scrub) pick(e);
+    if (touch && !touch.scrub) {
+      if (marker.hidden) pick(e);
+      else rest();
+      // A tap is a press, so it clicks like one.
+      tick('click');
+    }
     touch = null;
     detent(null);
   });
@@ -319,14 +331,14 @@ export function growthChart(
     detent(null);
   });
   frame.addEventListener('pointerleave', (e) => {
-    if (e.pointerType === 'mouse') show(last);
+    if (e.pointerType === 'mouse') rest();
   });
 
   const mid = Math.round(last / 2);
   const el = h(
     'div',
     { class: 'growth' },
-    h('div', { class: 'growth-caption' }, value, when, back),
+    h('div', { class: 'growth-caption' }, value, when),
     frame,
     h(
       'div',
@@ -342,6 +354,6 @@ export function growthChart(
     ),
     ahead,
   );
-  show(last);
+  rest();
   return el;
 }

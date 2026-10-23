@@ -28,6 +28,12 @@ const SIZES = [
 /** How to reach each screen from Home. */
 const SCREENS = {
   home: async () => {},
+  // The memory chart tapped where the past meets the forecast: the marker on today.
+  'home-chart': async (page) => {
+    const frame = await page.locator('.growth-frame').boundingBox();
+    const past = await page.locator('.growth-axis-past').boundingBox();
+    await page.touchscreen.tap(past.x + past.width, frame.y + frame.height * 0.8);
+  },
   drills: (page) => page.click('.drills-btn'),
   // With the speech model on the device (a stand-in for it), Drills asks for the microphone as it opens,
   // here a question never answered, so the holding screen stays up.

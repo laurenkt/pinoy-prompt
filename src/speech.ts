@@ -228,6 +228,11 @@ export function setTapSounds(on: boolean): void {
   tapSounds = on;
 }
 
+/** Whether a tap sound may play: Tap sounds on, not silent, and no microphone in use to catch it. */
+function tapSoundsCanPlay(): boolean {
+  return tapSounds && !muted && clipsSupported() && !microphoneInUse();
+}
+
 /** The two tap sounds: a thock for the big chunky buttons, a lighter click for pills, chips and small controls. */
 export type TapKind = 'thock' | 'click';
 
@@ -258,7 +263,7 @@ function loadThock(): Promise<AudioBuffer> {
  * where it would be recorded.
  */
 export function tick(kind: TapKind = 'thock'): void {
-  if (!tapSounds || muted || !clipsSupported() || microphoneInUse()) return;
+  if (!tapSoundsCanPlay()) return;
   // A word or the chime takes the shared context inside the press, and a reference sound or slice too.
   if (audioBusy(250) || speaking()) return;
   const ctx = audioContext(true);
@@ -299,7 +304,7 @@ export function detents(): (step: string | null) => void {
     if (!moved || !tapSounds || performance.now() - last < DETENT_GAP_MS) return;
     last = performance.now();
     hapticTick();
-    if (muted || !clipsSupported() || microphoneInUse() || speaking()) return;
+    if (!tapSoundsCanPlay() || speaking()) return;
     // A drag isn't a tap, so iOS won't start audio from it: tick only if it's already going, never late.
     const ctx = runningContext();
     if (!ctx) return;
@@ -310,6 +315,17 @@ export function detents(): (step: string | null) => void {
     }
     playBuffer(detentBuffer, { fades: false, incidental: true });
   };
+}
+
+/**
+ * Gets the shared context going as a scrub begins, so its next steps tick,
+ * not only once something else has played. iOS won't start a context from a
+ * drag, so the very first scrub after opening the app may stay silent; one
+ * resumed after a while idle starts. Plays nothing.
+ */
+export function readyDetents(): void {
+  if (!tapSoundsCanPlay() || speaking()) return;
+  audioContext(true);
 }
 
 /**
