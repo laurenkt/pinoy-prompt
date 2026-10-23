@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recordAnswer } from '../store';
 import { practiceScreen } from './practice';
+import { quietToggle } from './quiet';
 import type { SpeakDeps } from './speak';
 import { button, drillScope, fakeApp as knowing, flush } from '../test/screen';
 
@@ -156,6 +157,55 @@ describe('asking for the microphone in Drills', () => {
       root.querySelector<HTMLButtonElement>('.choice')!.click();
       button(root, 'Next').click();
     }
+  });
+
+  it("leaves speaking out when the model is only found after the round opened and the phone would ask", async () => {
+    const mic = micNotYet({ modelKnownDownloaded: () => false });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    document.body.append(root);
+    await flush();
+    for (let i = 0; i < 20; i++) {
+      expect(speaking(root)).toBe(false);
+      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      button(root, 'Next').click();
+    }
+    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+  });
+
+  it('lets speaking in once a later tap holds the microphone, when the model is found late', async () => {
+    const mic = micNotYet({ modelKnownDownloaded: () => false, microphoneAllowed: () => true });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    document.body.append(root);
+    await flush();
+    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+    // Narrowing to Speak and back is a tap that may ask to speak.
+    drillScope(root, ['read', 'speak']);
+    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    let spoke = false;
+    for (let i = 0; i < 40 && !spoke; i++) {
+      spoke = speaking(root);
+      if (spoke) break;
+      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      button(root, 'Next').click();
+    }
+    expect(spoke).toBe(true);
+    drillScope(root, ['listen', 'read', 'recall', 'speak']);
+  });
+
+  it('taps before turning Speak on or quiet mode off, as either may open the microphone, and only then', () => {
+    const root = practiceScreen(fakeApp(), micNotYet({ microphoneAllowed: () => true }).deps);
+    const tapsFirst = (selector: string) => root.querySelector(selector)!.getAttribute('data-tap') === 'before';
+    // Speak is on, so the chip would turn it off; quiet mode is off, so the toggle would turn silent mode on.
+    expect(tapsFirst('[data-mode="speak"]')).toBe(false);
+    expect(tapsFirst('[aria-label^="Quiet mode"]')).toBe(false);
+    drillScope(root, ['read']);
+    expect(tapsFirst('[data-mode="speak"]')).toBe(true);
+    expect(tapsFirst('[data-mode="listen"]')).toBe(false);
+    drillScope(root, ['listen', 'read', 'recall', 'speak']);
+    const headphones = practiceScreen(knowing(KNOWN, { dailyNew: KNOWN.length, quiet: true, headphones: true }), micNotYet().deps);
+    expect(headphones.querySelector('[aria-label^="Quiet mode"]')!.getAttribute('data-tap')).toBe('before');
+    // Elsewhere (Home, Study) it never opens the microphone, so it taps after, as other controls do.
+    expect(quietToggle(knowing(KNOWN, { quiet: true, headphones: true }), () => {}).hasAttribute('data-tap')).toBe(false);
   });
 
   it('asks when Speak is chosen again mid-round', async () => {

@@ -36,11 +36,14 @@ export function applyAudioMode(settings: Settings): void {
   document.documentElement.classList.toggle('silent', silent);
 }
 
-/** One button that steps through off, silent, and quiet with headphones: the same icon toggle on every screen. */
-export function quietToggle(app: App, onChange: () => void): HTMLButtonElement {
+/**
+ * One button that steps through off, silent, and quiet with headphones: the same icon toggle on every screen.
+ * `mayOpenMicrophone` is for a screen whose onChange opens the microphone when quiet mode goes off (Drills).
+ */
+export function quietToggle(app: App, onChange: () => void, { mayOpenMicrophone = false } = {}): HTMLButtonElement {
   const settings = app.progress.settings;
   const current = MODES[mode(settings)];
-  return iconButton(
+  const button = iconButton(
     current.icon,
     current.label,
     () => {
@@ -55,4 +58,8 @@ export function quietToggle(app: App, onChange: () => void): HTMLButtonElement {
     },
     { pressed: settings.quiet, title: current.title },
   );
+  // Quiet mode going off may then open the microphone, after which the tap sound would be held back. Only then: tapping
+  // first reads the mute from before the press, and in Study it would sound over a word the change plays.
+  if (mayOpenMicrophone && current.next === 'off') button.dataset.tap = 'before';
+  return button;
 }

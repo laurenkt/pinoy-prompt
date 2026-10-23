@@ -88,9 +88,13 @@ export function practiceScreen(
   const canSpeak = deps.recordingSupported();
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
   let speakReady = deps.modelKnownDownloaded?.() ?? false;
+  /** The model turned out to be on the device after the round opened; speaking joins once the microphone is held. */
+  let modelFound = false;
   if (canSpeak) {
+    // Found only after the round opened (the app's own check hadn't finished), it's too late to hold the microphone
+    // from the opening tap, so speaking waits for a later tap that does (see askForMicrophoneIfNeeded).
     deps.modelDownloaded().then(
-      (ready) => (speakReady ||= ready),
+      (ready) => (modelFound ||= ready),
       () => {},
     );
   }
@@ -162,7 +166,7 @@ export function practiceScreen(
   function modes(): Mode[] {
     const picks = chosen();
     if (picks.length === 1 && picks[0] === 'speak') return picks;
-    const ready = (m: Mode) => m !== 'speak' || speakReady;
+    const ready = (m: Mode) => m !== 'speak' || speakReady || (modelFound && micHeld);
     const ways = picks.filter(ready);
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
@@ -208,7 +212,8 @@ export function practiceScreen(
    * would ask, it asks now, over a holding screen.
    */
   function askForMicrophoneIfNeeded(): void {
-    if (waiting || !canSpeak || !current || !modes().includes('speak')) return;
+    const speaks = modes().includes('speak') || (modelFound && chosen().includes('speak'));
+    if (waiting || !canSpeak || !current || !speaks) return;
     // While WebKit still remembers the Allow it goes straight through, with no holding screen. Held anyway, as that
     // only lasts minutes. Once it has lapsed (a long while in the background closes the stream), the phone asks again.
     const asks = needsMicrophone(deps);
@@ -561,6 +566,8 @@ export function practiceScreen(
           const on = scope.has(m.id);
           return chip(m.title, on, {
             'data-mode': m.id,
+            // Choosing Speak may open the microphone, after which the tap sound would be held back.
+            'data-tap': m.id === 'speak' && !on ? 'before' : undefined,
             // One that can't be asked right now keeps its place, for when quiet mode goes off.
             disabled: unavailable(m.id) !== null,
             // The last kind left in stays on (see toggleScope); say so, rather than look like it will toggle.
@@ -583,7 +590,7 @@ export function practiceScreen(
         iconButton('close', 'End drill', home),
         h('span', { class: 'session-count' }, `${done} done`),
         scopeToggle,
-        quietToggle(app, rescope),
+        quietToggle(app, rescope, { mayOpenMicrophone: true }),
       ),
       scopeChips,
     ];
