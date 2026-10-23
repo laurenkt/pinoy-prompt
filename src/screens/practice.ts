@@ -362,6 +362,15 @@ export function practiceScreen(
     recording?.cancel();
   }
 
+  /** Throw away a meaning being said and give the box back, so it can be said again or typed. */
+  function cancelSaying(q: Question): void {
+    if (!listening) return;
+    stopListening();
+    q.wave = undefined;
+    q.thinkingSince = undefined;
+    draw();
+  }
+
   function answer(q: Question, pick: string): void {
     picked = pick;
     const right = pick === q.card.id;
@@ -718,7 +727,10 @@ export function practiceScreen(
           'div',
           { class: 'row' },
           h('button', { class: 'btn secondary', type: 'button', onclick: showChoices }, 'Show choices'),
-          h('button', { class: 'btn primary', type: 'submit', disabled: busy }, checking ? 'Checking…' : 'Check'),
+          // While a meaning is being said there's nothing to check yet, so this place throws it away instead.
+          listening
+            ? h('button', { class: 'btn secondary', type: 'button', onclick: () => cancelSaying(q) }, 'Cancel')
+            : h('button', { class: 'btn primary', type: 'submit', disabled: busy }, checking ? 'Checking…' : 'Check'),
         ),
     );
   }

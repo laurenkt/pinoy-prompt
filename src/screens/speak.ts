@@ -278,6 +278,18 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     }
   }
 
+  /** Throw the take away and go back to ready, so the learner can start again without it counting as an attempt. */
+  function cancelRecording(): void {
+    if (state.name !== 'recording') return;
+    takeFocus = true;
+    // Makes the take stale, so whatever it resolves to is ignored.
+    attempt++;
+    const current = recording;
+    recording = null;
+    current?.cancel();
+    set({ name: 'ready' });
+  }
+
   function updateProgress(): void {
     if (state.name !== 'loading' || state.progress === null) return;
     const pct = Math.round(state.progress * 100);
@@ -301,6 +313,13 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     h('button', { class: className, 'data-autofocus': true, 'data-no-tap': true, onclick: () => void startRecording() }, icon('mic'), ' ', label);
   const skip = (label = 'Skip') => h('button', { class: 'btn secondary', onclick: options.onNext }, label);
 
+  /**
+   * Below the big button while listening: throw the take away and start again. It keeps its room while ready and
+   * checking, hidden, so the big button doesn't move.
+   */
+  const cancel = () =>
+    h('div', { class: 'row speak-cancel' }, h('button', { class: 'btn secondary', disabled: state.name !== 'recording', onclick: cancelRecording }, 'Cancel'));
+
   function listening(status: string, button: HTMLElement): HTMLElement[] {
     return [
       h(
@@ -311,6 +330,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         h('p', { class: 'listen-status center', role: 'status' }, status),
       ),
       button,
+      cancel(),
     ];
   }
 

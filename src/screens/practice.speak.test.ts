@@ -69,11 +69,11 @@ describe('Speak mode', () => {
     await flush();
     drillScope(root, ['speak']);
     await flush();
-    // One layout while listening (.speak.listening in style.css): the cue, then the button below it.
+    // One layout while listening (.speak.listening in style.css): the cue, the button below it, and room for Cancel.
     const layout = () => [...document.querySelector('.panel > .speak')!.children].map((c) => c.className);
-    expect(layout()).toEqual(['speak-cue', 'btn mic huge']);
+    expect(layout()).toEqual(['speak-cue', 'btn mic huge', 'row speak-cancel']);
     button('Tap and speak').click();
-    expect(layout()).toEqual(['speak-cue', 'btn mic huge done']);
+    expect(layout()).toEqual(['speak-cue', 'btn mic huge done', 'row speak-cancel']);
     expect(document.querySelector('.speak-cue .meter')).toBeTruthy();
   });
 

@@ -307,6 +307,40 @@ describe('saying the meaning out loud', () => {
     }
   });
 
+  it('throws a meaning being said away on Cancel, leaving the question to say again or type', async () => {
+    let cancelled = 0;
+    let finish: (t: Take) => void = () => {};
+    const record = vi.fn(() => ({
+      audio: new Promise<Take>((r) => (finish = r)),
+      stop: () => finish({ samples: new Float32Array(160), speech: true }),
+      cancel: () => {
+        cancelled++;
+        finish({ samples: new Float32Array(0), speech: false });
+      },
+    }));
+    const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record } as unknown as SpeakDeps;
+    const hearer = vi.fn<MeaningHearer>(async () => 'Thank you.');
+    const root = speaking(learner(true), hearer, deps);
+    const cancel = () => [...root.querySelectorAll('button')].find((b) => b.textContent === 'Cancel');
+    expect(cancel()).toBeUndefined();
+    micButton(root)!.click();
+    cancel()!.click();
+    await flush();
+    expect(cancelled).toBe(1);
+    expect(hearer).not.toHaveBeenCalled();
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(root.querySelector('.meaning-status')).toBeNull();
+    expect(box(root)!.disabled).toBe(false);
+    expect(cancel()).toBeUndefined();
+    // Said again, it's heard and checked as usual.
+    micButton(root)!.click();
+    micButton(root)!.click();
+    await flush();
+    await flush();
+    expect(hearer).toHaveBeenCalledOnce();
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+
   it('says so when nothing was heard, and leaves the box to type in', async () => {
     const { deps } = mic(false);
     const hearer = vi.fn<MeaningHearer>(async () => '');

@@ -288,6 +288,28 @@ describe('an attempt', () => {
     expect(text('.hint')).toContain(getCard('salamat')!.hint!);
   });
 
+  it('throws a take away on Cancel, without counting it, and listens again on the next tap', async () => {
+    heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
+    await open('salamat');
+    expect(button('Cancel').disabled).toBe(true);
+    button('Tap and speak').click();
+    mic.events.onSpeech?.();
+    button('Cancel').click();
+    expect(mic.cancelled).toBe(true);
+    expect(panel.el.classList).toContain('ready');
+    // Whatever the cancelled take gives back is ignored.
+    mic.finish({ samples: new Float32Array(16000), speech: true });
+    await flush();
+    expect(onAttempt).not.toHaveBeenCalled();
+    expect(panel.el.classList).toContain('ready');
+    button('Tap and speak').click();
+    expect(text('.listen-status')).toBe('Mic on. Say it now.');
+    button("I'm done").click();
+    await flush();
+    expect(onAttempt).toHaveBeenCalledOnce();
+    expect(onAttempt).toHaveBeenCalledWith(true);
+  });
+
   it('stops recording when the question goes away', async () => {
     await open('salamat');
     button('Tap and speak').click();
