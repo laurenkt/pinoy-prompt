@@ -105,13 +105,10 @@ describe('asking for the microphone in Drills', () => {
     expect(waiting(root)).toBe(true);
   });
 
-  it("doesn't ask in quiet mode, when the round can't ask to speak, or when the browser wouldn't ask", () => {
+  it("doesn't ask in quiet mode, or when the round can't ask to speak", () => {
     const quiet = micNotYet();
     practiceScreen(fakeApp(true), quiet.deps);
     expect(quiet.holdMicrophone).not.toHaveBeenCalled();
-    const allowed = micNotYet({ microphoneAllowed: () => true });
-    practiceScreen(fakeApp(), allowed.deps);
-    expect(allowed.holdMicrophone).not.toHaveBeenCalled();
     const first = micNotYet();
     const root = practiceScreen(fakeApp(), first.deps);
     first.answer(true);
@@ -121,6 +118,31 @@ describe('asking for the microphone in Drills', () => {
     expect(readOnly.holdMicrophone).not.toHaveBeenCalled();
     // The scope is kept across visits, so the rest get the whole mix back.
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
+  });
+
+  it("holds it without a holding screen when the browser wouldn't ask, since its remembered Allow runs out", () => {
+    const allowed = micNotYet({ microphoneAllowed: () => true });
+    const root = practiceScreen(fakeApp(), allowed.deps);
+    expect(allowed.holdMicrophone).toHaveBeenCalledOnce();
+    expect(waiting(root)).toBe(false);
+    expect(root.querySelector('.choice, .speak')).not.toBeNull();
+    // Once is enough for the visit.
+    drillScope(root, ['read', 'speak']);
+    expect(allowed.holdMicrophone).toHaveBeenCalledOnce();
+    drillScope(root, ['listen', 'read', 'recall', 'speak']);
+  });
+
+  it('leaves speaking out when a hold that should have gone straight through is refused', async () => {
+    const allowed = micNotYet({ microphoneAllowed: () => true });
+    const root = practiceScreen(fakeApp(), allowed.deps);
+    document.body.append(root);
+    allowed.answer(false);
+    await flush();
+    for (let i = 0; i < 20; i++) {
+      expect(speaking(root)).toBe(false);
+      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      button(root, 'Next').click();
+    }
   });
 
   it('asks when Speak is chosen again mid-round', async () => {

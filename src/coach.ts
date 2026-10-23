@@ -96,7 +96,7 @@ function adviceFor(r: SoundResult, letters: string): string | null {
   return null;
 }
 
-/** Up to `max` tips, most important first: sounds that were off or missing before ones that were close. */
+/** Up to `max` tips, most important first: sounds that were off or missing before ones that were close. Each covers every sound it fits. */
 export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
   const rank = { missing: 0, off: 0, close: 1, good: 2 } as const;
   const problems = comparison.sounds
@@ -106,11 +106,10 @@ export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
   for (const r of problems) {
     const letters = text.slice(r.phone.from, r.phone.to);
     const tip = tipFor(r, letters);
-    // One tip per kind of sound is plenty.
+    // One tip per kind of sound is plenty. Past `max`, a later sound can still share one, so the breakdown shows it there too.
     const same = tip && tips.find((t) => t.text === tip.text);
     if (same) same.at.push(r.phone.from);
-    else if (tip) tips.push({ letters, at: [r.phone.from], ...tip });
-    if (tips.length >= max) break;
+    else if (tip && tips.length < max) tips.push({ letters, at: [r.phone.from], ...tip });
   }
   const added = comparison.extra.find((e) => e.counts);
   if (added && tips.length < max) {

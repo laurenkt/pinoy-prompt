@@ -279,6 +279,22 @@ describe('the breakdown', () => {
     expect(q('.sound-detail .detail-tip').textContent).toContain('Open your mouth wide');
   });
 
+  it('gives an added sound no advice, not even the advice meant for the sound before it', () => {
+    // The o slid towards "u" (advice on keeping it pure), then an added s.
+    show(attempt('po', ['p', 'u', 's']));
+    expect(q('.sound-detail .detail-tip').textContent).toContain('Keep the "o" pure');
+    q<HTMLButtonElement>('.mark-extra').click();
+    expect(q('.sound-detail').textContent).toMatch(/Added/);
+    expect(q('.sound-detail .detail-tip')).toBeNull();
+  });
+
+  it('shows a tip on every sound it fits, even past the first two kinds', () => {
+    // Two kinds of tip for the first two a's, then the last a shares the first one's.
+    show(attempt('salamat', ['s', 'ə', 'l', 'ɛ', 'm', 'ə', 't']));
+    all('.ribbon-mark')[5].click();
+    expect(q('.sound-detail .detail-tip').textContent).toContain('Open your mouth wide');
+  });
+
   it('only shows a tip on the sound that needs it, not on every sound spelled the same', () => {
     const a = attempt('Salamat', ['s', 'ɐ', 'l', 'a', 'm', 'a', 't']);
     show(a);

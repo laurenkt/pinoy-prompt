@@ -1,10 +1,11 @@
 // Plays short pieces of audio for the pronunciation results: a slice of the
 // learner's own recording, or a single sound made in code (src/phone-synth.ts),
 // held as long as a finger is down. One at a time; starting another stops the
-// last.
+// last. Silent mode (speech.ts's mute) plays nothing here either.
 
 import { audioContext, playBuffer, playLive, type Sound } from './audio-engine';
 import { canSynthesize, phoneVoice, type Voice } from './phone-synth';
+import { audioMuted } from './speech';
 
 export interface Playback {
   /** Resolves when it finishes or is stopped. */
@@ -16,7 +17,7 @@ export interface Player {
   playSlice(samples: Float32Array, sampleRate: number, from: number, to: number, onTime?: (t: number) => void): Playback;
   /**
    * Hold a sound made in code at `volume` (0–1, of its full loudness) until released.
-   * Null when it can't be made (canSynthesize).
+   * Null when it can't be made (canSynthesize), or in silent mode.
    */
   hold(sound: string, volume: number): Held | null;
   stop(): void;
@@ -61,6 +62,7 @@ export function webAudioPlayer(): Player {
   const player: Player = {
     playSlice(samples, sampleRate, from, to, onTime) {
       player.stop();
+      if (audioMuted()) return { done: Promise.resolve() };
       const ctx = audioContext();
       const a = Math.max(0, Math.floor(from * sampleRate));
       const b = Math.min(samples.length, Math.ceil(to * sampleRate));
@@ -70,7 +72,7 @@ export function webAudioPlayer(): Player {
       return start(buffer, onTime && ((f) => onTime(from + f * (to - from))), current);
     },
     hold(ipa, volume) {
-      if (!canSynthesize(ipa)) return null;
+      if (audioMuted() || !canSynthesize(ipa)) return null;
       player.stop();
       let live!: Voice;
       let ctx!: AudioContext;
