@@ -1997,7 +1997,8 @@ p {
 
 .sound-slider[data-side='heard'] .ramp-heard,
 .sound-slider[data-side='target'] .ramp-target {
-  --fill: calc(var(--reach, 0) * 100%);
+  /* Up to the thumb's middle, which stops half its width short of the end. */
+  --fill: calc(var(--reach, 0) * (100% - 20px));
 }
 
 .slider-thumb {
@@ -2014,6 +2015,28 @@ p {
   border: var(--outline);
   border-radius: 50%;
   box-shadow: 3px 3px 0 var(--line);
+}
+
+/* In the middle, where it's silent: arrows saying which way to go. */
+.sound-slider[data-side=''] .slider-thumb::before,
+.sound-slider[data-side=''] .slider-thumb::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-55%);
+  color: var(--saffron);
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sound-slider[data-side=''] .slider-thumb::before {
+  content: '‹';
+  right: calc(100% + 10px);
+}
+
+.sound-slider[data-side=''] .slider-thumb::after {
+  content: '›';
+  left: calc(100% + 10px);
 }
 
 /* Let go, it slides back to the middle. */

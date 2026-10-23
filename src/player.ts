@@ -99,7 +99,10 @@ export function webAudioPlayer(): Player {
       current = { stop: () => sound.stop() };
       return {
         done: sound.done,
-        setVolume: (v) => level.gain.setTargetAtTime(v, ctx.currentTime, FOLLOW),
+        setVolume(v) {
+          level.gain.cancelScheduledValues(ctx.currentTime);
+          level.gain.setTargetAtTime(v, ctx.currentTime, FOLLOW);
+        },
         release() {
           // Lifting is a tap, so the context the voice was built on can be started now. Not audioContext(), which
           // may replace it, leaving this voice on a closed one.

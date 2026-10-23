@@ -325,11 +325,11 @@ export function phoneVoice(ctx: BaseAudioContext, ipa: string, start: number): V
     });
 
   /** The hiss's own settings, held. */
-  const holdHiss = (s: Spec, at: number, follow: number) => {
-    hissFilter.frequency.setTargetAtTime(s.hissF, at, follow);
-    hissFilter.Q.setTargetAtTime(s.hissQ, at, follow);
-    hissAmp.gain.setTargetAtTime(s.hiss * HISS, at, follow);
-    voiceAmp.gain.setTargetAtTime(s.hissVoice * 0.35, at, follow);
+  const holdHiss = (s: Spec, at: number) => {
+    hissFilter.frequency.setTargetAtTime(s.hissF, at, 0.005);
+    hissFilter.Q.setTargetAtTime(s.hissQ, at, 0.005);
+    hissAmp.gain.setTargetAtTime(s.hiss * HISS, at, 0.005);
+    voiceAmp.gain.setTargetAtTime(s.hissVoice * 0.35, at, 0.005);
   };
 
   // A held vowel or hiss is set up once; a syllable is laid down repeat by repeat.
@@ -340,7 +340,7 @@ export function phoneVoice(ctx: BaseAudioContext, ipa: string, start: number): V
     voiceAmp.gain.linearRampToValueAtTime(1, start + 0.03);
   } else if (mode === 'hiss') {
     setFormants([250, 1500, 2500], start);
-    holdHiss(spec, start, 0.005);
+    holdHiss(spec, start);
   }
 
   function syllable(t: number): number {

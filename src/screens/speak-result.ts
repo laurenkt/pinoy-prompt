@@ -312,8 +312,10 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   function slider(from: string, to: string, drawn: Chart): HTMLElement {
     /** Where the thumb is, 0 (far left) to 1 (far right); it rests in the middle, where nothing plays. */
     let at = 0.5;
-    /** The side playing now: what was said, what to aim for, or neither. */
-    let side: 'heard' | 'target' | null = null;
+    /** The sound held now, even while silent in the middle: what was said, what to aim for, or neither. */
+    let playing: 'heard' | 'target' | null = null;
+    /** Whether space or enter is down. */
+    let keyed = false;
     const thumb = h('span', { class: 'slider-thumb' }, icon('speaker'));
     const track = h(
       'div',
@@ -336,35 +338,37 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       h('span', { class: 'slider-cap cap-target', lang: 'und-fonipa', 'aria-hidden': 'true' }, to),
     );
     const marks = { heard: drawn.heard, target: drawn.target };
-    const show = () => {
-      const loud = loudness(at);
+    const show = (down: boolean) => {
+      const side = sideOf(at);
       track.style.setProperty('--at', String(at));
       track.style.setProperty('--reach', String(Math.abs(at - 0.5) * 2));
       track.dataset.side = side ?? '';
+      track.classList.toggle('holding', down);
+      for (const key of ['heard', 'target'] as const) marks[key]?.classList.toggle('speaking', down && side === key);
       track.setAttribute('aria-valuenow', String(Math.round((at - 0.5) * 200)));
       track.setAttribute(
         'aria-valuetext',
-        side === null ? 'Silent' : `${side === 'heard' ? `What you said, ${from}` : `What to aim for, ${to}`}, ${Math.round(loud * 100)}% loud`,
+        side === null ? 'Silent' : `${side === 'heard' ? `What you said, ${from}` : `What to aim for, ${to}`}, ${Math.round(loudness(at) * 100)}% loud`,
       );
     };
-    /** Play the side the thumb is on, at its loudness, starting or switching the sound only when the side changes. */
-    const sound = (pressed: boolean) => {
-      const next = pressed ? sideOf(at) : null;
-      if (next !== side) {
-        // Into the middle with the finger still down: silent now, not after a tap's length.
-        if (pressed) holding?.setVolume(0);
+    /**
+     * Play the side the thumb is on at its loudness while `down`, or let go. A sound starts only on reaching a side
+     * other than the one held: in the middle it's held silent, so wavering there doesn't restart it, and only
+     * lifting lets it go, which on iOS is what can start audio (see Player.hold).
+     */
+    const sound = (down: boolean) => {
+      const side = down ? sideOf(at) : null;
+      if (!down) {
         letGo();
-        if (side) marks[side]?.classList.remove('speaking');
-        side = next;
-        if (side) {
-          holding = player.hold(side === 'heard' ? from : to, loudness(at));
-          marks[side]?.classList.add('speaking');
-        }
+        playing = null;
+      } else if (side && side !== playing) {
+        // Holding another stops this one.
+        holding = player.hold(side === 'heard' ? from : to, loudness(at));
+        playing = side;
       } else {
-        holding?.setVolume(loudness(at));
+        holding?.setVolume(side ? loudness(at) : 0);
       }
-      track.classList.toggle('holding', pressed);
-      show();
+      show(down);
     };
     /** Where a finger is along the rail, 0–1. */
     const atX = (x: number) => {
@@ -402,21 +406,24 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       if (step !== undefined) {
         e.preventDefault();
         at = Math.min(1, Math.max(0, Math.round((at + step) * 10) / 10));
-        if (holding) sound(true);
-        else {
-          sound(true);
-          sound(false);
-        }
+        sound(true);
+        if (!keyed && finger === null) sound(false);
       } else if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
         e.preventDefault();
+        keyed = true;
         sound(true);
       }
     });
     track.addEventListener('keyup', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') sound(false);
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      keyed = false;
+      sound(false);
     });
-    track.addEventListener('blur', () => sound(false));
-    show();
+    track.addEventListener('blur', () => {
+      keyed = false;
+      sound(false);
+    });
+    show(false);
     return track;
   }
 

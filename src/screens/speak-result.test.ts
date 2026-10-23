@@ -125,6 +125,25 @@ describe('the breakdown', () => {
     pointer(slider, 'pointerup', 90);
   });
 
+  it('holds a sound silent in the middle rather than letting it go, so wavering there never restarts it', () => {
+    show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
+    const slider = q('.sound-slider');
+    layOut();
+    pointer(slider, 'pointerdown', 200);
+    const holds = player.calls.length;
+    pointer(slider, 'pointermove', 120);
+    expect(player.held!.released).toBe(false);
+    expect(player.held!.volumes.at(-1)).toBe(0);
+    expect(slider.getAttribute('aria-valuetext')).toBe('Silent');
+    pointer(slider, 'pointermove', 150);
+    expect(player.calls.length).toBe(holds);
+    expect(player.held!.volumes.at(-1)).toBeGreaterThan(0);
+    pointer(slider, 'pointermove', 120);
+    // Lifting, not the slide, lets it go.
+    pointer(slider, 'pointerup', 120);
+    expect(player.held!.released).toBe(true);
+  });
+
   it("makes the ends of the slider loudest and the middle silent", () => {
     expect(loudness(0)).toBe(1);
     expect(loudness(1)).toBe(1);
@@ -148,7 +167,7 @@ describe('the breakdown', () => {
     expect(target.classList).not.toContain('speaking');
   });
 
-  it('steps along from the keyboard, playing each step, and holds while space is down', () => {
+  it('steps along from the keyboard, playing each step and saying where it is, and holds while space is down', () => {
     show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
     const slider = q('.sound-slider');
     slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
@@ -156,10 +175,23 @@ describe('the breakdown', () => {
     expect(step.sound).toBe('a');
     expect(step.volume).toBeLessThan(0.2);
     expect(player.held!.released).toBe(true);
+    expect(slider.getAttribute('aria-valuetext')).toMatch(/^What to aim for, a, \d+% loud$/);
     slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
     expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'a', volume: 1 });
     slider.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     expect(player.held!.released).toBe(false);
+    slider.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
+    expect(player.held!.released).toBe(true);
+  });
+
+  it('holds with space from the silent middle, then plays where the arrows take it until space is let go', () => {
+    show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
+    const slider = q('.sound-slider');
+    slider.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    expect((player.calls.at(-1) as { sound: string }).sound).toBe('ɛ');
+    expect(player.held!.released).toBe(false);
+    expect(slider.classList).toContain('holding');
     slider.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
     expect(player.held!.released).toBe(true);
   });
