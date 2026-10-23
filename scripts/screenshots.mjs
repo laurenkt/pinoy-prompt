@@ -9,8 +9,9 @@
 // Prints Home's scroll height at each size, how far any other screen scrolls,
 // and any screen wider than the phone.
 
-import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
@@ -24,6 +25,9 @@ const SIZES = [
   { name: 'se-375x667', width: 375, height: 667, top: 20, bottom: 0 },
   { name: 'max-430x932', width: 430, height: 932, top: 59, bottom: 34 },
 ];
+
+/** Where drills-speak keeps the speech model between runs. */
+const MODEL_FILE = 'node_modules/.cache/pinoy-prompt/model.int8.onnx';
 
 /** How to reach each screen from Home. */
 const SCREENS = {
@@ -48,6 +52,14 @@ const SCREENS = {
     await page.reload();
     await page.waitForSelector('.home');
     await page.click('.drills-btn');
+  },
+  // A round of Speak only, with the real speech model (about 70 MB, downloaded once into node_modules/.cache) and a
+  // stand-in microphone: ready to listen, then listening.
+  'drills-speak': (page) => speakOnly(page),
+  'drills-speaking': async (page) => {
+    await speakOnly(page);
+    await page.click('.btn.mic');
+    await page.waitForSelector('.speak.recording');
   },
   'drills-answered': async (page) => {
     await page.click('.drills-btn');
@@ -176,6 +188,37 @@ try {
 } finally {
   await browser.close();
   await server.close();
+}
+
+/** Drills, asking only Speak, ready to listen. */
+async function speakOnly(page) {
+  const { MODEL_URL } = await page.evaluate(() => import('/src/model-cache.ts'));
+  if (!existsSync(MODEL_FILE)) {
+    console.log('Downloading the speech model once…');
+    await mkdir(dirname(MODEL_FILE), { recursive: true });
+    await writeFile(MODEL_FILE, Buffer.from(await (await fetch(MODEL_URL)).arrayBuffer()));
+  }
+  const model = await readFile(MODEL_FILE);
+  await page.route(MODEL_URL, (route) => route.fulfill({ body: model, contentType: 'application/octet-stream' }));
+  await page.context().grantPermissions(['microphone']);
+  // Headless Chromium has no microphone: a quiet hum stands in for the room.
+  await page.evaluate(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const context = new AudioContext();
+      const hum = new OscillatorNode(context, { frequency: 120 });
+      const level = new GainNode(context, { gain: 0.01 });
+      const out = context.createMediaStreamDestination();
+      hum.connect(level).connect(out);
+      hum.start();
+      return out.stream;
+    };
+  });
+  await page.click('.drills-btn');
+  await page.click('.filter-toggle');
+  for (const mode of ['listen', 'read', 'recall']) await page.click(`#drill-scope [data-mode="${mode}"]`);
+  await page.click('.filter-toggle');
+  await page.click('.speak .btn.primary');
+  await page.waitForSelector('.speak.ready', { timeout: 60_000 });
 }
 
 /** A learner who has met `words` words, built and saved by the app's own code, then Home. */

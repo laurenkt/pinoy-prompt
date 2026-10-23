@@ -63,6 +63,20 @@ describe('Speak mode', () => {
     expect(button('Tap and speak')).toBeTruthy();
   });
 
+  it('starts and stops listening with one big button in the same place, under what the mic hears', async () => {
+    const root = practiceScreen(fakeApp(KNOWN), deps());
+    document.body.append(root);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    // The panel's middle row (see .speak.ready in style.css): the cue above it, then the button.
+    const layout = () => [...document.querySelector('.panel > .speak')!.children].map((c) => c.className);
+    expect(layout()).toEqual(['speak-cue', 'btn mic huge']);
+    button('Tap and speak').click();
+    expect(layout()).toEqual(['speak-cue', 'btn mic huge done']);
+    expect(document.querySelector('.speak-cue .meter')).toBeTruthy();
+  });
+
   it('chimes for a right attempt, not a miss', async () => {
     vi.stubGlobal('AudioContext', FakeAudioContext);
     chimes.count = 0;

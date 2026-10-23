@@ -297,7 +297,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   // The sounds-like spelling gives the pronunciation away too, so it waits for a first attempt like the audio.
   const hint = () => judged && card.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), card.hint);
-  const micButton = (label: string, className = 'btn mic big') =>
+  const micButton = (label: string, className: string) =>
     h('button', { class: className, 'data-autofocus': true, 'data-no-tap': true, onclick: () => void startRecording() }, icon('mic'), ' ', label);
   const skip = (label = 'Skip') => h('button', { class: 'btn secondary', onclick: options.onNext }, label);
 
@@ -333,15 +333,21 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           h('div', { class: 'bar download-bar', role: 'progressbar', 'aria-label': 'Download progress' }, h('div', { class: 'bar-fill', style: { width: `${Math.round(state.progress * 100)}%` } })),
           h('p', { class: 'listen-status center', role: 'status' }, loadingText(state.progress)),
         ];
+      // Starting and stopping are one big button in the middle of the space below the prompt, where a thumb
+      // rests, in the same place both times; what the microphone hears shows above it (see .speak.ready).
       case 'ready':
-        return [hint(), micButton('Tap and speak')].filter(Boolean) as HTMLElement[];
+        return [h('div', { class: 'speak-cue' }, hint()), micButton('Tap and speak', 'btn mic huge')];
       case 'recording':
         return [
-          hint(),
-          h('div', { class: 'meter', 'aria-hidden': 'true' }, [1, 2, 3, 4, 5].map(() => h('span', null))),
-          h('p', { class: 'listen-status center', role: 'status' }, state.speech ? 'Hearing you…' : 'Mic on. Say it now.'),
-          h('button', { class: 'btn mic big done', 'data-autofocus': true, 'data-no-tap': true, onclick: () => recording?.stop() }, "I'm done"),
-        ].filter(Boolean) as HTMLElement[];
+          h(
+            'div',
+            { class: 'speak-cue' },
+            hint(),
+            h('div', { class: 'meter', 'aria-hidden': 'true' }, [1, 2, 3, 4, 5].map(() => h('span', null))),
+            h('p', { class: 'listen-status center', role: 'status' }, state.speech ? 'Hearing you…' : 'Mic on. Say it now.'),
+          ),
+          h('button', { class: 'btn mic huge done', 'data-autofocus': true, 'data-no-tap': true, onclick: () => recording?.stop() }, "I'm done"),
+        ];
       case 'analysing':
         return [h('p', { class: 'listen-status center', role: 'status' }, 'Checking your sounds…')];
       case 'problem':
