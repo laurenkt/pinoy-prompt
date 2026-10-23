@@ -38,6 +38,8 @@ export interface Tip {
   /** The letters the tip is about, as written on the card. */
   letters: string;
   text: string;
+  /** Where in the text the sounds it's about start (Phone.from): the same tip can cover several. */
+  at: number[];
   /** Says only what was heard and what to aim for, with no advice on how: a breakdown that shows both already can leave it out. */
   plain?: boolean;
 }
@@ -45,7 +47,7 @@ export interface Tip {
 const STOPS = 'ptk';
 
 /** One tip for one problem sound, or null if there's nothing specific to say. */
-function tipFor(r: SoundResult, letters: string): Omit<Tip, 'letters'> | null {
+function tipFor(r: SoundResult, letters: string): Omit<Tip, 'letters' | 'at'> | null {
   const advice = adviceFor(r, letters);
   if (advice) return { text: advice };
   const want = r.phone.ipa;
@@ -53,7 +55,8 @@ function tipFor(r: SoundResult, letters: string): Omit<Tip, 'letters'> | null {
   if (r.verdict === 'missing') return { text: `We didn't hear the ${describeSound(want)} sound for "${letters}".`, plain: true };
   if (r.heard) {
     const aim = [...new Set([want, ...alternatives.filter((a) => a !== 'æ')].map(describeSound))].join(' or ');
-    return { text: `"${letters}" sounded like ${describeSound(r.heard)}. Aim for ${aim}.`, plain: true };
+    // Naming another way that's just as right says more than the labels over the slider do.
+    return { text: `"${letters}" sounded like ${describeSound(r.heard)}. Aim for ${aim}.`, plain: !aim.includes(' or ') };
   }
   return null;
 }
@@ -104,7 +107,9 @@ export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
     const letters = text.slice(r.phone.from, r.phone.to);
     const tip = tipFor(r, letters);
     // One tip per kind of sound is plenty.
-    if (tip && !tips.some((t) => t.text === tip.text)) tips.push({ letters, ...tip });
+    const same = tip && tips.find((t) => t.text === tip.text);
+    if (same) same.at.push(r.phone.from);
+    else if (tip) tips.push({ letters, at: [r.phone.from], ...tip });
     if (tips.length >= max) break;
   }
   const added = comparison.extra.find((e) => e.counts);
@@ -115,7 +120,7 @@ export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
     const anchor = after ?? written[0];
     const letters = anchor ? text.slice(anchor.from, anchor.to) : '';
     const where = after ? 'after' : 'before';
-    tips.push({ letters, text: `There was an extra ${describeSound(added.ipa)} sound ${where} "${letters}". Leave it out.`, plain: true });
+    tips.push({ letters, at: anchor ? [anchor.from] : [], text: `There was an extra ${describeSound(added.ipa)} sound ${where} "${letters}". Leave it out.`, plain: true });
   }
   return tips;
 }

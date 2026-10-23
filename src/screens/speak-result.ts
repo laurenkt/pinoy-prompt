@@ -203,8 +203,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     let owner: Pair | undefined;
     if (p.result) owner = p.result.verdict === 'good' ? undefined : p;
     else if (p.extraCounts) owner = list.slice(0, index).reverse().find((q) => q.result);
-    const want = owner ? letters(owner) : '';
-    return want ? attempt.tips.find((t) => t.letters.toLowerCase() === want && !t.plain)?.text : undefined;
+    const at = owner?.result?.phone.from;
+    return at === undefined ? undefined : attempt.tips.find((t) => t.at.includes(at) && !t.plain)?.text;
   }
 
   function renderDetail(p: Pair, index: number): void {

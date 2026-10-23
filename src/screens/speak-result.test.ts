@@ -210,8 +210,17 @@ describe('the breakdown', () => {
     expect(q('.sound-detail .detail-tip').textContent).toContain('back of your tongue');
   });
 
+  it("doesn't give one sound the advice meant for another spelled the same", () => {
+    // The first a said as e (only says what was heard), the last as "uh" (advice on opening up).
+    show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'ə', 't']));
+    expect(q('.ribbon-mark.selected .mark-heard').textContent).toBe('ɛ');
+    expect(q('.sound-detail .detail-tip')).toBeNull();
+    all('.ribbon-mark')[5].click();
+    expect(q('.sound-detail .detail-tip').textContent).toContain('Open your mouth wide');
+  });
+
   it('only shows a tip on the sound that needs it, not on every sound spelled the same', () => {
-    const a = attempt('Salamat', ['s', 'ə', 'l', 'a', 'm', 'a', 't']);
+    const a = attempt('Salamat', ['s', 'ɐ', 'l', 'a', 'm', 'a', 't']);
     show(a);
     expect(q('.sound-detail .detail-tip')).toBeTruthy();
     all('.ribbon-mark')[3].click();
