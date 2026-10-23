@@ -132,6 +132,19 @@ describe('asking for the microphone in Drills', () => {
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
   });
 
+  it('asks again, over the holding screen, once the remembered Allow has lapsed', () => {
+    let allowed = true;
+    const mic = micNotYet({ microphoneAllowed: () => allowed });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    // A long while in the background closes the stream.
+    allowed = false;
+    drillScope(root, ['read', 'speak']);
+    expect(mic.holdMicrophone).toHaveBeenCalledTimes(2);
+    expect(waiting(root)).toBe(true);
+    drillScope(root, ['listen', 'read', 'recall', 'speak']);
+  });
+
   it('leaves speaking out when a hold that should have gone straight through is refused', async () => {
     const allowed = micNotYet({ microphoneAllowed: () => true });
     const root = practiceScreen(fakeApp(), allowed.deps);

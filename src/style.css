@@ -367,8 +367,11 @@ p {
   color: var(--on-accent);
 }
 
-/* Silent quiet mode: nothing can play, so the play buttons go. */
-.silent .audio-btn {
+/* Silent quiet mode: nothing can play, so the play buttons go, and so do the results screen's ways to hear a sound. */
+.silent .audio-btn,
+.silent .word-actions,
+.silent .hold-btn,
+.silent .sound-slider {
   display: none;
 }
 
