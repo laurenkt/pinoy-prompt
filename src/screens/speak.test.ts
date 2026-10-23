@@ -254,6 +254,17 @@ describe('an attempt', () => {
     expect(text('.feedback')).toContain('microphone is blocked');
   });
 
+  it("tells a microphone that gave no sound at all from one that didn't hear speech, and records again on Try again", async () => {
+    await open('salamat');
+    button('Tap and speak').click();
+    mic.fail(new RecordError('silent'));
+    await flush();
+    expect(text('.feedback')).toContain("didn't pick up any sound");
+    expect(text('.feedback strong')).not.toBe("Didn't catch that.");
+    button('Try again').click();
+    expect(panel.el.textContent).toContain("I'm done");
+  });
+
   it("lets the card's audio play only once an attempt has been judged", async () => {
     heard = ['s', 'a', 'm', 'a', 't'];
     await open('salamat');
