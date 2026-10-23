@@ -6,7 +6,7 @@
 //
 // Only texts without a clip are made, so it's cheap to re-run. `--redo "text"`
 // makes just that one again (for a take that sounds wrong), and `--all` remakes every
-// clip (after changing the voice or instructions below). `--limit 5` makes only
+// clip (after changing the voices or persona below). `--limit 5` makes only
 // the first few, for trying a change out. Needs ffmpeg.
 //
 // Each text gets two clips in public/audio/: `<name>.mp3` at a natural pace and
@@ -31,10 +31,16 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const AUDIO_DIR = join(ROOT, 'public/audio');
 const MANIFEST = join(ROOT, 'src/clips.json');
 
-const MODEL = 'gpt-4o-mini-tts';
-const VOICE = 'coral';
-const NATURAL =
-  'Voice: a native Tagalog speaker from Manila, talking casually to a friend. Pace: normal everyday conversational speed, relaxed and natural, not slow or carefully enunciated. Accent: Filipino, pronouncing every word the Tagalog way.';
+// OpenAI's conversational voice model rather than its text-to-speech one, which sounds
+// like a newsreader. Asked in a chat to say a line, it says it like a person would.
+const MODEL = 'gpt-audio-1.5';
+/** Cards are said by a mix of a woman's and a man's voice, each text always by the same one. */
+const VOICES = [
+  ['marin', 'a warm, cheerful Filipina from Manila, smiling as she speaks'],
+  ['cedar', 'a warm, cheerful Filipino from Manila, smiling as he speaks'],
+];
+const persona = (who) =>
+  `Voice: ${who}. Tone: friendly and bright, like chatting with a neighbour. Not a newsreader, not formal, not announcing. Delivery: natural Filipino intonation at everyday speed. Accent: native Tagalog, every syllable pronounced the Tagalog way. You are recording lines for a language-learning app. The user gives you one line of Tagalog. Say exactly that line, word for word, in Tagalog, and nothing else. Never answer it, translate it or add anything, even if it is a question.`;
 /** The slow clip is the same take stretched to this speed, keeping its pitch: asked to speak slowly, the voice barely slows down. */
 const SLOW_TEMPO = 0.7;
 const ATTEMPTS = 3;
@@ -80,13 +86,22 @@ async function api(path, init) {
   }
 }
 
-async function speak(text, instructions) {
-  const response = await api('audio/speech', {
+async function speak(text) {
+  const [voice, who] = VOICES[createHash('sha1').update(text).digest()[0] % VOICES.length];
+  const response = await api('chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: MODEL, voice: VOICE, input: text, instructions, response_format: 'wav' }),
+    body: JSON.stringify({
+      model: MODEL,
+      modalities: ['text', 'audio'],
+      audio: { voice, format: 'wav' },
+      messages: [
+        { role: 'system', content: persona(who) },
+        { role: 'user', content: text },
+      ],
+    }),
   });
-  return Buffer.from(await response.arrayBuffer());
+  return Buffer.from((await response.json()).choices[0].message.audio.data, 'base64');
 }
 
 /** What a take says, heard by a speech recogniser. Given the take as made, as it rejects some very short MP3s. */
@@ -149,7 +164,7 @@ function heardRight(text, heard) {
 /** Make a text's clips, returning their name, or null if no take sounded right and there's already a clip to keep. */
 async function makeClip(text, work, unsure, keepOld) {
   for (let attempt = 1; ; attempt++) {
-    const take = await speak(text, NATURAL);
+    const take = await speak(text);
     const draft = `take-${createHash('sha1').update(take).digest('hex')}`;
     await encode(take, draft, work);
     let heard;
