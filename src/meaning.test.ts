@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { VOCAB, getCard } from './deck';
-import { canTypeMeaning, judgeMeaning, matchesMeaning, meanings, words } from './meaning';
+import { canTypeMeaning, judgeMeaning, matchesMeaning, meanings, repeatsTagalog, words } from './meaning';
 
 const card = (id: string) => getCard(id)!;
 
@@ -123,5 +123,46 @@ describe('judging a typed meaning', () => {
     const ask = vi.fn(async () => true);
     expect(await judgeMeaning('  ', card('salamat'), ask)).toEqual({ right: false });
     expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("takes the Tagalog said back as wrong, without asking OpenAI, which would say it means the same", async () => {
+    const ask = vi.fn(async () => true);
+    expect(await judgeMeaning('Salamat', card('salamat'), ask)).toEqual({ right: false });
+    expect(await judgeMeaning('salamat po.', card('salamat'), ask)).toEqual({ right: false });
+    expect(await judgeMeaning('Kamusta', card('kumusta'), ask)).toEqual({ right: false });
+    expect(await judgeMeaning('maraming salamat', card('maraming-salamat'), ask)).toEqual({ right: false });
+    expect(ask).not.toHaveBeenCalled();
+  });
+});
+
+describe('telling the Tagalog said back from an answer', () => {
+  it.each([
+    ['salamat', 'Salamat'],
+    ['salamat', 'salamat po'],
+    ['kumusta', 'Kumusta?'],
+    ['kumusta', 'kamusta'],
+    ['mabuti', 'mabuti naman'],
+    ['mabuti', 'Mabuti'],
+  ])('%s: "%s" is the Tagalog', (id, answer) => {
+    expect(repeatsTagalog(answer, card(id))).toBe(true);
+  });
+
+  it.each([
+    ['salamat', 'thank you'],
+    ['salamat', 'salamat, thank you'],
+    ['salamat', 'po'],
+    ['salamat', ''],
+    ['kumusta', 'salamat'],
+  ])('%s: "%s" is not', (id, answer) => {
+    expect(repeatsTagalog(answer, card(id))).toBe(false);
+  });
+
+  it('still takes an English word the card shares with its Tagalog', async () => {
+    expect(await judgeMeaning('the bill', card('bill-po'), null)).toEqual({ right: true });
+    // Not matched on the device, but English, so OpenAI is asked.
+    const ask = vi.fn(async () => true);
+    expect(await judgeMeaning('okay', card('okay-lang-ako'), ask)).toEqual({ right: true });
+    expect(ask).toHaveBeenCalledWith('okay', card('okay-lang-ako'));
+    expect(repeatsTagalog('Okay lang ako', card('okay-lang-ako'))).toBe(true);
   });
 });

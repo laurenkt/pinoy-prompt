@@ -258,7 +258,8 @@ const CHECK_TIMEOUT_MS = 8000;
 
 const CHECK_INSTRUCTIONS = `You check a beginner's answer in a Tagalog listening drill. They heard a Tagalog word or phrase and wrote what they think it means in English, possibly with a phone's dictation.
 Judge only whether they understood the meaning. Spelling, grammar, word order and wording don't matter; synonyms, paraphrases and a missing "please" or "very" are still right, and so is any one of the meanings separated by "/".
-It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.`;
+It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.
+The answer has to be in English. It's wrong if they just repeat the Tagalog or answer in Tagalog (or any other language), even though that means the same thing. English that uses a word Tagalog borrows or English borrows from Tagalog (okay, bill, adobo, jeepney) is still English.`;
 
 /**
  * Ask OpenAI whether `answer` means the same as the card's English. Sends
