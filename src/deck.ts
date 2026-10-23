@@ -114,6 +114,7 @@ export const UNITS: Unit[] = [
       { id: 'pasensya-na', tl: 'Pasensya na', en: "Sorry / I'm sorry", kind: 'phrase', hint: 'pah-SEN-shah nah', note: 'Used for small apologies, like bumping into someone.', hook: 'From Spanish "paciencia", patience. You are asking them to bear with you.' },
       { id: 'makikiraan-po', tl: 'Makikiraan po', en: 'Excuse me (to pass by)', kind: 'phrase', hint: 'mah-kee-kee-rah-AHN poh', hook: 'Built on "daan" (road, path), with the d softened to r. Roughly "may I share your path?"' },
       { id: 'sige', tl: 'Sige', en: 'Okay / Go ahead', kind: 'word', hint: 'SEE-geh', note: 'Very common. "Sige, salamat!" is a friendly way to end a chat.', hook: 'From Spanish "sigue", "go on, carry on". That is why it means both "okay" and "go ahead".' },
+      { id: 'tuloy-po-kayo', tl: 'Tuloy po kayo.', en: 'Come in, please.', kind: 'phrase', hint: 'too-LOY poh kah-YOH', note: 'What a host says at the door.', hook: '"Tuloy" means carry on, as in "Tuloy ba tayo?": carry on in, you (polite).' },
     ],
   },
   {
@@ -132,6 +133,10 @@ export const UNITS: Unit[] = [
       { id: 'hindi-maintindihan', tl: 'Hindi ko maintindihan.', en: "I don't understand.", kind: 'phrase', hint: 'hin-DEE koh mah-in-tin-dee-HAHN', hook: 'The root "intindi" comes from Spanish "entender", to understand. Literally "not I can understand".' },
       { id: 'pakiulit', tl: 'Pakiulit po.', en: 'Please repeat that.', kind: 'phrase', hint: 'pah-kee-OO-lit poh', hook: '"Paki-" (please) + "ulit" (again): literally "please, again". Put "paki-" on any verb to make a polite request.' },
       { id: 'dahan-dahan', tl: 'Dahan-dahan lang po.', en: 'Slowly, please.', kind: 'phrase', hint: 'dah-HAHN dah-HAHN lahng poh', hook: 'Doubling a word stretches it out: "dahan" is slow, "dahan-dahan" is slowly and gently. The word itself takes its time.' },
+      { id: 'saan-ka-nakatira', tl: 'Saan ka nakatira?', en: 'Where do you live?', kind: 'phrase', hint: 'sah-AHN kah nah-kah-tee-RAH', hook: '"Tira" means stay or live, and "naka-" means being that way: where, you, living?' },
+      { id: 'ano-trabaho-mo', tl: 'Ano ang trabaho mo?', en: 'What do you do for work?', kind: 'phrase', hint: 'ah-NOH ahng trah-BAH-hoh moh', hook: 'The same shape as "Ano ang pangalan mo?", with "trabaho", from Spanish "trabajo", work.' },
+      { id: 'ilang-taon-ka-na', tl: 'Ilang taon ka na?', en: 'How old are you?', kind: 'phrase', hint: 'ee-LAHNG tah-ON kah nah', note: 'Not a rude question here: it tells people whether to call you Ate or Kuya.', hook: '"Ilan" (how many) + "taon" (year) + "na" (already): how many years already, you?' },
+      { id: 'may-asawa-ka-na-ba', tl: 'May asawa ka na ba?', en: 'Are you married?', kind: 'phrase', hint: 'mai ah-SAH-wah kah nah bah', note: 'A friendly question, often asked soon after meeting. "Wala pa" (not yet) is a fine answer.', hook: '"May" (have) + "asawa" (spouse) + "na ba" (already?): have a spouse already, you?' },
     ],
   },
   {
@@ -220,6 +225,8 @@ export const UNITS: Unit[] = [
       { id: 'pero', tl: 'pero', en: 'but', kind: 'word', hint: 'PEH-roh', hook: 'The same as Spanish "pero". "Oo, pero..." is "yes, but...", the start of every polite refusal.' },
       { id: 'kasi', tl: 'kasi', en: 'because', kind: 'word', hint: 'kah-SEE', hook: 'Sounds like "\'cause, see": because, see? It often comes at the end of an excuse: "Trapik kasi."' },
       { id: 'mga', tl: 'mga', en: '(makes a word plural)', kind: 'word', hint: 'mah-NGAH', hook: 'Spelled m-g-a but said "mah-NGAH". It is in the title of the numbers topic: "Mga Numero", numbers.' },
+      { id: 'kayo', tl: 'kayo', en: 'you (polite, or more than one)', kind: 'word', hint: 'kah-YOH', note: 'For a group, or politely for one person, often with "po".', hook: 'You met it in "Meron ba kayong tinapay?". "Ikaw" is one friend; "kayo" is a group, or someone you would say "po" to.' },
+      { id: 'pa', tl: 'pa', en: 'still / yet / more', kind: 'word', hint: 'pah', hook: 'The partner of "na": "na" is already, "pa" is still. "Isa pa", one more; "Malayo pa?", still far?' },
     ],
   },
   {
@@ -268,6 +275,9 @@ export const UNITS: Unit[] = [
       { id: 'lunes', tl: 'Lunes', en: 'Monday', kind: 'word', hint: 'LOO-nes', hook: 'Spanish "lunes", the moon\'s day, just as English Monday is moon-day.' },
       { id: 'biyernes', tl: 'Biyernes', en: 'Friday', kind: 'word', hint: 'bee-YER-nes', hook: 'Spanish "viernes", with v turned to b. "Biyernes Santo" is Good Friday.' },
       { id: 'sabado', tl: 'Sabado', en: 'Saturday', kind: 'word', hint: 'SAH-bah-doh', hook: 'Spanish "sábado", from the Sabbath, the day of rest.' },
+      { id: 'martes', tl: 'Martes', en: 'Tuesday', kind: 'word', hint: 'MAHR-tes', hook: 'Spanish "martes", the day of Mars.' },
+      { id: 'miyerkoles', tl: 'Miyerkoles', en: 'Wednesday', kind: 'word', hint: 'mee-YER-koh-les', hook: 'Spanish "miércoles", the day of Mercury, spelled the Tagalog way.' },
+      { id: 'huwebes', tl: 'Huwebes', en: 'Thursday', kind: 'word', hint: 'hoo-WEH-bes', hook: 'Spanish "jueves", the day of Jupiter. The Spanish j sounds like an h, so Tagalog writes an h.' },
     ],
   },
   {
@@ -372,6 +382,19 @@ export const UNITS: Unit[] = [
       { id: 'manok', tl: 'manok', en: 'chicken', kind: 'word', hint: 'MAH-nok', hook: 'Sounds like "man, OK". Picture a rooster at dawn yelling "Man, OK, wake up!"' },
       { id: 'isda', tl: 'isda', en: 'fish', kind: 'word', hint: 'is-DAH', hook: 'Sounds like "is da": "Is da fish fresh?"' },
       { id: 'busog-na-ako', tl: 'Busog na ako.', en: "I'm full.", kind: 'phrase', hint: 'boo-SOG nah ah-KOH', note: 'Handy when your host keeps refilling your plate.', hook: '"Busog" sounds like "bus full": no more room on the bus.' },
+      { id: 'almusal', tl: 'almusal', en: 'breakfast', kind: 'word', hint: 'ahl-moo-SAHL', hook: 'From Spanish "almuerzo", which is lunch in Spain but became breakfast here.' },
+      { id: 'tanghalian', tl: 'tanghalian', en: 'lunch', kind: 'word', hint: 'tahng-hah-LEE-ahn', hook: 'The meal at "tanghali", noon: the one that came free with "tanghali".' },
+      { id: 'hapunan', tl: 'hapunan', en: 'dinner', kind: 'word', hint: 'hah-POO-nahn', hook: '"Hapon" (afternoon) + "-an": the meal as the afternoon ends.' },
+      { id: 'itlog', tl: 'itlog', en: 'egg', kind: 'word', hint: 'it-LOG', hook: 'The "-log" of every "silog" breakfast plate: "sinangag" (garlic fried rice) + "itlog".' },
+      { id: 'baboy', tl: 'baboy', en: 'pig / pork', kind: 'word', hint: 'BAH-boy', hook: 'The animal and the meat. A whole roast "baboy", "lechon", is the star of every big party.' },
+      { id: 'karne-ng-baka', tl: 'karne ng baka', en: 'beef', kind: 'phrase', hint: 'KAHR-neh nahng BAH-kah', hook: '"Karne" (meat, Spanish "carne") + "ng" (of) + "baka", the cow that "baka" also means: meat of cow.' },
+      { id: 'gulay', tl: 'gulay', en: 'vegetables', kind: 'word', hint: 'GOO-lai', hook: '"Bahay kubo", the folk song about the bamboo hut, is one long list of the "gulay" growing round it.' },
+      { id: 'prutas', tl: 'prutas', en: 'fruit', kind: 'word', hint: 'PROO-tahs', hook: 'Spanish "frutas", with the f turned to p, as in "pamilya".' },
+      { id: 'saging', tl: 'saging', en: 'banana', kind: 'word', hint: 'SAH-ging', hook: '"Banana cue" is a "saging" fried in brown sugar on a stick, sold on every corner.' },
+      { id: 'mangga', tl: 'mangga', en: 'mango', kind: 'word', hint: 'mahng-GAH', hook: 'Sounds like "mango", and comes from the same South Indian word. Philippine mangoes are famously sweet.' },
+      { id: 'gatas', tl: 'gatas', en: 'milk', kind: 'word', hint: 'GAH-tahs', hook: 'Sounds like "got us": the baby got us up at night for "gatas".' },
+      { id: 'asukal', tl: 'asukal', en: 'sugar', kind: 'word', hint: 'ah-SOO-kahl', hook: 'Spanish "azúcar". Filipino cooking loves it: even spaghetti here is sweet.' },
+      { id: 'asin', tl: 'asin', en: 'salt', kind: 'word', hint: 'ah-SIN', hook: 'Sounds like "a sin": too much "asin" is a sin.' },
     ],
   },
   {
@@ -408,6 +431,12 @@ export const UNITS: Unit[] = [
       { id: 'sukli', tl: 'sukli', en: 'change (money back)', kind: 'word', hint: 'sook-LEE', hook: '"May sukli po ba kayo?" (do you have change?) is the question before you hand over a big note.' },
       { id: 'barya', tl: 'barya', en: 'coins', kind: 'word', hint: 'bahr-YAH', note: 'Drivers and small shops prefer it. "Wala po akong barya" is "I have no coins".', hook: 'Sounds like "bury a": bury a jar of coins.' },
       { id: 'magkano-lahat', tl: 'Magkano lahat?', en: 'How much for everything?', kind: 'phrase', hint: 'mahg-KAH-noh lah-HAHT', hook: '"Lahat" means all. Add it to "Magkano" and you get the total.' },
+      { id: 'labing-isa', tl: 'labing-isa', en: 'eleven (11)', kind: 'word', hint: 'lah-bing-ee-SAH', hook: '"Labing-" means ten and more: ten and one. Every number up to nineteen works the same way.' },
+      { id: 'labindalawa', tl: 'labindalawa', en: 'twelve (12)', kind: 'word', hint: 'lah-bin-dah-lah-WAH', hook: '"Labing-" + "dalawa", with the ng turned to n before the d: ten and two.' },
+      { id: 'labinlima', tl: 'labinlima', en: 'fifteen (15)', kind: 'word', hint: 'lah-bin-lee-MAH', hook: '"Labing-" + "lima", ng turned to n again before the l: ten and five.' },
+      { id: 'tatlumpu', tl: 'tatlumpu', en: 'thirty (30)', kind: 'word', hint: 'taht-loom-POO', hook: '"Tatlo" (three) + "pu" (ten), squashed together like "dalawampu": three tens.' },
+      { id: 'apatnapu', tl: 'apatnapu', en: 'forty (40)', kind: 'word', hint: 'ah-paht-nah-POO', hook: '"Apat" (four) + "na" + "pu" (ten). A number ending in a consonant joins on with "na" instead of "-ng".' },
+      { id: 'dalawang-daan', tl: 'dalawang daan', en: 'two hundred (200)', kind: 'phrase', hint: 'dah-lah-WAHNG dah-AHN', hook: '"Dalawa" (two) + "-ng" + "daan" (hundred), just like "limang daan".' },
     ],
   },
   {
@@ -443,6 +472,12 @@ export const UNITS: Unit[] = [
       { id: 'lolo', tl: 'lolo', en: 'grandfather', kind: 'word', hint: 'LOH-loh', hook: 'Lola ends in -a like "abuela" (grandma), lolo ends in -o like "abuelo" (grandpa). Same rule as Spanish.' },
       { id: 'anak', tl: 'anak', en: 'child (son or daughter)', kind: 'word', hint: 'ah-NAHK', hook: '"Anak" is also the title of Freddie Aguilar\'s 1978 hit, a song about a parent and child that became famous around the world.' },
       { id: 'kaibigan', tl: 'kaibigan', en: 'friend', kind: 'word', hint: 'kah-ee-BEE-gahn', hook: 'The root is "ibig" (love, want). Ka- + ibig + -an: someone you share fondness with.' },
+      { id: 'asawa', tl: 'asawa', en: 'husband / wife', kind: 'word', hint: 'ah-SAH-wah', hook: 'One word for husband and wife, as "siya" is one word for he and she.' },
+      { id: 'pamilya', tl: 'pamilya', en: 'family', kind: 'word', hint: 'pah-MEEL-yah', hook: 'Spanish "familia", with the f turned to p, as in "opisina".' },
+      { id: 'lalaki', tl: 'lalaki', en: 'man / male', kind: 'word', hint: 'lah-LAH-kee', hook: 'One letter from "malaki" (big). On toilet doors you will see "Lalaki" for men.' },
+      { id: 'babae', tl: 'babae', en: 'woman / female', kind: 'word', hint: 'bah-BAH-eh', hook: 'The other toilet door. Three syllables, "ba-BA-eh", with the a and e said apart.' },
+      { id: 'kapatid', tl: 'kapatid', en: 'brother / sister', kind: 'word', hint: 'kah-pah-TID', note: 'Older ones are usually called Ate and Kuya instead.', hook: 'One word for brother or sister, like "asawa" for husband or wife. Add "na lalaki" or "na babae" only if it matters.' },
+      { id: 'bata', tl: 'bata', en: 'kid / young', kind: 'word', hint: 'BAH-tah', hook: 'Any child is a "bata"; your own child is your "anak". "Bata pa ako" is "I\'m still young".' },
     ],
   },
   {
@@ -461,6 +496,10 @@ export const UNITS: Unit[] = [
       { id: 'mura', tl: 'mura', en: 'cheap', kind: 'word', hint: 'moo-RAH', hook: 'Think "moo, rah!": a cow cheering at the bargain bin.' },
       { id: 'mahal-kita', tl: 'Mahal kita.', en: 'I love you.', kind: 'phrase', hint: 'mah-HAHL kee-TAH', hook: '"Mahal" is dear, and "kita" packs "I" and "you" into one tiny word.' },
       { id: 'anong-balita', tl: 'Anong balita?', en: "What's new?", kind: 'phrase', hint: 'ah-NONG bah-LEE-tah', note: 'A casual way to catch up with a friend.', hook: '"Balita" means "news". You will hear it on every Filipino news show.' },
+      { id: 'kumain-ka-na-ba', tl: 'Kumain ka na ba?', en: 'Have you eaten?', kind: 'phrase', hint: 'koo-mah-EEN kah nah bah', note: 'Often a greeting, the way English asks "How are you?".', hook: '"Kain" (eat) from "Kain tayo!" + "ka" + "na" (already) + "ba": eaten, you, already? Care, shown through food.' },
+      { id: 'kumain-na-ako', tl: 'Kumain na ako.', en: "I've already eaten.", kind: 'phrase', hint: 'koo-mah-EEN nah ah-KOH', hook: 'The answer to "Kumain ka na ba?": drop "ba", and "ako" goes last, as in "Gutom na ako".' },
+      { id: 'matutulog-na-ako', tl: 'Matutulog na ako.', en: "I'm off to bed.", kind: 'phrase', hint: 'mah-too-TOO-log nah ah-KOH', hook: '"Tulog" is sleep. Doubling "tu" makes it "about to", as in "Mahuhuli ako": about to sleep already, me.' },
+      { id: 'gising-ka-na-ba', tl: 'Gising ka na ba?', en: 'Are you awake?', kind: 'phrase', hint: 'gee-SING kah nah bah', hook: '"Gising" means awake. "Gising na!" is how every mother says "wake up!"' },
     ],
   },
   {
@@ -483,6 +522,11 @@ export const UNITS: Unit[] = [
       { id: 'sayang', tl: 'Sayang!', en: 'What a waste! / Too bad!', kind: 'word', hint: 'sah-YAHNG', hook: 'For a missed chance: the bus just leaving, food left on the plate. Say it with a sigh, "sigh-yang".' },
       { id: 'naku', tl: 'Naku!', en: 'Oh no! / Oh my!', kind: 'word', hint: 'nah-KOO', hook: 'Short for "Ina ko!", "my mother!". The Filipino "oh my goodness".' },
       { id: 'bahala-na', tl: 'Bahala na.', en: 'Come what may.', kind: 'phrase', hint: 'bah-HAH-lah nah', hook: 'Often traced to "Bathala", the old Tagalog supreme god: "leave it to God". A whole attitude in two words.' },
+      { id: 'hindi-pa', tl: 'Hindi pa.', en: 'Not yet.', kind: 'phrase', hint: 'hin-DEE pah', hook: '"Hindi" (not) + "pa" (still): still not. Answer "Kumain ka na ba?" with it and expect to be fed.' },
+      { id: 'walang-problema', tl: 'Walang problema.', en: 'No problem.', kind: 'phrase', hint: 'wah-LAHNG proh-BLEH-mah', hook: '"Wala" (none) + "-ng" + Spanish "problema", built just like "Walang anuman".' },
+      { id: 'ikaw-ang-bahala', tl: 'Ikaw ang bahala.', en: "It's up to you.", kind: 'phrase', hint: 'ee-KAOW ahng bah-HAH-lah', hook: 'The "bahala" of "Bahala na": you are the one in charge. Handy when asked where to eat.' },
+      { id: 'sigurado-ka-ba', tl: 'Sigurado ka ba?', en: 'Are you sure?', kind: 'phrase', hint: 'see-goo-RAH-doh kah bah', hook: 'Spanish "seguro" again, like "siguro". "Siguro" became probably; "sigurado" kept the sure.' },
+      { id: 'sana', tl: 'sana', en: 'hopefully / I hope', kind: 'word', hint: 'SAH-nah', hook: 'Tack it on to wish for something: "Sana bukas", hopefully tomorrow. "Sana all" is Taglish for "I wish that were me too".' },
     ],
   },
   {
@@ -505,6 +549,100 @@ export const UNITS: Unit[] = [
     ],
   },
   {
+    id: 'actions',
+    title: 'Doing things',
+    tlTitle: 'Mga Gawain',
+    intro: 'Doing words for an ordinary day. Most are a root with "-um-" slotted in (kain, kumain) or "mag-" in front (luto, magluto): the tricks you know from "sumakay" and "kumaliwa".',
+    cards: [
+      { id: 'kumain', tl: 'kumain', en: 'to eat', kind: 'word', hint: 'koo-mah-EEN', hook: '"Kain" (eat) from "Kain tayo!", with "-um-" slotted in: k-um-ain, the trick from "sumakay".' },
+      { id: 'uminom', tl: 'uminom', en: 'to drink', kind: 'word', hint: 'oo-mee-NOM', hook: '"Inom" is drink. Before a vowel "-um-" goes at the front: um-inom. "Inuman" is a night of drinks with friends.' },
+      { id: 'matulog', tl: 'matulog', en: 'to sleep', kind: 'word', hint: 'mah-TOO-log', hook: '"Tulog" is sleep, and "ma-" makes it a doing word. "Tulog na!" is "go to sleep!"' },
+      { id: 'maligo', tl: 'maligo', en: 'to take a bath / shower', kind: 'word', hint: 'mah-LEE-goh', hook: '"Ligo" is a wash. In the heat many Filipinos "maligo" twice a day, and "maligo sa dagat" is a swim in the sea.' },
+      { id: 'pumunta', tl: 'pumunta', en: 'to go (somewhere)', kind: 'word', hint: 'poo-MOON-tah', hook: 'The "punta" of "Papunta na ako", with "-um-": p-um-unta. You met it in "Paano pumunta sa palengke?".' },
+      { id: 'dumating', tl: 'dumating', en: 'to arrive', kind: 'word', hint: 'doo-mah-TING', hook: '"Dating" is arrival, with "-um-": d-um-ating. "Dumating na!" is "it\'s here!", for a delivery or a late jeepney.' },
+      { id: 'maghintay', tl: 'maghintay', en: 'to wait', kind: 'word', hint: 'mahg-hin-TAI', hook: '"Hintay" from "Hintayin mo ako", with "mag-" in front: just to wait, with no one in particular to wait for.' },
+      { id: 'bumili', tl: 'bumili', en: 'to buy', kind: 'word', hint: 'boo-mee-LEE', hook: '"Bili" (buy) from "Pabili po", with the "-um-" trick: b-um-ili.' },
+      { id: 'magbayad', tl: 'magbayad', en: 'to pay', kind: 'word', hint: 'mahg-BAH-yahd', hook: '"Bayad" (payment) from "Bayad po", with "mag-" to make it a doing word.' },
+      { id: 'magluto', tl: 'magluto', en: 'to cook', kind: 'word', hint: 'mahg-LOO-toh', hook: '"Luto" is cooking. A sign saying "lutong bahay" promises home cooking.' },
+      { id: 'magtrabaho', tl: 'magtrabaho', en: 'to work', kind: 'word', hint: 'mahg-trah-BAH-hoh', hook: '"Mag-" + Spanish "trabajo" (work). "Mag-" turns plenty of borrowed words into doing words, as in "mag-Ingles".' },
+      { id: 'maglakad', tl: 'maglakad', en: 'to walk', kind: 'word', hint: 'mahg-LAH-kahd', hook: '"Lakad" is a walk, and also an errand: "May lakad ako" is "I have somewhere to be".' },
+      { id: 'magsalita', tl: 'magsalita', en: 'to speak', kind: 'word', hint: 'mahg-sah-lee-TAH', hook: '"Salita" is a word. "Mag-" + "salita": to make words, to speak.' },
+      { id: 'makinig', tl: 'makinig', en: 'to listen', kind: 'word', hint: 'mah-kee-NIG', hook: '"Makinig ka!" is "Listen!", heard from every teacher and every lola.' },
+      { id: 'tumulong', tl: 'tumulong', en: 'to help', kind: 'word', hint: 'too-MOO-long', hook: '"Tulong" (help) from "Tulong!", with "-um-": t-um-ulong. The shout becomes the doing word.' },
+      { id: 'umupo', tl: 'umupo', en: 'to sit down', kind: 'word', hint: 'oo-moo-POH', hook: '"Upo" is sit, with "-um-" at the front like "uminom". "Upo ka" is "have a seat".' },
+      { id: 'magpahinga', tl: 'magpahinga', en: 'to rest', kind: 'word', hint: 'mahg-pah-hee-NGAH', hook: '"Hinga" is breath, so "pahinga" is a breather. "Magpahinga ka" is "get some rest".' },
+      { id: 'maglaro', tl: 'maglaro', en: 'to play', kind: 'word', hint: 'mahg-lah-ROH', hook: '"Laro" is a game. Kids out in the "kalye" after school are "naglalaro", playing.' },
+    ],
+  },
+  {
+    id: 'describing',
+    title: 'Describing things',
+    tlTitle: 'Paglalarawan',
+    intro: 'Most describing words are "ma-" and a root, like masarap and malaki. Put "ang" before the root instead and it becomes "how ...!": "Ang ganda!", how beautiful!',
+    cards: [
+      { id: 'maganda', tl: 'maganda', en: 'beautiful', kind: 'word', hint: 'mah-gahn-DAH', hook: 'The "maganda" of "Magandang umaga". "Ang ganda!" is "How beautiful!"' },
+      { id: 'pangit', tl: 'pangit', en: 'ugly', kind: 'word', hint: 'PAH-ngit', hook: 'The opposite of "maganda". "Ang pangit!" is "so ugly!", for a bad haircut or bad weather.' },
+      { id: 'mabait', tl: 'mabait', en: 'kind (person)', kind: 'word', hint: 'mah-bah-EET', hook: '"Bait" is goodness of heart. "Mabait siya" is about the best thing anyone can say of you.' },
+      { id: 'marami', tl: 'marami', en: 'many / a lot', kind: 'word', hint: 'mah-RAH-mee', hook: 'The "marami" in "Maraming salamat": many thanks.' },
+      { id: 'bago', tl: 'bago', en: 'new', kind: 'word', hint: 'BAH-goh', hook: 'The "bago" in "Bagong Taon", New Year. It also means "before": "bago kumain", before eating.' },
+      { id: 'luma', tl: 'luma', en: 'old (for things)', kind: 'word', hint: 'LOO-mah', hook: 'For things: "lumang bahay", an old house. Old people are "matanda", a different word.' },
+      { id: 'matanda', tl: 'matanda', en: 'old (for people)', kind: 'word', hint: 'mah-tahn-DAH', hook: '"Tanda" is age. Respect for "matatanda", the elders, is why Tagalog has "po".' },
+      { id: 'mabilis', tl: 'mabilis', en: 'fast', kind: 'word', hint: 'mah-bee-LIS', hook: '"Bilis" is speed. "Bilisan mo!" is "hurry up!"' },
+      { id: 'mabagal', tl: 'mabagal', en: 'slow', kind: 'word', hint: 'mah-BAH-gahl', hook: '"Bagal" is slowness: the opposite of "mabilis", and what traffic always is. Asking someone to slow down is still "Dahan-dahan lang".' },
+      { id: 'madali', tl: 'madali', en: 'easy', kind: 'word', hint: 'mah-dah-LEE', hook: '"Dali" is ease and quickness. "Dali!" on its own means "quick!"' },
+      { id: 'mahirap', tl: 'mahirap', en: 'hard / poor', kind: 'word', hint: 'mah-HEE-rahp', hook: '"Hirap" is hardship, so one word covers difficult and poor. "Mahirap ba ang Tagalog?" Not so much.' },
+      { id: 'malinis', tl: 'malinis', en: 'clean', kind: 'word', hint: 'mah-LEE-nis', hook: '"Linis" is cleaning. "Maglinis tayo!" is "let\'s tidy up!"' },
+      { id: 'madumi', tl: 'madumi', en: 'dirty', kind: 'word', hint: 'mah-doo-MEE', hook: '"Dumi" is dirt. The opposite of "malinis".' },
+      { id: 'mabango', tl: 'mabango', en: 'nice-smelling', kind: 'word', hint: 'mah-bah-NGOH', hook: '"Bango" is a good smell: fresh laundry, rice cooking, sampaguita flowers. Compliment someone\'s perfume with it.' },
+      { id: 'mabaho', tl: 'mabaho', en: 'smelly', kind: 'word', hint: 'mah-BAH-hoh', hook: 'One letter from "mabango", and the nose tells them apart. "Baho" is a stink.' },
+    ],
+  },
+  {
+    id: 'colours',
+    title: 'Colours',
+    tlTitle: 'Mga Kulay',
+    intro: 'Point and name it at a stall. Red, white, black and yellow are Tagalog words; blue and green come from Spanish.',
+    cards: [
+      { id: 'kulay', tl: 'kulay', en: 'colour', kind: 'word', hint: 'KOO-lai', hook: '"Anong kulay?" asks what colour. "Makulay", colourful, describes every jeepney.' },
+      { id: 'pula', tl: 'pula', en: 'red', kind: 'word', hint: 'poo-LAH', hook: 'The red on the flag. Going red in the face is "namumula".' },
+      { id: 'puti', tl: 'puti', en: 'white', kind: 'word', hint: 'poo-TEE', hook: 'The white triangle on the flag, and the colour of a plate of "kanin".' },
+      { id: 'itim', tl: 'itim', en: 'black', kind: 'word', hint: 'ee-TIM', hook: 'Sounds like "item": a little black item, like a phone left on the table.' },
+      { id: 'asul', tl: 'asul', en: 'blue', kind: 'word', hint: 'ah-SOOL', hook: 'Spanish "azul". The blue stripe on the flag.' },
+      { id: 'berde', tl: 'berde', en: 'green', kind: 'word', hint: 'BER-deh', hook: 'Spanish "verde", with the v turned to b, as in "baso" and "Biyernes".' },
+      { id: 'dilaw', tl: 'dilaw', en: 'yellow', kind: 'word', hint: 'dee-LAOW', hook: 'The yellow of the sun and stars on the flag, and of a ripe "mangga".' },
+    ],
+  },
+  {
+    id: 'weather',
+    title: 'Weather',
+    tlTitle: 'Panahon',
+    intro: 'Two seasons, hot and rainy, and plenty of small talk about both. You already know "Mainit!".',
+    cards: [
+      { id: 'panahon', tl: 'panahon', en: 'weather', kind: 'word', hint: 'pah-nah-HON', hook: 'It also means time or era: "noong panahon ng Kastila" is "back in Spanish times".' },
+      { id: 'maaraw', tl: 'Maaraw.', en: "It's sunny.", kind: 'word', hint: 'mah-AH-raow', hook: '"Araw" (sun, day) with "ma-": sunny. The same trick as "mainit".' },
+      { id: 'umuulan', tl: 'Umuulan.', en: "It's raining.", kind: 'word', hint: 'oo-moo-oo-LAHN', hook: '"Ulan" is rain. "-um-" and the doubled "u" make it happening right now.' },
+      { id: 'payong', tl: 'payong', en: 'umbrella', kind: 'word', hint: 'PAH-yong', hook: 'For rain and for sun alike: at noon you will see plenty of "payong" open under a clear sky.' },
+      { id: 'mahangin', tl: 'Mahangin.', en: "It's windy.", kind: 'word', hint: 'mah-HAH-ngin', hook: '"Hangin" is wind and air. Said of a show-off, "mahangin" means full of hot air.' },
+      { id: 'bagyo', tl: 'bagyo', en: 'typhoon', kind: 'word', hint: 'bahg-YOH', note: 'A strong one closes schools and offices: "Walang pasok", no school or work today.', hook: 'About twenty a year pass near the Philippines, so "May bagyo" (there\'s a typhoon) is everyday news.' },
+      { id: 'tag-init', tl: 'tag-init', en: 'hot season / summer', kind: 'word', hint: 'tahg-EE-nit', hook: '"Tag-" means the season of, and "init" is heat, from "Mainit!". March to May: beach time.' },
+      { id: 'tag-ulan', tl: 'tag-ulan', en: 'rainy season', kind: 'word', hint: 'tahg-oo-LAHN', hook: 'The season of "ulan", rain, from "Umuulan". Roughly June to October.' },
+    ],
+  },
+  {
+    id: 'phone',
+    title: 'Phone & messages',
+    tlTitle: 'Sa Telepono',
+    intro: 'Plans happen by text. Taglish is at home here: "I-text mo ako" is perfectly normal.',
+    cards: [
+      { id: 'selpon', tl: 'selpon', accept: ['cellphone'], en: 'mobile phone', kind: 'word', hint: 'SEL-pon', hook: 'English "cellphone", said the Tagalog way. Often just "CP".' },
+      { id: 'i-text-mo-ako', tl: 'I-text mo ako.', en: 'Text me.', kind: 'phrase', hint: 'ee-TEKST moh ah-KOH', hook: 'English "text" with "i-" to make it a Tagalog doing word, then "mo ako": you, me.' },
+      { id: 'tawagan-mo-ako', tl: 'Tawagan mo ako.', en: 'Call me.', kind: 'phrase', hint: 'tah-WAH-gahn moh ah-KOH', hook: '"Tawag" (call), from "Tumawag ka ng pulis!", with "-an": call me up.' },
+      { id: 'sino-ito', tl: 'Sino ito?', en: 'Who is this?', kind: 'phrase', hint: 'SEE-noh ee-TOH', hook: '"Sino" (who) + "ito" (this): the reply to a text from a number you don\'t know.' },
+      { id: 'ano-numero-mo', tl: 'Ano ang numero mo?', en: "What's your number?", kind: 'phrase', hint: 'ah-NOH ahng NOO-meh-roh moh', hook: '"Numero" as in "Mga Numero", in the shape of "Ano ang pangalan mo?".' },
+      { id: 'walang-signal', tl: 'Walang signal.', en: "There's no signal.", kind: 'phrase', hint: 'wah-LAHNG SIG-nahl', hook: '"Wala" (none) + "-ng" + English "signal". The excuse for every missed call.' },
+    ],
+  },
+  {
     id: 'help',
     title: 'Help & emergencies',
     tlTitle: 'Tulong',
@@ -520,6 +658,8 @@ export const UNITS: Unit[] = [
       { id: 'gamot', tl: 'gamot', en: 'medicine', kind: 'word', hint: 'gah-MOT', hook: 'Buy it at the botika. "Magpagamot" is to get yourself treated, built on the same root.' },
       { id: 'delikado', tl: 'Delikado!', en: 'Dangerous!', kind: 'word', hint: 'deh-lee-KAH-doh', hook: 'Spanish "delicado", delicate. In Tagalog delicate turned into dangerous.' },
       { id: 'tama-na', tl: 'Tama na!', en: "Stop it! / That's enough!", kind: 'phrase', hint: 'TAH-mah nah', hook: '"Tama" (right, correct) + "na" (already): it\'s right already, that\'s enough.' },
+      { id: 'sunog', tl: 'Sunog!', en: 'Fire!', kind: 'word', hint: 'SOO-nog', hook: '"Sunog" is a fire, and also burnt: "sunog na kanin" is rice burnt to the bottom of the pot.' },
+      { id: 'magnanakaw', tl: 'Magnanakaw!', en: 'Thief!', kind: 'word', hint: 'mahg-nah-NAH-kaow', hook: '"Nakaw" means steal. "Mag-" and the doubled "na" make it the one who steals.' },
     ],
   },
 ];
@@ -541,9 +681,12 @@ export const CORE_WORDS: readonly string[] = [
 
 /**
  * Cards close enough in meaning that one is never offered as a wrong answer
- * for another: "ko" can mean "I", "mo" can mean "you", and "na" can mean "now".
+ * for another: "ko" can mean "I", "mo" and "kayo" can mean "you", "na" can mean
+ * "now", a "bata" may be someone's "anak", and "luma" and "matanda" are both "old".
  */
-export const CLOSE_MEANINGS: readonly (readonly string[])[] = [['ako', 'ko'], ['ikaw', 'ka', 'mo'], ['na', 'ngayon']];
+export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
+  ['ako', 'ko'], ['ikaw', 'ka', 'mo', 'kayo'], ['na', 'ngayon'], ['anak', 'bata'], ['luma', 'matanda'],
+];
 
 /**
  * The order new cards are introduced in, most useful first, across topics. Topics
@@ -618,6 +761,26 @@ export const LEARN_ORDER: readonly string[] = [
   // Rarer places, dates and emergencies.
   'simbahan', 'opisina', 'bangko', 'paliparan', 'buwan', 'taon', 'lunes', 'biyernes', 'sabado', 'hatinggabi',
   'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',
+  // Have you eaten? Small talk about home, work and family, and the replies that go with it.
+  'pa', 'kumain-ka-na-ba', 'kumain-na-ako', 'hindi-pa', 'kayo', 'tuloy-po-kayo', 'saan-ka-nakatira', 'ano-trabaho-mo',
+  'ilang-taon-ka-na', 'asawa', 'may-asawa-ka-na-ba', 'pamilya', 'lalaki', 'babae', 'kapatid', 'bata',
+  'walang-problema', 'ikaw-ang-bahala', 'sigurado-ka-ba', 'sana',
+  // Doing words for an ordinary day.
+  'kumain', 'uminom', 'matulog', 'matutulog-na-ako', 'gising-ka-na-ba', 'maligo', 'pumunta', 'dumating',
+  'maghintay', 'bumili', 'magbayad', 'magluto', 'magtrabaho', 'maglakad', 'magsalita', 'makinig', 'tumulong',
+  'umupo', 'magpahinga', 'maglaro',
+  // Describing things and people.
+  'maganda', 'pangit', 'mabait', 'marami', 'bago', 'luma', 'matanda', 'mabilis', 'mabagal', 'madali',
+  'mahirap', 'malinis', 'madumi', 'mabango', 'mabaho',
+  // Meals and the market, and colours to point with.
+  'almusal', 'tanghalian', 'hapunan', 'itlog', 'baboy', 'karne-ng-baka', 'gulay', 'prutas', 'saging', 'mangga',
+  'gatas', 'asukal', 'asin', 'kulay', 'pula', 'puti', 'itim', 'asul', 'berde', 'dilaw',
+  // Phones, and the weather.
+  'selpon', 'i-text-mo-ako', 'tawagan-mo-ako', 'sino-ito', 'ano-numero-mo', 'walang-signal',
+  'panahon', 'maaraw', 'umuulan', 'payong', 'mahangin', 'bagyo', 'tag-init', 'tag-ulan',
+  // Bigger numbers, the rest of the week, and emergencies.
+  'labing-isa', 'labindalawa', 'labinlima', 'tatlumpu', 'apatnapu', 'dalawang-daan', 'martes', 'miyerkoles',
+  'huwebes', 'sunog', 'magnanakaw',
 ];
 
 const byId = new Map(ALL_CARDS.map((c) => [c.id, c]));
