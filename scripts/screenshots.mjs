@@ -144,32 +144,10 @@ const SCREENS = {
     await page.mouse.move(rail.x + 20 + (rail.width - 40) * 0.875, y);
     await page.mouse.down();
   },
-  // The same, after dragging along the word from its first letter to its last: the last sound open. Says if
-  // anything on the screen moved on the way, as each sound's panel should take the same room.
-  'speak-result-scrubbed': async (page) => {
-    await SCREENS['speak-result'](page);
-    const word = await page.locator('.word-scrub').boundingBox();
-    const y = word.y + word.height / 2;
-    const where = () =>
-      page.evaluate(() =>
-        Object.fromEntries(
-          ['.word-scrub', '.ribbon', '.sound-detail', '.detail-page.open .sound-chart', '.word-actions', '.result-actions'].map((sel) => {
-            const r = document.querySelector(sel)?.getBoundingClientRect();
-            return [sel, r ? `${Math.round(r.top)}+${Math.round(r.height)}` : 'none'];
-          }),
-        ),
-      );
-    const first = await where();
-    const moved = new Set();
-    await page.mouse.move(word.x + 4, y);
-    await page.mouse.down();
-    for (let i = 1; i <= 10; i++) {
-      await page.mouse.move(word.x + 4 + ((word.width - 8) * i) / 10, y);
-      for (const [sel, at] of Object.entries(await where())) if (at !== first[sel]) moved.add(sel);
-    }
-    await page.mouse.up();
-    if (moved.size) console.log(`speak-result-scrubbed at ${page.viewportSize().width} wide: ${[...moved].join(', ')} moved between sounds`);
-  },
+  // The same, after dragging along the word from its first letter to its last: the last sound open.
+  'speak-result-scrubbed': (page) => scrubAlong(page, 'speak-result-scrubbed', '.word-scrub'),
+  // The same, dragging along the recording instead.
+  'speak-result-ribbon': (page) => scrubAlong(page, 'speak-result-ribbon', '.ribbon'),
   // Listen only, on settled words, with a key for OpenAI: the meaning said into the box, as a wave of levels from a
   // stand-in microphone, then being heard (OpenAI never answers here).
   'drills-saying': (page) => sayMeaning(page),
@@ -370,6 +348,45 @@ async function drillOnlySpeak(page) {
   await page.click('.filter-toggle');
   for (const mode of ['listen', 'read', 'recall']) await page.click(`#drill-scope [data-mode="${mode}"]`);
   await page.click('.filter-toggle');
+}
+
+/**
+ * A spoken attempt's results, dragged along `selector` from end to end. Says if anything on the screen moved on the
+ * way, as each sound's panel should take the same room, and how many of the sounds the drag opened.
+ */
+async function scrubAlong(page, name, selector) {
+  await SCREENS['speak-result'](page);
+  const box = await page.locator(selector).boundingBox();
+  const y = box.y + box.height / 2;
+  const where = () =>
+    page.evaluate(() => ({
+      open: [...document.querySelectorAll('.ribbon-mark')].findIndex((m) => m.classList.contains('selected')),
+      at: Object.fromEntries(
+        ['.word-scrub', '.ribbon', '.sound-detail', '.detail-page.open .sound-chart', '.word-actions', '.result-actions'].map((sel) => {
+          const r = document.querySelector(sel)?.getBoundingClientRect();
+          return [sel, r ? `${Math.round(r.top)}+${Math.round(r.height)}` : 'none'];
+        }),
+      ),
+    }));
+  const first = await where();
+  const moved = new Set();
+  const opened = new Set();
+  let left = false;
+  await page.mouse.move(box.x + 4, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 20; i++) {
+    await page.mouse.move(box.x + 4 + ((box.width - 8) * i) / 20, y);
+    const now = await where();
+    if (now.open !== first.open) left = true;
+    if (left) opened.add(now.open);
+    for (const [sel, at] of Object.entries(now.at)) if (at !== first.at[sel]) moved.add(sel);
+  }
+  await page.mouse.up();
+  const width = page.viewportSize().width;
+  const marks = await page.locator('.ribbon-mark').count();
+  // Counting the sound open before the drag only if the drag came back to it.
+  console.log(`${name} at ${width} wide: opened ${opened.size} of ${marks} sounds`);
+  if (moved.size) console.log(`${name} at ${width} wide: ${[...moved].join(', ')} moved between sounds`);
 }
 
 /** Drills, asking only Listen on words settled in Study, saying the meaning into the box. */

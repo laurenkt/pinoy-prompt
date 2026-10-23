@@ -1703,6 +1703,8 @@ p {
 /* The recording with its sounds marked on it: aimed-for sound above, what was heard below. */
 .ribbon {
   position: relative;
+  /* Dragged sideways, it scrubs between sounds (see .word-scrub). */
+  touch-action: pan-y;
   border: var(--outline);
   border-radius: 16px;
   box-shadow: var(--shadow);
