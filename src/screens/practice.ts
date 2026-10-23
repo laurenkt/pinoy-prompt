@@ -446,7 +446,8 @@ export function practiceScreen(
 
   function draw(): void {
     if (!current) root.replaceChildren(tooFew());
-    else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting(hearMeaning() !== null)));
+    // A meaning can be said into the box only on a listening question, and with a way to hear it.
+    else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting(modes().includes('listen') && hearMeaning() !== null)));
     else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });

@@ -16,6 +16,7 @@ const SAME: [RegExp, string][] = [
   [/\b(thanks|thx|ty)\b/g, 'thank you'],
   [/\bok\b/g, 'okay'],
   [/\b(hi|hey)\b/g, 'hello'],
+  [/\bhow do you do\b/g, 'hello'],
   [/\b(bye|good bye)\b/g, 'goodbye'],
   [/\bo ?clock\b/g, 'oclock'],
   [/\bcannot\b/g, 'can not'],
@@ -54,8 +55,9 @@ interface Wording {
 }
 
 function wording(text: string): Wording {
-  const list = words(text);
-  return { words: meaningful(list), helper: helper(list) };
+  // A helping verb counts only when it's written out: "what's this mean" is "what does this mean" as often as "what is".
+  const written = text.replace(/['’]s\b/gi, '').replace(/\b(what|where|that|there|it)s\b/gi, '$1');
+  return { words: meaningful(words(text)), helper: helper(words(written)) };
 }
 
 /** Lower case words, with contractions, digits and common shorthands spelled out. */
