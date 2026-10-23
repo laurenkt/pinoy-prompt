@@ -82,13 +82,14 @@ export function wordsScreen(app: App): HTMLElement {
       ? `${met.length} of ${cards.length} met: ${firmest.map((s) => `${s.label} ${counts[s.id]}`).join(', ')}`
       : `None of ${cards.length} met yet`;
     const filled = (met.length / cards.length) * 100;
+    // The title comes first, so a screen reader names the topic before its count.
     return [
+      body(),
       h(
         'span',
         { class: `memory-fill${met.length === cards.length ? ' full' : ''}`, role: 'img', 'aria-label': label },
         firmest.map((s) => h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } })),
       ),
-      body(),
       met.length ? h('span', { class: 'memory-ink', 'aria-hidden': 'true', style: { clipPath: `inset(0 ${100 - filled}% 0 0)` } }, body()) : null,
     ].filter((el): el is HTMLElement => !!el);
   }

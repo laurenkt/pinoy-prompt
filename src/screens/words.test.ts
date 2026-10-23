@@ -60,6 +60,8 @@ describe('the Library', () => {
     app.progress.cards[b.id].interval = 30;
     const summary = wordsScreen(app).querySelector('.unit-list summary')!;
     const fill = summary.querySelector('.memory-fill')!;
+    // Named by its title before its count.
+    expect(summary.firstElementChild!.className).toBe('unit-body');
     expect([...fill.children].map((s) => s.className)).toEqual(['s-long', 's-days']);
     expect(parseFloat((fill.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / unit.cards.length);
     expect(fill.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: Long-term 1, Days 1`);
