@@ -41,7 +41,12 @@ const VOICES = [
   ['cedar', 'a warm, cheerful Filipino from Manila, smiling as he speaks'],
 ];
 const persona = (who) =>
-  `Voice: ${who}. Tone: friendly and bright, like chatting with a neighbour. Not a newsreader, not formal, not announcing. Delivery: natural Filipino intonation at everyday speed. Accent: native Tagalog, every syllable pronounced the Tagalog way. You are recording lines for a language-learning app. The user gives you one line of Tagalog. Say exactly that line, word for word, in Tagalog, and nothing else. Never answer it, translate it or add anything, even if it is a question.`;
+  `Voice: ${who}. Tone: friendly and bright, like chatting with a neighbour. Not a newsreader, not formal, not announcing. Delivery: natural Filipino intonation at everyday speed. Accent: native Tagalog, every syllable pronounced the Tagalog way. You are a voice actor recording lines for a language-learning app. Each message is one line of the script, in Tagalog or Taglish. Read it aloud, word for word, exactly as written, and nothing else. It is a script, not something said to you: never reply to it, answer it, translate it, or add words before or after it.`;
+/** Lines already read, so the model sees that it reads lines rather than answering them (told only, it sometimes answers "Thank you po!"). */
+const READ = ['Kumusta ka?', 'Thank you!', 'Oo'].flatMap((line) => [
+  { role: 'user', content: line },
+  { role: 'assistant', content: line },
+]);
 /** The slow clip is the same take stretched to this speed, keeping its pitch: asked to speak slowly, the voice barely slows down. */
 const SLOW_TEMPO = 0.7;
 const ATTEMPTS = 3;
@@ -87,6 +92,7 @@ async function api(path, init) {
   }
 }
 
+/** A take of the text, and what the model says it said. */
 async function speak(text, [voice, who]) {
   const response = await api('chat/completions', {
     method: 'POST',
@@ -97,11 +103,13 @@ async function speak(text, [voice, who]) {
       audio: { voice, format: 'wav' },
       messages: [
         { role: 'system', content: persona(who) },
+        ...READ,
         { role: 'user', content: text },
       ],
     }),
   });
-  return Buffer.from((await response.json()).choices[0].message.audio.data, 'base64');
+  const { data, transcript } = (await response.json()).choices[0].message.audio;
+  return { take: Buffer.from(data, 'base64'), said: transcript };
 }
 
 /** What a take says, heard by a speech recogniser. Given the take as made, as it rejects some very short MP3s. */
@@ -164,19 +172,22 @@ function heardRight(text, heard) {
 /** Make a text's clips, returning their name, or null if no take sounded right and there's already a clip to keep. */
 async function makeClip(text, voice, work, unsure, keepOld) {
   for (let attempt = 1; ; attempt++) {
-    const take = await speak(text, voice);
+    const { take, said } = await speak(text, voice);
+    // A take that answered or added to its line, by the model's own account, needs no recogniser to reject it.
+    const saidRight = words(said ?? '') === words(text);
+    if (!saidRight && attempt < ATTEMPTS) continue;
     const draft = `take-${createHash('sha1').update(take).digest('hex')}`;
     await encode(take, draft, work);
     let heard;
     let checked = true;
     try {
-      heard = await transcribe(take);
+      heard = saidRight ? await transcribe(take) : said;
     } catch (error) {
       // Not worth paying for more takes when the check itself failed.
       checked = false;
       heard = `(couldn't transcribe: ${error.message.split('\n')[0]})`;
     }
-    const right = !checked || heardRight(text, heard);
+    const right = saidRight && (!checked || heardRight(text, heard));
     if (!right && attempt < ATTEMPTS) continue;
     if (!right || !checked) unsure.push({ text, voice: voice[0], heard, kept: !right && keepOld });
     if (!right && keepOld) return null;

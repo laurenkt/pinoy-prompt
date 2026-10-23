@@ -200,7 +200,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
       // Offline support is a bonus; the app works without it.
     });
-    // A few seconds in, so the first screen isn't waiting behind 4 MB of clips.
+    // A few seconds in, so the first screen isn't waiting behind 7 MB of clips.
     setTimeout(() => {
       void keepClipsOffline(allClipUrls()).catch(() => {});
       void keepSpeakingReady().catch(() => {});
