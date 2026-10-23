@@ -327,12 +327,7 @@ describe('fitPower', () => {
 });
 
 describe('strengthCounts', () => {
-  it('counts only the given cards, and only those met', () => {
-    const progress = emptyProgress(NOW);
-    const [a, b, c] = ALL_CARDS;
-    progress.cards[a.id] = card(0, 0);
-    progress.cards[b.id] = card(10, 0);
-    progress.cards[c.id] = card(30, 0);
-    expect(strengthCounts(progress, [a, b, ALL_CARDS[3]])).toEqual({ new: 1, days: 0, weeks: 1, long: 0 });
+  it('counts the cards at each strength', () => {
+    expect(strengthCounts([card(0, 0), card(10, 0), card(30, 0), card(25, 3)])).toEqual({ new: 1, days: 0, weeks: 1, long: 2 });
   });
 });

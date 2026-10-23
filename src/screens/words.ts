@@ -69,22 +69,21 @@ export function wordsScreen(app: App): HTMLElement {
   }
 
   /**
-   * A strip along the bottom of a topic's heading: its cards by strength, as
+   * A strip along the bottom of a group's heading: its cards by strength, as
    * on Home's memory chart, firmest first, with the rest left empty. It sits in
-   * the heading's padding, so a topic takes no more room than without it.
+   * the heading's padding, so a group takes no more room than without it.
    */
   function memoryStrip(cards: Card[]): HTMLElement {
-    const counts = strengthCounts(app.progress, cards);
-    const met = STRENGTHS.reduce((sum, s) => sum + counts[s.id], 0);
-    const label = met
-      ? `${met} of ${cards.length} met: ${STRENGTHS.filter((s) => counts[s.id]).map((s) => `${counts[s.id]} ${s.label}`).join(', ')}`
+    const met = cards.flatMap((card) => app.progress.cards[card.id] ?? []);
+    const counts = strengthCounts(met);
+    const firmest = [...STRENGTHS].reverse().filter((s) => counts[s.id]);
+    const label = met.length
+      ? `${met.length} of ${cards.length} met: ${firmest.map((s) => `${s.label} ${counts[s.id]}`).join(', ')}`
       : `None of ${cards.length} met yet`;
     return h(
       'span',
       { class: 'memory-strip', role: 'img', 'aria-label': label },
-      [...STRENGTHS].reverse().map((s) =>
-        counts[s.id] ? h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } }) : null,
-      ),
+      firmest.map((s) => h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } })),
     );
   }
 

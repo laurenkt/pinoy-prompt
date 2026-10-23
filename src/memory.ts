@@ -65,13 +65,10 @@ export function recallChance(card: CardState, now: number): number {
   return Math.pow(1 + ((19 / 81) * days) / card.interval, -0.5);
 }
 
-/** How many of these cards are at each strength; cards not met yet aren't counted. */
-export function strengthCounts(progress: Progress, cards: readonly Card[]): Record<Strength, number> {
+/** How many of these cards are at each strength. */
+export function strengthCounts(cards: readonly CardState[]): Record<Strength, number> {
   const counts: Record<Strength, number> = { new: 0, days: 0, weeks: 0, long: 0 };
-  for (const card of cards) {
-    const state = progress.cards[card.id];
-    if (state) counts[strengthOf(state)]++;
-  }
+  for (const card of cards) counts[strengthOf(card)]++;
   return counts;
 }
 
@@ -92,13 +89,11 @@ export function memorySummary(progress: Progress, now: number): MemorySummary {
   const cards = Object.entries(progress.cards)
     .filter(([id]) => getCard(id))
     .map(([, card]) => card);
-  const strengths: Record<Strength, number> = { new: 0, days: 0, weeks: 0, long: 0 };
   const due = { tomorrow: 0, week: 0 };
   const endOfTomorrow = startOfDayAfter(now, 2);
   const endOfWeek = startOfDayAfter(now, 8);
   let recall = 0;
   for (const card of cards) {
-    strengths[strengthOf(card)]++;
     recall += recallChance(card, now);
     if (card.due <= now) continue;
     if (card.due < endOfTomorrow) due.tomorrow++;
@@ -106,7 +101,7 @@ export function memorySummary(progress: Progress, now: number): MemorySummary {
   }
   return {
     total: cards.length,
-    strengths,
+    strengths: strengthCounts(cards),
     estimatedRecall: cards.length ? recall / cards.length : null,
     recent: recentReviews(progress, now),
     due,

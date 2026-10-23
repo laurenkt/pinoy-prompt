@@ -2235,21 +2235,22 @@ p {
   color: var(--muted);
 }
 
-/* The topic's cards by memory strength, in the heading's bottom padding so the heading keeps its height. Unmet cards are the empty track. */
+/* The group's cards by memory strength, in the heading's bottom padding so the heading keeps its height: clear of the rounded corners and above the focus ring. Unmet cards are the empty track. */
 .memory-strip {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 14px;
+  right: 14px;
+  bottom: 7px;
   height: 8px;
   display: flex;
+  overflow: hidden;
   background: var(--line);
-  border-top: 2px solid var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: 99px;
 }
 
 .memory-strip > span {
   height: 100%;
-  border-right: 2px solid var(--ink);
 }
 
 .word-list {
