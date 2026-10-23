@@ -206,26 +206,32 @@ async function failure(response: Response): Promise<AiError> {
   return new AiError('other', message);
 }
 
+/** A request that never got through, or an answer that broke off. */
+function unreachable(e: unknown): AiError {
+  return new AiError('network', e instanceof Error ? e.message : String(e));
+}
+
 /**
- * Send a request that's given up if OpenAI hasn't started answering after `ms`. Once it has, the limit is lifted, so
- * the answer is read in full and what it used is counted. AbortSignal.timeout wouldn't lift, and iOS only has it from 16.
+ * Run a whole exchange with OpenAI, sending and reading the answer, and give it up after `ms`. The limit is cleared
+ * once the exchange is over. AbortSignal.timeout can't be cleared, and iOS only has it from 16.
  */
-async function timed(ms: number, send: (signal: AbortSignal) => Promise<Response>): Promise<Response> {
+async function timed<T>(ms: number, exchange: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   try {
-    return await send(controller.signal);
+    return await exchange(controller.signal);
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** An answer's body; the connection dropping while it's read is a network failure like any other. */
+/** An answer's body. One that breaks off (or is given up) is a network failure like any other. */
 async function readJson<T>(response: Response): Promise<T> {
   try {
     return (await response.json()) as T;
   } catch (e) {
-    throw new AiError('network', e instanceof Error ? e.message : String(e));
+    if (e instanceof SyntaxError) throw new AiError('other', "OpenAI's answer couldn't be read.");
+    throw unreachable(e);
   }
 }
 
@@ -239,7 +245,7 @@ async function post(key: string, path: string, body: unknown, fetchFn: typeof fe
       body: JSON.stringify(body),
     });
   } catch (e) {
-    throw new AiError('network', e instanceof Error ? e.message : String(e));
+    throw unreachable(e);
   }
   if (!response.ok) throw await failure(response);
   return response;
@@ -263,30 +269,32 @@ export async function checkMeaning(
   { tl, en, answer }: { tl: string; en: string; answer: string },
   fetchFn: typeof fetch = (...args) => fetch(...args),
 ): Promise<boolean> {
-  const response = await timed(CHECK_TIMEOUT_MS, (signal) =>
-    post(
-      key,
-      '/responses',
-      {
-        model: CHECK_MODEL,
-        reasoning: { effort: 'none' },
-        instructions: CHECK_INSTRUCTIONS,
-        input: `Tagalog: ${tl}\nMeaning: ${en}\nAnswer: ${answer.slice(0, 200)}`,
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'verdict',
-            strict: true,
-            schema: { type: 'object', properties: { right: { type: 'boolean' } }, required: ['right'], additionalProperties: false },
+  type Answer = { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
+  const body = await timed(CHECK_TIMEOUT_MS, async (signal) =>
+    readJson<Answer>(
+      await post(
+        key,
+        '/responses',
+        {
+          model: CHECK_MODEL,
+          reasoning: { effort: 'none' },
+          instructions: CHECK_INSTRUCTIONS,
+          input: `Tagalog: ${tl}\nMeaning: ${en}\nAnswer: ${answer.slice(0, 200)}`,
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'verdict',
+              strict: true,
+              schema: { type: 'object', properties: { right: { type: 'boolean' } }, required: ['right'], additionalProperties: false },
+            },
           },
+          store: false,
         },
-        store: false,
-      },
-      fetchFn,
-      signal,
+        fetchFn,
+        signal,
+      ),
     ),
   );
-  const body = await readJson<{ output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage }>(response);
   addSpend(tokenCost(CHECK_MODEL, body.usage));
   const text = body.output?.find((o) => o.type === 'message')?.content?.find((c) => c.type === 'output_text')?.text;
   try {
@@ -310,16 +318,16 @@ export async function transcribe(key: string, audio: Blob, fetchFn: typeof fetch
   form.append('language', 'en');
   form.append('prompt', 'Someone saying in English what a Tagalog word or phrase means.');
   form.append('file', audio, 'answer.wav');
-  let response: Response;
-  try {
-    response = await timed(TRANSCRIBE_TIMEOUT_MS, (signal) =>
-      fetchFn(`${API}/audio/transcriptions`, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form, signal }),
-    );
-  } catch (e) {
-    throw new AiError('network', e instanceof Error ? e.message : String(e));
-  }
-  if (!response.ok) throw await failure(response);
-  const body = await readJson<{ text?: unknown; usage?: TranscriptionUsage }>(response);
+  const body = await timed(TRANSCRIBE_TIMEOUT_MS, async (signal) => {
+    let response: Response;
+    try {
+      response = await fetchFn(`${API}/audio/transcriptions`, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form, signal });
+    } catch (e) {
+      throw unreachable(e);
+    }
+    if (!response.ok) throw await failure(response);
+    return readJson<{ text?: unknown; usage?: TranscriptionUsage }>(response);
+  });
   addSpend(transcriptionCost(body.usage));
   return typeof body.text === 'string' ? body.text.trim() : '';
 }

@@ -53,6 +53,14 @@ describe('asking for the microphone in Drills', () => {
     expect(root.querySelector('.choice, .speak')).not.toBeNull();
   });
 
+  it('says where a spoken answer goes: on the phone, or to OpenAI for a meaning said into the box', () => {
+    const local = practiceScreen(fakeApp(), micNotYet().deps, null, () => null);
+    expect(local.querySelector('.mic-waiting')!.textContent).toContain('checked on this phone');
+    expect(local.querySelector('.mic-waiting')!.textContent).not.toContain('OpenAI');
+    const withKey = practiceScreen(fakeApp(), micNotYet().deps, null, () => async () => '');
+    expect(withKey.querySelector('.mic-waiting')!.textContent).toContain('goes to OpenAI');
+  });
+
   it('leaves speaking out for the visit when refused', async () => {
     const mic = micNotYet();
     const root = practiceScreen(fakeApp(), mic.deps);

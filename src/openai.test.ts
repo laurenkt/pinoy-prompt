@@ -347,29 +347,28 @@ describe('checking a typed meaning', () => {
     await expect(checkMeaning(KEY, CARD, (async () => json(200, { output: [] })) as unknown as typeof fetch)).rejects.toBeInstanceOf(AiError);
   });
 
-  it("gives up on a slow answer, but not once it's coming, so what it used still counts", async () => {
+  it('gives up on an answer that stalls, as a lost connection, and leaves no time limit behind', async () => {
     vi.useFakeTimers();
     try {
-      localStorage.clear();
-      let signal: AbortSignal | undefined;
-      let finish: (body: unknown) => void = () => {};
-      const response = { ok: true, status: 200, json: () => new Promise((resolve) => (finish = resolve)) } as unknown as Response;
-      const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
-        signal = init.signal ?? undefined;
-        return response;
-      });
-      const checked = checkMeaning(KEY, CARD, fetchFn as unknown as typeof fetch);
-      await vi.advanceTimersByTimeAsync(20000);
-      expect(signal?.aborted).toBe(false);
-      const usage = { input_tokens: 200, output_tokens: 10 };
-      finish({ output: [{ type: 'message', content: [{ type: 'output_text', text: '{"right":true}' }] }], usage });
-      expect(await checked).toBe(true);
-      expect(getSpend().total).toBeCloseTo(tokenCost(CHECK_MODEL, usage));
-
-      const stalled = vi.fn((_url: string, init: RequestInit) => new Promise<Response>((_, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))));
-      const late = expect(checkMeaning(KEY, CARD, stalled as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+      // Headers in, then the body never comes: the body breaks off when the request is given up, as fetch's does.
+      const stalling = vi.fn(async (_url: string, init: RequestInit) => ({
+        ok: true,
+        status: 200,
+        json: () => new Promise((_, reject) => init.signal!.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))),
+      }));
+      const checked = expect(checkMeaning(KEY, CARD, stalling as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
       await vi.advanceTimersByTimeAsync(8000);
-      await late;
+      await checked;
+
+      const heard = expect(transcribe(KEY, new Blob(), stalling as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+      await vi.advanceTimersByTimeAsync(19000);
+      expect(stalling).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1000);
+      await heard;
+
+      await checkMeaning(KEY, CARD, (async () => verdict(true)) as unknown as typeof fetch);
+      await transcribe(KEY, new Blob(), (async () => json(200, { text: 'hi' })) as unknown as typeof fetch);
+      expect(vi.getTimerCount()).toBe(0);
     } finally {
       vi.useRealTimers();
     }
@@ -379,6 +378,11 @@ describe('checking a typed meaning', () => {
     const broken = { ok: true, status: 200, json: () => Promise.reject(new DOMException('Aborted', 'AbortError')) } as unknown as Response;
     await expect(checkMeaning(KEY, CARD, (async () => broken) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
     await expect(transcribe(KEY, new Blob(), (async () => broken) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'network' });
+  });
+
+  it("doesn't blame the connection for an answer that isn't JSON", async () => {
+    const page = new Response('<html>Sign in to the Wi-Fi</html>', { status: 200 });
+    await expect(checkMeaning(KEY, CARD, (async () => page) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'other' });
   });
 });
 
