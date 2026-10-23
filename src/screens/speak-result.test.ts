@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The sound-by-sound breakdown: what opens when each part is tapped, and holding the slider either side of its middle to hear a sound.
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { coach } from '../coach';
 import { compare, toPhones } from '../phonetics';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
@@ -19,7 +19,8 @@ const all = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)];
 
 function show(a: Attempt) {
   const view = resultView(a, { player });
-  document.body.replaceChildren(view.el);
+  // The word sits on the result card above the breakdown.
+  document.body.replaceChildren(view.word, view.el);
   return view;
 }
 
@@ -333,4 +334,109 @@ describe('the breakdown', () => {
     expect(player.stopped).toBeGreaterThan(0);
   });
 
+});
+
+describe('the word as a scrubber', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  /** Lays each letter of the word out 20px wide from x 0, as happy-dom lays nothing out. */
+  function layOutWord(view: { word: HTMLElement }) {
+    [...view.word.querySelectorAll<HTMLElement>('span > span')].forEach((el, i) => {
+      el.getBoundingClientRect = () => ({ left: i * 20, right: i * 20 + 20, width: 20, top: 0, bottom: 30, height: 30, x: i * 20, y: 0, toJSON() {} });
+    });
+  }
+  const at = (view: { word: HTMLElement }, type: string, clientX: number, clientY = 15) =>
+    view.word.dispatchEvent(new PointerEvent(type, { clientX, clientY, pointerId: 1, isPrimary: true, pointerType: 'touch' }));
+  const opened = () => q('.ribbon-mark.selected .mark-target').textContent;
+  const underlined = () => all('.word-scrub .on').map((e) => e.textContent).join('');
+
+  it("underlines the open sound's letters in the word, however it was opened", () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    expect(underlined()).toBe('ng');
+    all('.ribbon-mark')[3].click();
+    expect(underlined()).toBe('o');
+  });
+
+  it('opens each sound in turn as a finger drags along its letters, moving the ribbon with it, and plays nothing', () => {
+    const view = show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutWord(view);
+    const seen: string[] = [];
+    at(view, 'pointerdown', 5);
+    for (const x of [15, 30, 45, 50, 70, 90, 110]) {
+      at(view, 'pointermove', x);
+      if (opened() !== seen.at(-1)) seen.push(opened()!);
+    }
+    at(view, 'pointerup', 110);
+    // "ng" is two letters and one sound.
+    expect(seen).toEqual(['ŋ', 'a', 'j', 'o', 'n']);
+    expect(underlined()).toBe('n');
+    expect(view.word.getAttribute('aria-valuenow')).toBe('5');
+    expect(player.calls).toEqual([]);
+  });
+
+  it('ticks once for each sound moved to, not for each letter', async () => {
+    const vibrate = vi.fn();
+    vi.stubGlobal('navigator', { vibrate });
+    const view = show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutWord(view);
+    at(view, 'pointerdown', 5);
+    for (const x of [15, 25, 30, 50, 70]) {
+      at(view, 'pointermove', x);
+      await new Promise((r) => setTimeout(r, 60));
+    }
+    at(view, 'pointerup', 70);
+    // From ng to a (past the second letter of ng, which doesn't tick), then to y.
+    expect(vibrate).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the sound under a tap, and leaves a drag up or down to scroll the page', () => {
+    const view = show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutWord(view);
+    at(view, 'pointerdown', 85);
+    at(view, 'pointerup', 85);
+    expect(opened()).toBe('o');
+    at(view, 'pointerdown', 25);
+    at(view, 'pointermove', 27, 40);
+    at(view, 'pointermove', 100, 40);
+    at(view, 'pointerup', 100, 40);
+    expect(opened()).toBe('o');
+  });
+
+  it('opens the vowel, not the catch before it, from a letter that spells both', () => {
+    const view = show(attempt('ako', ['ʔ', 'a', 'k', 'o']));
+    layOutWord(view);
+    expect(all('.ribbon-mark .mark-target').map((e) => e.textContent)).toEqual(['ʔ', 'a', 'k', 'o']);
+    at(view, 'pointerdown', 5);
+    at(view, 'pointerup', 5);
+    expect(opened()).toBe('a');
+    expect(underlined()).toBe('a');
+    all('.ribbon-mark')[0].click();
+    expect(underlined()).toBe('a');
+  });
+
+  it('keeps scrubbing with the first finger when a second one lands', () => {
+    const view = show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutWord(view);
+    const second = (type: string, clientX: number) =>
+      view.word.dispatchEvent(new PointerEvent(type, { clientX, clientY: 15, pointerId: 2, isPrimary: false, pointerType: 'touch' }));
+    at(view, 'pointerdown', 5);
+    at(view, 'pointermove', 50);
+    second('pointerdown', 110);
+    second('pointerup', 110);
+    at(view, 'pointermove', 85);
+    expect(opened()).toBe('o');
+  });
+
+  it('steps from sound to sound with the arrow keys', () => {
+    const view = show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    const key = (k: string) => view.word.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
+    key('ArrowRight');
+    expect(opened()).toBe('a');
+    key('End');
+    expect(opened()).toBe('n');
+    key('ArrowRight');
+    expect(opened()).toBe('n');
+    key('Home');
+    expect(opened()).toBe('ŋ');
+    expect(view.word.getAttribute('aria-valuetext')).toContain('Aim for');
+  });
 });

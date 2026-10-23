@@ -1661,6 +1661,17 @@ p {
   font-size: 1.5rem;
 }
 
+/* The word as a scrubber: drag along it to open each sound; the open sound's letters are underlined. */
+.word-scrub {
+  touch-action: pan-y;
+  cursor: ew-resize;
+}
+
+.word-scrub .on {
+  text-decoration: underline 3px;
+  text-underline-offset: 4px;
+}
+
 .result-card .sound-good {
   color: var(--on-accent);
 }
