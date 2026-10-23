@@ -5,7 +5,8 @@
 // the slider under the map plays one or the other, made in code rather than cut
 // from the recording: what was said to the left of the middle, what to aim for
 // to the right, louder the further the finger goes. The word itself, coloured
-// sound by sound, is a scrubber too: drag along its letters to move between sounds.
+// sound by sound, and the ribbon are scrubbers too: drag along the letters or the
+// recording to move between sounds.
 
 import type { Tip } from '../coach';
 import type { Comparison, SoundResult, SoundVerdict } from '../phonetics';
@@ -13,7 +14,7 @@ import { canSynthesize } from '../phone-synth';
 import type { Held, Player } from '../player';
 import { MANNERS, PLACES, placeOf, soundName, type Place } from '../sound-map';
 import { createSpectrogram, type Segment, type Spectrogram } from '../spectrogram';
-import { detents, readyDetents, tick } from '../speech';
+import { scrubbable } from '../speech';
 import { h, icon, svg } from '../ui';
 
 export interface Attempt {
@@ -258,61 +259,34 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     'aria-valuemin': '1',
     'aria-valuemax': String(list.length),
   });
-  /** Where each letter sat as the drag began: read once, rather than at every move. */
+  /** Where each letter or mark sat as the drag began: read once, rather than at every move. */
   let boxes: DOMRect[] = [];
-  /** The letter nearest a point: on its line first, then along it. */
-  const letterAt = (x: number, y: number) => {
+  /** The box nearest a point: on its line first, then along it, and the narrowest of those it's in (a missing sound's slim mark over its neighbour's). */
+  const nearest = (x: number, y: number) => {
     let best = -1;
     let far = Infinity;
     boxes.forEach((r, i) => {
       const d = Math.max(r.top - y, 0, y - r.bottom) * 1000 + Math.max(r.left - x, 0, x - r.right);
-      if (d < far) [best, far] = [i, d];
+      if (d < far || (d === far && r.width < boxes[best].width)) [best, far] = [i, d];
     });
     return best;
   };
-  /** Opens the sound under the pointer, and says which it is, for the ticks. */
-  const pick = (e: PointerEvent): string | null => {
-    const index = markAt(letterAt(e.clientX, e.clientY));
+  /** Opens a sound, and says which it is, for the ticks. */
+  const open = (index: number): string | null => {
     if (index < 0) return null;
     select(index);
     return String(index);
   };
-  // Like the memory chart: a drag sideways scrubs, ticking at each sound; one that
-  // starts up or down is left to scroll the page; a tap clicks like any press.
-  const detent = detents();
-  let touch: { x: number; y: number; scrub: boolean } | null = null;
-  word.addEventListener('pointerdown', (e) => {
-    // One finger scrubs; a second, or a mouse's other buttons, are left alone.
-    if (!e.isPrimary || e.button > 0) return;
-    boxes = letterEls.map((el) => el.getBoundingClientRect());
-    touch = { x: e.clientX, y: e.clientY, scrub: false };
-    // So a mouse dragged off the word keeps scrubbing.
-    word.setPointerCapture?.(e.pointerId);
+  // Like the memory chart: a drag sideways along the word's letters, or along the recording's marks, opens each sound
+  // in turn. A tap on a letter opens its sound; a tap on a mark is the mark's own press.
+  scrubbable(word, {
+    start: () => (boxes = letterEls.map((el) => el.getBoundingClientRect())),
+    pick: (e) => open(markAt(nearest(e.clientX, e.clientY))),
+    tap: (e) => open(markAt(nearest(e.clientX, e.clientY))),
   });
-  word.addEventListener('pointermove', (e) => {
-    if (!touch || !e.isPrimary) return;
-    const dx = Math.abs(e.clientX - touch.x);
-    const dy = Math.abs(e.clientY - touch.y);
-    if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
-    else if (touch.scrub || (dx > 8 && dx > dy)) {
-      if (!touch.scrub) readyDetents();
-      touch.scrub = true;
-      detent(pick(e));
-    }
-  });
-  word.addEventListener('pointerup', (e) => {
-    if (!e.isPrimary) return;
-    if (touch && !touch.scrub) {
-      pick(e);
-      tick('click');
-    }
-    touch = null;
-    detent(null);
-  });
-  word.addEventListener('pointercancel', (e) => {
-    if (!e.isPrimary) return;
-    touch = null;
-    detent(null);
+  scrubbable(ribbonEl, {
+    start: () => (boxes = marks.map((el) => el.getBoundingClientRect())),
+    pick: (e) => open(nearest(e.clientX, e.clientY)),
   });
   word.addEventListener('keydown', (e) => {
     const to = ({ ArrowLeft: selected - 1, ArrowDown: selected - 1, ArrowRight: selected + 1, ArrowUp: selected + 1, Home: 0, End: list.length - 1 } as Record<string, number>)[e.key];

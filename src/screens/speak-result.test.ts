@@ -482,3 +482,50 @@ describe('the word as a scrubber', () => {
     expect(view.word.getAttribute('aria-valuetext')).toContain('Aim for');
   });
 });
+
+describe('the recording as a scrubber', () => {
+  /** Lays each mark on the ribbon out from x 0, 40px wide or, for a sound nobody said, a slim 10px over the one before. */
+  function layOutMarks() {
+    let x = 0;
+    all('.ribbon-mark').forEach((el) => {
+      const gap = el.classList.contains('mark-gap');
+      const left = gap ? x - 10 : x;
+      const width = gap ? 10 : 40;
+      if (!gap) x += 40;
+      el.getBoundingClientRect = () => ({ left, right: left + width, width, top: 0, bottom: 60, height: 60, x: left, y: 0, toJSON() {} });
+    });
+  }
+  const at = (type: string, clientX: number, clientY = 30) =>
+    q('.ribbon').dispatchEvent(new PointerEvent(type, { clientX, clientY, pointerId: 1, isPrimary: true, pointerType: 'touch' }));
+  const opened = () => q('.ribbon-mark.selected .mark-target').textContent;
+
+  it('opens each sound in turn as a finger drags along the recording, and plays nothing', () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutMarks();
+    const seen: string[] = [];
+    at('pointerdown', 5);
+    for (const x of [20, 50, 90, 130, 170, 250]) {
+      at('pointermove', x);
+      if (opened() !== seen.at(-1)) seen.push(opened()!);
+    }
+    at('pointerup', 250);
+    expect(seen).toEqual(['ŋ', 'a', 'j', 'o', 'n']);
+    expect(player.calls).toEqual([]);
+  });
+
+  it("reaches a missing sound's slim mark, and leaves a drag up or down to scroll the page", () => {
+    // The l is missing: its mark sits over the end of the a before it.
+    show(attempt('salamat', ['s', 'a', 'a', 'm', 'a', 't']));
+    layOutMarks();
+    const gap = all('.ribbon-mark').findIndex((m) => m.classList.contains('mark-gap'));
+    expect(all('.ribbon-mark .mark-target')[gap].textContent).toBe('l');
+    at('pointerdown', 5);
+    at('pointermove', 75);
+    expect(opened()).toBe('l');
+    at('pointerup', 75);
+    at('pointerdown', 150);
+    at('pointermove', 152, 80);
+    at('pointermove', 200, 80);
+    expect(opened()).toBe('l');
+  });
+});

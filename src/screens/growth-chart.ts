@@ -4,7 +4,7 @@
 // today towards the next milestone, with roughly when it might be reached.
 
 import { STRENGTHS, curveAt, type Forecast, type MemoryHistory, type Strength } from '../memory';
-import { detents, readyDetents, tick } from '../speech';
+import { scrubbable } from '../speech';
 import { DAY_MS } from '../srs';
 import { h, svg } from '../ui';
 
@@ -293,43 +293,15 @@ export function growthChart(
     show(i);
     return `day ${i}`;
   };
-  // A finger scrubbing across the days ticks at each one, like a picker wheel.
-  const detent = detents();
-  // A mouse looks by hovering. A finger looks by dragging sideways or tapping,
-  // and a tap while looking puts the chart back on today; a drag that starts
-  // up or down is left to scroll the page.
-  let touch: { x: number; y: number; scrub: boolean } | null = null;
+  // A mouse looks by hovering. A finger looks by scrubbing across the days, ticking at each one like a picker wheel,
+  // or by tapping, and a tap while looking puts the chart back on today.
   frame.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return pick(e);
-    touch = { x: e.clientX, y: e.clientY, scrub: false };
+    if (e.pointerType === 'mouse') pick(e);
   });
   frame.addEventListener('pointermove', (e) => {
-    if (e.pointerType === 'mouse') return pick(e);
-    if (!touch) return;
-    const dx = Math.abs(e.clientX - touch.x);
-    const dy = Math.abs(e.clientY - touch.y);
-    if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
-    else if (touch.scrub || (dx > 8 && dx > dy)) {
-      // Audio is got going as the scrub begins (not for a touch that scrolls), so its next step ticks.
-      if (!touch.scrub) readyDetents();
-      touch.scrub = true;
-      detent(pick(e));
-    }
+    if (e.pointerType === 'mouse') pick(e);
   });
-  frame.addEventListener('pointerup', (e) => {
-    if (touch && !touch.scrub) {
-      if (marker.hidden) pick(e);
-      else rest();
-      // A tap is a press, so it clicks like one.
-      tick('click');
-    }
-    touch = null;
-    detent(null);
-  });
-  frame.addEventListener('pointercancel', () => {
-    touch = null;
-    detent(null);
-  });
+  scrubbable(frame, { pick, tap: (e) => (marker.hidden ? pick(e) : rest()), skipMouse: true });
   frame.addEventListener('pointerleave', (e) => {
     if (e.pointerType === 'mouse') rest();
   });

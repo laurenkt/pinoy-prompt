@@ -212,8 +212,8 @@ describe('ticks for scrubbing across the chart', () => {
     const frame = chart.querySelector<HTMLElement>('.growth-frame')!;
     frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
     for (let i = 0; i < 2; i++) {
-      frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, pointerType: 'touch' }));
-      frame.dispatchEvent(new PointerEvent('pointerup', { clientX: 10, pointerType: 'touch' }));
+      frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 10, isPrimary: true, pointerType: 'touch' }));
+      frame.dispatchEvent(new PointerEvent('pointerup', { clientX: 10, isPrimary: true, pointerType: 'touch' }));
     }
     expect(ticks.count).toBe(2);
   });
@@ -229,12 +229,12 @@ describe('ticks for scrubbing across the chart', () => {
     const ctx = audioContext() as unknown as { state: string };
     ctx.state = 'suspended';
     const resume = vi.spyOn(ctx as unknown as AudioContext, 'resume');
-    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 50, pointerType: 'touch' }));
-    frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 102, clientY: 90, pointerType: 'touch' }));
-    frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 140, clientY: 130, pointerType: 'touch' }));
+    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 50, isPrimary: true, pointerType: 'touch' }));
+    frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 102, clientY: 90, isPrimary: true, pointerType: 'touch' }));
+    frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 140, clientY: 130, isPrimary: true, pointerType: 'touch' }));
     ctx.state = 'running';
     expect(resume).not.toHaveBeenCalled();
-    frame.dispatchEvent(new PointerEvent('pointercancel', { pointerType: 'touch' }));
+    frame.dispatchEvent(new PointerEvent('pointercancel', { isPrimary: true, pointerType: 'touch' }));
   });
 
   it("doesn't start audio for a drag, as iOS would only play it late", async () => {
