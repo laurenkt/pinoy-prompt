@@ -521,7 +521,7 @@ export function practiceScreen(
     if (!current) root.replaceChildren(tooFew());
     // An answer can be said into the box only on a listening or recall question, and with a way to hear it.
     else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting((modes().includes('listen') || modes().includes('recall')) && hearMeaning() !== null)));
-    else if (lookingBack && previous && previousPick) root.replaceChildren(questionView(previous, previousPick));
+    else if (lookingBack && previous && previousPick !== null) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
     autoMoved = false;
@@ -615,7 +615,7 @@ export function practiceScreen(
     const onward = () =>
       reviewing ? continueButton(() => setLookingBack(false), false, 'Back to the current card') : continueButton(() => advance(), auto !== null, 'Next');
     const back =
-      previousPick && !answered && !checking && !listening && !hearing && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true));
+      previousPick !== null && !answered && !checking && !listening && !hearing && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true));
 
     if (q.guide) {
       const d = q.guide.drill;

@@ -130,6 +130,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     guide = null;
     if (card) recent.push(card.id);
     if (card && isVocab(card)) preload(card);
+    // A missed card asked again straight away can't offer its own answer to look back at.
+    if (previous && previous.card?.id === card?.id) previous = null;
     if (!step || !card) {
       // Open-ended study runs until it's caught up, then points on to Drills.
       phase = open ? 'caught-up' : 'done';
@@ -334,8 +336,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
         quietToggle(app, quietChanged),
       );
     }
-    // On the missed screen the card is already back in the queue.
-    const remaining = queue.length + (phase === 'done' || phase === 'missed' ? 0 : 1);
+    // On the missed screen the card is already back in the queue. Looking back counts from the card being asked.
+    const at = reviewing?.phase ?? phase;
+    const remaining = queue.length + (at === 'done' || at === 'missed' ? 0 : 1);
     return h(
       'header',
       { class: 'session-header' },
@@ -666,6 +669,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       hold();
       return say();
     }
+    // A card looked back at has been answered already.
+    if (reviewing) return;
     // Enter and Space activate the focused primary button natively.
     const n = Number(e.key);
     if (phase === 'quiz' && card && !isVocab(card)) {
@@ -673,8 +678,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       return;
     }
     if (phase === 'quiz' && n >= 1 && n <= choices.length) return pick(choices[n - 1]);
-    // A card looked back at has been rated already.
-    if (reviewing) return;
     if (phase === 'back' && n >= 1 && n <= 4) return rate(RATINGS[n - 1].rating);
     if (phase === 'back' && !hookShown && (e.key === 'h' || e.key === 'H')) return showHook();
   });

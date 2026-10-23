@@ -68,6 +68,25 @@ describe('moving on after a right answer in a session', () => {
     expect(root.querySelector('.feedback.bad')).not.toBeNull();
   });
 
+  it("doesn't offer a missed card's answer when it's asked again straight away", () => {
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat')));
+    answer(root, false);
+    button(root, 'Continue').click();
+    expect(shownCard(root).id).toBe('salamat');
+    expect(has(root, 'Previous card')).toBe(false);
+  });
+
+  it('keeps the progress bar on the card being asked while looking back', () => {
+    const root = mount(sessionScreen(fakeApp(KNOWN), [{ kind: 'review', cardId: 'salamat', format: 'remember' }, ...reads('oo', 'hindi')]));
+    button(root, 'Show the meaning').click();
+    button(root, 'Again').click();
+    button(root, 'Continue').click();
+    const bar = () => root.querySelector('[role="progressbar"]')?.outerHTML;
+    const asked = bar();
+    button(root, 'Previous card').click();
+    expect(bar()).toBe(asked);
+  });
+
   it('keeps the hook up when a card missed earlier is got right', () => {
     const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat')));
     answer(root, false);

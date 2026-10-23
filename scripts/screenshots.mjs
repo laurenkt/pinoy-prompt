@@ -31,12 +31,18 @@ const MODEL_FILE = 'node_modules/.cache/pinoy-prompt/model.int8.onnx';
 /** The speech model, read once. */
 let model;
 
-/** Answer what's asked (a choice, or a flashcard rated Good) and move on, until the way back shows, then take it. */
+/** Answer what's asked (a choice, from a typed question's Show choices, or a flashcard rated Good) and move on, until the way back shows, then take it. */
 async function lookBack(page) {
   for (let i = 0; i < 8 && !(await page.$('.prev-btn')); i++) {
-    const next = (await page.$('.choice:not(:disabled)')) ?? (await page.$('.rate-good')) ?? (await page.$('.panel .btn.big'));
+    const next =
+      (await page.$('.choice:not(:disabled)')) ??
+      (await page.$('.rate-good')) ??
+      (await page.$('.meaning-form .btn.secondary')) ??
+      (await page.$('.panel .btn.big'));
+    if (!next) throw new Error('Nothing to answer or move on with on the way to Previous card');
     await next.click();
   }
+  if (!(await page.$('.prev-btn'))) throw new Error('Previous card never showed');
   await page.click('.prev-btn');
 }
 
