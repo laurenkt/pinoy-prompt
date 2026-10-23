@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Decoded clips are kept between tests, so each test that counts fetches has its own word.
-vi.mock('./clips.json', () => ({ default: { Salamat: 'salamat-1a2b', Oo: 'oo-3c4d', Paalam: 'paalam-5e6f', 'Kumusta?': 'kumusta-7a8b' } }));
+vi.mock('./clips.json', () => ({ default: { Salamat: ['salamat-1a2b'], Opo: ['opo-a1-marin', 'opo-b2-cedar'], Sige: ['sige-c3-marin', 'sige-d4-cedar'], Oo: ['oo-3c4d'], Paalam: ['paalam-5e6f'], 'Kumusta?': ['kumusta-7a8b'] } }));
 
 const { audioBusy, IDLE_SUSPEND_MS, KEEP_DECODED, loadClip, playLive } = await import('./audio-engine');
 const { canPlay, chime, clickSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
@@ -114,6 +114,28 @@ describe('clips', () => {
     expect(clipUrl({ tl: 'Salamat' })).toMatch(/audio\/salamat-1a2b\.mp3$/);
     expect(clipUrl({ tl: 'Salamat' }, true)).toMatch(/audio\/salamat-1a2b-slow\.mp3$/);
     expect(clipUrl({ tl: 'Hindi' })).toBeNull();
+  });
+
+  it('plays each word in a voice picked at random, keeping it for the slow version', async () => {
+    const random = vi.spyOn(Math, 'random');
+    random.mockReturnValue(0.9);
+    await play({ tl: 'Opo' });
+    random.mockReturnValue(0.1);
+    await play({ tl: 'Opo' }, true);
+    await play({ tl: 'Opo' });
+    expect(fetched).toEqual([expect.stringMatching(/opo-b2-cedar\.mp3$/), expect.stringMatching(/opo-b2-cedar-slow\.mp3$/), expect.stringMatching(/opo-a1-marin\.mp3$/)]);
+    random.mockRestore();
+  });
+
+  it('plays a word loaded ahead in the voice it was loaded in', async () => {
+    const random = vi.spyOn(Math, 'random');
+    random.mockReturnValue(0.9);
+    preload({ tl: 'Sige' });
+    random.mockReturnValue(0.1);
+    await play({ tl: 'Sige' });
+    expect(sources).toHaveLength(1);
+    expect(fetched.filter((url) => url.includes('sige-'))).toEqual([expect.stringMatching(/sige-d4-cedar\.mp3$/)]);
+    random.mockRestore();
   });
 
   it("plays a word's clip through the one shared context instead of the built-in voice", async () => {

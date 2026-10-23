@@ -9,9 +9,10 @@
 // clip (after changing the voices or persona below). `--limit 5` makes only
 // the first few, for trying a change out. Needs ffmpeg.
 //
-// Each text gets two clips in public/audio/: `<name>.mp3` at a natural pace and
-// `<name>-slow.mp3`, the same take slowed down, listed in src/clips.json by
-// text (what play() looks up, and what the app keeps offline). A name ends in
+// Each text gets a take in each voice, and each take two clips in public/audio/:
+// `<name>.mp3` at a natural pace and `<name>-slow.mp3`, the same take slowed
+// down, listed in src/clips.json by text, one name per voice in VOICES order
+// (what play() picks from at random, and what the app keeps offline). A name ends in
 // a hash of the sound, so a remade take gets a new name and phones that kept
 // the old one fetch it again. Every take is transcribed back and compared with
 // its text; a take that doesn't match is made again, up to three times, and
@@ -34,7 +35,7 @@ const MANIFEST = join(ROOT, 'src/clips.json');
 // OpenAI's conversational voice model rather than its text-to-speech one, which sounds
 // like a newsreader. Asked in a chat to say a line, it says it like a person would.
 const MODEL = 'gpt-audio-1.5';
-/** Cards are said by a mix of a woman's and a man's voice, each text always by the same one. */
+/** Every text is said by both a woman's and a man's voice, and the app picks one at random. */
 const VOICES = [
   ['marin', 'a warm, cheerful Filipina from Manila, smiling as she speaks'],
   ['cedar', 'a warm, cheerful Filipino from Manila, smiling as he speaks'],
@@ -86,8 +87,7 @@ async function api(path, init) {
   }
 }
 
-async function speak(text) {
-  const [voice, who] = VOICES[createHash('sha1').update(text).digest()[0] % VOICES.length];
+async function speak(text, [voice, who]) {
   const response = await api('chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -162,9 +162,9 @@ function heardRight(text, heard) {
 }
 
 /** Make a text's clips, returning their name, or null if no take sounded right and there's already a clip to keep. */
-async function makeClip(text, work, unsure, keepOld) {
+async function makeClip(text, voice, work, unsure, keepOld) {
   for (let attempt = 1; ; attempt++) {
-    const take = await speak(text);
+    const take = await speak(text, voice);
     const draft = `take-${createHash('sha1').update(take).digest('hex')}`;
     await encode(take, draft, work);
     let heard;
@@ -178,7 +178,7 @@ async function makeClip(text, work, unsure, keepOld) {
     }
     const right = !checked || heardRight(text, heard);
     if (!right && attempt < ATTEMPTS) continue;
-    if (!right || !checked) unsure.push({ text, heard, kept: !right && keepOld });
+    if (!right || !checked) unsure.push({ text, voice: voice[0], heard, kept: !right && keepOld });
     if (!right && keepOld) return null;
     const name = clipName(text, await readFile(join(work, `${draft}.mp3`)));
     for (const suffix of ['', '-slow']) await rename(join(work, `${draft}${suffix}.mp3`), join(AUDIO_DIR, `${name}${suffix}.mp3`));
@@ -191,10 +191,15 @@ const manifest = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
 await mkdir(AUDIO_DIR, { recursive: true });
 // Inside the repo, not the system temp folder, so takes can be moved into public/audio (a move can't cross disks).
 const work = await mkdtemp(join(ROOT, 'node_modules', '.pinoy-audio-'));
-const todo = (redo.length ? redo : texts.filter((t) => all || !manifest[t])).slice(0, limit);
+// One job per text and voice. A text listed with a single name (made before there were two voices) needs all of them.
+const missing = (t, v) => all || manifest[t]?.length !== VOICES.length || !manifest[t][v];
+const todo = (redo.length ? redo : texts)
+  .flatMap((text) => VOICES.map((_, v) => ({ text, v })))
+  .filter(({ text, v }) => redo.length || missing(text, v))
+  .slice(0, limit);
 const unknown = redo.filter((t) => !texts.includes(t));
 if (unknown.length) throw new Error(`Not a text the app says: ${unknown.join(', ')}`);
-console.log(`${texts.length} texts, ${todo.length} to make.`);
+console.log(`${texts.length} texts, ${todo.length} takes to make.`);
 
 /** Write the lists, keeping only what the app still says, in deck order. Saved after every clip, so a run cut short keeps what it made. */
 let saving = Promise.resolve();
@@ -204,11 +209,12 @@ function save(prune = false) {
 }
 
 async function write(prune) {
-  const kept = Object.fromEntries(texts.filter((t) => manifest[t]).map((t) => [t, manifest[t]]));
+  // Only texts with every voice made, so the app never picks a missing one.
+  const kept = Object.fromEntries(texts.filter((t) => VOICES.every((_, v) => manifest[t]?.[v])).map((t) => [t, manifest[t]]));
   await writeFile(MANIFEST, `${JSON.stringify(kept, null, 2)}\n`);
   if (!prune) return;
   // Every clip here is one this script made, so one no longer listed can go.
-  const files = Object.values(kept).flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
+  const files = Object.values(kept).flat().flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
   for (const file of await readdir(AUDIO_DIR)) {
     if (file.endsWith('.mp3') && !files.includes(file)) await rm(join(AUDIO_DIR, file));
   }
@@ -219,11 +225,13 @@ let done = 0;
 const queue = [...todo];
 await Promise.all(
   Array.from({ length: PARALLEL }, async () => {
-    for (let text; (text = queue.shift()) !== undefined; ) {
-      const name = await makeClip(text, work, unsure, !!manifest[text]);
-      if (name) manifest[text] = name;
+    for (let job; (job = queue.shift()) !== undefined; ) {
+      const { text, v } = job;
+      if (!Array.isArray(manifest[text])) manifest[text] = [];
+      const name = await makeClip(text, VOICES[v], work, unsure, !!manifest[text][v]);
+      if (name) manifest[text][v] = name;
       await save();
-      console.log(`${++done}/${todo.length} ${text}`);
+      console.log(`${++done}/${todo.length} ${text} (${VOICES[v][0]})`);
     }
   }),
 );
@@ -232,5 +240,5 @@ await save(true);
 
 if (unsure.length) {
   console.log(`\nThese didn't transcribe back to their text. Listen to them, and --redo any that sound wrong:`);
-  for (const u of unsure) console.log(`  "${u.text}" heard as "${u.heard}"${u.kept ? ', so the old clip was kept' : ''}`);
+  for (const u of unsure) console.log(`  "${u.text}" (${u.voice}) heard as "${u.heard}"${u.kept ? ', so the old clip was kept' : ''}`);
 }
