@@ -210,6 +210,45 @@ export function playBuffer(buffer: AudioBuffer, { rate = 1, at = 0, fades = true
   };
 }
 
+/**
+ * Play a sound made as it plays, from a graph of nodes rather than a buffer (a synthesized sound, held as long as a
+ * finger is down). `make` builds it on the shared context to start at `t0`, and says how to stop its sources; it's
+ * faded in and out like a clip, and counts as playing (audioBusy) until stopped.
+ */
+export function playLive(make: (ctx: AudioContext, t0: number) => { out: AudioNode; end(at: number): void }): Sound {
+  const ctx = audioContext();
+  const t0 = ctx.currentTime + 0.005;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, t0);
+  gain.gain.linearRampToValueAtTime(1, t0 + FADE);
+  gain.connect(ctx.destination);
+  const { out, end } = make(ctx, t0);
+  out.connect(gain);
+  let finish = () => {};
+  const done = new Promise<void>((resolve) => (finish = resolve));
+  sounding.add(finish);
+  void done.then(() => {
+    sounding.delete(finish);
+    suspendWhenIdle();
+  });
+  let stopped = false;
+  return {
+    startsAt: t0,
+    done,
+    stop() {
+      if (stopped) return;
+      stopped = true;
+      const at = Math.max(ctx.currentTime, t0);
+      gain.gain.cancelScheduledValues(at);
+      gain.gain.setValueAtTime(gain.gain.value, at);
+      gain.gain.linearRampToValueAtTime(0, at + FADE * 2);
+      end(at + FADE * 2 + 0.01);
+      setTimeout(() => gain.disconnect(), (FADE * 2 + 0.05) * 1000);
+      finish();
+    },
+  };
+}
+
 /** How long after now a sound started at `at` (context time) reaches the speaker, in ms. */
 export function msUntilHeard(at: number): number {
   const ctx = audioContext();

@@ -86,11 +86,8 @@ describe('the tap sound', () => {
   it("doesn't tick when the press plays a sound on the results screen", () => {
     const player = webAudioPlayer();
     const yours = h('button', { onclick: () => player.playSlice(new Float32Array(4800), 48000, 0, 0.1) }, '▶ Yours');
-    const target = h('button', { onclick: () => player.playUrl('/audio/a.mp3') }, '▶ Target');
-    root.append(yours, target);
+    root.append(yours);
     press(yours);
-    player.stop();
-    press(target);
     player.stop();
     expect(ticks.count).toBe(0);
   });

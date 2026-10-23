@@ -80,6 +80,7 @@ svg,
 [role='img'],
 [role='progressbar'],
 [role='meter'],
+[role='slider'],
 .session-header,
 .page-header,
 .chips,
@@ -1618,20 +1619,6 @@ p {
   stroke: var(--on-accent);
 }
 
-.result-card .word-actions {
-  margin-top: 8px;
-}
-
-.result-card .word-actions-label {
-  color: var(--on-accent);
-}
-
-.result-card .audio-btn.small {
-  width: 44px;
-  height: 38px;
-  border-color: var(--ink);
-  box-shadow: 3px 3px 0 var(--ink);
-}
 
 .sound-results {
   margin-top: 10px;
@@ -1754,11 +1741,19 @@ p {
   color: var(--saffron);
 }
 
-/* Play the whole word: yours, or how it should sound. */
+/* Play the whole word: yours, or how it should sound. At the bottom, above the way on, under the thumb. */
 .word-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 12px;
+}
+
+.word-actions .audio-btn.small {
+  width: 44px;
+  height: 38px;
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
 }
 
 .word-actions-label {
@@ -1844,39 +1839,139 @@ p {
   border-radius: 999px;
 }
 
-.detail-sounds {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0 10px;
-  margin: 6px 0 0;
-  font-size: 0.9rem;
-}
-
-.detail-sounds dt {
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding-top: 3px;
-}
-
-.detail-sounds dd {
-  margin: 0;
-}
-
-.detail-sounds strong {
-  font-size: 1.05rem;
-}
-
 .detail-tip {
-  margin: 2px 0 0;
+  margin: 6px 0 0;
   font-size: 0.9rem;
   line-height: 1.3;
 }
 
-.detail-actions .btn {
+/* What you said and what to aim for, over the ends of the slider that plays them. */
+.sound-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  line-height: 1.25;
+}
+
+.sound-ends p {
+  margin: 0;
+  max-width: 50%;
+}
+
+.end-target {
+  margin-left: auto;
+  text-align: right;
+}
+
+.end-label {
+  display: block;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* Hold to hear; slide from what you said (left) to what to aim for (right). */
+.sound-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px;
+  min-height: 56px;
+  background: var(--ink);
+  border: var(--outline);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  touch-action: none;
+  cursor: pointer;
+}
+
+.slider-cap {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: var(--outline);
+  border-radius: 50%;
+  color: var(--on-accent);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.cap-heard {
+  background: var(--magenta);
+}
+
+.cap-target {
+  background: var(--teal);
+}
+
+.slider-rail {
+  position: relative;
   flex: 1;
-  min-width: 0;
-  padding-left: 8px;
-  padding-right: 8px;
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+}
+
+.slider-hint {
+  /* Clear of the thumb where it starts. */
+  padding-left: 40px;
+  color: var(--faint);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.slider-thumb {
+  position: absolute;
+  top: 50%;
+  left: calc((100% - 40px) * var(--mix, 0));
+  width: 40px;
+  height: 40px;
+  margin-top: -20px;
+  display: grid;
+  place-items: center;
+  background: var(--saffron);
+  color: var(--on-accent);
+  border: var(--outline);
+  border-radius: 50%;
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.slider-thumb .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.sound-slider.holding .slider-thumb {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 4px var(--saffron);
+}
+
+.sound-slider.holding .slider-hint {
+  visibility: hidden;
+}
+
+.sound-slider:focus-visible {
+  outline: 3px solid var(--saffron);
+  outline-offset: 2px;
+}
+
+/* One sound to hear: held, like the slider. */
+.hold-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  touch-action: none;
+}
+
+.hold-btn.holding {
+  background: var(--saffron);
 }
 
 /* Where the sound is made: target ring, your mark, and the way from one to the other. */
