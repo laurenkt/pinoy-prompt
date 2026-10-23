@@ -1461,6 +1461,11 @@ p {
   opacity: 0.6;
 }
 
+/* Only there while listening; ready and checking keep its room so the big button stays put. */
+.speak:not(.recording) .speak-cancel {
+  visibility: hidden;
+}
+
 /* Listening: bars show the microphone state, from flat (waiting) to dancing (hearing sound). */
 .meter {
   display: flex;
