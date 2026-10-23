@@ -176,7 +176,7 @@ describe('ticks for scrubbing across the chart', () => {
     expect(vibrate).toHaveBeenCalledTimes(1);
   });
 
-  it('gets audio going from the touch a drag starts with, so its first step ticks', async () => {
+  it('gets audio going as a scrub begins, so its steps tick', async () => {
     // Asleep after a while idle, or never started: only a touch may start it.
     const ctx = audioContext() as unknown as { state: string; resume: () => Promise<void> };
     ctx.state = 'suspended';
@@ -199,6 +199,25 @@ describe('ticks for scrubbing across the chart', () => {
       frame.dispatchEvent(new PointerEvent('pointerup', { clientX: 10, pointerType: 'touch' }));
     }
     expect(ticks.count).toBe(2);
+  });
+
+  it("leaves audio alone for a touch on the chart that scrolls the page", () => {
+    const now = Date.now();
+    const chart = growthChart(
+      { since: now - 2 * DAY_MS, times: [now - DAY_MS, now], counts: { new: [1, 1], days: [0, 0], weeks: [0, 0], long: [0, 0] } },
+      { new: h('span'), days: h('span'), weeks: h('span'), long: h('span') },
+    );
+    const frame = chart.querySelector<HTMLElement>('.growth-frame')!;
+    frame.getBoundingClientRect = () => ({ left: 0, width: 300 }) as DOMRect;
+    const ctx = audioContext() as unknown as { state: string };
+    ctx.state = 'suspended';
+    const resume = vi.spyOn(ctx as unknown as AudioContext, 'resume');
+    frame.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 50, pointerType: 'touch' }));
+    frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 102, clientY: 90, pointerType: 'touch' }));
+    frame.dispatchEvent(new PointerEvent('pointermove', { clientX: 140, clientY: 130, pointerType: 'touch' }));
+    ctx.state = 'running';
+    expect(resume).not.toHaveBeenCalled();
+    frame.dispatchEvent(new PointerEvent('pointercancel', { pointerType: 'touch' }));
   });
 
   it("doesn't start audio for a drag, as iOS would only play it late", async () => {

@@ -30,8 +30,9 @@ const SCREENS = {
   home: async () => {},
   // The memory chart tapped where the past meets the forecast: the marker on today.
   'home-chart': async (page) => {
-    const box = await page.locator('.growth-frame').boundingBox();
-    await page.touchscreen.tap(box.x + box.width * 0.7, box.y + box.height * 0.8);
+    const frame = await page.locator('.growth-frame').boundingBox();
+    const past = await page.locator('.growth-axis-past').boundingBox();
+    await page.touchscreen.tap(past.x + past.width, frame.y + frame.height * 0.8);
   },
   drills: (page) => page.click('.drills-btn'),
   // With the speech model on the device (a stand-in for it), Drills asks for the microphone as it opens,

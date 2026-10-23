@@ -302,8 +302,6 @@ export function growthChart(
   frame.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse') return pick(e);
     touch = { x: e.clientX, y: e.clientY, scrub: false };
-    // So a scrub ticks from its first step, even before the app has made any sound.
-    readyDetents();
   });
   frame.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'mouse') return pick(e);
@@ -312,6 +310,8 @@ export function growthChart(
     const dy = Math.abs(e.clientY - touch.y);
     if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
     else if (touch.scrub || (dx > 8 && dx > dy)) {
+      // Audio is got going as the scrub begins (not for a touch that scrolls), so its next step ticks.
+      if (!touch.scrub) readyDetents();
       touch.scrub = true;
       detent(pick(e));
     }
