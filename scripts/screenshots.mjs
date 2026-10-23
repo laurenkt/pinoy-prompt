@@ -123,21 +123,37 @@ const SCREENS = {
   // The same, with a finger held on the slider three quarters of the way from the middle to the right: the target, fairly loud.
   'speak-result-held': async (page) => {
     await SCREENS['speak-result'](page);
-    const rail = await page.locator('.sound-slider .slider-rail').boundingBox();
+    const rail = await page.locator('.detail-page.open .sound-slider .slider-rail').boundingBox();
     const y = rail.y + rail.height / 2;
     // The thumb's middle travels from 20px in at either end.
     await page.mouse.move(rail.x + 20 + (rail.width - 40) * 0.875, y);
     await page.mouse.down();
   },
-  // The same, after dragging along the word from its first letter to its last: the last sound open.
+  // The same, after dragging along the word from its first letter to its last: the last sound open. Says if
+  // anything on the screen moved on the way, as each sound's panel should take the same room.
   'speak-result-scrubbed': async (page) => {
     await SCREENS['speak-result'](page);
     const word = await page.locator('.word-scrub').boundingBox();
     const y = word.y + word.height / 2;
+    const where = () =>
+      page.evaluate(() =>
+        Object.fromEntries(
+          ['.word-scrub', '.ribbon', '.sound-detail', '.detail-page.open .sound-chart', '.word-actions', '.result-actions'].map((sel) => {
+            const r = document.querySelector(sel)?.getBoundingClientRect();
+            return [sel, r ? `${Math.round(r.top)}+${Math.round(r.height)}` : 'none'];
+          }),
+        ),
+      );
+    const first = await where();
+    const moved = new Set();
     await page.mouse.move(word.x + 4, y);
     await page.mouse.down();
-    for (let i = 1; i <= 10; i++) await page.mouse.move(word.x + 4 + ((word.width - 8) * i) / 10, y);
+    for (let i = 1; i <= 10; i++) {
+      await page.mouse.move(word.x + 4 + ((word.width - 8) * i) / 10, y);
+      for (const [sel, at] of Object.entries(await where())) if (at !== first[sel]) moved.add(sel);
+    }
     await page.mouse.up();
+    if (moved.size) console.log(`speak-result-scrubbed at ${page.viewportSize().width} wide: ${[...moved].join(', ')} moved between sounds`);
   },
   // Listen only, on settled words, with a key for OpenAI: the meaning said into the box, as a wave of levels from a
   // stand-in microphone, then being heard (OpenAI never answers here).

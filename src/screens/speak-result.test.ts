@@ -14,8 +14,10 @@ function attempt(text: string, heard: string[]): Attempt {
 }
 
 let player: FakePlayer;
-const q = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T & HTMLElement>(sel)!;
-const all = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)];
+/** What's on screen: every sound's page is there, but only the open one shows. */
+const all = <T extends Element = HTMLElement>(sel: string) =>
+  [...document.querySelectorAll<T & HTMLElement>(sel)].filter((el) => !el.closest('.detail-page:not(.open)'));
+const q = <T extends Element = HTMLElement>(sel: string) => all<T>(sel)[0] ?? null!;
 
 function show(a: Attempt) {
   const view = resultView(a, { player });
@@ -55,9 +57,9 @@ describe('the breakdown', () => {
     expect(all('.ribbon-mark .mark-heard').map((e) => e.textContent)).toEqual(['n', 'a', 'j', 'o', 'n']);
     expect(q('.ribbon-mark.selected .mark-target').textContent).toBe('ŋ');
     expect(q('.ribbon-mark.selected').getAttribute('aria-pressed')).toBe('true');
-    expect(q('.sound-detail').textContent).toContain('ng as in "sing"');
-    expect(q('.sound-detail').textContent).toContain('You said');
-    expect(q('.sound-detail').textContent).toContain('Aim for');
+    expect(q('.detail-page.open').textContent).toContain('ng as in "sing"');
+    expect(q('.detail-page.open').textContent).toContain('You said');
+    expect(q('.detail-page.open').textContent).toContain('Aim for');
   });
 
   it('has no second row of sound buttons to keep in step with the recording', () => {
@@ -77,7 +79,7 @@ describe('the breakdown', () => {
     all('.ribbon-mark')[1].click();
     expect(q('.ribbon-mark.selected .mark-target').textContent).toBe('a');
     expect(all('.ribbon-mark.selected')).toHaveLength(1);
-    expect(q('.sound-detail .detail-letters').textContent).toBe('“a”');
+    expect(q('.detail-page.open .detail-letters').textContent).toBe('“a”');
   });
 
   it('holds what you said left of the middle and the target right of it, until let go', () => {
@@ -205,10 +207,50 @@ describe('the breakdown', () => {
     expect(player.held!.released).toBe(true);
   });
 
+  it("keeps every sound's page in one place and shows the open one, so moving between sounds moves nothing", () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    const pages = [...document.querySelectorAll<HTMLElement>('.sound-detail > .detail-page')];
+    expect(pages).toHaveLength(all('.ribbon-mark').length);
+    all('.ribbon-mark').forEach((mark, i) => {
+      mark.click();
+      // The same pages, not new ones: the panel is sized by all of them at once.
+      expect([...document.querySelectorAll('.sound-detail > .detail-page')]).toEqual(pages);
+      expect(pages.map((p) => p.classList.contains('open'))).toEqual(pages.map((_, k) => k === i));
+      expect(pages.map((p) => p.inert)).toEqual(pages.map((_, k) => k !== i));
+    });
+  });
+
+  it('lets go of a finger left on a sound when another opens, so it stops nothing later', () => {
+    show(attempt('po', ['p', 'u']));
+    layOut();
+    const slider = q('.sound-slider');
+    pointer(slider, 'pointerdown', 0);
+    expect(player.held!.released).toBe(false);
+    // A second finger opens the p, and holds it.
+    q<HTMLButtonElement>('.mark-good').click();
+    pointer(q('.hold-btn'), 'pointerdown');
+    const p = player.held!;
+    const calls = player.calls.length;
+    // The first finger, still on the o's hidden slider, moves and lifts.
+    pointer(slider, 'pointermove', 240);
+    pointer(slider, 'pointerup', 240);
+    expect(player.calls.length).toBe(calls);
+    expect(p.released).toBe(false);
+    expect(slider.classList).not.toContain('holding');
+  });
+
+  it('says which sound opened, as the pages are only shown and hidden', () => {
+    show(attempt('po', ['p', 'u']));
+    const live = q('.sound-results [aria-live]');
+    expect(live.textContent).toContain('Aim for o');
+    q<HTMLButtonElement>('.mark-good').click();
+    expect(live.textContent).toMatch(/^Spot on\. Aim for /);
+  });
+
   it('has one sound to hold when it was spot on, with no slider', () => {
     show(attempt('po', ['p', 'u']));
     q<HTMLButtonElement>('.mark-good').click();
-    expect(document.querySelector('.sound-slider')).toBeNull();
+    expect(q('.sound-slider')).toBeNull();
     const hold = q('.hold-btn');
     expect(hold.textContent).toContain('p');
     pointer(hold, 'pointerdown');
@@ -221,8 +263,8 @@ describe('the breakdown', () => {
     // ng before b is just as right said m.
     show(attempt('ang bata', ['a', 'm', 'b', 'a', 't', 'a']));
     all('.ribbon-mark')[1].click();
-    expect(q('.sound-detail').textContent).toContain('Spot on');
-    expect(document.querySelector('.sound-slider, .end-heard')).toBeNull();
+    expect(q('.detail-page.open').textContent).toContain('Spot on');
+    expect(q('.sound-slider, .end-heard')).toBeNull();
     pointer(q('.hold-btn'), 'pointerdown');
     expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'ŋ', volume: BUTTON_VOLUME });
   });
@@ -237,7 +279,7 @@ describe('the breakdown', () => {
   it("holds just the target when what was heard can't be made", () => {
     show(attempt('po', ['ǃ', 'o']));
     q<HTMLButtonElement>('.ribbon-mark').click();
-    expect(document.querySelector('.sound-slider')).toBeNull();
+    expect(q('.sound-slider')).toBeNull();
     pointer(q('.hold-btn'), 'pointerdown');
     expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'p', volume: BUTTON_VOLUME });
   });
@@ -254,55 +296,55 @@ describe('the breakdown', () => {
     show(attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'o']));
     expect(q('.ribbon-mark.selected').classList).toContain('mark-extra');
     expect(q('.mark-extra .mark-target').textContent).toBe('+');
-    expect(q('.sound-detail').textContent).toMatch(/Added/);
+    expect(q('.detail-page.open').textContent).toMatch(/Added/);
     expect(q('.end-target').textContent).toContain('leave it out');
-    expect(q('.sound-detail .detail-tip')).toBeNull();
+    expect(q('.detail-page.open .detail-tip')).toBeNull();
     // The t itself was spot on, so it carries no correction.
     all('.ribbon-mark')[6].click();
-    expect(q('.sound-detail').textContent).toContain('Spot on');
-    expect(q('.sound-detail .detail-tip')).toBeNull();
+    expect(q('.detail-page.open').textContent).toContain('Spot on');
+    expect(q('.detail-page.open .detail-tip')).toBeNull();
   });
 
   it("leaves out a tip that only repeats what was said and what to aim for, but keeps one on how to say it", () => {
     show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
-    expect(q('.sound-detail').textContent).toContain('e as in "bed"');
-    expect(q('.sound-detail .detail-tip')).toBeNull();
+    expect(q('.detail-page.open').textContent).toContain('e as in "bed"');
+    expect(q('.detail-page.open .detail-tip')).toBeNull();
     show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
-    expect(q('.sound-detail .detail-tip').textContent).toContain('back of your tongue');
+    expect(q('.detail-page.open .detail-tip').textContent).toContain('back of your tongue');
   });
 
   it("doesn't give one sound the advice meant for another spelled the same", () => {
     // The first a said as e (only says what was heard), the last as "uh" (advice on opening up).
     show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'ə', 't']));
     expect(q('.ribbon-mark.selected .mark-heard').textContent).toBe('ɛ');
-    expect(q('.sound-detail .detail-tip')).toBeNull();
+    expect(q('.detail-page.open .detail-tip')).toBeNull();
     all('.ribbon-mark')[5].click();
-    expect(q('.sound-detail .detail-tip').textContent).toContain('Open your mouth wide');
+    expect(q('.detail-page.open .detail-tip').textContent).toContain('Open your mouth wide');
   });
 
   it('gives an added sound no advice, not even the advice meant for the sound before it', () => {
     // The o slid towards "u" (advice on keeping it pure), then an added s.
     show(attempt('po', ['p', 'u', 's']));
-    expect(q('.sound-detail .detail-tip').textContent).toContain('Keep the "o" pure');
+    expect(q('.detail-page.open .detail-tip').textContent).toContain('Keep the "o" pure');
     q<HTMLButtonElement>('.mark-extra').click();
-    expect(q('.sound-detail').textContent).toMatch(/Added/);
-    expect(q('.sound-detail .detail-tip')).toBeNull();
+    expect(q('.detail-page.open').textContent).toMatch(/Added/);
+    expect(q('.detail-page.open .detail-tip')).toBeNull();
   });
 
   it('shows a tip on every sound it fits, even past the first two kinds', () => {
     // Two kinds of tip for the first two a's, then the last a shares the first one's.
     show(attempt('salamat', ['s', 'ə', 'l', 'ɛ', 'm', 'ə', 't']));
     all('.ribbon-mark')[5].click();
-    expect(q('.sound-detail .detail-tip').textContent).toContain('Open your mouth wide');
+    expect(q('.detail-page.open .detail-tip').textContent).toContain('Open your mouth wide');
   });
 
   it('only shows a tip on the sound that needs it, not on every sound spelled the same', () => {
     const a = attempt('Salamat', ['s', 'ɐ', 'l', 'a', 'm', 'a', 't']);
     show(a);
-    expect(q('.sound-detail .detail-tip')).toBeTruthy();
+    expect(q('.detail-page.open .detail-tip')).toBeTruthy();
     all('.ribbon-mark')[3].click();
-    expect(q('.sound-detail').textContent).toContain('Spot on');
-    expect(q('.sound-detail .detail-tip')).toBeNull();
+    expect(q('.detail-page.open').textContent).toContain('Spot on');
+    expect(q('.detail-page.open .detail-tip')).toBeNull();
   });
 
   it('puts missing sounds in a row side by side instead of on top of each other', () => {
@@ -318,8 +360,8 @@ describe('the breakdown', () => {
     expect(gap.querySelector('.mark-target')!.textContent).toBe('t');
     expect(gap.querySelector('.mark-heard')!.textContent).toBe('–');
     gap.click();
-    expect(q('.sound-detail').textContent).toContain('nothing here');
-    expect(document.querySelector('.sound-slider')).toBeNull();
+    expect(q('.detail-page.open').textContent).toContain('nothing here');
+    expect(q('.sound-slider')).toBeNull();
     pointer(q('.hold-btn'), 'pointerdown');
     expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 't', volume: BUTTON_VOLUME });
   });

@@ -1862,6 +1862,51 @@ p {
   display: none;
 }
 
+/*
+ * Every sound's page sits in the same place, only the open one showing. They share the panel's rows (heading, tip,
+ * map, the two sounds, the slider), each as tall as it is on the page that needs most, so moving between sounds
+ * moves neither the panel nor anything in it: a sound without a tip leaves its row empty.
+ */
+.sound-detail {
+  display: grid;
+  grid-template-rows: repeat(5, auto);
+}
+
+.detail-page {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  display: grid;
+  grid-template-rows: subgrid;
+  align-content: start;
+}
+
+.detail-page:not(.open) {
+  visibility: hidden;
+}
+
+.detail-page > .detail-head {
+  grid-row: 1;
+}
+
+.detail-page > .detail-tip {
+  grid-row: 2;
+}
+
+.detail-page > .sound-chart {
+  grid-row: 3;
+}
+
+.detail-page > .sound-ends {
+  grid-row: 4;
+}
+
+/* The button keeps its own height where other sounds have the taller slider. */
+.detail-page > .sound-slider,
+.detail-page > .hold-btn {
+  grid-row: 5;
+  align-self: start;
+}
+
 .detail-head {
   display: flex;
   align-items: center;

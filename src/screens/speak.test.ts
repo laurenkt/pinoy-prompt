@@ -209,8 +209,8 @@ describe('an attempt', () => {
     // The breakdown marks the ng and the n that was heard, and starts on it with its tip.
     expect(text('.mark-off .mark-target')).toBe('ŋ');
     expect(text('.mark-off .mark-heard')).toBe('n');
-    expect(text('.sound-detail .detail-letters')).toBe('“ng”');
-    expect(text('.sound-detail')).toContain('sing');
+    expect(text('.detail-page.open .detail-letters')).toBe('“ng”');
+    expect(text('.detail-page.open')).toContain('sing');
     // The whole word, yours and the target, at the bottom over the way on, not in the result card.
     expect(panel.el.classList).toContain('has-breakdown');
     expect(panel.el.querySelector('.result-card button')).toBeNull();
