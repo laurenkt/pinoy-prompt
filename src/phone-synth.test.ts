@@ -1,8 +1,8 @@
-// Single sounds made in code: which can be made, how a pair is played, and blending between them.
+// Single sounds made in code: which can be made, and how each is played.
 
 import { describe, expect, it } from 'vitest';
 import { ALL_CARDS } from './deck';
-import { blend, canSynthesize, modeOf, specFor, syllableLength } from './phone-synth';
+import { canSynthesize, modeOf, specFor, syllableLength } from './phone-synth';
 import { toPhones } from './phonetics';
 
 describe('single sounds', () => {
@@ -22,13 +22,13 @@ describe('single sounds', () => {
     expect(specFor('ǃ')).toBeNull();
   });
 
-  it('holds two vowels, or two hissing sounds; anything else repeats with "a"', () => {
-    expect(modeOf('ɛ', 'a')).toBe('vowel');
-    expect(modeOf('s', 'ʃ')).toBe('hiss');
-    expect(modeOf('n', 'ŋ')).toBe('syllable');
-    expect(modeOf('h', 'h')).toBe('syllable');
-    expect(modeOf('s', 't')).toBe('syllable');
-    expect(modeOf('a', 'ŋ')).toBe('syllable');
+  it('holds a vowel or a hissing sound; anything else repeats with "a"', () => {
+    expect(modeOf('ɛ')).toBe('vowel');
+    expect(modeOf('s')).toBe('hiss');
+    expect(modeOf('ʃ')).toBe('hiss');
+    expect(modeOf('n')).toBe('syllable');
+    expect(modeOf('h')).toBe('syllable');
+    expect(modeOf('t')).toBe('syllable');
   });
 
   it('places vowels as the chart does: ee high and front, ah low, oo back', () => {
@@ -47,16 +47,6 @@ describe('single sounds', () => {
     expect(s.hiss).toBeGreaterThan(0);
     // ng is made further back than n.
     expect(specFor('ŋ')!.hum).not.toBe(n.hum);
-  });
-
-  it('blends every setting between two sounds, and is each sound at either end', () => {
-    const e = specFor('ɛ')!;
-    const a = specFor('a')!;
-    expect(blend(e, a, 0)).toEqual(e);
-    expect(blend(e, a, 1)).toEqual(a);
-    const half = blend(e, a, 0.5);
-    expect(half.vowel[0]).toBeCloseTo((e.vowel[0] + a.vowel[0]) / 2);
-    expect(blend(e, a, 2)).toEqual(a);
   });
 
   it('repeats a syllable a couple of times a second', () => {

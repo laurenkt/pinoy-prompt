@@ -15,16 +15,16 @@ export interface Player {
   /** Play samples[from..to] (in seconds) of a recording. onTime reports the position, in seconds of the recording. */
   playSlice(samples: Float32Array, sampleRate: number, from: number, to: number, onTime?: (t: number) => void): Playback;
   /**
-   * Hold a sound made in code: `from`, `to`, or `mix` of the way between them (0 is `from`), until released.
-   * Null when either sound can't be made (canSynthesize).
+   * Hold a sound made in code at `volume` (0–1, of its full loudness) until released.
+   * Null when it can't be made (canSynthesize).
    */
-  hold(from: string, to: string, mix: number): Held | null;
+  hold(sound: string, volume: number): Held | null;
   stop(): void;
 }
 
 export interface Held extends Playback {
-  /** Move between the two sounds, 0–1. */
-  setMix(mix: number): void;
+  /** Make it quieter or louder, 0–1. */
+  setVolume(volume: number): void;
   /** Let go. A tap still sounds for a moment (TAP_MS). */
   release(): void;
 }
@@ -34,6 +34,8 @@ export const TAP_MS = 600;
 /** How far ahead a held sound is laid down, and how often, in seconds. */
 const AHEAD = 0.3;
 const EVERY_MS = 80;
+/** How quickly a held sound follows a change of volume, in seconds (time constant). */
+const FOLLOW = 0.03;
 
 function start(buffer: AudioBuffer, onFraction: ((f: number) => void) | undefined, stopper: { stop: () => void }): Playback {
   const ctx = audioContext();
@@ -67,16 +69,20 @@ export function webAudioPlayer(): Player {
       current = { stop: () => {} };
       return start(buffer, onTime && ((f) => onTime(from + f * (to - from))), current);
     },
-    hold(from, to, mix) {
-      if (!canSynthesize(from) || !canSynthesize(to)) return null;
+    hold(ipa, volume) {
+      if (!canSynthesize(ipa)) return null;
       player.stop();
       let live!: Voice;
       let ctx!: AudioContext;
+      let level!: GainNode;
       const sound = playLive((context, t0) => {
         ctx = context;
-        live = phoneVoice(ctx, from, to, mix, t0)!;
+        live = phoneVoice(ctx, ipa, t0)!;
         live.scheduleUntil(t0 + AHEAD);
-        return live;
+        level = ctx.createGain();
+        level.gain.value = volume;
+        live.out.connect(level);
+        return { out: level, end: (at) => live.end(at) };
       });
       // A finger going down doesn't count as a tap on iOS, so a context that hasn't started yet may stay silent
       // until it's lifted; then it's resumed, and the sound plays from there for a tap's length.
@@ -93,7 +99,7 @@ export function webAudioPlayer(): Player {
       current = { stop: () => sound.stop() };
       return {
         done: sound.done,
-        setMix: (m) => live.setMix(m),
+        setVolume: (v) => level.gain.setTargetAtTime(v, ctx.currentTime, FOLLOW),
         release() {
           // Lifting is a tap, so the context the voice was built on can be started now. Not audioContext(), which
           // may replace it, leaving this voice on a closed one.

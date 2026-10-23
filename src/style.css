@@ -1930,7 +1930,7 @@ p {
   font-weight: 700;
 }
 
-/* Hold to hear; slide from what you said (left) to what to aim for (right). */
+/* Hold to hear: left of the middle what you said, right of it what to aim for, louder further out. */
 .sound-slider {
   display: flex;
   align-items: center;
@@ -1971,22 +1971,39 @@ p {
   position: relative;
   flex: 1;
   align-self: stretch;
-  display: grid;
-  place-items: center;
 }
 
-.slider-hint {
-  /* Clear of the thumb where it starts. */
-  padding-left: 40px;
-  color: var(--faint);
-  font-size: 0.8rem;
-  font-weight: 700;
+/* Each side a wedge, thin at the middle and tall at the end, filling from the middle to the thumb. */
+.slider-ramp {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 50%;
+  --fill: 0%;
+  opacity: 0.85;
+}
+
+.ramp-heard {
+  left: 0;
+  clip-path: polygon(0 0, 100% 46%, 100% 54%, 0 100%);
+  background: linear-gradient(to left, var(--magenta) var(--fill), var(--line) var(--fill));
+}
+
+.ramp-target {
+  right: 0;
+  clip-path: polygon(0 46%, 100% 0, 100% 100%, 0 54%);
+  background: linear-gradient(to right, var(--teal) var(--fill), var(--line) var(--fill));
+}
+
+.sound-slider[data-side='heard'] .ramp-heard,
+.sound-slider[data-side='target'] .ramp-target {
+  --fill: calc(var(--reach, 0) * 100%);
 }
 
 .slider-thumb {
   position: absolute;
   top: 50%;
-  left: calc((100% - 40px) * var(--mix, 0));
+  left: calc((100% - 40px) * var(--at, 0.5));
   width: 40px;
   height: 40px;
   margin-top: -20px;
@@ -1999,6 +2016,17 @@ p {
   box-shadow: 3px 3px 0 var(--line);
 }
 
+/* Let go, it slides back to the middle. */
+.sound-slider:not(.holding) .slider-thumb {
+  transition: left 0.15s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound-slider .slider-thumb {
+    transition: none;
+  }
+}
+
 .slider-thumb .icon {
   width: 20px;
   height: 20px;
@@ -2007,10 +2035,6 @@ p {
 .sound-slider.holding .slider-thumb {
   transform: scale(1.12);
   box-shadow: 0 0 0 4px var(--saffron);
-}
-
-.sound-slider.holding .slider-hint {
-  visibility: hidden;
 }
 
 .sound-slider:focus-visible {
@@ -2039,6 +2063,8 @@ p {
   width: 100%;
   margin-top: 4px;
   font-family: var(--font-sans);
+  /* A mark low on the vowel chart, ringed while it plays, reaches past the bottom edge. */
+  overflow: visible;
 }
 
 .chart-frame {
@@ -2097,7 +2123,8 @@ p {
   stroke-width: 3;
 }
 
-.chart-heard.speaking circle {
+.chart-heard.speaking circle,
+.chart-target.speaking circle {
   animation: speaking 0.25s ease-in-out infinite alternate;
 }
 
@@ -2105,11 +2132,6 @@ p {
   to {
     stroke-width: 7;
   }
-}
-
-.chart-heard.arrived circle {
-  fill: var(--teal);
-  transition: fill 0.7s;
 }
 
 @media (prefers-reduced-motion: reduce) {

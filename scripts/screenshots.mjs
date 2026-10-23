@@ -110,6 +110,14 @@ const SCREENS = {
     await page.click('.speak .btn.mic');
     await page.waitForSelector('.sound-results');
   },
+  // The same, with a finger held on the slider three quarters of the way to the right: the target, fairly loud.
+  'speak-result-held': async (page) => {
+    await SCREENS['speak-result'](page);
+    const rail = await page.locator('.sound-slider .slider-rail').boundingBox();
+    const y = rail.y + rail.height / 2;
+    await page.mouse.move(rail.x + rail.width * 0.8, y);
+    await page.mouse.down();
+  },
   // Listen only, on settled words, with a key for OpenAI: the meaning said into the box, as a wave of levels from a
   // stand-in microphone, then being heard (OpenAI never answers here).
   'drills-saying': (page) => sayMeaning(page),

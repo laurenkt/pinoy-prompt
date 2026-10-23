@@ -4,8 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { TAP_MS, webAudioPlayer } = await import('./player');
 
-/** An AudioParam that takes any automation. */
-const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} });
+/** An AudioParam that takes any automation, remembering where it was last sent. */
+const param = () => {
+  const p = {
+    value: 0,
+    target: undefined as number | undefined,
+    setValueAtTime() {},
+    linearRampToValueAtTime() {},
+    setTargetAtTime: (v: number) => void (p.target = v),
+    cancelScheduledValues() {},
+  };
+  return p;
+};
 
 const contexts: FakeContext[] = [];
 
@@ -15,6 +25,7 @@ class FakeContext {
   sampleRate = 48000;
   destination = {};
   stopped: number[] = [];
+  gains: { gain: ReturnType<typeof param> }[] = [];
   constructor() {
     contexts.push(this);
   }
@@ -32,7 +43,9 @@ class FakeContext {
     return { connect: (to: unknown) => to, disconnect() {}, ...extra };
   }
   createGain() {
-    return this.node({ gain: param() });
+    const g = { ...this.node(), gain: param() };
+    this.gains.push(g);
+    return g;
   }
   createBiquadFilter() {
     return this.node({ type: '', frequency: param(), Q: param(), gain: param() });
@@ -70,23 +83,32 @@ afterEach(() => {
 
 describe('holding a sound', () => {
   it("can't hold a sound it can't make", () => {
-    expect(webAudioPlayer().hold('ǃ', 'a', 0)).toBeNull();
+    expect(webAudioPlayer().hold('ǃ', 1)).toBeNull();
   });
 
   it('plays until let go, then stops its sources', async () => {
-    const held = webAudioPlayer().hold('ɛ', 'a', 0)!;
+    const held = webAudioPlayer().hold('ɛ', 1)!;
     const ctx = contexts.at(-1)!;
     const stops = ctx.stopped.length;
     vi.advanceTimersByTime(TAP_MS * 3);
     expect(ctx.stopped.length).toBe(stops);
-    held.setMix(0.5);
+    held.setVolume(0.5);
     held.release();
     await held.done;
     expect(ctx.stopped.length).toBeGreaterThan(stops);
   });
 
+  it('plays at the volume asked for, and follows a change', () => {
+    const held = webAudioPlayer().hold('a', 0.3)!;
+    const level = contexts.at(-1)!.gains.at(-1)!;
+    expect(level.gain.value).toBe(0.3);
+    held.setVolume(0.8);
+    expect(level.gain.target).toBe(0.8);
+    held.release();
+  });
+
   it('keeps a quick tap going for a moment, so it is heard', async () => {
-    const held = webAudioPlayer().hold('m', 'n', 1)!;
+    const held = webAudioPlayer().hold('n', 1)!;
     const ctx = contexts.at(-1)!;
     const stops = ctx.stopped.length;
     held.release();
@@ -98,20 +120,20 @@ describe('holding a sound', () => {
 
   it('stops the last sound when another is held', async () => {
     const player = webAudioPlayer();
-    const first = player.hold('s', 'ʃ', 0)!;
+    const first = player.hold('s', 1)!;
     const stops = contexts.at(-1)!.stopped.length;
-    player.hold('a', 'a', 0);
+    player.hold('a', 1);
     await first.done;
     expect(contexts.at(-1)!.stopped.length).toBeGreaterThan(stops);
   });
 
   it("starts, from the lift, a context a finger going down couldn't start, and plays a tap's length from there", async () => {
-    webAudioPlayer().hold('a', 'a', 0)!.release();
+    webAudioPlayer().hold('a', 1)!.release();
     const ctx = contexts.at(-1)!;
     // A press on iOS: the context won't start from it.
     ctx.state = 'suspended';
     ctx.resume = () => Promise.resolve();
-    const held = webAudioPlayer().hold('a', 'a', 0)!;
+    const held = webAudioPlayer().hold('a', 1)!;
     vi.advanceTimersByTime(1000);
     const stops = ctx.stopped.length;
     let resumed = 0;

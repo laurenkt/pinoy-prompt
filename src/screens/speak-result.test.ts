@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-// The sound-by-sound breakdown: what opens when each part is tapped, and holding and sliding to hear a sound.
+// The sound-by-sound breakdown: what opens when each part is tapped, and holding the slider either side of its middle to hear a sound.
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { coach } from '../coach';
 import { compare, toPhones } from '../phonetics';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
-import { resultView, spanOf, type Attempt } from './speak-result';
+import { BUTTON_VOLUME, loudness, resultView, spanOf, type Attempt } from './speak-result';
 
 function attempt(text: string, heard: string[]): Attempt {
   const comparison = compare(toPhones(text), heard);
@@ -79,57 +79,85 @@ describe('the breakdown', () => {
     expect(q('.sound-detail .detail-letters').textContent).toBe('“a”');
   });
 
-  it('holds what you said at the left of the slider and the target at the right, until let go', () => {
+  it('holds what you said left of the middle and the target right of it, until let go', () => {
     show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
     const slider = q('.sound-slider');
     expect(slider.getAttribute('role')).toBe('slider');
     expect(all('.slider-cap').map((c) => c.textContent)).toEqual(['n', 'ŋ']);
     layOut();
     pointer(slider, 'pointerdown', 0);
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'n', to: 'ŋ', mix: 0 });
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'n', volume: 1 });
     expect(slider.classList).toContain('holding');
+    expect(slider.getAttribute('aria-valuetext')).toBe('What you said, n, 100% loud');
     pointer(slider, 'pointerup', 0);
     expect(player.held!.released).toBe(true);
     expect(slider.classList).not.toContain('holding');
+    // Back to the middle.
+    expect(slider.getAttribute('aria-valuenow')).toBe('0');
     pointer(slider, 'pointerdown', 240);
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'n', to: 'ŋ', mix: 1 });
-    expect(slider.getAttribute('aria-valuetext')).toBe('What to aim for, ŋ');
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'ŋ', volume: 1 });
+    expect(slider.getAttribute('aria-valuetext')).toBe('What to aim for, ŋ, 100% loud');
   });
 
-  it('moves between the two as the finger slides, snapping to either end near it', () => {
+  it('plays nothing in the middle, quietly just out of it, and louder further out', () => {
     show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
     const slider = q('.sound-slider');
     layOut();
-    pointer(slider, 'pointerdown', 5);
-    pointer(slider, 'pointermove', 120);
+    const holds = player.calls.length;
+    pointer(slider, 'pointerdown', 120);
+    expect(player.calls.length).toBe(holds);
+    expect(slider.getAttribute('aria-valuetext')).toBe('Silent');
+    pointer(slider, 'pointermove', 150);
+    const quiet = player.calls.at(-1) as { sound: string; volume: number };
+    expect(quiet.sound).toBe('a');
+    expect(quiet.volume).toBeLessThan(0.2);
+    pointer(slider, 'pointermove', 200);
     pointer(slider, 'pointermove', 236);
-    expect(player.held!.mixes).toEqual([0, 0.5, 1]);
-    expect(slider.style.getPropertyValue('--mix')).toBe('1');
-    // Let go, it stays where it was left.
-    pointer(slider, 'pointerup', 236);
-    expect(slider.getAttribute('aria-valuenow')).toBe('100');
+    const [, louder, loudest] = player.held!.volumes;
+    expect(louder).toBeGreaterThan(quiet.volume);
+    expect(loudest).toBe(1);
+    // Over to the other side: what was said, from quiet again.
+    pointer(slider, 'pointermove', 90);
+    expect(player.held!.released).toBe(false);
+    const other = player.calls.at(-1) as { sound: string; volume: number };
+    expect(other.sound).toBe('ɛ');
+    expect(other.volume).toBeLessThan(0.2);
+    pointer(slider, 'pointerup', 90);
   });
 
-  it('moves your mark on the map along with the slider, onto the target at the far end', () => {
+  it("makes the ends of the slider loudest and the middle silent", () => {
+    expect(loudness(0)).toBe(1);
+    expect(loudness(1)).toBe(1);
+    expect(loudness(0.5)).toBe(0);
+    expect(loudness(0.3)).toBeCloseTo(loudness(0.7));
+    expect(loudness(0.3)).toBeLessThan(loudness(0.2));
+  });
+
+  it('pulses the mark on the map for the sound being played', () => {
     show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
-    const mark = q('.chart-heard');
-    const start = mark.getAttribute('transform');
-    const goal = q('.chart-target').getAttribute('transform');
+    const heard = q('.chart-heard');
+    const target = q('.chart-target');
     layOut();
-    pointer(q('.sound-slider'), 'pointerdown', 120);
-    expect(mark.classList).toContain('speaking');
-    expect(mark.getAttribute('transform')).not.toBe(start);
-    pointer(q('.sound-slider'), 'pointermove', 240);
-    expect(mark.getAttribute('transform')).toBe(goal);
-    expect(mark.classList).toContain('arrived');
+    pointer(q('.sound-slider'), 'pointerdown', 10);
+    expect(heard.classList).toContain('speaking');
+    expect(target.classList).not.toContain('speaking');
+    pointer(q('.sound-slider'), 'pointermove', 230);
+    expect(heard.classList).not.toContain('speaking');
+    expect(target.classList).toContain('speaking');
+    pointer(q('.sound-slider'), 'pointerup', 230);
+    expect(target.classList).not.toContain('speaking');
   });
 
   it('steps along from the keyboard, playing each step, and holds while space is down', () => {
     show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
     const slider = q('.sound-slider');
     slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'ɛ', to: 'a', mix: 0.1 });
+    const step = player.calls.at(-1) as { sound: string; volume: number };
+    expect(step.sound).toBe('a');
+    expect(step.volume).toBeLessThan(0.2);
     expect(player.held!.released).toBe(true);
+    slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'a', volume: 1 });
     slider.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     expect(player.held!.released).toBe(false);
     slider.dispatchEvent(new KeyboardEvent('keyup', { key: ' ', bubbles: true }));
@@ -151,7 +179,7 @@ describe('the breakdown', () => {
     const hold = q('.hold-btn');
     expect(hold.textContent).toContain('p');
     pointer(hold, 'pointerdown');
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'p', to: 'p', mix: 0 });
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'p', volume: BUTTON_VOLUME });
     pointer(hold, 'pointerup');
     expect(player.held!.released).toBe(true);
   });
@@ -163,14 +191,14 @@ describe('the breakdown', () => {
     expect(q('.sound-detail').textContent).toContain('Spot on');
     expect(document.querySelector('.sound-slider, .end-heard')).toBeNull();
     pointer(q('.hold-btn'), 'pointerdown');
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'ŋ', to: 'ŋ', mix: 0 });
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'ŋ', volume: BUTTON_VOLUME });
   });
 
   it('says to leave out an added sound, and holds what was said', () => {
     show(attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'o']));
     expect(q('.end-target').textContent).toContain('leave it out');
     pointer(q('.hold-btn'), 'pointerdown');
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'o', to: 'o', mix: 0 });
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'o', volume: BUTTON_VOLUME });
   });
 
   it("holds just the target when what was heard can't be made", () => {
@@ -178,7 +206,7 @@ describe('the breakdown', () => {
     q<HTMLButtonElement>('.ribbon-mark').click();
     expect(document.querySelector('.sound-slider')).toBeNull();
     pointer(q('.hold-btn'), 'pointerdown');
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'p', to: 'p', mix: 0 });
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 'p', volume: BUTTON_VOLUME });
   });
 
   it('draws vowels on the vowel map and consonants on the consonant map', () => {
@@ -244,7 +272,7 @@ describe('the breakdown', () => {
     expect(q('.sound-detail').textContent).toContain('nothing here');
     expect(document.querySelector('.sound-slider')).toBeNull();
     pointer(q('.hold-btn'), 'pointerdown');
-    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 't', to: 't', mix: 0 });
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', sound: 't', volume: BUTTON_VOLUME });
   });
 
   it('plays the whole recording and stops audio when it goes away', () => {
