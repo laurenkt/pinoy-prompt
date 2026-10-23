@@ -108,8 +108,9 @@ async function speak(text, [voice, who]) {
       ],
     }),
   });
-  const { data, transcript } = (await response.json()).choices[0].message.audio;
-  return { take: Buffer.from(data, 'base64'), said: transcript };
+  // A refusal comes back as text alone, with no take.
+  const audio = (await response.json()).choices[0].message.audio;
+  return { take: audio ? Buffer.from(audio.data, 'base64') : null, said: audio?.transcript ?? '' };
 }
 
 /** What a take says, heard by a speech recogniser. Given the take as made, as it rejects some very short MP3s. */
@@ -174,8 +175,12 @@ async function makeClip(text, voice, work, unsure, keepOld) {
   for (let attempt = 1; ; attempt++) {
     const { take, said } = await speak(text, voice);
     // A take that answered or added to its line, by the model's own account, needs no recogniser to reject it.
-    const saidRight = words(said ?? '') === words(text);
+    const saidRight = take !== null && heardRight(text, said);
     if (!saidRight && attempt < ATTEMPTS) continue;
+    if (!take) {
+      unsure.push({ text, voice: voice[0], heard: '(no audio, only text)', kept: keepOld });
+      return null;
+    }
     const draft = `take-${createHash('sha1').update(take).digest('hex')}`;
     await encode(take, draft, work);
     let heard;
@@ -225,7 +230,8 @@ async function write(prune) {
   await writeFile(MANIFEST, `${JSON.stringify(kept, null, 2)}\n`);
   if (!prune) return;
   // Every clip here is one this script made, so one no longer listed can go.
-  const files = Object.values(kept).flat().flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
+  // Takes made for only some voices of a text are kept too, for the run that makes the rest.
+  const files = texts.flatMap((t) => (Array.isArray(manifest[t]) ? manifest[t].filter(Boolean) : [])).flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
   for (const file of await readdir(AUDIO_DIR)) {
     if (file.endsWith('.mp3') && !files.includes(file)) await rm(join(AUDIO_DIR, file));
   }

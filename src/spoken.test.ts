@@ -31,6 +31,10 @@ describe('recorded clips', () => {
     expect(Object.keys(CLIPS).filter((t) => !spoken.has(t))).toEqual([]);
   });
 
+  it('has a clip in both voices for every text, as the app picks between them', () => {
+    expect(Object.keys(CLIPS).filter((t) => CLIPS[t].length !== 2)).toEqual([]);
+  });
+
   it('has both files of every clip, and nothing else, so all of them can be kept offline', () => {
     const files = allClipUrls().map((url) => url.split('/').pop());
     expect(files).toHaveLength(2 * Object.values(CLIPS).flat().length);

@@ -70,21 +70,17 @@ export function voiceQuality(): VoiceQuality {
 /** Clip files by the text they say, one take per voice: `<name>.mp3`, and `<name>-slow.mp3` said slowly. */
 const CLIPS: Record<string, string[]> = clips;
 
-/**
- * Which voice each text plays in: a new one at random for each play at natural
- * pace (picked when a card loads it ahead, if it did), kept for its slow
- * version, so that's the same voice slowed down.
- */
-const picked = new Map<string, { take: number; played: boolean }>();
+/** Which voice each text last played in, so its slow version is the same voice slowed down. */
+const lastVoice = new Map<string, number>();
 
-/** The clip for this text, in its picked voice, if there is one. */
-export function clipUrl(card: Pick<Card, 'tl' | 'say'>, slow = false): string | null {
-  const text = card.say ?? card.tl;
-  const names = CLIPS[text];
-  if (!names?.length) return null;
-  let choice = picked.get(text);
-  if (!choice) picked.set(text, (choice = { take: Math.floor(Math.random() * names.length), played: false }));
-  return clipFile(names[choice.take], slow);
+/** The clips for this text, one per voice. */
+function clipUrls(card: Pick<Card, 'tl' | 'say'>, slow = false): string[] {
+  return (CLIPS[card.say ?? card.tl] ?? []).map((name) => clipFile(name, slow));
+}
+
+/** The clip for this text in one voice (the first unless given), if there is one. */
+export function clipUrl(card: Pick<Card, 'tl' | 'say'>, slow = false, voice = 0): string | null {
+  return clipUrls(card, slow)[voice] ?? null;
 }
 
 function clipFile(name: string, slow: boolean): string {
@@ -96,12 +92,10 @@ export function allClipUrls(): string[] {
   return Object.values(CLIPS).flatMap((names) => names.flatMap((name) => [clipFile(name, false), clipFile(name, true)]));
 }
 
-/** Load a word's clip ahead, in a newly picked voice, so a tap only has to start it. Plays nothing. */
+/** Load a word's clips ahead, in every voice as either may play, so a tap only has to start one. Plays nothing. */
 export function preload(card: Pick<Card, 'tl' | 'say'>): void {
   if (muted || !clipsSupported()) return;
-  picked.delete(card.say ?? card.tl);
-  const url = clipUrl(card);
-  if (url) void loadClip(url).catch(() => {});
+  for (const url of clipUrls(card)) void loadClip(url).catch(() => {});
 }
 
 let currentClip: Sound | null = null;
@@ -149,10 +143,12 @@ export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promis
 
 async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: number, tapped: number, report: (ms: number | null) => void): Promise<void> {
   const text = card.say ?? card.tl;
-  if (!slow && picked.get(text)?.played) picked.delete(text);
-  const url = clipsSupported() ? clipUrl(card, slow) : null;
-  const choice = picked.get(text);
-  if (choice && !slow) choice.played = true;
+  const urls = clipsSupported() ? clipUrls(card, slow) : [];
+  // A new voice at random each time, except that a slow replay keeps the one just heard.
+  const last = lastVoice.get(text);
+  const take = slow && last !== undefined && last < urls.length ? last : Math.floor(Math.random() * urls.length);
+  if (urls.length) lastVoice.set(text, take);
+  const url = urls[take];
   if (url) {
     // Made or resumed now, inside the tap, as the clip may only be ready after it.
     audioContext();

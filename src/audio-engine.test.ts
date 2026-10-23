@@ -127,15 +127,12 @@ describe('clips', () => {
     random.mockRestore();
   });
 
-  it('plays a word loaded ahead in the voice it was loaded in', async () => {
-    const random = vi.spyOn(Math, 'random');
-    random.mockReturnValue(0.9);
+  it('loads a word ahead in both voices, so either plays at once', async () => {
     preload({ tl: 'Sige' });
-    random.mockReturnValue(0.1);
+    expect(fetched).toEqual([expect.stringMatching(/sige-c3-marin\.mp3$/), expect.stringMatching(/sige-d4-cedar\.mp3$/)]);
     await play({ tl: 'Sige' });
+    expect(fetched).toHaveLength(2);
     expect(sources).toHaveLength(1);
-    expect(fetched.filter((url) => url.includes('sige-'))).toEqual([expect.stringMatching(/sige-d4-cedar\.mp3$/)]);
-    random.mockRestore();
   });
 
   it("plays a word's clip through the one shared context instead of the built-in voice", async () => {
