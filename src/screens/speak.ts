@@ -6,12 +6,12 @@ import { holdMicrophone, microphoneAllowed } from '../microphone';
 import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
-import { compare, toPhones, type Comparison, type SoundVerdict } from '../phonetics';
+import { compare, toPhones, type Comparison } from '../phonetics';
 import { record, RecordError, recordingSupported, type RecordProblem, type Recording } from '../recorder';
 import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
 import { continueButton } from './auto-advance';
-import { resultView as soundResults, type ResultView } from './speak-result';
+import { markLetters, resultView as soundResults, type ResultView } from './speak-result';
 
 /** Download size shown to the learner before they agree to it. */
 const MODEL_MB = 71;
@@ -144,28 +144,6 @@ export function micWaiting(dictation = false): HTMLElement {
       dictation ? ' A meaning you say into the answer box goes to OpenAI to be written out.' : null,
     ),
   );
-}
-
-/** How each sound verdict ranks when several sounds share letters: the worst one shows. */
-const RANK: Record<SoundVerdict, number> = { good: 0, close: 1, off: 2, missing: 2 };
-
-/** The card's text split into runs of letters, each marked with how it was said. */
-export function markLetters(text: string, comparison: Comparison): { text: string; verdict: SoundVerdict | null }[] {
-  const marks: (SoundVerdict | null)[] = Array.from(text, () => null);
-  for (const s of comparison.sounds) {
-    if (s.phone.optional) continue;
-    for (let i = s.phone.from; i < s.phone.to; i++) {
-      const current = marks[i];
-      if (current === null || RANK[s.verdict] > RANK[current]) marks[i] = s.verdict;
-    }
-  }
-  const runs: { text: string; verdict: SoundVerdict | null }[] = [];
-  Array.from(text).forEach((ch, i) => {
-    const last = runs[runs.length - 1];
-    if (last && last.verdict === marks[i]) last.text += ch;
-    else runs.push({ text: ch, verdict: marks[i] });
-  });
-  return runs;
 }
 
 /** True when the attempt was good enough to count as right. */
@@ -424,7 +402,6 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       heard.length > 0 && recognition && samples
         ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: deps.player() })
         : null;
-    const lettersEl = heard.length > 0 && h('p', { class: `letters${text.length > 16 ? ' long' : ''}`, lang: 'fil' }, markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)));
     if (breakdown) {
       // The breakdown takes the card's place: the word, coloured by how each sound came
       // out. Each sound's tip is in the breakdown. The whole word to play back sits at
@@ -434,7 +411,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         h(
           'div',
           { class: `feedback result-card ${right ? 'good' : 'bad'}`, role: 'status' },
-          h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title), ' ', h('span', { class: 'result-meaning' }, card.en)), lettersEl), dial(comparison.score, `${pct}% of the way there`)),
+          h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title), ' ', h('span', { class: 'result-meaning' }, card.en)), breakdown.word), dial(comparison.score, `${pct}% of the way there`)),
         ),
         breakdown.el,
         h(
@@ -448,6 +425,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         actions(right),
       ];
     }
+    const lettersEl = heard.length > 0 && h('p', { class: `letters${text.length > 16 ? ' long' : ''}`, lang: 'fil' }, markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)));
     return [
       h(
         'div',

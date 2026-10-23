@@ -129,6 +129,16 @@ const SCREENS = {
     await page.mouse.move(rail.x + 20 + (rail.width - 40) * 0.875, y);
     await page.mouse.down();
   },
+  // The same, after dragging along the word from its first letter to its last: the last sound open.
+  'speak-result-scrubbed': async (page) => {
+    await SCREENS['speak-result'](page);
+    const word = await page.locator('.word-scrub').boundingBox();
+    const y = word.y + word.height / 2;
+    await page.mouse.move(word.x + 4, y);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i++) await page.mouse.move(word.x + 4 + ((word.width - 8) * i) / 10, y);
+    await page.mouse.up();
+  },
   // Listen only, on settled words, with a key for OpenAI: the meaning said into the box, as a wave of levels from a
   // stand-in microphone, then being heard (OpenAI never answers here).
   'drills-saying': (page) => sayMeaning(page),

@@ -4,7 +4,8 @@
 // it's made in the mouth, with what the learner said and the target. Holding
 // the slider under the map plays one or the other, made in code rather than cut
 // from the recording: what was said to the left of the middle, what to aim for
-// to the right, louder the further the finger goes.
+// to the right, louder the further the finger goes. The word itself, coloured
+// sound by sound, is a scrubber too: drag along its letters to move between sounds.
 
 import type { Tip } from '../coach';
 import type { Comparison, SoundResult, SoundVerdict } from '../phonetics';
@@ -12,6 +13,7 @@ import { canSynthesize } from '../phone-synth';
 import type { Held, Player } from '../player';
 import { MANNERS, PLACES, placeOf, soundName, type Place } from '../sound-map';
 import { createSpectrogram, type Segment, type Spectrogram } from '../spectrogram';
+import { detents, readyDetents, tick } from '../speech';
 import { h, icon, svg } from '../ui';
 
 export interface Attempt {
@@ -36,6 +38,28 @@ const COLORS: Record<SoundVerdict | 'extra', string> = {
   extra: '#ff6b92',
 };
 const VERDICT_LABEL: Record<SoundVerdict, string> = { good: 'Spot on', close: 'Nearly', off: 'Off', missing: 'Missing' };
+
+/** How each sound verdict ranks when several sounds share letters: the worst one shows. */
+const RANK: Record<SoundVerdict, number> = { good: 0, close: 1, off: 2, missing: 2 };
+
+/** The card's text split into runs of letters, each marked with how it was said. */
+export function markLetters(text: string, comparison: Comparison): { text: string; verdict: SoundVerdict | null }[] {
+  const marks: (SoundVerdict | null)[] = Array.from(text, () => null);
+  for (const s of comparison.sounds) {
+    if (s.phone.optional) continue;
+    for (let i = s.phone.from; i < s.phone.to; i++) {
+      const current = marks[i];
+      if (current === null || RANK[s.verdict] > RANK[current]) marks[i] = s.verdict;
+    }
+  }
+  const runs: { text: string; verdict: SoundVerdict | null }[] = [];
+  Array.from(text).forEach((ch, i) => {
+    const last = runs[runs.length - 1];
+    if (last && last.verdict === marks[i]) last.text += ch;
+    else runs.push({ text: ch, verdict: marks[i] });
+  });
+  return runs;
+}
 
 /** The stretch of the recording that holds heard sound i: halfway to its neighbours, at least 120 ms. */
 export function spanOf(timing: Attempt['timing'], i: number, duration: number): { start: number; end: number } {
@@ -79,6 +103,8 @@ export interface ResultOptions {
 
 export interface ResultView {
   el: HTMLElement;
+  /** The word, coloured by how each sound came out; drag along it to open each sound in turn. */
+  word: HTMLElement;
   /** Play the learner's whole attempt, without the silence either side. */
   playWhole(): void;
   dispose(): void;
@@ -176,6 +202,103 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 
   const ribbonEl = h('div', { class: 'ribbon' }, h('div', { class: 'ribbon-lane lane-target', 'aria-hidden': 'true' }), ribbon?.el, h('div', { class: 'ribbon-lane lane-heard', 'aria-hidden': 'true' }), h('div', { class: 'ribbon-marks', role: 'group', 'aria-label': 'Your sounds' }, marks));
 
+  // --- The word --------------------------------------------------------------
+  // The card's text, coloured by how each sound came out, with the open sound's
+  // letters underlined. A finger dragged along it opens each sound in turn, so
+  // the part of the recording to hear can be found by its letters rather than
+  // by its marks on the ribbon; a tap opens the sound under it.
+  const chars = Array.from(attempt.text);
+  /** The mark each letter belongs to, or -1 (a space, a hyphen, a sound left out). */
+  const own = chars.map((_, i) => list.findIndex((p) => p.result !== undefined && p.result.phone.from <= i && i < p.result.phone.to));
+  /** The mark letter i opens: its own, or the nearest letter's that has one. */
+  const markAt = (i: number) => {
+    for (let d = 0; i >= 0 && d < chars.length; d++) {
+      if (own[i - d] >= 0) return own[i - d];
+      if (own[i + d] >= 0) return own[i + d];
+    }
+    return -1;
+  };
+  const letterEls: HTMLElement[] = [];
+  const word = h(
+    'p',
+    {
+      class: `letters word-scrub${attempt.text.length > 16 ? ' long' : ''}`,
+      lang: 'fil',
+      role: 'slider',
+      tabindex: '0',
+      'aria-label': 'The word. Drag along it to choose a sound',
+      'aria-valuemin': '1',
+      'aria-valuemax': String(list.length),
+    },
+    markLetters(attempt.text, attempt.comparison).map((run) =>
+      h(
+        'span',
+        { class: run.verdict ? `sound-${run.verdict}` : '' },
+        Array.from(run.text, (ch) => {
+          const el = h('span', null, ch);
+          letterEls.push(el);
+          return el;
+        }),
+      ),
+    ),
+  );
+  /** The letter nearest a point: on its line first, then along it. */
+  const letterAt = (x: number, y: number) => {
+    let best = -1;
+    let far = Infinity;
+    letterEls.forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      const d = Math.max(r.top - y, 0, y - r.bottom) * 1000 + Math.max(r.left - x, 0, x - r.right);
+      if (d < far) [best, far] = [i, d];
+    });
+    return best;
+  };
+  /** Opens the sound under the pointer, and says which it is, for the ticks. */
+  const pick = (e: PointerEvent): string | null => {
+    const index = markAt(letterAt(e.clientX, e.clientY));
+    if (index < 0) return null;
+    select(index);
+    return String(index);
+  };
+  // Like the memory chart: a drag sideways scrubs, ticking at each sound; one that
+  // starts up or down is left to scroll the page; a tap clicks like any press.
+  const detent = detents();
+  let touch: { x: number; y: number; scrub: boolean } | null = null;
+  word.addEventListener('pointerdown', (e) => {
+    touch = { x: e.clientX, y: e.clientY, scrub: false };
+    // So a mouse dragged off the word keeps scrubbing.
+    word.setPointerCapture?.(e.pointerId);
+  });
+  word.addEventListener('pointermove', (e) => {
+    if (!touch) return;
+    const dx = Math.abs(e.clientX - touch.x);
+    const dy = Math.abs(e.clientY - touch.y);
+    if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
+    else if (touch.scrub || (dx > 8 && dx > dy)) {
+      if (!touch.scrub) readyDetents();
+      touch.scrub = true;
+      detent(pick(e));
+    }
+  });
+  word.addEventListener('pointerup', (e) => {
+    if (touch && !touch.scrub) {
+      pick(e);
+      tick('click');
+    }
+    touch = null;
+    detent(null);
+  });
+  word.addEventListener('pointercancel', () => {
+    touch = null;
+    detent(null);
+  });
+  word.addEventListener('keydown', (e) => {
+    const to = ({ ArrowLeft: selected - 1, ArrowDown: selected - 1, ArrowRight: selected + 1, ArrowUp: selected + 1, Home: 0, End: list.length - 1 } as Record<string, number>)[e.key];
+    if (to === undefined || list.length === 0) return;
+    e.preventDefault();
+    select(Math.min(list.length - 1, Math.max(0, to)));
+  });
+
   // --- Detail for one sound --------------------------------------------------
   const detail = h('div', { class: 'sound-detail', 'aria-live': 'polite' });
 
@@ -187,6 +310,9 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       m.classList.toggle('selected', i === index);
       m.setAttribute('aria-pressed', String(i === index));
     });
+    letterEls.forEach((el, i) => el.classList.toggle('on', own[i] === index));
+    word.setAttribute('aria-valuenow', String(index + 1));
+    word.setAttribute('aria-valuetext', marks[index].getAttribute('aria-label')!);
     const p = list[index];
     if (p.heardAt !== undefined) ribbon?.setFocus(span(p.heardAt));
     else ribbon?.setFocus(gapFor(index));
@@ -436,6 +562,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 
   return {
     el,
+    word,
     playWhole: () => void playMine(whole()),
     dispose: () => {
       letGo();
