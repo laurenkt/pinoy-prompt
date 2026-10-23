@@ -52,4 +52,16 @@ describe('the Library', () => {
     expect(first.open).toBe(true);
     expect(toggle(root)).toBe(button);
   });
+
+  it('shows how much of each topic is in memory, firmest first, in the heading it already has', () => {
+    const unit = UNITS[0];
+    const [a, b] = unit.cards;
+    const app = fakeApp([a.id, b.id]);
+    app.progress.cards[b.id].interval = 30;
+    const strip = wordsScreen(app).querySelector('.unit-list summary .memory-strip')!;
+    expect([...strip.children].map((s) => s.className)).toEqual(['s-long', 's-days']);
+    expect((strip.children[0] as HTMLElement).style.width).toBe(`${100 / unit.cards.length}%`);
+    expect(strip.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: 1 Days, 1 Long-term`);
+    expect(wordsScreen(fakeApp()).querySelector('.memory-strip')!.getAttribute('aria-label')).toBe(`None of ${unit.cards.length} met yet`);
+  });
 });

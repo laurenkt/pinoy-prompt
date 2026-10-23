@@ -2200,6 +2200,7 @@ p {
 }
 
 .unit-list summary {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -2232,6 +2233,23 @@ p {
 
 .unit-list .unit-tl {
   color: var(--muted);
+}
+
+/* The topic's cards by memory strength, in the heading's bottom padding so the heading keeps its height. Unmet cards are the empty track. */
+.memory-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  display: flex;
+  background: var(--line);
+  border-top: 2px solid var(--ink);
+}
+
+.memory-strip > span {
+  height: 100%;
+  border-right: 2px solid var(--ink);
 }
 
 .word-list {

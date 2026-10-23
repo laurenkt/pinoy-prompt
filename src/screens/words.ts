@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import { UNITS, type Card, type CardKind } from '../deck';
 import { GUIDES, KIND_INFO } from '../guides';
-import { STRENGTHS, strengthOf } from '../memory';
+import { STRENGTHS, strengthCounts, strengthOf } from '../memory';
 import { play } from '../speech';
 import { audioButton, chip, h, icon, pageHeader } from '../ui';
 
@@ -68,13 +68,33 @@ export function wordsScreen(app: App): HTMLElement {
     );
   }
 
-  function group(title: string, sub: string | null, items: HTMLElement[]): HTMLElement {
+  /**
+   * A strip along the bottom of a topic's heading: its cards by strength, as
+   * on Home's memory chart, firmest first, with the rest left empty. It sits in
+   * the heading's padding, so a topic takes no more room than without it.
+   */
+  function memoryStrip(cards: Card[]): HTMLElement {
+    const counts = strengthCounts(app.progress, cards);
+    const met = STRENGTHS.reduce((sum, s) => sum + counts[s.id], 0);
+    const label = met
+      ? `${met} of ${cards.length} met: ${STRENGTHS.filter((s) => counts[s.id]).map((s) => `${counts[s.id]} ${s.label}`).join(', ')}`
+      : `None of ${cards.length} met yet`;
+    return h(
+      'span',
+      { class: 'memory-strip', role: 'img', 'aria-label': label },
+      [...STRENGTHS].reverse().map((s) =>
+        counts[s.id] ? h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } }) : null,
+      ),
+    );
+  }
+
+  function group(title: string, sub: string | null, cards: Card[], item: (card: Card) => HTMLElement): HTMLElement {
     return h(
       'details',
       // Narrowed to one kind of guide, there is only one group, so it opens straight away.
       { class: 'card unit-list', open: filter !== 'all' && filter !== 'vocab' },
-      h('summary', null, h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub))),
-      h('ul', { class: 'word-list' }, items),
+      h('summary', null, h('span', { class: 'unit-body' }, h('span', { class: 'unit-title' }, title), sub && h('span', { class: 'unit-tl' }, sub)), memoryStrip(cards)),
+      h('ul', { class: 'word-list' }, cards.map(item)),
     );
   }
 
@@ -116,8 +136,8 @@ export function wordsScreen(app: App): HTMLElement {
       ...pageHeader('Library', () => app.navigate({ name: 'home' }), toggle),
       chips,
       h('p', { class: 'muted' }, 'Tap the speaker to hear any word.'),
-      ...(showVocab ? UNITS.map((unit) => group(unit.title, unit.tlTitle, unit.cards.map(wordItem))) : []),
-      ...kinds.map((k) => group(KIND_INFO[k].label, null, GUIDES.filter((g) => g.kind === k).map(guideItem))),
+      ...(showVocab ? UNITS.map((unit) => group(unit.title, unit.tlTitle, unit.cards, wordItem)) : []),
+      ...kinds.map((k) => group(KIND_INFO[k].label, null, GUIDES.filter((g) => g.kind === k), guideItem)),
     );
   }
 

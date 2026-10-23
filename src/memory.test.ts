@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MILESTONES, cardsPerWord, curveAt, curveReaches, fitPower, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthOf, strengthSteps } from './memory';
+import { MILESTONES, cardsPerWord, curveAt, curveReaches, fitPower, forecast, memoryHistory, memorySummary, recallChance, recentReviews, strengthCounts, strengthOf, strengthSteps } from './memory';
 import { ALL_CARDS, LEARN_ORDER, isVocab } from './deck';
 import { DAY_MS, newCardState, review, startOfDayAfter, type CardState } from './srs';
 import { dayKey, emptyProgress, recordAnswer } from './store';
@@ -323,5 +323,16 @@ describe('fitPower', () => {
   it('needs a few days to show a shape', () => {
     expect(fitPower([[1, 3], [2, 5]])).toBeNull();
     expect(fitPower([[0.5, 3], [1, 0], [2, 0], [3, 4]])).toBeNull();
+  });
+});
+
+describe('strengthCounts', () => {
+  it('counts only the given cards, and only those met', () => {
+    const progress = emptyProgress(NOW);
+    const [a, b, c] = ALL_CARDS;
+    progress.cards[a.id] = card(0, 0);
+    progress.cards[b.id] = card(10, 0);
+    progress.cards[c.id] = card(30, 0);
+    expect(strengthCounts(progress, [a, b, ALL_CARDS[3]])).toEqual({ new: 1, days: 0, weeks: 1, long: 0 });
   });
 });

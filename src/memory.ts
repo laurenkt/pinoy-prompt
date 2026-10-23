@@ -65,6 +65,16 @@ export function recallChance(card: CardState, now: number): number {
   return Math.pow(1 + ((19 / 81) * days) / card.interval, -0.5);
 }
 
+/** How many of these cards are at each strength; cards not met yet aren't counted. */
+export function strengthCounts(progress: Progress, cards: readonly Card[]): Record<Strength, number> {
+  const counts: Record<Strength, number> = { new: 0, days: 0, weeks: 0, long: 0 };
+  for (const card of cards) {
+    const state = progress.cards[card.id];
+    if (state) counts[strengthOf(state)]++;
+  }
+  return counts;
+}
+
 export interface MemorySummary {
   /** Words and phrases met so far. */
   total: number;
