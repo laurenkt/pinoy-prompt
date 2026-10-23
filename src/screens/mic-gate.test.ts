@@ -5,7 +5,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { recordAnswer } from '../store';
 import { practiceScreen } from './practice';
-import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
 import { button, drillScope, fakeApp as knowing, flush } from '../test/screen';
 
@@ -136,34 +135,6 @@ describe('asking for the microphone in Drills', () => {
     expect(mic.holdMicrophone).toHaveBeenCalledOnce();
     expect(waiting(again)).toBe(true);
     drillScope(again, ['listen', 'read', 'recall', 'speak']);
-  });
-});
-
-describe('asking for the microphone in Study', () => {
-  it('asks as practice starts, before a speaking step', async () => {
-    const mic = micNotYet();
-    const root = sessionScreen(fakeApp(), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, mic.deps);
-    document.body.append(root);
-    expect(mic.holdMicrophone).not.toHaveBeenCalled();
-    button(root, 'Keep practising').click();
-    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
-    expect(waiting(root)).toBe(true);
-    expect(speaking(root)).toBe(false);
-    mic.answer(true);
-    await flush();
-    expect(speaking(root)).toBe(true);
-  });
-
-  it('asks the step another way when refused', async () => {
-    const mic = micNotYet();
-    const root = sessionScreen(fakeApp(), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, mic.deps);
-    document.body.append(root);
-    button(root, 'Keep practising').click();
-    mic.answer(false);
-    await flush();
-    expect(waiting(root)).toBe(false);
-    expect(speaking(root)).toBe(false);
-    expect(root.querySelector('.panel')).not.toBeNull();
   });
 });
 

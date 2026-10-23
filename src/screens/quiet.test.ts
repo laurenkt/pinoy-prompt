@@ -27,12 +27,6 @@ function fakeApp(quiet: boolean, headphones = true) {
   return knowing(KNOWN, { dailyNew: KNOWN.length, quiet, headphones });
 }
 
-/** Pick the first choice, right or wrong, and move on. */
-function answer(root: HTMLElement): void {
-  root.querySelector<HTMLButtonElement>('.choice')!.click();
-  root.querySelector<HTMLButtonElement>('.btn.primary')!.click();
-}
-
 const speaking = (root: HTMLElement) => root.textContent?.includes('Say this out loud') ?? false;
 
 const hearing = (root: HTMLElement) => /What did you hear|what you heard/.test(root.textContent ?? '');
@@ -55,81 +49,25 @@ afterEach(() => {
 const quietButton = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.icon-btn[aria-label^="Quiet mode"]')!;
 
 describe('quiet mode in study', () => {
-  it('never asks to speak', async () => {
-    // Always roll a speaking step, if speaking is allowed.
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const root = sessionScreen(fakeApp(true), null, undefined, micReady);
-    await flush();
-    button(root, 'Keep practising').click();
-    for (let i = 0; i < 10; i++) {
-      expect(speaking(root)).toBe(false);
-      answer(root);
-    }
-  });
-
-  it('skips a speaking step when turned on mid-step, leaving the card as it was', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
-    const app = fakeApp(false);
-    const root = sessionScreen(app, null, undefined, micReady);
-    await flush();
-    button(root, 'Keep practising').click();
-    // The first practice step was picked before the microphone was known to be ready.
-    answer(root);
-    expect(speaking(root)).toBe(true);
-    const before = structuredClone(app.progress.cards);
-
-    quietButton(root).click();
-
-    expect(app.progress.settings.quiet).toBe(true);
-    expect(app.progress.settings.headphones).toBe(false);
-    expect(speaking(root)).toBe(false);
-    expect(root.querySelector('.choice')).not.toBeNull();
-    expect(root.textContent).toContain('1 done');
-    expect(app.progress.cards).toEqual(before);
-    expect(quietButton(root).getAttribute('aria-label')).toBe('Quiet mode: silent');
-  });
-
-  it('asks a speaking step that was already picked another way', async () => {
-    const root = sessionScreen(fakeApp(true), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, micReady);
-    await flush();
-    button(root, 'Keep practising').click();
-    expect(speaking(root)).toBe(false);
-  });
-
   it('asks new words to be said in your head, and in silence says nothing about listening', () => {
-    const silent = sessionScreen(fakeApp(true, false), [{ kind: 'new', cardId: 'mabuti' }], undefined, micReady);
+    const silent = sessionScreen(fakeApp(true, false), [{ kind: 'new', cardId: 'mabuti' }]);
     expect(silent.textContent).toContain('Say it in your head');
     expect(silent.textContent).not.toContain('Listen');
 
     const app = fakeApp(true);
-    const root = sessionScreen(app, [{ kind: 'new', cardId: 'mabuti' }], undefined, micReady);
+    const root = sessionScreen(app, [{ kind: 'new', cardId: 'mabuti' }]);
     expect(root.textContent).toContain('say it in your head');
     expect(root.textContent).not.toContain('out loud');
   });
 });
 
 describe('silent quiet mode (no headphones)', () => {
-  it('never asks a listening question in practice, though headphones allow one', async () => {
-    // Always roll the last format: listening, when it's allowed.
-    vi.spyOn(Math, 'random').mockReturnValue(0.99);
-    const withHeadphones = sessionScreen(fakeApp(true, true), null, undefined, micReady);
-    button(withHeadphones, 'Keep practising').click();
-    expect(hearing(withHeadphones)).toBe(true);
-
-    const silent = sessionScreen(fakeApp(true, false), null, undefined, micReady);
-    button(silent, 'Keep practising').click();
-    for (let i = 0; i < 6; i++) {
-      expect(hearing(silent)).toBe(false);
-      answer(silent);
-    }
-  });
-
   it('reviews a learned card by reading instead of hearing, and still counts it', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.99);
     const app = fakeApp(true, false);
     Object.assign(app.progress.cards.salamat, { interval: 10, due: app.now() - 1 });
     const reps = app.progress.cards.salamat.reps;
-    const root = sessionScreen(app, [{ kind: 'review', cardId: 'salamat' }], undefined, micReady);
+    const root = sessionScreen(app, [{ kind: 'review', cardId: 'salamat' }]);
     expect(hearing(root)).toBe(false);
     button(root, 'Show the').click();
     button(root, 'Good').click();
@@ -138,7 +76,7 @@ describe('silent quiet mode (no headphones)', () => {
 
   it('asks an unanswered listening step again by reading when silence is turned on', () => {
     const app = fakeApp(false);
-    const root = sessionScreen(app, [{ kind: 'review', cardId: 'salamat', format: 'hear' }], undefined, micReady);
+    const root = sessionScreen(app, [{ kind: 'review', cardId: 'salamat', format: 'hear' }]);
     expect(hearing(root)).toBe(true);
     const before = structuredClone(app.progress.cards);
     quietButton(root).click();
@@ -166,7 +104,7 @@ describe('silent quiet mode (no headphones)', () => {
 
   it('shows as an icon button, pressed while quiet mode is on, on Home, Study and Drills alike', () => {
     for (const [quiet, headphones] of [[false, false], [true, false], [true, true]] as const) {
-      const roots = [homeScreen(fakeApp(quiet, headphones)), sessionScreen(fakeApp(quiet, headphones), null, undefined, micReady), practiceScreen(fakeApp(quiet, headphones))];
+      const roots = [homeScreen(fakeApp(quiet, headphones)), sessionScreen(fakeApp(quiet, headphones), null), practiceScreen(fakeApp(quiet, headphones))];
       const looks = roots.map((root) => {
         const b = quietButton(root);
         return { class: b.className, pressed: b.getAttribute('aria-pressed'), label: b.getAttribute('aria-label'), text: b.textContent };

@@ -15,6 +15,7 @@ import {
   learningCount,
   newCardsLeftToday,
   nextStudyStep,
+  pickDrillCard,
   pickFormat,
   requeue,
   studyQueue,
@@ -25,7 +26,7 @@ import { emptyProgress, recordAnswer } from './store';
 
 const NOW = Date.UTC(2026, 0, 1, 12);
 
-const CAN = { listen: true, speak: false };
+const CAN = { listen: true };
 
 const isVocabId = (id: string) => isVocab(getCard(id)!);
 const VOCAB_ORDER = LEARN_ORDER.filter(isVocabId);
@@ -86,26 +87,19 @@ describe('nextStudyStep', () => {
     expect(nextStudyStep(progress, NOW, [a], CAN)?.kind).toBe('new');
   });
 
-  it('keeps to the daily new-word rate, then moves on to practice', () => {
+  it('keeps to the daily new-word rate, then is caught up: practice beyond that is Drills\'', () => {
     const progress = emptyProgress(NOW);
-    const ids = ALL_CARDS.slice(0, 8).map((c) => c.id);
-    learn(progress, ids);
+    learn(progress, ALL_CARDS.slice(0, 8).map((c) => c.id));
     expect(newCardsLeftToday(progress)).toBe(0);
-    const step = nextStudyStep(progress, NOW, [], CAN);
-    expect(step?.kind).toBe('extra');
-    expect(ids).toContain(step?.cardId);
+    expect(nextStudyStep(progress, NOW, [], CAN)).toBeNull();
   });
 
-  it('practises the weakest words, and missed ones first', () => {
+  it('asks the card just shown again when it is the only one left being learned, rather than being caught up', () => {
     const progress = emptyProgress(NOW);
     progress.settings.dailyNew = 0;
-    const [a, b, c] = UNITS[0].cards.map((card) => card.id);
-    learn(progress, [a], 30);
-    learn(progress, [b], 3);
-    learn(progress, [c], 30);
-    const later = NOW + 2 * DAY_MS;
-    expect(nextStudyStep(progress, later, [], CAN)?.cardId).toBe(b);
-    expect(nextStudyStep(progress, later, [], CAN, new Map([[c, 1]]))?.cardId).toBe(c);
+    const [a] = UNITS[0].cards.map((card) => card.id);
+    recordAnswer(progress, a, 'again', NOW);
+    expect(nextStudyStep(progress, NOW, [a], CAN)?.cardId).toBe(a);
   });
 
   it("doesn't ask the same card twice in a row while there are others", () => {
@@ -113,18 +107,11 @@ describe('nextStudyStep', () => {
     progress.settings.dailyNew = 0;
     const [a, b] = UNITS[0].cards.map((card) => card.id);
     learn(progress, [a, b]);
+    for (const id of [a, b]) progress.cards[id].due = NOW - 1;
     for (let i = 0; i < 10; i++) {
       const first = nextStudyStep(progress, NOW, [], CAN)!.cardId;
       expect(nextStudyStep(progress, NOW, [first], CAN)!.cardId).not.toBe(first);
     }
-  });
-
-  it('only adds speaking when the device can do it', () => {
-    const progress = emptyProgress(NOW);
-    progress.settings.dailyNew = 0;
-    learn(progress, UNITS[0].cards.slice(0, 4).map((c) => c.id));
-    expect(nextStudyStep(progress, NOW, [], { listen: false, speak: true }, new Map(), () => 0)?.format).toBe('speak');
-    expect(nextStudyStep(progress, NOW, [], { listen: false, speak: false }, new Map(), () => 0)?.format).toBe('read');
   });
 });
 
@@ -142,7 +129,7 @@ describe('pickFormat', () => {
   });
 
   it('leaves out listening without a voice', () => {
-    expect(all(14, { listen: false, speak: false })).not.toContain('hear');
+    expect(all(14, { listen: false })).not.toContain('hear');
   });
 });
 
@@ -310,16 +297,6 @@ describe('guides', () => {
     expect(pickFormat(learned, CAN, () => 0.1, 'knowhow')).toBe('think');
   });
 
-  it('are never offered for speaking in extra practice', () => {
-    const progress = emptyProgress(NOW);
-    learn(progress, ['p-po', 's-ng'], 30);
-    progress.today.newCount = progress.settings.dailyNew;
-    for (let i = 0; i < 20; i++) {
-      const step = nextStudyStep(progress, NOW, [], { listen: true, speak: true }, new Map(), () => i / 20);
-      expect(['gap', 'build']).toContain(step?.format);
-    }
-  });
-
   it('pick drills made of cards already met, and not the same one twice running', () => {
     const progress = emptyProgress(NOW);
     const card = getCard('p-gusto')!;
@@ -343,6 +320,79 @@ describe('guides', () => {
   it('are never used as wrong answers for words', () => {
     for (let i = 0; i < 20; i++) {
       for (const c of distractors(getCard('kape')!, 'en', 3, ALL_CARDS)) expect(isVocab(c)).toBe(true);
+    }
+  });
+});
+
+describe('picking the next card to drill', () => {
+  const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
+  const LATER = NOW + 60 * DAY_MS;
+
+  /** Cards all met long ago and holding for months, so none stands out unless a test makes it. */
+  function settledProgress(ids = KNOWN) {
+    const progress = emptyProgress(NOW);
+    learn(progress, ids, 90);
+    return progress;
+  }
+
+  /** How often each card comes up over many picks. */
+  function counts(progress: ReturnType<typeof emptyProgress>, recent: string[] = [], missed = new Map<string, number>(), now = LATER) {
+    const seen = new Map<string, number>();
+    for (let i = 0; i < 4000; i++) {
+      const id = pickDrillCard(progress, now, recent, missed, undefined, () => (i + 0.5) / 4000)!.id;
+      seen.set(id, (seen.get(id) ?? 0) + 1);
+    }
+    return seen;
+  }
+
+  it('keeps the last three cards out', () => {
+    const seen = counts(settledProgress(), ['kape', 'salamat', 'oo', 'hindi']);
+    expect([...seen.keys()].sort()).toEqual(['kape', 'kumusta', 'paalam']);
+  });
+
+  it('only keeps out what leaves a card to ask, when few are known', () => {
+    const progress = settledProgress(['salamat', 'oo']);
+    expect(pickDrillCard(progress, LATER, ['salamat', 'oo'], new Map())!.id).toBe('salamat');
+    expect(pickDrillCard(progress, LATER, ['oo', 'salamat'], new Map())!.id).toBe('oo');
+    expect(pickDrillCard(settledProgress(['oo']), LATER, ['oo'], new Map())!.id).toBe('oo');
+  });
+
+  it('has nothing to ask with no cards, or none it may ask', () => {
+    expect(pickDrillCard(emptyProgress(NOW), NOW, [], new Map())).toBeNull();
+    expect(pickDrillCard(settledProgress(), LATER, [], new Map(), () => false)).toBeNull();
+  });
+
+  it('brings a card missed this round back more often', () => {
+    const plain = counts(settledProgress()).get('kape')!;
+    const missed = counts(settledProgress(), [], new Map([['kape', 2]])).get('kape')!;
+    expect(missed).toBeGreaterThan(plain * 3);
+  });
+
+  it('leans on cards that are fading, still being learned, newly met or often forgotten, and still asks the rest', () => {
+    const progress = settledProgress();
+    const strong = (id: string) => counts(progress).get(id)! / 4000;
+    const before = strong('kape');
+    // Fading: last seen long before its interval would hold it.
+    progress.cards.oo = { ...progress.cards.oo, interval: 3 };
+    // Forgotten and being learned again.
+    progress.cards.hindi = { ...progress.cards.hindi, interval: 0, lapses: 2, reviewed: LATER };
+    // Just met.
+    progress.cards.paalam = { ...progress.cards.paalam, introduced: LATER, reviewed: LATER, interval: 0 };
+    const seen = counts(progress);
+    for (const id of ['oo', 'hindi', 'paalam']) expect(seen.get(id)!).toBeGreaterThan(seen.get('kape')! * 2);
+    // The strong ones come up less than before, but still come up.
+    expect(seen.get('kape')! / 4000).toBeLessThan(before);
+    expect(seen.get('kape')! / 4000).toBeGreaterThan(0.03);
+  });
+
+  it('drills guides as well as words, as far as the round can ask them', () => {
+    const progress = settledProgress([...KNOWN, 'p-gusto', 's-ng']);
+    const seen = counts(progress);
+    expect(seen.get('p-gusto')).toBeGreaterThan(0);
+    expect(seen.get('s-ng')).toBeGreaterThan(0);
+    for (let i = 0; i < 50; i++) {
+      const card = pickDrillCard(progress, LATER, [], new Map(), isVocab, () => i / 50)!;
+      expect(isVocab(card)).toBe(true);
     }
   });
 });
