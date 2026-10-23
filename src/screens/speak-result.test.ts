@@ -189,19 +189,34 @@ describe('the breakdown', () => {
     expect(q('.sound-chart').classList).toContain('chart-consonant');
   });
 
-  it('opens on an added sound that counts, with the tip the coach gave for it', () => {
-    const a = attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'o']);
-    const tip = a.tips.find((t) => t.letters.toLowerCase() === 't')!;
-    expect(tip).toBeTruthy();
-    show(a);
+  it('opens on an added sound that counts, saying to leave it out once, over the slider', () => {
+    show(attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'o']));
     expect(q('.ribbon-mark.selected').classList).toContain('mark-extra');
     expect(q('.mark-extra .mark-target').textContent).toBe('+');
     expect(q('.sound-detail').textContent).toMatch(/Added/);
-    expect(q('.sound-detail').textContent).toContain(tip.text);
+    expect(q('.end-target').textContent).toContain('leave it out');
+    expect(q('.sound-detail .detail-tip')).toBeNull();
     // The t itself was spot on, so it carries no correction.
     all('.ribbon-mark')[6].click();
     expect(q('.sound-detail').textContent).toContain('Spot on');
     expect(q('.sound-detail .detail-tip')).toBeNull();
+  });
+
+  it("leaves out a tip that only repeats what was said and what to aim for, but keeps one on how to say it", () => {
+    show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'a', 't']));
+    expect(q('.sound-detail').textContent).toContain('e as in "bed"');
+    expect(q('.sound-detail .detail-tip')).toBeNull();
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    expect(q('.sound-detail .detail-tip').textContent).toContain('back of your tongue');
+  });
+
+  it("doesn't give one sound the advice meant for another spelled the same", () => {
+    // The first a said as e (only says what was heard), the last as "uh" (advice on opening up).
+    show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'ə', 't']));
+    expect(q('.ribbon-mark.selected .mark-heard').textContent).toBe('ɛ');
+    expect(q('.sound-detail .detail-tip')).toBeNull();
+    all('.ribbon-mark')[5].click();
+    expect(q('.sound-detail .detail-tip').textContent).toContain('Open your mouth wide');
   });
 
   it('only shows a tip on the sound that needs it, not on every sound spelled the same', () => {
