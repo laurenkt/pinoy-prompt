@@ -3,16 +3,27 @@
 // stops by itself shortly after the learner stops speaking.
 
 import { SAMPLE_RATE } from './fbank';
-import { getMicrophone, releaseMicrophone } from './microphone';
+import { getMicrophone, dropMicrophone, releaseMicrophone } from './microphone';
 
 /** Level (RMS, 0–1) above which a block counts as speech. */
 const SPEECH_LEVEL = 0.02;
 /** Stop this long after speech ends. */
 const TRAILING_SILENCE_MS = 900;
-/** Never record longer than this. */
+/** Never record longer than this, counted from when the microphone gave sound (it may be reopened first: SIGNAL_WAIT_MS). */
 export const MAX_RECORDING_MS = 7000;
+/**
+ * A working microphone never gives exact silence: there's always some hiss. iOS can hand back a stream
+ * that looks live but gives only zeros (after the audio session changed under it, or an interruption),
+ * or a context that never starts, so no audio comes at all. If nothing above this level has come this
+ * long after the microphone opened, it's opened afresh, once; if that gives nothing either, the take
+ * fails as 'silent' rather than passing for a learner who said nothing.
+ */
+export const SIGNAL_LEVEL = 1e-6;
+export const SIGNAL_WAIT_MS = 1200;
+/** Exact silence for this long before the learner stops counts as a dead microphone too; any less is too soon to tell. */
+const DEAD_AFTER_MS = 500;
 
-export type RecordProblem = 'denied' | 'no-mic' | 'unsupported';
+export type RecordProblem = 'denied' | 'no-mic' | 'unsupported' | 'silent';
 
 export class RecordError extends Error {
   constructor(readonly problem: RecordProblem) {
@@ -25,6 +36,8 @@ export interface RecorderEvents {
   onLevel?: (level: number) => void;
   /** Called once when speech is first detected. */
   onSpeech?: () => void;
+  /** The microphone gave no sound and has been opened afresh, so anything said so far wasn't heard. */
+  onRestart?: () => void;
 }
 
 export interface Take {
@@ -79,7 +92,7 @@ export function resample(input: Float32Array, fromRate: number): Float32Array {
 }
 
 /** Start recording. Asks for the microphone if it hasn't been allowed yet. */
-export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
+export function record({ onLevel, onSpeech, onRestart }: RecorderEvents = {}): Recording {
   let finish: () => void = () => {};
   let cancelled = false;
   // stop() can come before the microphone is open (e.g. during the permission prompt).
@@ -90,36 +103,56 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
   void context?.resume().catch(() => {});
   const audio = (async () => {
     if (!context) throw new RecordError('unsupported');
+    const problem = (err: unknown) => {
+      const name = err instanceof DOMException ? err.name : '';
+      return new RecordError(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic');
+    };
     let stream: MediaStream;
     try {
       stream = await getMicrophone();
     } catch (err) {
       void context.close().catch(() => {});
-      const name = err instanceof DOMException ? err.name : '';
-      throw new RecordError(name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic');
+      throw problem(err);
     }
     // iOS can also leave it 'interrupted' as the microphone takes over the audio session.
     if (context.state !== 'running') await context.resume().catch(() => {});
-    const source = context.createMediaStreamSource(stream);
+    let source = context.createMediaStreamSource(stream);
     // ScriptProcessor is deprecated but works everywhere, including iOS, without a separate worklet file.
     const processor = context.createScriptProcessor(4096, 1, 1);
-    const chunks: Float32Array[] = [];
+    let chunks: Float32Array[] = [];
     let heardSpeech = false;
     let silentMs = 0;
     let elapsedMs = 0;
+    /** Whether the microphone has given anything but exact silence (SIGNAL_LEVEL). */
+    let signal = false;
+    /** When the current stream was wired up, by Date.now(); a context that never starts gives no blocks to count. */
+    let listeningSince = Date.now();
 
-    return new Promise<Take>((resolve) => {
+    return new Promise<Take>((resolve, reject) => {
       let done = false;
+      let limit: ReturnType<typeof setTimeout> | undefined;
+      let watchdog: ReturnType<typeof setTimeout> | undefined;
       // The time limit runs on a timer too, in case the audio never starts flowing.
-      const limit = setTimeout(() => finish(), MAX_RECORDING_MS + 500);
-      finish = () => {
-        if (done) return;
+      const startLimit = () => {
+        clearTimeout(limit);
+        limit = setTimeout(() => finish(), MAX_RECORDING_MS + 500);
+      };
+      const end = () => {
         done = true;
         clearTimeout(limit);
+        clearTimeout(watchdog);
         processor.disconnect();
         source.disconnect();
-        releaseMicrophone(stream);
         void context.close().catch(() => {});
+      };
+      finish = () => {
+        if (done) return;
+        end();
+        // Stopped over a stream giving exact silence: it's dead, not a learner who said nothing.
+        const dead = !signal && !cancelled;
+        if (dead) dropMicrophone(stream);
+        else releaseMicrophone(stream);
+        if (dead && Date.now() - listeningSince >= DEAD_AFTER_MS) return reject(new RecordError('silent'));
         const total = chunks.reduce((n, c) => n + c.length, 0);
         const all = new Float32Array(total);
         let offset = 0;
@@ -129,12 +162,49 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
         }
         resolve(cancelled ? { samples: new Float32Array(0), speech: false } : { samples: resample(all, context.sampleRate), speech: heardSpeech });
       };
+      /** Nothing at all from the microphone yet: open it afresh once, then give up. */
+      const watch = (retried: boolean) => {
+        watchdog = setTimeout(async () => {
+          if (done || signal) return;
+          if (retried) {
+            end();
+            // The stream is no good, so the next take opens a new one rather than the same dead one.
+            dropMicrophone(stream);
+            return reject(new RecordError('silent'));
+          }
+          source.disconnect();
+          dropMicrophone(stream);
+          try {
+            stream = await getMicrophone();
+          } catch (err) {
+            if (done) return;
+            end();
+            return reject(problem(err));
+          }
+          if (done) return releaseMicrophone(stream);
+          if (context.state !== 'running') await context.resume().catch(() => {});
+          if (done) return;
+          // What came before was silence, so the learner gets the whole time from here.
+          chunks = [];
+          elapsedMs = 0;
+          startLimit();
+          source = context.createMediaStreamSource(stream);
+          source.connect(processor);
+          listeningSince = Date.now();
+          onRestart?.();
+          watch(true);
+        }, SIGNAL_WAIT_MS);
+      };
+      startLimit();
       if (cancelled || stopped) return finish();
       processor.onaudioprocess = (e) => {
         const block = new Float32Array(e.inputBuffer.getChannelData(0));
         chunks.push(block);
         let sum = 0;
-        for (const v of block) sum += v * v;
+        for (const v of block) {
+          sum += v * v;
+          if (!signal && Math.abs(v) > SIGNAL_LEVEL) signal = true;
+        }
         const level = Math.sqrt(sum / block.length);
         onLevel?.(Math.min(1, level * 8));
         const blockMs = (block.length / context.sampleRate) * 1000;
@@ -151,6 +221,7 @@ export function record({ onLevel, onSpeech }: RecorderEvents = {}): Recording {
       source.connect(processor);
       // Some browsers only run the processor while it's connected to an output.
       processor.connect(context.destination);
+      watch(false);
     });
   })();
   const recording: Recording = {

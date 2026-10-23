@@ -62,6 +62,7 @@ export const PROBLEMS: Record<Problem, string> = {
   unsupported: "This browser can't record from the microphone, so speaking questions are off here.",
   denied: 'The microphone is blocked. Allow it for this site in your browser settings, then try again.',
   'no-mic': "Couldn't use the microphone. Check that the device has one and no other app is using it.",
+  silent: "The microphone didn't pick up any sound, not even the room. Try again, and if it keeps happening, close the app and open it again.",
   download: "Couldn't download the pronunciation model. Check your connection and try again.",
   start: "Couldn't start the pronunciation model. Try again, or close the app and open it again.",
   failed: 'Something went wrong while checking your pronunciation. Try again.',
@@ -242,6 +243,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         state = { name: 'recording', speech: true };
         el.querySelector('.listen-status')!.textContent = 'Hearing you…';
         el.classList.replace('phase-mic-on', 'phase-sound');
+      },
+      onRestart: () => {
+        if (recording !== current || state.name !== 'recording' || state.speech) return;
+        el.querySelector('.listen-status')!.textContent = 'Mic restarted. Say it again.';
       },
     });
     recording = current;

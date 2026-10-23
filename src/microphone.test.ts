@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALLOW_KEPT_MS, closeMicrophone, endMicrophoneHold, getMicrophone, holdMicrophone, IDLE_CLOSE_MS, microphoneAllowed, releaseMicrophone } from './microphone';
+import { ALLOW_KEPT_MS, closeMicrophone, dropMicrophone, endMicrophoneHold, getMicrophone, holdMicrophone, IDLE_CLOSE_MS, microphoneAllowed, releaseMicrophone } from './microphone';
 
 function fakeStream() {
   const track = {
@@ -80,6 +80,26 @@ describe('shared microphone after an interruption', () => {
     (opened[0].track as { muted?: boolean }).muted = true;
     expect(await getMicrophone()).not.toBe(mic);
     expect(opened).toHaveLength(2);
+  });
+});
+
+describe('dropping a stream that gave no sound', () => {
+  it('closes it, so the next caller gets a fresh one, and keeps a screen\'s hold', async () => {
+    await holdMicrophone();
+    const dead = await getMicrophone();
+    dropMicrophone(dead);
+    expect(opened[0].track.readyState).toBe('ended');
+    const fresh = await getMicrophone();
+    expect(fresh).not.toBe(dead);
+    releaseMicrophone(fresh);
+    vi.advanceTimersByTime(IDLE_CLOSE_MS * 2);
+    expect(opened[1].track.readyState).toBe('live');
+  });
+
+  it('leaves it open while something else is using it', async () => {
+    const [a] = await Promise.all([getMicrophone(), getMicrophone()]);
+    dropMicrophone(a);
+    expect(opened[0].track.readyState).toBe('live');
   });
 });
 
