@@ -297,9 +297,22 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   // The sounds-like spelling gives the pronunciation away too, so it waits for a first attempt like the audio.
   const hint = () => judged && card.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), card.hint);
-  const micButton = (label: string, className = 'btn mic big') =>
+  const micButton = (label: string, className: string) =>
     h('button', { class: className, 'data-autofocus': true, 'data-no-tap': true, onclick: () => void startRecording() }, icon('mic'), ' ', label);
   const skip = (label = 'Skip') => h('button', { class: 'btn secondary', onclick: options.onNext }, label);
+
+  function listening(status: string, button: HTMLElement): HTMLElement[] {
+    return [
+      h(
+        'div',
+        { class: 'speak-cue' },
+        hint(),
+        h('div', { class: 'meter', 'aria-hidden': 'true' }, [1, 2, 3, 4, 5].map(() => h('span', null))),
+        h('p', { class: 'listen-status center', role: 'status' }, status),
+      ),
+      button,
+    ];
+  }
 
   function view(): HTMLElement[] {
     switch (state.name) {
@@ -333,17 +346,18 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           h('div', { class: 'bar download-bar', role: 'progressbar', 'aria-label': 'Download progress' }, h('div', { class: 'bar-fill', style: { width: `${Math.round(state.progress * 100)}%` } })),
           h('p', { class: 'listen-status center', role: 'status' }, loadingText(state.progress)),
         ];
+      // Ready, listening and checking share one layout: one big button in the middle of the space below the prompt,
+      // where a thumb rests, to start and then stop in the same place, with what the microphone hears above it
+      // (see .speak.listening in style.css). The meter and status keep their room while ready, so nothing moves.
       case 'ready':
-        return [hint(), micButton('Tap and speak')].filter(Boolean) as HTMLElement[];
+        return listening('', micButton('Tap and speak', 'btn mic huge'));
       case 'recording':
-        return [
-          hint(),
-          h('div', { class: 'meter', 'aria-hidden': 'true' }, [1, 2, 3, 4, 5].map(() => h('span', null))),
-          h('p', { class: 'listen-status center', role: 'status' }, state.speech ? 'Hearing you…' : 'Mic on. Say it now.'),
-          h('button', { class: 'btn mic big done', 'data-autofocus': true, 'data-no-tap': true, onclick: () => recording?.stop() }, "I'm done"),
-        ].filter(Boolean) as HTMLElement[];
+        return listening(
+          state.speech ? 'Hearing you…' : 'Mic on. Say it now.',
+          h('button', { class: 'btn mic huge done', 'data-autofocus': true, 'data-no-tap': true, onclick: () => recording?.stop() }, "I'm done"),
+        );
       case 'analysing':
-        return [h('p', { class: 'listen-status center', role: 'status' }, 'Checking your sounds…')];
+        return listening('Checking your sounds…', h('button', { class: 'btn mic huge done', disabled: true }, "I'm done"));
       case 'problem':
         return [
           h(
@@ -451,7 +465,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     const phase = state.name === 'recording' ? (state.speech ? 'phase-sound' : 'phase-mic-on') : '';
     const children = view();
     // With a breakdown on screen, the card above gives way to it (see .result-card).
-    el.className = `speak ${state.name} ${phase}${breakdown ? ' has-breakdown' : ''}`.trim();
+    const listens = state.name === 'ready' || state.name === 'recording' || state.name === 'analysing';
+    el.className = `speak ${state.name} ${phase}${listens ? ' listening' : ''}${breakdown ? ' has-breakdown' : ''}`.trim();
     el.replaceChildren(...children);
     if (takeFocus) el.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
   }
