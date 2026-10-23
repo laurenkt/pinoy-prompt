@@ -2,9 +2,9 @@
 // ribbon with each sound marked on it (the sound aimed for above, what was
 // heard below; tap one to open it), and for the chosen sound a map of where
 // it's made in the mouth, with what the learner said and the target. Holding
-// the slider under the map plays either, made in code rather than cut from the
-// recording, and sliding moves from one to the other, the mark on the map
-// following.
+// the slider under the map plays one or the other, made in code rather than cut
+// from the recording: what was said to the left of the middle, what to aim for
+// to the right, louder the further the finger goes.
 
 import type { Tip } from '../coach';
 import type { Comparison, SoundResult, SoundVerdict } from '../phonetics';
@@ -261,8 +261,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   };
 
   /**
-   * How the open sound is heard: a slider from what was said to what to aim for when they differ and both can be
-   * made, held to hear and slid to move between them; otherwise a button held to hear the one sound there is.
+   * How the open sound is heard: when what was said and what to aim for differ and both can be made, a slider held
+   * either side of its middle to hear one or the other; otherwise a button held to hear the one sound there is.
    */
   function listener(heard: string | null, ipa: string | null, drawn: Chart): HTMLElement | null {
     const from = heard && canSynthesize(heard) ? heard : null;
@@ -275,7 +275,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   function holdButton(sound: string): HTMLElement {
     const press = () => {
       letGo();
-      holding = player.hold(sound, sound, 0);
+      holding = player.hold(sound, BUTTON_VOLUME);
       button.classList.toggle('holding', holding !== null);
     };
     const lift = () => {
@@ -310,7 +310,12 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   }
 
   function slider(from: string, to: string, drawn: Chart): HTMLElement {
-    let mix = 0;
+    /** Where the thumb is, 0 (far left) to 1 (far right); it rests in the middle, where nothing plays. */
+    let at = 0.5;
+    /** The sound held now, even while silent in the middle: what was said, what to aim for, or neither. */
+    let playing: 'heard' | 'target' | null = null;
+    /** Whether space or enter is down. */
+    let keyed = false;
     const thumb = h('span', { class: 'slider-thumb' }, icon('speaker'));
     const track = h(
       'div',
@@ -318,83 +323,107 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
         class: 'sound-slider',
         role: 'slider',
         tabindex: '0',
-        'aria-label': 'Hold to hear. Slide from what you said to what to aim for',
-        'aria-valuemin': '0',
+        'aria-label': 'Hold to hear. Left for what you said, right for what to aim for, louder further out',
+        'aria-valuemin': '-100',
         'aria-valuemax': '100',
       },
       h('span', { class: 'slider-cap cap-heard', lang: 'und-fonipa', 'aria-hidden': 'true' }, from),
-      h('span', { class: 'slider-rail', 'aria-hidden': 'true' }, h('span', { class: 'slider-hint' }, 'Hold and slide'), thumb),
+      h(
+        'span',
+        { class: 'slider-rail', 'aria-hidden': 'true' },
+        h('span', { class: 'slider-ramp ramp-heard' }),
+        h('span', { class: 'slider-ramp ramp-target' }),
+        thumb,
+      ),
       h('span', { class: 'slider-cap cap-target', lang: 'und-fonipa', 'aria-hidden': 'true' }, to),
     );
-    const show = () => {
-      track.style.setProperty('--mix', String(mix));
-      track.setAttribute('aria-valuenow', String(Math.round(mix * 100)));
-      track.setAttribute('aria-valuetext', mix === 0 ? `What you said, ${from}` : mix === 1 ? `What to aim for, ${to}` : `${Math.round(mix * 100)}% of the way to ${to}`);
-      drawn.setMix(mix);
+    const marks = { heard: drawn.heard, target: drawn.target };
+    const show = (down: boolean) => {
+      const side = sideOf(at);
+      track.style.setProperty('--at', String(at));
+      track.style.setProperty('--reach', String(Math.abs(at - 0.5) * 2));
+      track.dataset.side = side ?? '';
+      track.classList.toggle('holding', down);
+      for (const key of ['heard', 'target'] as const) marks[key]?.classList.toggle('speaking', down && side === key);
+      track.setAttribute('aria-valuenow', String(Math.round((at - 0.5) * 200)));
+      track.setAttribute(
+        'aria-valuetext',
+        side === null ? 'Silent' : `${side === 'heard' ? `What you said, ${from}` : `What to aim for, ${to}`}, ${Math.round(loudness(at) * 100)}% loud`,
+      );
     };
-    const moveTo = (next: number) => {
-      mix = next;
-      holding?.setMix(mix);
-      show();
+    /**
+     * Play the side the thumb is on at its loudness while `down`, or let go. A sound starts only on reaching a side
+     * other than the one held: in the middle it's held silent, so wavering there doesn't restart it, and only
+     * lifting lets it go, which on iOS is what can start audio (see Player.hold).
+     */
+    const sound = (down: boolean) => {
+      const side = down ? sideOf(at) : null;
+      if (!down) {
+        letGo();
+        playing = null;
+      } else if (side && side !== playing) {
+        // Holding another stops this one.
+        holding = player.hold(side === 'heard' ? from : to, loudness(at));
+        playing = side;
+      } else {
+        holding?.setVolume(side ? loudness(at) : 0);
+      }
+      show(down);
     };
-    const press = () => {
-      letGo();
-      holding = player.hold(from, to, mix);
-      track.classList.add('holding');
-      drawn.heard?.classList.add('speaking');
-    };
-    const lift = () => {
-      letGo();
-      track.classList.remove('holding');
-      drawn.heard?.classList.remove('speaking');
-    };
-    /** Where a finger is along the rail, 0–1, snapping to either end near it. */
-    const mixAt = (x: number) => {
+    /** Where a finger is along the rail, 0–1. */
+    const atX = (x: number) => {
       const rail = track.querySelector('.slider-rail')!.getBoundingClientRect();
       const inner = rail.width - thumb.offsetWidth;
-      const t = inner > 0 ? (x - rail.left - thumb.offsetWidth / 2) / inner : 0;
-      return t < SNAP ? 0 : t > 1 - SNAP ? 1 : t;
+      const t = inner > 0 ? (x - rail.left - thumb.offsetWidth / 2) / inner : 0.5;
+      return Math.min(1, Math.max(0, t));
     };
     let finger: number | null = null;
     track.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       finger = e.pointerId;
       track.setPointerCapture?.(e.pointerId);
-      mix = mixAt(e.clientX);
-      show();
-      press();
+      at = atX(e.clientX);
+      sound(true);
     });
     track.addEventListener('pointermove', (e) => {
-      if (e.pointerId === finger) moveTo(mixAt(e.clientX));
+      if (e.pointerId !== finger) return;
+      at = atX(e.clientX);
+      sound(true);
     });
     const up = (e: PointerEvent) => {
       if (e.pointerId !== finger) return;
       finger = null;
-      lift();
+      // Back to the middle, ready for the next press.
+      at = 0.5;
+      sound(false);
     };
     track.addEventListener('pointerup', up);
     track.addEventListener('pointercancel', up);
     track.addEventListener('contextmenu', (e) => e.preventDefault());
+    // From the keyboard the thumb stays where it's put: a step plays there as a tap, and space or enter holds it.
     track.addEventListener('keydown', (e) => {
       const step = ({ ArrowLeft: -0.1, ArrowDown: -0.1, ArrowRight: 0.1, ArrowUp: 0.1, Home: -1, End: 1 } as Record<string, number>)[e.key];
       if (step !== undefined) {
         e.preventDefault();
-        moveTo(Math.min(1, Math.max(0, Math.round((mix + step) * 10) / 10)));
-        // Not held: a step plays where it landed, as a tap.
-        if (!holding) {
-          press();
-          lift();
-        }
+        at = Math.min(1, Math.max(0, Math.round((at + step) * 10) / 10));
+        sound(true);
+        if (!keyed && finger === null) sound(false);
       } else if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) {
         e.preventDefault();
-        press();
+        keyed = true;
+        sound(true);
       }
     });
     track.addEventListener('keyup', (e) => {
-      if (e.key === ' ' || e.key === 'Enter') lift();
+      if (e.key !== ' ' && e.key !== 'Enter') return;
+      keyed = false;
+      sound(false);
     });
-    track.addEventListener('blur', lift);
-    show();
+    track.addEventListener('blur', () => {
+      keyed = false;
+      sound(false);
+    });
+    show(false);
     return track;
   }
 
@@ -421,15 +450,33 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 
 // --- Charts -------------------------------------------------------------------
 
-/** How close to either end of the slider counts as that end, as a share of its length. */
-const SNAP = 0.06;
+/** How far either side of the slider's middle is silent, as a share of its length. */
+const MIDDLE = 0.06;
+/** How close to either end of the slider is as loud as it goes, as a share of its length. */
+const END = 0.04;
+/** The quietest a sound plays, just out of the middle, of its full loudness. */
+const QUIETEST = 0.06;
+/** How loud the one-sound button plays: it has no slider to turn it up or down. */
+export const BUTTON_VOLUME = 0.4;
+
+/** Which sound the slider plays at `at` (0–1): what was said to the left of the middle, what to aim for to the right. */
+function sideOf(at: number): 'heard' | 'target' | null {
+  return at < 0.5 - MIDDLE ? 'heard' : at > 0.5 + MIDDLE ? 'target' : null;
+}
+
+/** How loud the slider plays at `at`, 0–1: quiet just out of the middle, rising to full at either end. */
+export function loudness(at: number): number {
+  const reach = Math.min(1, Math.max(0, (Math.abs(at - 0.5) - MIDDLE) / (0.5 - MIDDLE - END)));
+  // Squared, as loudness is heard: an even slide sounds like an even rise.
+  return sideOf(at) ? QUIETEST + (1 - QUIETEST) * reach * reach : 0;
+}
 
 interface Chart {
   el: SVGSVGElement;
   /** The mark for what was heard, if it's on this chart. */
   heard: SVGGElement | null;
-  /** Put the heard mark `mix` of the way to the target (0 is where it was heard). */
-  setMix(mix: number): void;
+  /** The mark for the target, if there is one. */
+  target: SVGGElement | null;
 }
 
 const W = 300;
@@ -508,29 +555,15 @@ function drawChart(target: string | null, heard: string | null): Chart {
   if (goal && from && (from.x !== goal.x || from.y !== goal.y)) {
     root.append(svg('line', { x1: from.x, y1: from.y, x2: goal.x, y2: goal.y, class: 'chart-arrow' }));
   }
+  let targetMark: SVGGElement | null = null;
   if (goal) {
-    root.append(
-      svg('g', { class: 'chart-target', transform: `translate(${goal.x} ${goal.y})` }, svg('circle', { r: 15 }), svg('text', { 'text-anchor': 'middle', y: 5 }, target!)),
-    );
+    targetMark = svg('g', { class: 'chart-target', transform: `translate(${goal.x} ${goal.y})` }, svg('circle', { r: 15 }), svg('text', { 'text-anchor': 'middle', y: 5 }, target!));
+    root.append(targetMark);
   }
   let heardMark: SVGGElement | null = null;
   if (from && heard) {
     heardMark = svg('g', { class: 'chart-heard', transform: `translate(${from.x} ${from.y})` }, svg('circle', { r: 12 }), svg('text', { 'text-anchor': 'middle', y: 4 }, heard));
-    // CSS transform too, so moving it can animate.
-    heardMark.style.transform = `translate(${from.x}px, ${from.y}px)`;
     root.append(heardMark);
   }
-  const start = from;
-  return {
-    el: root,
-    heard: heardMark,
-    setMix(mix) {
-      if (!heardMark || !start || !goal) return;
-      const x = start.x + (goal.x - start.x) * mix;
-      const y = start.y + (goal.y - start.y) * mix;
-      heardMark.setAttribute('transform', `translate(${x} ${y})`);
-      heardMark.style.transform = `translate(${x}px, ${y}px)`;
-      heardMark.classList.toggle('arrived', mix > 0.9);
-    },
-  };
+  return { el: root, heard: heardMark, target: targetMark };
 }

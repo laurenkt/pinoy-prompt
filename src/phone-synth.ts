@@ -1,23 +1,20 @@
 // Single sounds made in code, for the pronunciation results: what the learner
-// said and what to aim for, held as long as a finger is down, and anywhere in
-// between. A recording of one sound can't be held or blended into another, so
-// they're synthesized: a buzzing voice shaped by the mouth's resonances
+// said and what to aim for, held as long as a finger is down. A recording of
+// one sound can't be held, so they're synthesized: a buzzing voice shaped by the mouth's resonances
 // (formants), and hiss for the noisy sounds.
 //
 // Vowels and hissing sounds (s, sh) carry on for as long as they're held.
 // Other consonants can't be held on their own, so they repeat with "a" after
-// them, as "ma-ma-ma", like the syllables they're taught with. Between two
-// sounds, every setting is blended, so sliding from e to a moves the tongue
-// down, and from s to sh moves the hiss back. Where a sound sits comes from
-// its place on the mouth charts (src/sound-map.ts), so the sound and the chart
-// agree on how far apart two sounds are.
+// them, as "ma-ma-ma", like the syllables they're taught with. Where a sound
+// sits comes from its place on the mouth charts (src/sound-map.ts), so the
+// sound and the chart agree on how far apart two sounds are.
 
 import { baseSound } from './phonetics';
 import { placeOf } from './sound-map';
 
 type Formants = [number, number, number];
 
-/** Everything that makes one sound, as numbers, so two sounds can be blended. */
+/** Everything that makes one sound, as numbers. */
 export interface Spec {
   /** The vowel, or for a consonant the "a" after it. */
   vowel: Formants;
@@ -158,28 +155,11 @@ export function canSynthesize(ipa: string): boolean {
 const holdsAsHiss = (s: Spec) => s.hiss > 0 && s.hissDur > 0.1;
 const isVowel = (ipa: string) => placeOf(plain(ipa)).chart === 'vowel';
 
-/** How a pair is played: held if both can be, otherwise both as repeated syllables. */
-export function modeOf(from: string, to: string): Mode {
-  if (isVowel(from) && isVowel(to)) return 'vowel';
-  const a = specFor(from);
-  const b = specFor(to);
-  if (a && b && holdsAsHiss(a) && holdsAsHiss(b)) return 'hiss';
-  return 'syllable';
-}
-
-const mixF = (a: Formants, b: Formants, t: number): Formants => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t) as Formants;
-
-/** The settings `mix` of the way from one sound to another. */
-export function blend(a: Spec, b: Spec, mix: number): Spec {
-  const t = Math.min(1, Math.max(0, mix));
-  const out = { ...a };
-  for (const key of Object.keys(a) as (keyof Spec)[]) {
-    const x = a[key];
-    const y = b[key];
-    if (Array.isArray(x)) (out[key] as Formants) = mixF(x, y as Formants, t);
-    else (out[key] as number) = x + ((y as number) - x) * t;
-  }
-  return out;
+/** How a sound is played: held if it can be, otherwise as a repeated syllable. */
+export function modeOf(ipa: string): Mode {
+  if (isVowel(ipa)) return 'vowel';
+  const s = specFor(ipa);
+  return s && holdsAsHiss(s) ? 'hiss' : 'syllable';
 }
 
 /** One repeat of a syllable, in seconds. */
@@ -220,8 +200,6 @@ function madeFor(ctx: BaseAudioContext) {
 export interface Voice {
   /** Connect this to be heard. */
   out: AudioNode;
-  /** Move between the two sounds. Vowels and hiss follow at once; a syllable changes at its next repeat. */
-  setMix(mix: number): void;
   /** Lay down the sound up to this context time; call it often while held, a little ahead. */
   scheduleUntil(time: number): void;
   /** Stop everything at this context time. */
@@ -236,20 +214,16 @@ const HISS = 0.9;
 const BANDWIDTHS = [80, 100, 150];
 /** A resonance's peak for a low-pass filter, whose Q is in decibels. */
 const qOf = (frequency: number, bandwidth: number) => 20 * Math.log10(Math.max(1, frequency / bandwidth));
-/** How quickly a held vowel or hiss follows the slider, in seconds (time constant). */
-const FOLLOW = 0.03;
 
 /**
- * A voice saying one sound, or a blend of two (`mix` 0 is `from`, 1 is `to`), from `start` until ended.
+ * A voice saying one sound, from `start` until ended.
  * Built on whatever context it's given: the shared one to play, an offline one to render.
  */
-export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix: number, start: number): Voice | null {
-  const a = specFor(from);
-  const b = specFor(to);
-  if (!a || !b) return null;
-  const mode = modeOf(from, to);
-  let current = mix;
-  const spec = () => blend(a, b, current);
+export function phoneVoice(ctx: BaseAudioContext, ipa: string, start: number): Voice | null {
+  const found = specFor(ipa);
+  if (!found) return null;
+  const spec: Spec = found;
+  const mode = modeOf(ipa);
 
   const out = ctx.createGain();
   out.gain.value = 0.25;
@@ -351,26 +325,26 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
     });
 
   /** The hiss's own settings, held. */
-  const holdHiss = (s: Spec, at: number, follow: number) => {
-    hissFilter.frequency.setTargetAtTime(s.hissF, at, follow);
-    hissFilter.Q.setTargetAtTime(s.hissQ, at, follow);
-    hissAmp.gain.setTargetAtTime(s.hiss * HISS, at, follow);
-    voiceAmp.gain.setTargetAtTime(s.hissVoice * 0.35, at, follow);
+  const holdHiss = (s: Spec, at: number) => {
+    hissFilter.frequency.setTargetAtTime(s.hissF, at, 0.005);
+    hissFilter.Q.setTargetAtTime(s.hissQ, at, 0.005);
+    hissAmp.gain.setTargetAtTime(s.hiss * HISS, at, 0.005);
+    voiceAmp.gain.setTargetAtTime(s.hissVoice * 0.35, at, 0.005);
   };
 
-  // A held vowel or hiss is set up once and follows the slider; a syllable is laid down repeat by repeat.
+  // A held vowel or hiss is set up once; a syllable is laid down repeat by repeat.
   let next = start;
   if (mode === 'vowel') {
-    setFormants(spec().vowel, start);
+    setFormants(spec.vowel, start);
     voiceAmp.gain.setValueAtTime(0, start);
     voiceAmp.gain.linearRampToValueAtTime(1, start + 0.03);
   } else if (mode === 'hiss') {
     setFormants([250, 1500, 2500], start);
-    holdHiss(spec(), start, 0.005);
+    holdHiss(spec, start);
   }
 
   function syllable(t: number): number {
-    const s = spec();
+    const s = spec;
     const release = t + s.close;
     const hissEnd = release + s.hissDur;
     const voicing = hissEnd + s.breathDur;
@@ -435,12 +409,6 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
 
   return {
     out,
-    setMix(mix) {
-      current = Math.min(1, Math.max(0, mix));
-      const now = Math.max(ctx.currentTime, start);
-      if (mode === 'vowel') setFormants(spec().vowel, now, FOLLOW);
-      else if (mode === 'hiss') holdHiss(spec(), now, FOLLOW);
-    },
     scheduleUntil(time) {
       if (mode !== 'syllable') return;
       while (next < time) next = syllable(next);

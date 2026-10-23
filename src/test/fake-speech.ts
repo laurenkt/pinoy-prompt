@@ -17,22 +17,22 @@ export function fakeRecognition(sounds: string[]): Recognition {
 
 /** A player that remembers what it was asked to play and finishes straight away. */
 export class FakePlayer implements Player {
-  calls: ({ kind: 'slice'; from: number; to: number } | { kind: 'hold'; from: string; to: string; mix: number })[] = [];
+  calls: ({ kind: 'slice'; from: number; to: number } | { kind: 'hold'; sound: string; volume: number })[] = [];
   stopped = 0;
-  /** The sound being held, if any: where it has been moved to, and whether it was let go. */
-  held: { mixes: number[]; released: boolean } | null = null;
+  /** The sound being held, if any: the volumes it has been set to, and whether it was let go. */
+  held: { volumes: number[]; released: boolean } | null = null;
   playSlice(_samples: Float32Array, _rate: number, from: number, to: number) {
     this.calls.push({ kind: 'slice', from, to });
     return { done: Promise.resolve() };
   }
-  hold(from: string, to: string, mix: number): Held | null {
-    if (!canSynthesize(from) || !canSynthesize(to)) return null;
-    this.calls.push({ kind: 'hold', from, to, mix });
-    const held = { mixes: [mix], released: false };
+  hold(sound: string, volume: number): Held | null {
+    if (!canSynthesize(sound)) return null;
+    this.calls.push({ kind: 'hold', sound, volume });
+    const held = { volumes: [volume], released: false };
     this.held = held;
     return {
       done: Promise.resolve(),
-      setMix: (m) => held.mixes.push(m),
+      setVolume: (v) => held.volumes.push(v),
       release: () => (held.released = true),
     };
   }
