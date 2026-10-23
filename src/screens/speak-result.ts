@@ -43,7 +43,7 @@ const VERDICT_LABEL: Record<SoundVerdict, string> = { good: 'Spot on', close: 'N
 const RANK: Record<SoundVerdict, number> = { good: 0, close: 1, off: 2, missing: 2 };
 
 /** The card's text split into runs of letters, each marked with how it was said. */
-export function markLetters(text: string, comparison: Comparison): { text: string; verdict: SoundVerdict | null }[] {
+function markLetters(text: string, comparison: Comparison): { text: string; verdict: SoundVerdict | null }[] {
   const marks: (SoundVerdict | null)[] = Array.from(text, () => null);
   for (const s of comparison.sounds) {
     if (s.phone.optional) continue;
@@ -59,6 +59,27 @@ export function markLetters(text: string, comparison: Comparison): { text: strin
     else runs.push({ text: ch, verdict: marks[i] });
   });
   return runs;
+}
+
+/** The card's text, each letter coloured by how its sound came out, and the letters one by one. */
+export function colouredWord(text: string, comparison: Comparison, attrs: Record<string, string> = {}): { el: HTMLElement; letters: HTMLElement[] } {
+  const letters: HTMLElement[] = [];
+  const el = h(
+    'p',
+    { ...attrs, class: ['letters', text.length > 16 && 'long', attrs.class].filter(Boolean).join(' '), lang: 'fil' },
+    markLetters(text, comparison).map((run) =>
+      h(
+        'span',
+        { class: run.verdict ? `sound-${run.verdict}` : '' },
+        Array.from(run.text, (ch) => {
+          const letter = h('span', null, ch);
+          letters.push(letter);
+          return letter;
+        }),
+      ),
+    ),
+  );
+  return { el, letters };
 }
 
 /** The stretch of the recording that holds heard sound i: halfway to its neighbours, at least 120 ms. */
@@ -208,8 +229,19 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   // the part of the recording to hear can be found by its letters rather than
   // by its marks on the ribbon; a tap opens the sound under it.
   const chars = Array.from(attempt.text);
-  /** The mark each letter belongs to, or -1 (a space, a hyphen, a sound left out). */
-  const own = chars.map((_, i) => list.findIndex((p) => p.result !== undefined && p.result.phone.from <= i && i < p.result.phone.to));
+  /** Whether mark k's sound is spelled by letter i. */
+  const covers = (k: number, i: number) => {
+    const phone = list[k]?.result?.phone;
+    return phone !== undefined && phone.from <= i && i < phone.to;
+  };
+  /**
+   * The mark each letter belongs to, or -1 (a space, a hyphen, a sound left out). A letter can spell two sounds (a
+   * glottal catch before its vowel): it belongs to the one that isn't optional, so the vowel can be reached.
+   */
+  const own = chars.map((_, i) => {
+    const found = list.map((_, k) => k).filter((k) => covers(k, i));
+    return found.find((k) => !list[k].result!.phone.optional) ?? found[0] ?? -1;
+  });
   /** The mark letter i opens: its own, or the nearest letter's that has one. */
   const markAt = (i: number) => {
     for (let d = 0; i >= 0 && d < chars.length; d++) {
@@ -218,36 +250,21 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     }
     return -1;
   };
-  const letterEls: HTMLElement[] = [];
-  const word = h(
-    'p',
-    {
-      class: `letters word-scrub${attempt.text.length > 16 ? ' long' : ''}`,
-      lang: 'fil',
-      role: 'slider',
-      tabindex: '0',
-      'aria-label': 'The word. Drag along it to choose a sound',
-      'aria-valuemin': '1',
-      'aria-valuemax': String(list.length),
-    },
-    markLetters(attempt.text, attempt.comparison).map((run) =>
-      h(
-        'span',
-        { class: run.verdict ? `sound-${run.verdict}` : '' },
-        Array.from(run.text, (ch) => {
-          const el = h('span', null, ch);
-          letterEls.push(el);
-          return el;
-        }),
-      ),
-    ),
-  );
+  const { el: word, letters: letterEls } = colouredWord(attempt.text, attempt.comparison, {
+    class: 'word-scrub',
+    role: 'slider',
+    tabindex: '0',
+    'aria-label': 'The word. Drag along it to choose a sound',
+    'aria-valuemin': '1',
+    'aria-valuemax': String(list.length),
+  });
+  /** Where each letter sat as the drag began: read once, as opening a sound redraws the detail below. */
+  let boxes: DOMRect[] = [];
   /** The letter nearest a point: on its line first, then along it. */
   const letterAt = (x: number, y: number) => {
     let best = -1;
     let far = Infinity;
-    letterEls.forEach((el, i) => {
-      const r = el.getBoundingClientRect();
+    boxes.forEach((r, i) => {
       const d = Math.max(r.top - y, 0, y - r.bottom) * 1000 + Math.max(r.left - x, 0, x - r.right);
       if (d < far) [best, far] = [i, d];
     });
@@ -265,12 +282,15 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   const detent = detents();
   let touch: { x: number; y: number; scrub: boolean } | null = null;
   word.addEventListener('pointerdown', (e) => {
+    // One finger scrubs; a second, or a mouse's other buttons, are left alone.
+    if (!e.isPrimary || e.button > 0) return;
+    boxes = letterEls.map((el) => el.getBoundingClientRect());
     touch = { x: e.clientX, y: e.clientY, scrub: false };
     // So a mouse dragged off the word keeps scrubbing.
     word.setPointerCapture?.(e.pointerId);
   });
   word.addEventListener('pointermove', (e) => {
-    if (!touch) return;
+    if (!touch || !e.isPrimary) return;
     const dx = Math.abs(e.clientX - touch.x);
     const dy = Math.abs(e.clientY - touch.y);
     if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
@@ -281,6 +301,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     }
   });
   word.addEventListener('pointerup', (e) => {
+    if (!e.isPrimary) return;
     if (touch && !touch.scrub) {
       pick(e);
       tick('click');
@@ -288,7 +309,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     touch = null;
     detent(null);
   });
-  word.addEventListener('pointercancel', () => {
+  word.addEventListener('pointercancel', (e) => {
+    if (!e.isPrimary) return;
     touch = null;
     detent(null);
   });
@@ -310,7 +332,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       m.classList.toggle('selected', i === index);
       m.setAttribute('aria-pressed', String(i === index));
     });
-    letterEls.forEach((el, i) => el.classList.toggle('on', own[i] === index));
+    letterEls.forEach((el, i) => el.classList.toggle('on', covers(index, i)));
     word.setAttribute('aria-valuenow', String(index + 1));
     word.setAttribute('aria-valuetext', marks[index].getAttribute('aria-label')!);
     const p = list[index];

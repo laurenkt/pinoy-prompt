@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // The sound-by-sound breakdown: what opens when each part is tapped, and holding the slider either side of its middle to hear a sound.
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { coach } from '../coach';
 import { compare, toPhones } from '../phonetics';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
@@ -337,6 +337,7 @@ describe('the breakdown', () => {
 });
 
 describe('the word as a scrubber', () => {
+  afterEach(() => vi.unstubAllGlobals());
   /** Lays each letter of the word out 20px wide from x 0, as happy-dom lays nothing out. */
   function layOutWord(view: { word: HTMLElement }) {
     [...view.word.querySelectorAll<HTMLElement>('span > span')].forEach((el, i) => {
@@ -344,7 +345,7 @@ describe('the word as a scrubber', () => {
     });
   }
   const at = (view: { word: HTMLElement }, type: string, clientX: number, clientY = 15) =>
-    view.word.dispatchEvent(new PointerEvent(type, { clientX, clientY, pointerId: 1, pointerType: 'touch' }));
+    view.word.dispatchEvent(new PointerEvent(type, { clientX, clientY, pointerId: 1, isPrimary: true, pointerType: 'touch' }));
   const opened = () => q('.ribbon-mark.selected .mark-target').textContent;
   const underlined = () => all('.word-scrub .on').map((e) => e.textContent).join('');
 
@@ -385,7 +386,6 @@ describe('the word as a scrubber', () => {
     at(view, 'pointerup', 70);
     // From ng to a (past the second letter of ng, which doesn't tick), then to y.
     expect(vibrate).toHaveBeenCalledTimes(2);
-    vi.unstubAllGlobals();
   });
 
   it('opens the sound under a tap, and leaves a drag up or down to scroll the page', () => {
@@ -398,6 +398,31 @@ describe('the word as a scrubber', () => {
     at(view, 'pointermove', 27, 40);
     at(view, 'pointermove', 100, 40);
     at(view, 'pointerup', 100, 40);
+    expect(opened()).toBe('o');
+  });
+
+  it('opens the vowel, not the catch before it, from a letter that spells both', () => {
+    const view = show(attempt('ako', ['ʔ', 'a', 'k', 'o']));
+    layOutWord(view);
+    expect(all('.ribbon-mark .mark-target').map((e) => e.textContent)).toEqual(['ʔ', 'a', 'k', 'o']);
+    at(view, 'pointerdown', 5);
+    at(view, 'pointerup', 5);
+    expect(opened()).toBe('a');
+    expect(underlined()).toBe('a');
+    all('.ribbon-mark')[0].click();
+    expect(underlined()).toBe('a');
+  });
+
+  it('keeps scrubbing with the first finger when a second one lands', () => {
+    const view = show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutWord(view);
+    const second = (type: string, clientX: number) =>
+      view.word.dispatchEvent(new PointerEvent(type, { clientX, clientY: 15, pointerId: 2, isPrimary: false, pointerType: 'touch' }));
+    at(view, 'pointerdown', 5);
+    at(view, 'pointermove', 50);
+    second('pointerdown', 110);
+    second('pointerup', 110);
+    at(view, 'pointermove', 85);
     expect(opened()).toBe('o');
   });
 

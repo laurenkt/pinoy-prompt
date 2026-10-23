@@ -11,7 +11,7 @@ import { record, RecordError, recordingSupported, type RecordProblem, type Recor
 import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
 import { continueButton } from './auto-advance';
-import { markLetters, resultView as soundResults, type ResultView } from './speak-result';
+import { colouredWord, resultView as soundResults, type ResultView } from './speak-result';
 
 /** Download size shown to the learner before they agree to it. */
 const MODEL_MB = 71;
@@ -425,7 +425,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         actions(right),
       ];
     }
-    const lettersEl = heard.length > 0 && h('p', { class: `letters${text.length > 16 ? ' long' : ''}`, lang: 'fil' }, markLetters(text, comparison).map((run) => h('span', { class: run.verdict ? `sound-${run.verdict}` : '' }, run.text)));
+    const lettersEl = heard.length > 0 && colouredWord(text, comparison).el;
     return [
       h(
         'div',
