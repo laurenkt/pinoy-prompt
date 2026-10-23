@@ -482,3 +482,86 @@ describe('the word as a scrubber', () => {
     expect(view.word.getAttribute('aria-valuetext')).toContain('Aim for');
   });
 });
+
+describe('the recording as a scrubber', () => {
+  /**
+   * Lays each mark on the ribbon out from x 0, `wide` px wide or, for a sound nobody said, 26px centred on the end of
+   * the one before (as .mark-gap is, which can be wider than a short sound beside it).
+   */
+  function layOutMarks(wide = 40) {
+    let x = 0;
+    all('.ribbon-mark').forEach((el) => {
+      const gap = el.classList.contains('mark-gap');
+      const left = gap ? x - 13 : x;
+      const width = gap ? 26 : wide;
+      if (!gap) x += wide;
+      el.getBoundingClientRect = () => ({ left, right: left + width, width, top: 0, bottom: 60, height: 60, x: left, y: 0, toJSON() {} });
+    });
+  }
+  const at = (type: string, clientX: number, clientY = 30) =>
+    q('.ribbon').dispatchEvent(new PointerEvent(type, { clientX, clientY, pointerId: 1, isPrimary: true, pointerType: 'touch' }));
+  const opened = () => q('.ribbon-mark.selected .mark-target').textContent;
+
+  it('opens each sound in turn as a finger drags along the recording, and plays nothing', () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutMarks();
+    const seen: string[] = [];
+    at('pointerdown', 5);
+    for (const x of [20, 50, 90, 130, 170, 250]) {
+      at('pointermove', x);
+      if (opened() !== seen.at(-1)) seen.push(opened()!);
+    }
+    at('pointerup', 250);
+    expect(seen).toEqual(['ŋ', 'a', 'j', 'o', 'n']);
+    expect(player.calls).toEqual([]);
+  });
+
+  it("reaches a missing sound's slim mark, and leaves a drag up or down to scroll the page", () => {
+    // The l is missing: its mark sits over the end of the a before it.
+    show(attempt('salamat', ['s', 'a', 'a', 'm', 'a', 't']));
+    // Short sounds, narrower than the slot between the a's: 27–53px.
+    layOutMarks(20);
+    const gap = all('.ribbon-mark').findIndex((m) => m.classList.contains('mark-gap'));
+    expect(all('.ribbon-mark .mark-target')[gap].textContent).toBe('l');
+    at('pointerdown', 5);
+    at('pointermove', 35);
+    expect(opened()).toBe('l');
+    at('pointermove', 45);
+    expect(opened()).toBe('l');
+    at('pointermove', 55);
+    expect(opened()).toBe('a');
+    at('pointermove', 45);
+    at('pointerup', 75);
+    at('pointerdown', 150);
+    at('pointermove', 152, 80);
+    at('pointermove', 200, 80);
+    expect(opened()).toBe('l');
+  });
+
+  it('takes the pointer only once a drag begins, so a tap reaches the mark under it', () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutMarks();
+    const ribbon = q('.ribbon');
+    const capture = vi.fn();
+    ribbon.setPointerCapture = capture;
+    at('pointerdown', 5);
+    at('pointerup', 5);
+    expect(capture).not.toHaveBeenCalled();
+    at('pointerdown', 5);
+    at('pointermove', 50);
+    expect(capture).toHaveBeenCalledWith(1);
+  });
+
+  it("doesn't scrub for a mouse moved over it after letting go somewhere else", () => {
+    show(attempt('ngayon', ['n', 'a', 'j', 'o', 'n']));
+    layOutMarks();
+    const mouse = (type: string, clientX: number, buttons: number) =>
+      q('.ribbon').dispatchEvent(new PointerEvent(type, { clientX, clientY: 30, pointerId: 1, isPrimary: true, pointerType: 'mouse', buttons }));
+    const before = opened();
+    mouse('pointerdown', 5, 1);
+    // Let go off the ribbon, then back over it with nothing held.
+    mouse('pointermove', 100, 0);
+    mouse('pointermove', 170, 0);
+    expect(opened()).toBe(before);
+  });
+});

@@ -1,5 +1,6 @@
-// Audio for cards. Each text has a recorded clip, listed in clips.json (made
-// by scripts/generate-audio.mjs); it plays through the app's one AudioContext,
+// Audio for cards. Each text has a recorded clip in each of two voices, listed
+// in clips.json (made by scripts/generate-audio.mjs), and a word plays in one
+// picked at random. It plays through the app's one AudioContext,
 // which starts it at once. If a clip can't play, the browser's built-in speech
 // voice reads the Tagalog text instead.
 //
@@ -66,13 +67,20 @@ export function voiceQuality(): VoiceQuality {
   return lang.startsWith('fil') || lang.startsWith('tl') ? 'native' : 'approximate';
 }
 
-/** Clip files by the text they say: `<name>.mp3`, and `<name>-slow.mp3` said slowly. */
-const CLIPS: Record<string, string> = clips;
+/** Clip files by the text they say, one take per voice: `<name>.mp3`, and `<name>-slow.mp3` said slowly. */
+const CLIPS: Record<string, string[]> = clips;
 
-/** The clip for this text, if there is one. */
-export function clipUrl(card: Pick<Card, 'tl' | 'say'>, slow = false): string | null {
-  const name = CLIPS[card.say ?? card.tl];
-  return name ? clipFile(name, slow) : null;
+/** Which voice each text last played in, so its slow version is the same voice slowed down. */
+const lastVoice = new Map<string, number>();
+
+/** The clips for this text, one per voice. */
+function clipUrls(card: Pick<Card, 'tl' | 'say'>, slow = false): string[] {
+  return (CLIPS[card.say ?? card.tl] ?? []).map((name) => clipFile(name, slow));
+}
+
+/** The clip for this text in one voice (the first unless given), if there is one. */
+export function clipUrl(card: Pick<Card, 'tl' | 'say'>, slow = false, voice = 0): string | null {
+  return clipUrls(card, slow)[voice] ?? null;
 }
 
 function clipFile(name: string, slow: boolean): string {
@@ -81,13 +89,13 @@ function clipFile(name: string, slow: boolean): string {
 
 /** Every clip file, to keep offline. */
 export function allClipUrls(): string[] {
-  return Object.values(CLIPS).flatMap((name) => [clipFile(name, false), clipFile(name, true)]);
+  return Object.values(CLIPS).flatMap((names) => names.flatMap((name) => [clipFile(name, false), clipFile(name, true)]));
 }
 
-/** Load a word's clip ahead, so a tap only has to start it. Plays nothing. */
+/** Load a word's clips ahead, in every voice as either may play, so a tap only has to start one. Plays nothing. */
 export function preload(card: Pick<Card, 'tl' | 'say'>): void {
-  const url = !muted && clipsSupported() ? clipUrl(card) : null;
-  if (url) void loadClip(url).catch(() => {});
+  if (muted || !clipsSupported()) return;
+  for (const url of clipUrls(card)) void loadClip(url).catch(() => {});
 }
 
 let currentClip: Sound | null = null;
@@ -134,7 +142,13 @@ export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promis
 }
 
 async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: number, tapped: number, report: (ms: number | null) => void): Promise<void> {
-  const url = clipsSupported() ? clipUrl(card, slow) : null;
+  const text = card.say ?? card.tl;
+  const urls = clipsSupported() ? clipUrls(card, slow) : [];
+  // A new voice at random each time, except that a slow replay keeps the one just heard.
+  const last = lastVoice.get(text);
+  const take = slow && last !== undefined && last < urls.length ? last : Math.floor(Math.random() * urls.length);
+  if (urls.length) lastVoice.set(text, take);
+  const url = urls[take];
   if (url) {
     // Made or resumed now, inside the tap, as the clip may only be ready after it.
     audioContext();
@@ -331,6 +345,69 @@ export function detents(): (step: string | null) => void {
 export function readyDetents(): void {
   if (!tapSoundsCanPlay() || speaking()) return;
   audioContext(true);
+}
+
+export interface ScrubOptions {
+  /** Shows what's under the pointer, and says which step it is, for the ticks (null for none). */
+  pick(e: PointerEvent): string | null;
+  /** As a press begins, before anything is picked: a chance to read where things are. */
+  start?(e: PointerEvent): void;
+  /** A tap, which clicks like any press. Left out, a tap is left to the control under it (its click ticks itself). */
+  tap?(e: PointerEvent): void;
+  /** Mice left to the caller (the memory chart looks by hovering). */
+  skipMouse?: boolean;
+}
+
+/**
+ * Scrubbing across something with steps in it (the memory chart's days, a spoken word's sounds by its letters or
+ * along its recording): one finger dragged sideways picks each step in turn, ticking at each (see `detents`); a drag
+ * that starts up or down is left to scroll the page; a tap is a press. A second finger, or a mouse's other buttons,
+ * are left alone.
+ */
+export function scrubbable(el: HTMLElement, options: ScrubOptions): void {
+  const detent = detents();
+  let touch: { x: number; y: number; scrub: boolean } | null = null;
+  const skip = (e: PointerEvent) => !e.isPrimary || (options.skipMouse === true && e.pointerType === 'mouse');
+  el.addEventListener('pointerdown', (e) => {
+    if (skip(e) || e.button > 0) return;
+    options.start?.(e);
+    touch = { x: e.clientX, y: e.clientY, scrub: false };
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!touch || skip(e)) return;
+    // A mouse let go off it, so its lift never came here: nothing is held now.
+    if (e.pointerType === 'mouse' && e.buttons === 0) {
+      touch = null;
+      return;
+    }
+    const dx = Math.abs(e.clientX - touch.x);
+    const dy = Math.abs(e.clientY - touch.y);
+    if (!touch.scrub && dy > 8 && dy >= dx) touch = null;
+    else if (touch.scrub || (dx > 8 && dx > dy)) {
+      if (!touch.scrub) {
+        // Audio is got going as the scrub begins (not for a touch that scrolls), so its next step ticks.
+        readyDetents();
+        // So a finger or mouse dragged off it keeps scrubbing. Only now, so a tap still reaches the control under it.
+        el.setPointerCapture?.(e.pointerId);
+      }
+      touch.scrub = true;
+      detent(options.pick(e));
+    }
+  });
+  el.addEventListener('pointerup', (e) => {
+    if (skip(e)) return;
+    if (touch && !touch.scrub && options.tap) {
+      options.tap(e);
+      tick('click');
+    }
+    touch = null;
+    detent(null);
+  });
+  el.addEventListener('pointercancel', (e) => {
+    if (skip(e)) return;
+    touch = null;
+    detent(null);
+  });
 }
 
 /**

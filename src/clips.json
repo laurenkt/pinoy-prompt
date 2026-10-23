@@ -1,434 +1,1730 @@
 {
-  "Kumusta?": "kumusta-3d030c93",
-  "Mabuti naman.": "mabuti-naman-a640622c",
-  "Salamat": "salamat-f75f5296",
-  "Maraming salamat": "maraming-salamat-d26f9e8d",
-  "Walang anuman": "walang-anuman-9bdf54fe",
-  "Wala 'yon.": "wala-yon-1e1e3d88",
-  "Magandang umaga": "magandang-umaga-7fb43268",
-  "Magandang hapon": "magandang-hapon-2e916e94",
-  "Magandang gabi": "magandang-gabi-2f8cb474",
-  "Paalam": "paalam-d023f39c",
-  "Ingat!": "ingat-b6a92614",
-  "Uy!": "uy-7b718276",
-  "Ikaw pala!": "ikaw-pala-df7ea052",
-  "Saan ka galing?": "saan-ka-galing-09cc01c7",
-  "Diyan lang.": "diyan-lang-8ff18067",
-  "Mauna na ako.": "mauna-na-ako-d71ca1e6",
-  "Anong meron?": "anong-meron-b3b2e96c",
-  "Oo": "oo-26b53335",
-  "Opo": "opo-83cf3d7a",
-  "Hindi": "hindi-6d99cc4c",
-  "po": "po-628435e5",
-  "Salamat po": "salamat-po-5e37a731",
-  "Pasensya na": "pasensya-na-39f0e8e2",
-  "Makikiraan po": "makikiraan-po-a6881397",
-  "Sige": "sige-a4d79541",
-  "Tuloy po kayo.": "tuloy-po-kayo-5c4fda39",
-  "Tao po!": "tao-po-cd7a4d2a",
-  "Anong pangalan mo?": "anong-pangalan-mo-361f4346",
-  "Ako si Ana.": "ako-si-ana-9948d696",
-  "Ikinagagalak kitang makilala.": "ikinagagalak-kitang-makilala-840a3565",
-  "Taga-saan ka?": "taga-saan-ka-08c467cd",
-  "Taga-Amerika ako.": "taga-amerika-ako-e4c6ec55",
-  "Marunong ka bang mag-English?": "marunong-ka-bang-mag-english-f9a827f7",
-  "Konti lang.": "konti-lang-d64a7138",
-  "Hindi ko maintindihan.": "hindi-ko-maintindihan-98999c2a",
-  "Pakiulit po.": "pakiulit-po-72bcfc05",
-  "Dahan-dahan lang po.": "dahan-dahan-lang-po-0a2c05f5",
-  "Saan ka nakatira?": "saan-ka-nakatira-ce4457b7",
-  "Anong trabaho mo?": "anong-trabaho-mo-c6dc0144",
-  "Ilang taon ka na?": "ilang-taon-ka-na-c708c546",
-  "May asawa ka na ba?": "may-asawa-ka-na-ba-a9c70538",
-  "isa": "isa-a839c60a",
-  "dalawa": "dalawa-4e4fbfbe",
-  "tatlo": "tatlo-08462598",
-  "apat": "apat-ebe22fce",
-  "lima": "lima-dc00fe61",
-  "anim": "anim-73633816",
-  "pito": "pito-cb82f258",
-  "walo": "walo-697256fe",
-  "siyam": "siyam-f1f83fae",
-  "sampu": "sampu-f08c5fc1",
-  "Ano?": "ano-a8b9cf32",
-  "Sino?": "sino-5a11a211",
-  "Saan?": "saan-c6f3a188",
-  "Kailan?": "kailan-e1e150f9",
-  "Bakit?": "bakit-c21510c7",
-  "Paano?": "paano-35ff70a1",
-  "Ano ito?": "ano-ito-5f24d79f",
-  "Magkano ito?": "magkano-ito-26c4e0a5",
-  "Nasaan ka?": "nasaan-ka-a3066f51",
-  "Saan ka pupunta?": "saan-ka-pupunta-8d08e05c",
-  "Ilan?": "ilan-15d150c6",
-  "Alin?": "alin-8478ae7a",
-  "Kanino ito?": "kanino-ito-43271e0b",
-  "Gaano katagal?": "gaano-katagal-408486c9",
-  "Gaano kalayo?": "gaano-kalayo-f2743e77",
-  "Anong ginagawa mo?": "anong-ginagawa-mo-31470892",
-  "Para saan ito?": "para-saan-ito-c0904847",
-  "Anong ibig sabihin nito?": "anong-ibig-sabihin-nito-c7b7c918",
-  "Paano sabihin ito sa Tagalog?": "paano-sabihin-ito-sa-tagalog-3e80f648",
-  "Okay lang ba?": "okay-lang-ba-3ff0ab96",
-  "ako": "ako-ed98c6f3",
-  "ikaw": "ikaw-0cc61e6f",
-  "ka": "ka-03694a5f",
-  "ko": "ko-7ed18b07",
-  "mo": "mo-273bfd14",
-  "ang": "ang-7fb8da32",
-  "ito": "ito-d1b4ecec",
-  "na": "na-54f178f2",
-  "lang": "lang-1168fd56",
-  "sa": "sa-cc389e13",
-  "ba": "ba-abf6aca1",
-  "nang": "nang-b77a36ff",
-  "siya": "siya-07bc854a",
-  "tayo": "tayo-26803d0f",
-  "kami": "kami-e91e68a6",
-  "sila": "sila-26450a17",
-  "May kape ba?": "may-kape-ba-a25df19d",
-  "Meron.": "meron-46f899d8",
-  "Wala.": "wala-768b725d",
-  "Kailangan ko ito.": "kailangan-ko-ito-a301782a",
-  "Puwede ba?": "puwede-ba-4675b6d2",
-  "dito": "dito-a172d09e",
-  "at": "at-446558cd",
-  "pero": "pero-7c45537d",
-  "kasi": "kasi-f93328a5",
-  "mga": "mga-7842d829",
-  "kayo": "kayo-0d97c839",
-  "pa": "pa-24a133b7",
-  "Anong oras na?": "anong-oras-na-e448efdd",
-  "Ala-una": "ala-una-6d938a95",
-  "Alas-dos": "alas-dos-dac98a85",
-  "Alas-tres": "alas-tres-514d65e7",
-  "Alas-singko": "alas-singko-4722c6e2",
-  "Alas-sais": "alas-sais-227da433",
-  "Alas-siyete": "alas-siyete-40fa97ec",
-  "Alas-otso": "alas-otso-41c9b053",
-  "Alas-diyes": "alas-diyes-c4e8133a",
-  "Alas-dose": "alas-dose-4651f521",
-  "kalahati": "kalahati-ce7cca49",
-  "Alas-siyete ng umaga": "alas-siyete-ng-umaga-45fe2755",
-  "Alas-otso ng gabi": "alas-otso-ng-gabi-5870292a",
-  "tanghali": "tanghali-40aebfd9",
-  "hatinggabi": "hatinggabi-0cf79f69",
-  "ngayon": "ngayon-2cf9b656",
-  "mamaya": "mamaya-f2505849",
-  "kanina": "kanina-e7f0a857",
-  "bukas": "bukas-fa280019",
-  "kahapon": "kahapon-55879457",
-  "araw": "araw-93017c54",
-  "linggo": "linggo-bb4f2fc6",
-  "buwan": "buwan-367b18c2",
-  "taon": "taon-02caec6a",
-  "sa susunod na linggo": "sa-susunod-na-linggo-516a525e",
-  "noong isang linggo": "noong-isang-linggo-a10ebce8",
-  "lagi": "lagi-62b3a6ac",
-  "minsan": "minsan-22516b77",
-  "kaagad": "kaagad-d36fcd4a",
-  "Lunes": "lunes-10efea56",
-  "Biyernes": "biyernes-451bdd8b",
-  "Sabado": "sabado-941872b4",
-  "Martes": "martes-4b27e876",
-  "Miyerkoles": "miyerkoles-b09e118d",
-  "Huwebes": "huwebes-e5b0a576",
-  "Papunta na ako.": "papunta-na-ako-cb23e33e",
-  "Malapit na ako.": "malapit-na-ako-e6d8dc8a",
-  "Nandito na ako.": "nandito-na-ako-0d4e861f",
-  "Nasaan ka na?": "nasaan-ka-na-7d4109aa",
-  "Aalis na ako.": "aalis-na-ako-64af1ab4",
-  "Pauwi na ako.": "pauwi-na-ako-379ba66e",
-  "Trapik!": "trapik-51fc5366",
-  "Mahuhuli ako.": "mahuhuli-ako-f1da48d7",
-  "Hintayin mo ako.": "hintayin-mo-ako-01174851",
-  "Para po!": "para-po-60782488",
-  "Bayad po.": "bayad-po-fe652f8b",
-  "Sa tabi lang po.": "sa-tabi-lang-po-003fc523",
-  "sumakay": "sumakay-9db54dc0",
-  "bumaba": "bumaba-b82ae01b",
-  "dyip": "dyip-8a76880c",
-  "bahay": "bahay-ff4771e5",
-  "Nasa bahay ako.": "nasa-bahay-ako-eb88f728",
-  "palengke": "palengke-411dd81b",
-  "tindahan": "tindahan-d9acd4f9",
-  "simbahan": "simbahan-8ad98ee4",
-  "ospital": "ospital-22272967",
-  "botika": "botika-288459a3",
-  "paaralan": "paaralan-ad07eef1",
-  "opisina": "opisina-4db1cb0a",
-  "kainan": "kainan-e616e5e1",
-  "bangko": "bangko-b8b8890c",
-  "kanto": "kanto-35632bba",
-  "kalye": "kalye-6a46a44e",
-  "paliparan": "paliparan-a702dff9",
-  "Paano pumunta sa palengke?": "paano-pumunta-sa-palengke-96eae62a",
-  "kaliwa": "kaliwa-443c5901",
-  "kanan": "kanan-1396333a",
-  "diretso": "diretso-1a90e5ed",
-  "Kumaliwa ka.": "kumaliwa-ka-fe938498",
-  "Kumanan ka.": "kumanan-ka-abe6f352",
-  "diyan": "diyan-852e6a8b",
-  "doon": "doon-47cc56a1",
-  "malapit": "malapit-f404df87",
-  "malayo": "malayo-4019190d",
-  "katabi": "katabi-6615c860",
-  "sa harap": "sa-harap-b8491c2c",
-  "sa likod": "sa-likod-a225c7f3",
-  "Libre ka ba?": "libre-ka-ba-1fdd4bcb",
-  "Anong plano?": "anong-plano-6f535f26",
-  "Saan tayo magkikita?": "saan-tayo-magkikita-48e897e1",
-  "Anong oras tayo magkikita?": "anong-oras-tayo-magkikita-85b1b4ac",
-  "Kita tayo bukas.": "kita-tayo-bukas-140ad06c",
-  "Puwede ako.": "puwede-ako-0c2ec573",
-  "Hindi ako puwede.": "hindi-ako-puwede-f8343b90",
-  "Mamaya na lang.": "mamaya-na-lang-ebe265e4",
-  "Teka.": "teka-6c6daae7",
-  "Tuloy ba tayo?": "tuloy-ba-tayo-74305724",
-  "Sasama ako.": "sasama-ako-2e7dc288",
-  "baka": "baka-7767e55b",
-  "Kain tayo!": "kain-tayo-a5f5e27c",
-  "Gutom na ako.": "gutom-na-ako-718e9919",
-  "Masarap!": "masarap-2d5a0ff1",
-  "kanin": "kanin-3e2b676d",
-  "tubig": "tubig-238369c4",
-  "kape": "kape-7936b720",
-  "tinapay": "tinapay-d3e1f7b6",
-  "manok": "manok-a85a2437",
-  "isda": "isda-2a6bf107",
-  "Busog na ako.": "busog-na-ako-b498f5cb",
-  "almusal": "almusal-649a760c",
-  "tanghalian": "tanghalian-52427aaf",
-  "hapunan": "hapunan-565e3c12",
-  "itlog": "itlog-94775cb0",
-  "baboy": "baboy-74971cc4",
-  "karne ng baka": "karne-ng-baka-59a72d36",
-  "gulay": "gulay-876ce536",
-  "prutas": "prutas-8ab2fa3b",
-  "saging": "saging-588ddae2",
-  "mangga": "mangga-cc84db67",
-  "gatas": "gatas-a22917e5",
-  "asukal": "asukal-c4e0016f",
-  "asin": "asin-0f856206",
-  "Isa pong adobo.": "isa-pong-adobo-5ca158fc",
-  "Pahingi po ng tubig.": "pahingi-po-ng-tubig-f7e491bb",
-  "Anong masarap dito?": "anong-masarap-dito-10bc7a91",
-  "maanghang": "maanghang-5b329a2f",
-  "Huwag pong maanghang.": "huwag-pong-maanghang-09fc4d91",
-  "ulam": "ulam-41de9b42",
-  "kutsara": "kutsara-d59526d3",
-  "tinidor": "tinidor-a0de5424",
-  "baso": "baso-c03a7193",
-  "Bill po.": "bill-po-214f4b7c",
-  "pera": "pera-b09b1582",
-  "piso": "piso-d51e1983",
-  "dalawampu": "dalawampu-5c67a9d1",
-  "limampu": "limampu-62fab8eb",
-  "isang daan": "isang-daan-759b3794",
-  "limang daan": "limang-daan-0a795e27",
-  "isang libo": "isang-libo-a541a20e",
-  "sukli": "sukli-bb37d0e6",
-  "barya": "barya-ee695aaf",
-  "Magkano lahat?": "magkano-lahat-8c02e816",
-  "labing-isa": "labing-isa-b77bf804",
-  "labindalawa": "labindalawa-7e894db3",
-  "labinlima": "labinlima-173901c2",
-  "tatlumpu": "tatlumpu-428ceeb2",
-  "apatnapu": "apatnapu-7361832f",
-  "dalawang daan": "dalawang-daan-d4bf4e65",
-  "Pabili po.": "pabili-po-76617f96",
-  "Meron ba kayong tinapay?": "meron-ba-kayong-tinapay-ef1ac66d",
-  "iyan": "iyan-6add68f3",
-  "iyon": "iyon-1b264181",
-  "Isa pa.": "isa-pa-36b55614",
-  "Ito na lang.": "ito-na-lang-013ad67d",
-  "Puwede bang tumawad?": "puwede-bang-tumawad-4f73c842",
-  "Wala na.": "wala-na-c5323ec4",
-  "Tumitingin lang po.": "tumitingin-lang-po-1e3737cd",
-  "malaki": "malaki-781cd23f",
-  "maliit": "maliit-a3f8498e",
-  "nanay": "nanay-e0b44958",
-  "tatay": "tatay-650a8605",
-  "Ate": "ate-342cd616",
-  "Kuya": "kuya-374d3a0b",
-  "lola": "lola-28725433",
-  "lolo": "lolo-4bfb34eb",
-  "anak": "anak-a8633f86",
-  "kaibigan": "kaibigan-a1740f97",
-  "asawa": "asawa-abc7720f",
-  "pamilya": "pamilya-ca9a51a6",
-  "lalaki": "lalaki-fecb460b",
-  "babae": "babae-4de75cbf",
-  "kapatid": "kapatid-828c94dd",
-  "bata": "bata-9918a283",
-  "Tara na!": "tara-na-ef9b752f",
-  "Sandali lang.": "sandali-lang-df1e05eb",
-  "Nasaan ang banyo?": "nasaan-ang-banyo-17971775",
-  "Gusto ko ito.": "gusto-ko-ito-474b328b",
-  "Ayoko.": "ayoko-64aa320f",
-  "Hindi ko alam.": "hindi-ko-alam-9a5d91ac",
-  "mahal": "mahal-e376dc68",
-  "mura": "mura-ac5da9b9",
-  "Mahal kita.": "mahal-kita-926fefb0",
-  "Anong balita?": "anong-balita-a44a4162",
-  "Kumain ka na ba?": "kumain-ka-na-ba-7056b359",
-  "Kumain na ako.": "kumain-na-ako-ceb1f7a9",
-  "Matutulog na ako.": "matutulog-na-ako-bb1ec74c",
-  "Gising ka na ba?": "gising-ka-na-ba-9ecda52a",
-  "Talaga?": "talaga-93be3554",
-  "Oo nga.": "oo-nga-9882a4ca",
-  "Ako rin.": "ako-rin-dc1965a8",
-  "Tama.": "tama-835cb6bf",
-  "Siguro.": "siguro-088ca9a7",
-  "Ewan ko.": "ewan-ko-a4ebf1aa",
-  "Ganun ba?": "ganun-ba-fe32fe72",
-  "Grabe!": "grabe-c25c8e86",
-  "Ayos lang.": "ayos-lang-a72ca542",
-  "Hindi naman.": "hindi-naman-38990d3d",
-  "Ano ulit?": "ano-ulit-c708d332",
-  "Sayang!": "sayang-99020a72",
-  "Naku!": "naku-a454a50a",
-  "Bahala na.": "bahala-na-57b40114",
-  "Hindi pa.": "hindi-pa-c79da05a",
-  "Walang problema.": "walang-problema-47b8677c",
-  "Ikaw ang bahala.": "ikaw-ang-bahala-a78fee77",
-  "Sigurado ka ba?": "sigurado-ka-ba-5c0c3775",
-  "sana": "sana-2aeccebd",
-  "Pagod na ako.": "pagod-na-ako-9f399513",
-  "Inaantok ako.": "inaantok-ako-de58bed8",
-  "Nauuhaw ako.": "nauuhaw-ako-fb5777a4",
-  "Mainit!": "mainit-01f79159",
-  "Malamig.": "malamig-687e5124",
-  "masaya": "masaya-3e870053",
-  "malungkot": "malungkot-4a5f7287",
-  "Masakit.": "masakit-955a9335",
-  "May sakit ako.": "may-sakit-ako-6f4161ef",
-  "Okay lang ako.": "okay-lang-ako-e1de6c81",
-  "Gusto ko nang umuwi.": "gusto-ko-nang-umuwi-67bd66cd",
-  "kumain": "kumain-7ab29afc",
-  "uminom": "uminom-83c605a4",
-  "matulog": "matulog-24f29589",
-  "maligo": "maligo-7e687aa6",
-  "pumunta": "pumunta-c6989dd7",
-  "dumating": "dumating-a8001aac",
-  "maghintay": "maghintay-248b7715",
-  "bumili": "bumili-6dede325",
-  "magbayad": "magbayad-65a0d7ba",
-  "magluto": "magluto-2b411edc",
-  "magtrabaho": "magtrabaho-f51eaf0c",
-  "maglakad": "maglakad-552d6099",
-  "magsalita": "magsalita-10d3befe",
-  "makinig": "makinig-7366b8cd",
-  "tumulong": "tumulong-a3ff0a3f",
-  "umupo": "umupo-6edae09e",
-  "magpahinga": "magpahinga-f98167b6",
-  "maglaro": "maglaro-cb34f66c",
-  "maganda": "maganda-7f2a0069",
-  "pangit": "pangit-8c058488",
-  "mabait": "mabait-c6d08c2c",
-  "marami": "marami-b7fa70c4",
-  "bago": "bago-4507ddbc",
-  "luma": "luma-d81c56e8",
-  "matanda": "matanda-61c54cb3",
-  "mabilis": "mabilis-2b9f3dff",
-  "mabagal": "mabagal-d61bbf98",
-  "madali": "madali-6cf22b1a",
-  "mahirap": "mahirap-eaeda69d",
-  "malinis": "malinis-a0f941f0",
-  "marumi": "marumi-5194eed8",
-  "mabango": "mabango-6651137f",
-  "mabaho": "mabaho-4b6a6d17",
-  "kulay": "kulay-802ada3f",
-  "pula": "pula-7f553e65",
-  "puti": "puti-d90a5780",
-  "itim": "itim-70270e67",
-  "asul": "asul-55565d70",
-  "berde": "berde-55dc7add",
-  "dilaw": "dilaw-5b86e2e5",
-  "panahon": "panahon-b0fc34e5",
-  "Maaraw.": "maaraw-1e775a84",
-  "Umuulan.": "umuulan-1f947bba",
-  "payong": "payong-82266d41",
-  "Mahangin.": "mahangin-5245017c",
-  "bagyo": "bagyo-0896dc7a",
-  "tag-init": "tag-init-43cf4405",
-  "tag-ulan": "tag-ulan-f6332837",
-  "selpon": "selpon-eecf58d1",
-  "I-text mo ako.": "i-text-mo-ako-d88166a8",
-  "Tawagan mo ako.": "tawagan-mo-ako-bd037dec",
-  "Sino ito?": "sino-ito-71063262",
-  "Anong number mo?": "anong-number-mo-e93bfc40",
-  "Walang signal.": "walang-signal-5bc02ecf",
-  "Tulong!": "tulong-b26c6283",
-  "Pakitulungan mo ako.": "pakitulungan-mo-ako-87c0b0c4",
-  "Naliligaw ako.": "naliligaw-ako-ed952acd",
-  "Nawala ang bag ko.": "nawala-ang-bag-ko-fb888aba",
-  "Tumawag ka ng pulis!": "tumawag-ka-ng-pulis-5379f76f",
-  "Kailangan ko ng doktor.": "kailangan-ko-ng-doktor-8b8575b2",
-  "Nasaan ang ospital?": "nasaan-ang-ospital-d5ce27f8",
-  "gamot": "gamot-0a6c7bbf",
-  "Delikado!": "delikado-02e15597",
-  "Tama na!": "tama-na-23cb5992",
-  "Sunog!": "sunog-71a3078c",
-  "Magnanakaw!": "magnanakaw-135a2024",
-  "Salamat po.": "salamat-po-7290242c",
-  "Hindi po.": "hindi-po-f335c213",
-  "Gutom na po ako.": "gutom-na-po-ako-ffe5492e",
-  "Tara na po.": "tara-na-po-ddff327d",
-  "Sino si Ben?": "sino-si-ben-43baff98",
-  "Kaibigan ko si Ben.": "kaibigan-ko-si-ben-bf78da05",
-  "Ako si Ben.": "ako-si-ben-9edfce03",
-  "Sino si Ana?": "sino-si-ana-aed940a0",
-  "Kaibigan ko si Ana.": "kaibigan-ko-si-ana-535a9c95",
-  "Gutom ka ba?": "gutom-ka-ba-57d57df1",
-  "Malayo ba?": "malayo-ba-7186396d",
-  "Pagod ka ba?": "pagod-ka-ba-3009efc8",
-  "Hindi ako gutom.": "hindi-ako-gutom-3fced1fb",
-  "Hindi ako pagod.": "hindi-ako-pagod-b35243af",
-  "Hindi malayo.": "hindi-malayo-2d35912b",
-  "Hindi maanghang.": "hindi-maanghang-a67f378e",
-  "Gutom ako.": "gutom-ako-8713521d",
-  "Pagod siya.": "pagod-siya-da673d9d",
-  "Masarap ito.": "masarap-ito-ddc6a6bc",
-  "Masaya siya.": "masaya-siya-e9e2ccc3",
-  "Pagod na kami.": "pagod-na-kami-50c43439",
-  "Gusto ko ng kape.": "gusto-ko-ng-kape-2444af13",
-  "Gusto ko ng tubig.": "gusto-ko-ng-tubig-5d57a167",
-  "Gusto ko ng kanin.": "gusto-ko-ng-kanin-1773b195",
-  "Gusto ko ng tinapay.": "gusto-ko-ng-tinapay-3cb7a2af",
-  "May tubig.": "may-tubig-ef9a2b9c",
-  "May tubig ba?": "may-tubig-ba-e207cda0",
-  "May kanin ba?": "may-kanin-ba-13215bc6",
-  "Magandang umaga.": "magandang-umaga-fdd22452",
-  "masarap na kape": "masarap-na-kape-197fb0b6",
-  "mainit na tubig": "mainit-na-tubig-25a5230f",
-  "Magandang gabi.": "magandang-gabi-ec06b25f",
-  "malaking bahay": "malaking-bahay-cde9746e",
-  "Pakiabot po ang tubig.": "pakiabot-po-ang-tubig-cdfb2717",
-  "mga bahay": "mga-bahay-4c5a7b1a",
-  "mga kaibigan ko": "mga-kaibigan-ko-b39dc492",
-  "dalawang kape": "dalawang-kape-73568966",
-  "Masarap ang kape.": "masarap-ang-kape-6d9ac517",
-  "Malayo ang palengke.": "malayo-ang-palengke-513c02ab",
-  "Nasaan ang palengke?": "nasaan-ang-palengke-fc54c56d",
-  "Nasaan si Ana?": "nasaan-si-ana-7a819f6b",
-  "Malaki ang bahay.": "malaki-ang-bahay-bbca99e8",
-  "Kita tayo sa kanto.": "kita-tayo-sa-kanto-a6cfe6ad",
-  "Paano pumunta sa ospital?": "paano-pumunta-sa-ospital-c1451e0c",
-  "Kumakain ako.": "kumakain-ako-24c06ecb",
-  "Kakain tayo mamaya.": "kakain-tayo-mamaya-5dff6869",
-  "Gusto ko ng kape": "gusto-ko-ng-kape-8124797c",
-  "Gutom ka?": "gutom-ka-9627c6c6",
-  "Malayo?": "malayo-8254fbd1",
-  "Ha?": "ha-7caf8a98",
-  "Ano po?": "ano-po-e391f249",
-  "Ay!": "ay-d3e3355d",
-  "Ay naku!": "ay-naku-402a8b74",
-  "Kuya, para po!": "kuya-para-po-566ec80b",
-  "Ate, magkano ito?": "ate-magkano-ito-57a0e977",
-  "Psst! Kuya!": "psst-kuya-9953900d",
-  "Sige, salamat.": "sige-salamat-d657b34e",
-  "Good morning po!": "good-morning-po-3d5650dc",
-  "Thank you po!": "thank-you-po-c8a97ff7",
-  "Sorry, trapik!": "sorry-trapik-fc56a3a2"
+  "Kumusta?": [
+    "kumusta-2e491841",
+    "kumusta-f6fbfb9e"
+  ],
+  "Mabuti naman.": [
+    "mabuti-naman-333214c2",
+    "mabuti-naman-967e842f"
+  ],
+  "Salamat": [
+    "salamat-07726e3f",
+    "salamat-45545e11"
+  ],
+  "Maraming salamat": [
+    "maraming-salamat-84ac4060",
+    "maraming-salamat-4cf83598"
+  ],
+  "Walang anuman": [
+    "walang-anuman-26818725",
+    "walang-anuman-a57b5e21"
+  ],
+  "Wala 'yon.": [
+    "wala-yon-dddd04fa",
+    "wala-yon-310c6181"
+  ],
+  "Magandang umaga": [
+    "magandang-umaga-30a914d3",
+    "magandang-umaga-7533f916"
+  ],
+  "Magandang hapon": [
+    "magandang-hapon-294004f0",
+    "magandang-hapon-6deba7f6"
+  ],
+  "Magandang gabi": [
+    "magandang-gabi-088dc7e6",
+    "magandang-gabi-72c5a46b"
+  ],
+  "Paalam": [
+    "paalam-4574e1e7",
+    "paalam-e65cccab"
+  ],
+  "Ingat!": [
+    "ingat-634a929e",
+    "ingat-d925c04a"
+  ],
+  "Uy!": [
+    "uy-9aa2a4ee",
+    "uy-c3707a1f"
+  ],
+  "Ikaw pala!": [
+    "ikaw-pala-883366d5",
+    "ikaw-pala-1bb609b4"
+  ],
+  "Saan ka galing?": [
+    "saan-ka-galing-a3ab82fe",
+    "saan-ka-galing-8a2ab918"
+  ],
+  "Diyan lang.": [
+    "diyan-lang-8f644ebd",
+    "diyan-lang-c07052f4"
+  ],
+  "Mauna na ako.": [
+    "mauna-na-ako-13cc513e",
+    "mauna-na-ako-37d5e150"
+  ],
+  "Anong meron?": [
+    "anong-meron-fe565008",
+    "anong-meron-ef05b706"
+  ],
+  "Oo": [
+    "oo-0ddd9c41",
+    "oo-159aadad"
+  ],
+  "Opo": [
+    "opo-c2eeee42",
+    "opo-816752d1"
+  ],
+  "Hindi": [
+    "hindi-0acfb805",
+    "hindi-655b6696"
+  ],
+  "po": [
+    "po-bf575c30",
+    "po-ff84f666"
+  ],
+  "Salamat po": [
+    "salamat-po-8e7febba",
+    "salamat-po-e13d1ece"
+  ],
+  "Pasensya na": [
+    "pasensya-na-479136f3",
+    "pasensya-na-a0d10e6c"
+  ],
+  "Makikiraan po": [
+    "makikiraan-po-a89b8676",
+    "makikiraan-po-865fdcea"
+  ],
+  "Sige": [
+    "sige-efb418ab",
+    "sige-7011a2e6"
+  ],
+  "Tuloy po kayo.": [
+    "tuloy-po-kayo-f70a7324",
+    "tuloy-po-kayo-8a896e35"
+  ],
+  "Tao po!": [
+    "tao-po-a33b61ab",
+    "tao-po-dbb50aa6"
+  ],
+  "Anong pangalan mo?": [
+    "anong-pangalan-mo-5621524e",
+    "anong-pangalan-mo-018acb6c"
+  ],
+  "Ako si Ana.": [
+    "ako-si-ana-b9d8a633",
+    "ako-si-ana-b901b7df"
+  ],
+  "Ikinagagalak kitang makilala.": [
+    "ikinagagalak-kitang-makilala-3ccfb27e",
+    "ikinagagalak-kitang-makilala-61705297"
+  ],
+  "Taga-saan ka?": [
+    "taga-saan-ka-2846f734",
+    "taga-saan-ka-f3d3d11e"
+  ],
+  "Taga-Amerika ako.": [
+    "taga-amerika-ako-6681b460",
+    "taga-amerika-ako-201805d9"
+  ],
+  "Marunong ka bang mag-English?": [
+    "marunong-ka-bang-mag-english-7e7df961",
+    "marunong-ka-bang-mag-english-e1da053d"
+  ],
+  "Konti lang.": [
+    "konti-lang-b13faee0",
+    "konti-lang-b9b4f489"
+  ],
+  "Hindi ko maintindihan.": [
+    "hindi-ko-maintindihan-deee5db1",
+    "hindi-ko-maintindihan-3dc3efa1"
+  ],
+  "Pakiulit po.": [
+    "pakiulit-po-1e39cad3",
+    "pakiulit-po-6ad27897"
+  ],
+  "Dahan-dahan lang po.": [
+    "dahan-dahan-lang-po-547afc52",
+    "dahan-dahan-lang-po-23570b78"
+  ],
+  "Saan ka nakatira?": [
+    "saan-ka-nakatira-e3077329",
+    "saan-ka-nakatira-edb6bd75"
+  ],
+  "Anong trabaho mo?": [
+    "anong-trabaho-mo-8d0dfb77",
+    "anong-trabaho-mo-a832d93b"
+  ],
+  "Ilang taon ka na?": [
+    "ilang-taon-ka-na-6aa6ca92",
+    "ilang-taon-ka-na-627f2dd7"
+  ],
+  "May asawa ka na ba?": [
+    "may-asawa-ka-na-ba-45ed3be6",
+    "may-asawa-ka-na-ba-50c0e29a"
+  ],
+  "isa": [
+    "isa-142ca672",
+    "isa-28ef1cac"
+  ],
+  "dalawa": [
+    "dalawa-d536a7e4",
+    "dalawa-bfafc390"
+  ],
+  "tatlo": [
+    "tatlo-6eef6ce9",
+    "tatlo-ab0e2aae"
+  ],
+  "apat": [
+    "apat-41e6be87",
+    "apat-d9a949fa"
+  ],
+  "lima": [
+    "lima-9c26a6c1",
+    "lima-db3f9c84"
+  ],
+  "anim": [
+    "anim-423bfd12",
+    "anim-207ab603"
+  ],
+  "pito": [
+    "pito-c3a9c9ea",
+    "pito-29d3d2a7"
+  ],
+  "walo": [
+    "walo-af4a1269",
+    "walo-6ea486c2"
+  ],
+  "siyam": [
+    "siyam-ce1e417d",
+    "siyam-d7297cf7"
+  ],
+  "sampu": [
+    "sampu-42e88c07",
+    "sampu-383ab2c9"
+  ],
+  "Ano?": [
+    "ano-e14c45d9",
+    "ano-f9fdf6bb"
+  ],
+  "Sino?": [
+    "sino-7e5d39c9",
+    "sino-1ab4399b"
+  ],
+  "Saan?": [
+    "saan-3f2083a8",
+    "saan-156ea6b8"
+  ],
+  "Kailan?": [
+    "kailan-069eec1c",
+    "kailan-97530b87"
+  ],
+  "Bakit?": [
+    "bakit-f6247ada",
+    "bakit-c85f494c"
+  ],
+  "Paano?": [
+    "paano-be4c47eb",
+    "paano-7b3922f8"
+  ],
+  "Ano ito?": [
+    "ano-ito-99fb0733",
+    "ano-ito-e2b4dec9"
+  ],
+  "Magkano ito?": [
+    "magkano-ito-9a6120d9",
+    "magkano-ito-9e81f198"
+  ],
+  "Nasaan ka?": [
+    "nasaan-ka-83bb30cc",
+    "nasaan-ka-fb28f2b0"
+  ],
+  "Saan ka pupunta?": [
+    "saan-ka-pupunta-f6978d0e",
+    "saan-ka-pupunta-83dc51f0"
+  ],
+  "Ilan?": [
+    "ilan-fb769999",
+    "ilan-1747afe2"
+  ],
+  "Alin?": [
+    "alin-26404721",
+    "alin-61a18bba"
+  ],
+  "Kanino ito?": [
+    "kanino-ito-010def9b",
+    "kanino-ito-2ab90373"
+  ],
+  "Gaano katagal?": [
+    "gaano-katagal-7a5e65b4",
+    "gaano-katagal-fd0b3248"
+  ],
+  "Gaano kalayo?": [
+    "gaano-kalayo-1cdd68c8",
+    "gaano-kalayo-7d7f0d65"
+  ],
+  "Anong ginagawa mo?": [
+    "anong-ginagawa-mo-9db0c67e",
+    "anong-ginagawa-mo-9138aa88"
+  ],
+  "Para saan ito?": [
+    "para-saan-ito-b13feb41",
+    "para-saan-ito-77c0c6ac"
+  ],
+  "Anong ibig sabihin nito?": [
+    "anong-ibig-sabihin-nito-4039b4a8",
+    "anong-ibig-sabihin-nito-59c90d74"
+  ],
+  "Paano sabihin ito sa Tagalog?": [
+    "paano-sabihin-ito-sa-tagalog-3d3cd4ae",
+    "paano-sabihin-ito-sa-tagalog-e713ee8c"
+  ],
+  "Okay lang ba?": [
+    "okay-lang-ba-5b56d275",
+    "okay-lang-ba-a6240005"
+  ],
+  "ako": [
+    "ako-cad51805",
+    "ako-90a68178"
+  ],
+  "ikaw": [
+    "ikaw-4ade2e19",
+    "ikaw-03bc9f7b"
+  ],
+  "ka": [
+    "ka-f43b0b23",
+    "ka-12df8dc5"
+  ],
+  "ko": [
+    "ko-c78c7d7d",
+    "ko-69c1434e"
+  ],
+  "mo": [
+    "mo-d4ebdfed",
+    "mo-c5db5ac1"
+  ],
+  "ang": [
+    "ang-8f1f967a",
+    "ang-26ae5c0d"
+  ],
+  "ito": [
+    "ito-f98ae8e5",
+    "ito-682fe7d9"
+  ],
+  "na": [
+    "na-4b02ca43",
+    "na-b1bddae6"
+  ],
+  "lang": [
+    "lang-7815bd17",
+    "lang-f7d79315"
+  ],
+  "sa": [
+    "sa-28cd23fd",
+    "sa-1f6e1ee6"
+  ],
+  "ba": [
+    "ba-c770954b",
+    "ba-3d0f738e"
+  ],
+  "nang": [
+    "nang-d7e78f7e",
+    "nang-0d15735c"
+  ],
+  "siya": [
+    "siya-c011248d",
+    "siya-ce115f47"
+  ],
+  "tayo": [
+    "tayo-eceef4aa",
+    "tayo-d06d0df3"
+  ],
+  "kami": [
+    "kami-440e1b17",
+    "kami-fd45b824"
+  ],
+  "sila": [
+    "sila-0ea92dd0",
+    "sila-8c40df10"
+  ],
+  "May kape ba?": [
+    "may-kape-ba-799f1c35",
+    "may-kape-ba-abe4eeb6"
+  ],
+  "Meron.": [
+    "meron-8e307538",
+    "meron-60658330"
+  ],
+  "Wala.": [
+    "wala-f8f4322e",
+    "wala-68c41bcd"
+  ],
+  "Kailangan ko ito.": [
+    "kailangan-ko-ito-c065dd2b",
+    "kailangan-ko-ito-8c6a8f17"
+  ],
+  "Puwede ba?": [
+    "puwede-ba-6f3954a5",
+    "puwede-ba-6b87f213"
+  ],
+  "dito": [
+    "dito-e4dcf1a1",
+    "dito-72074d2d"
+  ],
+  "at": [
+    "at-79b0873c",
+    "at-b8a6acd8"
+  ],
+  "pero": [
+    "pero-cc6630e5",
+    "pero-4bf123f1"
+  ],
+  "kasi": [
+    "kasi-d3025f1f",
+    "kasi-da67621f"
+  ],
+  "mga": [
+    "mga-fbb7095b",
+    "mga-aeca9c11"
+  ],
+  "kayo": [
+    "kayo-cddf6b0f",
+    "kayo-24380698"
+  ],
+  "pa": [
+    "pa-e4a61897",
+    "pa-0cffeb3c"
+  ],
+  "Anong oras na?": [
+    "anong-oras-na-de54c7e5",
+    "anong-oras-na-1ad69daa"
+  ],
+  "Ala-una": [
+    "ala-una-cfc81d54",
+    "ala-una-3d7d6a16"
+  ],
+  "Alas-dos": [
+    "alas-dos-285ab4c1",
+    "alas-dos-6b1a5617"
+  ],
+  "Alas-tres": [
+    "alas-tres-87154365",
+    "alas-tres-cc3676cd"
+  ],
+  "Alas-singko": [
+    "alas-singko-a3edf361",
+    "alas-singko-4b653316"
+  ],
+  "Alas-sais": [
+    "alas-sais-95a31d64",
+    "alas-sais-49812f42"
+  ],
+  "Alas-siyete": [
+    "alas-siyete-86c00956",
+    "alas-siyete-31f6cf72"
+  ],
+  "Alas-otso": [
+    "alas-otso-6e44b195",
+    "alas-otso-ba54f0a7"
+  ],
+  "Alas-diyes": [
+    "alas-diyes-051975fe",
+    "alas-diyes-8e832942"
+  ],
+  "Alas-dose": [
+    "alas-dose-b6b9fd29",
+    "alas-dose-7d9fa755"
+  ],
+  "kalahati": [
+    "kalahati-12eaad59",
+    "kalahati-79d6e901"
+  ],
+  "Alas-siyete ng umaga": [
+    "alas-siyete-ng-umaga-e5d4a411",
+    "alas-siyete-ng-umaga-fe127c87"
+  ],
+  "Alas-otso ng gabi": [
+    "alas-otso-ng-gabi-ded1cd71",
+    "alas-otso-ng-gabi-69b27943"
+  ],
+  "tanghali": [
+    "tanghali-6b46becc",
+    "tanghali-e45a56e3"
+  ],
+  "hatinggabi": [
+    "hatinggabi-9a661efe",
+    "hatinggabi-d83fba03"
+  ],
+  "ngayon": [
+    "ngayon-247e9ccc",
+    "ngayon-e4d9cb78"
+  ],
+  "mamaya": [
+    "mamaya-1c4b3d84",
+    "mamaya-cb20a4ea"
+  ],
+  "kanina": [
+    "kanina-2f2a69bc",
+    "kanina-2533016f"
+  ],
+  "bukas": [
+    "bukas-e4f384dd",
+    "bukas-85bb1aa1"
+  ],
+  "kahapon": [
+    "kahapon-fed72403",
+    "kahapon-d57c082f"
+  ],
+  "araw": [
+    "araw-39dbc76d",
+    "araw-f77cc626"
+  ],
+  "linggo": [
+    "linggo-09d93fd3",
+    "linggo-f8da3fee"
+  ],
+  "buwan": [
+    "buwan-92b04025",
+    "buwan-156837fa"
+  ],
+  "taon": [
+    "taon-21849fee",
+    "taon-fd2f2eb1"
+  ],
+  "sa susunod na linggo": [
+    "sa-susunod-na-linggo-735055ce",
+    "sa-susunod-na-linggo-83bebcc2"
+  ],
+  "noong isang linggo": [
+    "noong-isang-linggo-f06bc406",
+    "noong-isang-linggo-b8145200"
+  ],
+  "lagi": [
+    "lagi-d0b68053",
+    "lagi-3fcd4fe6"
+  ],
+  "minsan": [
+    "minsan-e6453c82",
+    "minsan-6bbd7a99"
+  ],
+  "kaagad": [
+    "kaagad-420f9c93",
+    "kaagad-3e336eab"
+  ],
+  "Lunes": [
+    "lunes-1f281b97",
+    "lunes-50c9fe4b"
+  ],
+  "Biyernes": [
+    "biyernes-940947b9",
+    "biyernes-69d29ab0"
+  ],
+  "Sabado": [
+    "sabado-530f274e",
+    "sabado-eab3c709"
+  ],
+  "Martes": [
+    "martes-2ee2e024",
+    "martes-9eae2da4"
+  ],
+  "Miyerkoles": [
+    "miyerkoles-0622ec46",
+    "miyerkoles-ce1ddbab"
+  ],
+  "Huwebes": [
+    "huwebes-f0434367",
+    "huwebes-bcb859dc"
+  ],
+  "Papunta na ako.": [
+    "papunta-na-ako-1785ceca",
+    "papunta-na-ako-602ade7a"
+  ],
+  "Malapit na ako.": [
+    "malapit-na-ako-69813317",
+    "malapit-na-ako-11517d18"
+  ],
+  "Nandito na ako.": [
+    "nandito-na-ako-070e1b33",
+    "nandito-na-ako-98cf8510"
+  ],
+  "Nasaan ka na?": [
+    "nasaan-ka-na-b1671fbb",
+    "nasaan-ka-na-bcdd0f28"
+  ],
+  "Aalis na ako.": [
+    "aalis-na-ako-786b7532",
+    "aalis-na-ako-755e5f84"
+  ],
+  "Pauwi na ako.": [
+    "pauwi-na-ako-81bcc20a",
+    "pauwi-na-ako-a8b06038"
+  ],
+  "Trapik!": [
+    "trapik-2d20edf1",
+    "trapik-115778ad"
+  ],
+  "Mahuhuli ako.": [
+    "mahuhuli-ako-b47df59c",
+    "mahuhuli-ako-69ac4fcb"
+  ],
+  "Hintayin mo ako.": [
+    "hintayin-mo-ako-17de33db",
+    "hintayin-mo-ako-c6d10f40"
+  ],
+  "Para po!": [
+    "para-po-ba3e91f7",
+    "para-po-5022556f"
+  ],
+  "Bayad po.": [
+    "bayad-po-d29e1b47",
+    "bayad-po-f047d0d2"
+  ],
+  "Sa tabi lang po.": [
+    "sa-tabi-lang-po-0d3c9ced",
+    "sa-tabi-lang-po-d9882f55"
+  ],
+  "sumakay": [
+    "sumakay-29d9a5c4",
+    "sumakay-40bf19ce"
+  ],
+  "bumaba": [
+    "bumaba-1d408d03",
+    "bumaba-151d8fa5"
+  ],
+  "dyip": [
+    "dyip-795974f8",
+    "dyip-733974d7"
+  ],
+  "bahay": [
+    "bahay-7c340292",
+    "bahay-8759c0cc"
+  ],
+  "Nasa bahay ako.": [
+    "nasa-bahay-ako-e89c1198",
+    "nasa-bahay-ako-d4237612"
+  ],
+  "palengke": [
+    "palengke-d3086c5d",
+    "palengke-c4bc0fdb"
+  ],
+  "tindahan": [
+    "tindahan-d0f99ef6",
+    "tindahan-18d0882c"
+  ],
+  "simbahan": [
+    "simbahan-82bcdaa1",
+    "simbahan-f2b1e613"
+  ],
+  "ospital": [
+    "ospital-34f2c5b2",
+    "ospital-4e968983"
+  ],
+  "botika": [
+    "botika-47a5e249",
+    "botika-852dff92"
+  ],
+  "paaralan": [
+    "paaralan-6fd9d8a2",
+    "paaralan-f1c3ade3"
+  ],
+  "opisina": [
+    "opisina-0d286689",
+    "opisina-7ccfff3a"
+  ],
+  "kainan": [
+    "kainan-f6750d43",
+    "kainan-4434aa4b"
+  ],
+  "bangko": [
+    "bangko-44e7060e",
+    "bangko-4244f5d0"
+  ],
+  "kanto": [
+    "kanto-2a206529",
+    "kanto-65a1a479"
+  ],
+  "kalye": [
+    "kalye-7a50743e",
+    "kalye-931a64c6"
+  ],
+  "paliparan": [
+    "paliparan-00bed8e6",
+    "paliparan-c8ea5d49"
+  ],
+  "Paano pumunta sa palengke?": [
+    "paano-pumunta-sa-palengke-970e6d43",
+    "paano-pumunta-sa-palengke-56b2711e"
+  ],
+  "kaliwa": [
+    "kaliwa-31c4ace6",
+    "kaliwa-94091961"
+  ],
+  "kanan": [
+    "kanan-89ea945e",
+    "kanan-d9e13988"
+  ],
+  "diretso": [
+    "diretso-789e4d23",
+    "diretso-b81ac1de"
+  ],
+  "Kumaliwa ka.": [
+    "kumaliwa-ka-6c34a81b",
+    "kumaliwa-ka-49e02e3a"
+  ],
+  "Kumanan ka.": [
+    "kumanan-ka-998e17c5",
+    "kumanan-ka-93d34a0c"
+  ],
+  "diyan": [
+    "diyan-eeaf4e34",
+    "diyan-eec6e2b3"
+  ],
+  "doon": [
+    "doon-70f21fec",
+    "doon-11a2e444"
+  ],
+  "malapit": [
+    "malapit-17980f13",
+    "malapit-74bf5bc1"
+  ],
+  "malayo": [
+    "malayo-25906c2c",
+    "malayo-33804ab6"
+  ],
+  "katabi": [
+    "katabi-39b0c652",
+    "katabi-e0d178e7"
+  ],
+  "sa harap": [
+    "sa-harap-8ced1bce",
+    "sa-harap-1761fe4b"
+  ],
+  "sa likod": [
+    "sa-likod-57a82e9e",
+    "sa-likod-045ee4de"
+  ],
+  "Libre ka ba?": [
+    "libre-ka-ba-96ca3623",
+    "libre-ka-ba-f110a699"
+  ],
+  "Anong plano?": [
+    "anong-plano-9b321e25",
+    "anong-plano-7a20e60b"
+  ],
+  "Saan tayo magkikita?": [
+    "saan-tayo-magkikita-e737c593",
+    "saan-tayo-magkikita-eaca9280"
+  ],
+  "Anong oras tayo magkikita?": [
+    "anong-oras-tayo-magkikita-28d199b7",
+    "anong-oras-tayo-magkikita-238d86d9"
+  ],
+  "Kita tayo bukas.": [
+    "kita-tayo-bukas-ba1732e2",
+    "kita-tayo-bukas-5a2a4b69"
+  ],
+  "Puwede ako.": [
+    "puwede-ako-0769e54b",
+    "puwede-ako-dafb389c"
+  ],
+  "Hindi ako puwede.": [
+    "hindi-ako-puwede-94757fe7",
+    "hindi-ako-puwede-8838f1c8"
+  ],
+  "Mamaya na lang.": [
+    "mamaya-na-lang-449ff25d",
+    "mamaya-na-lang-575f2881"
+  ],
+  "Teka.": [
+    "teka-68869c05",
+    "teka-aa521064"
+  ],
+  "Tuloy ba tayo?": [
+    "tuloy-ba-tayo-7d944f7c",
+    "tuloy-ba-tayo-c3fa985e"
+  ],
+  "Sasama ako.": [
+    "sasama-ako-670b2e31",
+    "sasama-ako-e5bd51e5"
+  ],
+  "baka": [
+    "baka-89bbf0f1",
+    "baka-add72e49"
+  ],
+  "Kain tayo!": [
+    "kain-tayo-32582875",
+    "kain-tayo-eeb345fd"
+  ],
+  "Gutom na ako.": [
+    "gutom-na-ako-46f22b2d",
+    "gutom-na-ako-30887fb6"
+  ],
+  "Masarap!": [
+    "masarap-05d314bf",
+    "masarap-13014410"
+  ],
+  "kanin": [
+    "kanin-fe33e055",
+    "kanin-da95e1df"
+  ],
+  "tubig": [
+    "tubig-d63c156b",
+    "tubig-2463f08c"
+  ],
+  "kape": [
+    "kape-e220df89",
+    "kape-16124980"
+  ],
+  "tinapay": [
+    "tinapay-5a9c279d",
+    "tinapay-80dcafca"
+  ],
+  "manok": [
+    "manok-a0936afd",
+    "manok-6b68b2db"
+  ],
+  "isda": [
+    "isda-668b8ac0",
+    "isda-89d4a247"
+  ],
+  "Busog na ako.": [
+    "busog-na-ako-7ed4c0ae",
+    "busog-na-ako-6f5f8831"
+  ],
+  "almusal": [
+    "almusal-0b1c7319",
+    "almusal-71ab7592"
+  ],
+  "tanghalian": [
+    "tanghalian-39b24290",
+    "tanghalian-766ec31b"
+  ],
+  "hapunan": [
+    "hapunan-90a0a843",
+    "hapunan-3f482b4c"
+  ],
+  "itlog": [
+    "itlog-a0fb5e1c",
+    "itlog-49d877c8"
+  ],
+  "baboy": [
+    "baboy-dc94383c",
+    "baboy-cdf5448e"
+  ],
+  "karne ng baka": [
+    "karne-ng-baka-7b4d5e16",
+    "karne-ng-baka-a8dffbc9"
+  ],
+  "gulay": [
+    "gulay-4c7ee169",
+    "gulay-c187a8c3"
+  ],
+  "prutas": [
+    "prutas-3c5ac0ea",
+    "prutas-9d292947"
+  ],
+  "saging": [
+    "saging-882f21b8",
+    "saging-3df6e932"
+  ],
+  "mangga": [
+    "mangga-7a2d4e7d",
+    "mangga-99248a53"
+  ],
+  "gatas": [
+    "gatas-346fc829",
+    "gatas-71612489"
+  ],
+  "asukal": [
+    "asukal-0fab9a2a",
+    "asukal-dc77af63"
+  ],
+  "asin": [
+    "asin-dd482df6",
+    "asin-2d7bfcc9"
+  ],
+  "Isa pong adobo.": [
+    "isa-pong-adobo-027bf37f",
+    "isa-pong-adobo-900598db"
+  ],
+  "Pahingi po ng tubig.": [
+    "pahingi-po-ng-tubig-b95cd656",
+    "pahingi-po-ng-tubig-8760a9fb"
+  ],
+  "Anong masarap dito?": [
+    "anong-masarap-dito-e7f5099a",
+    "anong-masarap-dito-26af2b83"
+  ],
+  "maanghang": [
+    "maanghang-0a102adb",
+    "maanghang-ce28194b"
+  ],
+  "Huwag pong maanghang.": [
+    "huwag-pong-maanghang-f3341884",
+    "huwag-pong-maanghang-9d96abeb"
+  ],
+  "ulam": [
+    "ulam-1d898db5",
+    "ulam-a217347c"
+  ],
+  "kutsara": [
+    "kutsara-650023b3",
+    "kutsara-726f5f1e"
+  ],
+  "tinidor": [
+    "tinidor-d6de7b44",
+    "tinidor-7ea05c42"
+  ],
+  "baso": [
+    "baso-f92c918f",
+    "baso-6ba34d05"
+  ],
+  "Bill po.": [
+    "bill-po-f26ca3fe",
+    "bill-po-4b77ade5"
+  ],
+  "pera": [
+    "pera-ac9566fb",
+    "pera-9a5f5045"
+  ],
+  "piso": [
+    "piso-e63ff38c",
+    "piso-02f70a7d"
+  ],
+  "dalawampu": [
+    "dalawampu-5da50a2b",
+    "dalawampu-5aff4bd6"
+  ],
+  "limampu": [
+    "limampu-21b097ce",
+    "limampu-b8c73223"
+  ],
+  "isang daan": [
+    "isang-daan-1d872cb0",
+    "isang-daan-3ec70324"
+  ],
+  "limang daan": [
+    "limang-daan-9491e258",
+    "limang-daan-09b2687f"
+  ],
+  "isang libo": [
+    "isang-libo-a1b51abf",
+    "isang-libo-cc04cc59"
+  ],
+  "sukli": [
+    "sukli-7ea6be9e",
+    "sukli-0897760b"
+  ],
+  "barya": [
+    "barya-9d4cfac6",
+    "barya-c76061ad"
+  ],
+  "Magkano lahat?": [
+    "magkano-lahat-255b0d01",
+    "magkano-lahat-b67517c3"
+  ],
+  "labing-isa": [
+    "labing-isa-fd7e20a5",
+    "labing-isa-1573e1b8"
+  ],
+  "labindalawa": [
+    "labindalawa-f87df918",
+    "labindalawa-9ff7ae28"
+  ],
+  "labinlima": [
+    "labinlima-b6ef7acc",
+    "labinlima-d3d831cf"
+  ],
+  "tatlumpu": [
+    "tatlumpu-46f185a6",
+    "tatlumpu-3dd458ff"
+  ],
+  "apatnapu": [
+    "apatnapu-d6bfcf9d",
+    "apatnapu-76ef4f7b"
+  ],
+  "dalawang daan": [
+    "dalawang-daan-b732b24a",
+    "dalawang-daan-83a0cbef"
+  ],
+  "Pabili po.": [
+    "pabili-po-f3997531",
+    "pabili-po-a9a2d59e"
+  ],
+  "Meron ba kayong tinapay?": [
+    "meron-ba-kayong-tinapay-70cfa09c",
+    "meron-ba-kayong-tinapay-e6d9a662"
+  ],
+  "iyan": [
+    "iyan-15c57cba",
+    "iyan-f35c7290"
+  ],
+  "iyon": [
+    "iyon-5ca20965",
+    "iyon-974d0e03"
+  ],
+  "Isa pa.": [
+    "isa-pa-db57b2ae",
+    "isa-pa-0de760ad"
+  ],
+  "Ito na lang.": [
+    "ito-na-lang-58658a79",
+    "ito-na-lang-d1d41592"
+  ],
+  "Puwede bang tumawad?": [
+    "puwede-bang-tumawad-77ea4bbd",
+    "puwede-bang-tumawad-d7e95b4c"
+  ],
+  "Wala na.": [
+    "wala-na-c6e9d8a1",
+    "wala-na-db53ef29"
+  ],
+  "Tumitingin lang po.": [
+    "tumitingin-lang-po-63ab4dfd",
+    "tumitingin-lang-po-e54b036b"
+  ],
+  "malaki": [
+    "malaki-f9009e97",
+    "malaki-ec60292a"
+  ],
+  "maliit": [
+    "maliit-6311a872",
+    "maliit-4fc21a5e"
+  ],
+  "nanay": [
+    "nanay-1d93904e",
+    "nanay-e2291d08"
+  ],
+  "tatay": [
+    "tatay-b48be4c7",
+    "tatay-e4e04137"
+  ],
+  "Ate": [
+    "ate-be3bd6c5",
+    "ate-e57af543"
+  ],
+  "Kuya": [
+    "kuya-de8e30e8",
+    "kuya-00a37711"
+  ],
+  "lola": [
+    "lola-e60d05c0",
+    "lola-b4cc8d44"
+  ],
+  "lolo": [
+    "lolo-be67bff4",
+    "lolo-7b574156"
+  ],
+  "anak": [
+    "anak-ef539c68",
+    "anak-cee73f6f"
+  ],
+  "kaibigan": [
+    "kaibigan-4c196fbe",
+    "kaibigan-4f9137cd"
+  ],
+  "asawa": [
+    "asawa-22682c7c",
+    "asawa-a634f4fb"
+  ],
+  "pamilya": [
+    "pamilya-fa78a139",
+    "pamilya-4d025d0d"
+  ],
+  "lalaki": [
+    "lalaki-09ca6ed6",
+    "lalaki-f265e775"
+  ],
+  "babae": [
+    "babae-825f479e",
+    "babae-8eaa5783"
+  ],
+  "kapatid": [
+    "kapatid-ddb007c4",
+    "kapatid-f46203cb"
+  ],
+  "bata": [
+    "bata-0ef35618",
+    "bata-3e2bcceb"
+  ],
+  "Tara na!": [
+    "tara-na-2abd25e9",
+    "tara-na-11286821"
+  ],
+  "Sandali lang.": [
+    "sandali-lang-be748bff",
+    "sandali-lang-44afd52d"
+  ],
+  "Nasaan ang banyo?": [
+    "nasaan-ang-banyo-6342c992",
+    "nasaan-ang-banyo-efce98a6"
+  ],
+  "Gusto ko ito.": [
+    "gusto-ko-ito-c49fa7e1",
+    "gusto-ko-ito-709505ec"
+  ],
+  "Ayoko.": [
+    "ayoko-f6964eb9",
+    "ayoko-3535178c"
+  ],
+  "Hindi ko alam.": [
+    "hindi-ko-alam-f5047c6c",
+    "hindi-ko-alam-6fbdbe84"
+  ],
+  "mahal": [
+    "mahal-caf04676",
+    "mahal-e6f59748"
+  ],
+  "mura": [
+    "mura-88deb7fa",
+    "mura-f29748ee"
+  ],
+  "Mahal kita.": [
+    "mahal-kita-d61dd4c4",
+    "mahal-kita-b406b02f"
+  ],
+  "Anong balita?": [
+    "anong-balita-e9c9d851",
+    "anong-balita-2a8ea16d"
+  ],
+  "Kumain ka na ba?": [
+    "kumain-ka-na-ba-4befcf39",
+    "kumain-ka-na-ba-3afe6e9c"
+  ],
+  "Kumain na ako.": [
+    "kumain-na-ako-d7e62ee2",
+    "kumain-na-ako-3c4d8c4b"
+  ],
+  "Matutulog na ako.": [
+    "matutulog-na-ako-c9845f4a",
+    "matutulog-na-ako-869d2f72"
+  ],
+  "Gising ka na ba?": [
+    "gising-ka-na-ba-c0b4d3e4",
+    "gising-ka-na-ba-97671169"
+  ],
+  "Talaga?": [
+    "talaga-1fe3a884",
+    "talaga-8b296993"
+  ],
+  "Oo nga.": [
+    "oo-nga-15009c95",
+    "oo-nga-db0771a7"
+  ],
+  "Ako rin.": [
+    "ako-rin-805ebc52",
+    "ako-rin-abdb1860"
+  ],
+  "Tama.": [
+    "tama-1fc14356",
+    "tama-e95ec2cf"
+  ],
+  "Siguro.": [
+    "siguro-603cd699",
+    "siguro-2f06e858"
+  ],
+  "Ewan ko.": [
+    "ewan-ko-06d06056",
+    "ewan-ko-eebe8f46"
+  ],
+  "Ganun ba?": [
+    "ganun-ba-5b1b02fb",
+    "ganun-ba-fa6a5603"
+  ],
+  "Grabe!": [
+    "grabe-ca73a0ce",
+    "grabe-f63d8741"
+  ],
+  "Ayos lang.": [
+    "ayos-lang-70b59a38",
+    "ayos-lang-836c4372"
+  ],
+  "Hindi naman.": [
+    "hindi-naman-f9a11041",
+    "hindi-naman-34873f39"
+  ],
+  "Ano ulit?": [
+    "ano-ulit-bb857fe3",
+    "ano-ulit-eb4e298c"
+  ],
+  "Sayang!": [
+    "sayang-18302e82",
+    "sayang-e7a39fc6"
+  ],
+  "Naku!": [
+    "naku-dab52e20",
+    "naku-2cbe7bb0"
+  ],
+  "Bahala na.": [
+    "bahala-na-0f7a1406",
+    "bahala-na-b8651fb1"
+  ],
+  "Hindi pa.": [
+    "hindi-pa-6707cbc8",
+    "hindi-pa-2ec64600"
+  ],
+  "Walang problema.": [
+    "walang-problema-b1322da7",
+    "walang-problema-9ad4e5a6"
+  ],
+  "Ikaw ang bahala.": [
+    "ikaw-ang-bahala-7b105869",
+    "ikaw-ang-bahala-1bfe2da0"
+  ],
+  "Sigurado ka ba?": [
+    "sigurado-ka-ba-2b30dfe6",
+    "sigurado-ka-ba-02a46f18"
+  ],
+  "sana": [
+    "sana-a5524b01",
+    "sana-a9876734"
+  ],
+  "Pagod na ako.": [
+    "pagod-na-ako-5a70b5f8",
+    "pagod-na-ako-61def828"
+  ],
+  "Inaantok ako.": [
+    "inaantok-ako-0df11904",
+    "inaantok-ako-762065fc"
+  ],
+  "Nauuhaw ako.": [
+    "nauuhaw-ako-a5cbd024",
+    "nauuhaw-ako-ff5fb872"
+  ],
+  "Mainit!": [
+    "mainit-6c05f985",
+    "mainit-25ba7e7e"
+  ],
+  "Malamig.": [
+    "malamig-46d7a1bf",
+    "malamig-208236ac"
+  ],
+  "masaya": [
+    "masaya-dfa00faa",
+    "masaya-192b5877"
+  ],
+  "malungkot": [
+    "malungkot-afa9204c",
+    "malungkot-7b88bf13"
+  ],
+  "Masakit.": [
+    "masakit-8dcb02ed",
+    "masakit-bb6c62eb"
+  ],
+  "May sakit ako.": [
+    "may-sakit-ako-74c1cc16",
+    "may-sakit-ako-6e27af9e"
+  ],
+  "Okay lang ako.": [
+    "okay-lang-ako-52bbb797",
+    "okay-lang-ako-613d62e8"
+  ],
+  "Gusto ko nang umuwi.": [
+    "gusto-ko-nang-umuwi-d2076f11",
+    "gusto-ko-nang-umuwi-1c869d35"
+  ],
+  "kumain": [
+    "kumain-a07f0277",
+    "kumain-50127f4a"
+  ],
+  "uminom": [
+    "uminom-7f8d1846",
+    "uminom-0807130b"
+  ],
+  "matulog": [
+    "matulog-cf79bea0",
+    "matulog-80d27362"
+  ],
+  "maligo": [
+    "maligo-fc95e317",
+    "maligo-43cd74d4"
+  ],
+  "pumunta": [
+    "pumunta-ae225241",
+    "pumunta-123c3471"
+  ],
+  "dumating": [
+    "dumating-d5ce36fd",
+    "dumating-c41cd0ed"
+  ],
+  "maghintay": [
+    "maghintay-faeb5ea6",
+    "maghintay-1648fe2d"
+  ],
+  "bumili": [
+    "bumili-a2c2b952",
+    "bumili-03e3b1a2"
+  ],
+  "magbayad": [
+    "magbayad-68ad60a0",
+    "magbayad-3f8f02e4"
+  ],
+  "magluto": [
+    "magluto-c374630a",
+    "magluto-4ddd8942"
+  ],
+  "magtrabaho": [
+    "magtrabaho-43422e0e",
+    "magtrabaho-5f09652d"
+  ],
+  "maglakad": [
+    "maglakad-070d739a",
+    "maglakad-d6e048e1"
+  ],
+  "magsalita": [
+    "magsalita-28aaad18",
+    "magsalita-4487a8ec"
+  ],
+  "makinig": [
+    "makinig-daf5ed98",
+    "makinig-b2af8f4d"
+  ],
+  "tumulong": [
+    "tumulong-c098bf16",
+    "tumulong-d187aec8"
+  ],
+  "umupo": [
+    "umupo-09d44c45",
+    "umupo-cff250b1"
+  ],
+  "magpahinga": [
+    "magpahinga-e05925db",
+    "magpahinga-1c64310f"
+  ],
+  "maglaro": [
+    "maglaro-38a8d8f1",
+    "maglaro-4bfd4730"
+  ],
+  "maganda": [
+    "maganda-2067d9ea",
+    "maganda-0c6d0c7e"
+  ],
+  "pangit": [
+    "pangit-ae23340e",
+    "pangit-4c511f7f"
+  ],
+  "mabait": [
+    "mabait-695c4e19",
+    "mabait-24d0926e"
+  ],
+  "marami": [
+    "marami-3b0f91a3",
+    "marami-3ac37a5a"
+  ],
+  "bago": [
+    "bago-ee0aacdc",
+    "bago-b09f9951"
+  ],
+  "luma": [
+    "luma-944ca6e9",
+    "luma-5032749b"
+  ],
+  "matanda": [
+    "matanda-75473141",
+    "matanda-b109ae26"
+  ],
+  "mabilis": [
+    "mabilis-1839214f",
+    "mabilis-a6d8e5db"
+  ],
+  "mabagal": [
+    "mabagal-78e275bb",
+    "mabagal-6e048e87"
+  ],
+  "madali": [
+    "madali-81fe7880",
+    "madali-1d8a10cf"
+  ],
+  "mahirap": [
+    "mahirap-6e6299d8",
+    "mahirap-c5bdc2da"
+  ],
+  "malinis": [
+    "malinis-bfd57d19",
+    "malinis-0fd19842"
+  ],
+  "marumi": [
+    "marumi-cce01e77",
+    "marumi-7c24fda5"
+  ],
+  "mabango": [
+    "mabango-0572d215",
+    "mabango-5b6cbfe1"
+  ],
+  "mabaho": [
+    "mabaho-8bc26d53",
+    "mabaho-6a315230"
+  ],
+  "kulay": [
+    "kulay-d61603cf",
+    "kulay-f642cf88"
+  ],
+  "pula": [
+    "pula-e516d5e0",
+    "pula-2fcb43a3"
+  ],
+  "puti": [
+    "puti-344daa6a",
+    "puti-64a550b1"
+  ],
+  "itim": [
+    "itim-6cda8583",
+    "itim-5f0ad81a"
+  ],
+  "asul": [
+    "asul-65e2c21b",
+    "asul-8f7a9cf7"
+  ],
+  "berde": [
+    "berde-512aa0ff",
+    "berde-7a4ceaae"
+  ],
+  "dilaw": [
+    "dilaw-1b68ca85",
+    "dilaw-f2d8d7ca"
+  ],
+  "panahon": [
+    "panahon-53ce510a",
+    "panahon-314c8887"
+  ],
+  "Maaraw.": [
+    "maaraw-62666c7e",
+    "maaraw-1e8029e7"
+  ],
+  "Umuulan.": [
+    "umuulan-5b9d67ba",
+    "umuulan-559cda8f"
+  ],
+  "payong": [
+    "payong-985ab3c8",
+    "payong-8ce9ea1e"
+  ],
+  "Mahangin.": [
+    "mahangin-2eca516a",
+    "mahangin-c97ca95f"
+  ],
+  "bagyo": [
+    "bagyo-e996bfd8",
+    "bagyo-90594887"
+  ],
+  "tag-init": [
+    "tag-init-88111855",
+    "tag-init-1a00cb6b"
+  ],
+  "tag-ulan": [
+    "tag-ulan-18bf5bad",
+    "tag-ulan-2bb464cb"
+  ],
+  "selpon": [
+    "selpon-c0c56cb1",
+    "selpon-f58dace4"
+  ],
+  "I-text mo ako.": [
+    "i-text-mo-ako-013f74d3",
+    "i-text-mo-ako-690aa05d"
+  ],
+  "Tawagan mo ako.": [
+    "tawagan-mo-ako-24dbcebe",
+    "tawagan-mo-ako-4a9bc55b"
+  ],
+  "Sino ito?": [
+    "sino-ito-8de6356e",
+    "sino-ito-25f58fc4"
+  ],
+  "Anong number mo?": [
+    "anong-number-mo-02a94bb8",
+    "anong-number-mo-7efa4a03"
+  ],
+  "Walang signal.": [
+    "walang-signal-f7dc4265",
+    "walang-signal-f81ac428"
+  ],
+  "Tulong!": [
+    "tulong-779e408c",
+    "tulong-acb66f9b"
+  ],
+  "Pakitulungan mo ako.": [
+    "pakitulungan-mo-ako-ff0164f7",
+    "pakitulungan-mo-ako-e4558729"
+  ],
+  "Naliligaw ako.": [
+    "naliligaw-ako-097fd85d",
+    "naliligaw-ako-1053bff1"
+  ],
+  "Nawala ang bag ko.": [
+    "nawala-ang-bag-ko-cbff40bf",
+    "nawala-ang-bag-ko-c7e05e21"
+  ],
+  "Tumawag ka ng pulis!": [
+    "tumawag-ka-ng-pulis-16d79e5f",
+    "tumawag-ka-ng-pulis-b70c4088"
+  ],
+  "Kailangan ko ng doktor.": [
+    "kailangan-ko-ng-doktor-a112505e",
+    "kailangan-ko-ng-doktor-1b0e96a2"
+  ],
+  "Nasaan ang ospital?": [
+    "nasaan-ang-ospital-cf9e3265",
+    "nasaan-ang-ospital-53cd36a1"
+  ],
+  "gamot": [
+    "gamot-4a9a14ad",
+    "gamot-62fe70bc"
+  ],
+  "Delikado!": [
+    "delikado-b3fa8d51",
+    "delikado-66de2c3e"
+  ],
+  "Tama na!": [
+    "tama-na-c007603b",
+    "tama-na-85d8716a"
+  ],
+  "Sunog!": [
+    "sunog-b4f4a8af",
+    "sunog-61a7dbc1"
+  ],
+  "Magnanakaw!": [
+    "magnanakaw-ca35ce66",
+    "magnanakaw-4a573d57"
+  ],
+  "Salamat po.": [
+    "salamat-po-4477bfaa",
+    "salamat-po-0482865d"
+  ],
+  "Hindi po.": [
+    "hindi-po-bb6f0880",
+    "hindi-po-5fd3a9e1"
+  ],
+  "Gutom na po ako.": [
+    "gutom-na-po-ako-770ff28e",
+    "gutom-na-po-ako-c80c13b4"
+  ],
+  "Tara na po.": [
+    "tara-na-po-cafd1250",
+    "tara-na-po-057e458e"
+  ],
+  "Sino si Ben?": [
+    "sino-si-ben-9160aa36",
+    "sino-si-ben-2ab50655"
+  ],
+  "Kaibigan ko si Ben.": [
+    "kaibigan-ko-si-ben-8da23f3f",
+    "kaibigan-ko-si-ben-047f3935"
+  ],
+  "Ako si Ben.": [
+    "ako-si-ben-2866ebce",
+    "ako-si-ben-cd29465a"
+  ],
+  "Sino si Ana?": [
+    "sino-si-ana-6ea50ede",
+    "sino-si-ana-703c6aff"
+  ],
+  "Kaibigan ko si Ana.": [
+    "kaibigan-ko-si-ana-9860b497",
+    "kaibigan-ko-si-ana-4547ef24"
+  ],
+  "Gutom ka ba?": [
+    "gutom-ka-ba-25d3e131",
+    "gutom-ka-ba-b47134b4"
+  ],
+  "Malayo ba?": [
+    "malayo-ba-8e5be1bf",
+    "malayo-ba-807672e8"
+  ],
+  "Pagod ka ba?": [
+    "pagod-ka-ba-72840c09",
+    "pagod-ka-ba-30ee166c"
+  ],
+  "Hindi ako gutom.": [
+    "hindi-ako-gutom-0a7109d0",
+    "hindi-ako-gutom-5822becc"
+  ],
+  "Hindi ako pagod.": [
+    "hindi-ako-pagod-34fbfd36",
+    "hindi-ako-pagod-35a412a5"
+  ],
+  "Hindi malayo.": [
+    "hindi-malayo-c022af92",
+    "hindi-malayo-d463de94"
+  ],
+  "Hindi maanghang.": [
+    "hindi-maanghang-fa8abb58",
+    "hindi-maanghang-e9e19c91"
+  ],
+  "Gutom ako.": [
+    "gutom-ako-c09a0ce4",
+    "gutom-ako-6a0ed361"
+  ],
+  "Pagod siya.": [
+    "pagod-siya-51904ab2",
+    "pagod-siya-e1852b18"
+  ],
+  "Masarap ito.": [
+    "masarap-ito-acf0c661",
+    "masarap-ito-45b47da6"
+  ],
+  "Masaya siya.": [
+    "masaya-siya-d9267f92",
+    "masaya-siya-1dfd0b1b"
+  ],
+  "Pagod na kami.": [
+    "pagod-na-kami-ec4ac344",
+    "pagod-na-kami-a2c8f4d0"
+  ],
+  "Gusto ko ng kape.": [
+    "gusto-ko-ng-kape-f175ffec",
+    "gusto-ko-ng-kape-9f501ca6"
+  ],
+  "Gusto ko ng tubig.": [
+    "gusto-ko-ng-tubig-94ef1cbb",
+    "gusto-ko-ng-tubig-19b3499f"
+  ],
+  "Gusto ko ng kanin.": [
+    "gusto-ko-ng-kanin-846113c1",
+    "gusto-ko-ng-kanin-bfcc69d6"
+  ],
+  "Gusto ko ng tinapay.": [
+    "gusto-ko-ng-tinapay-7cab6b6b",
+    "gusto-ko-ng-tinapay-a601375f"
+  ],
+  "May tubig.": [
+    "may-tubig-00373564",
+    "may-tubig-c86d40a3"
+  ],
+  "May tubig ba?": [
+    "may-tubig-ba-a3afa1de",
+    "may-tubig-ba-04dc4441"
+  ],
+  "May kanin ba?": [
+    "may-kanin-ba-eae0dac7",
+    "may-kanin-ba-a5da0563"
+  ],
+  "Magandang umaga.": [
+    "magandang-umaga-494d2028",
+    "magandang-umaga-98a6d7a0"
+  ],
+  "masarap na kape": [
+    "masarap-na-kape-69a39615",
+    "masarap-na-kape-251f3569"
+  ],
+  "mainit na tubig": [
+    "mainit-na-tubig-64ae210d",
+    "mainit-na-tubig-65a8490e"
+  ],
+  "Magandang gabi.": [
+    "magandang-gabi-5bd0a6c4",
+    "magandang-gabi-c416a443"
+  ],
+  "malaking bahay": [
+    "malaking-bahay-6c94fd13",
+    "malaking-bahay-87efef11"
+  ],
+  "Pakiabot po ang tubig.": [
+    "pakiabot-po-ang-tubig-97da5c25",
+    "pakiabot-po-ang-tubig-9f450bcf"
+  ],
+  "mga bahay": [
+    "mga-bahay-421cfd4f",
+    "mga-bahay-3ce231a1"
+  ],
+  "mga kaibigan ko": [
+    "mga-kaibigan-ko-9887006f",
+    "mga-kaibigan-ko-d572a0ac"
+  ],
+  "dalawang kape": [
+    "dalawang-kape-a3247045",
+    "dalawang-kape-e0fdc14c"
+  ],
+  "Masarap ang kape.": [
+    "masarap-ang-kape-af5096b0",
+    "masarap-ang-kape-4138f5a5"
+  ],
+  "Malayo ang palengke.": [
+    "malayo-ang-palengke-161ec46f",
+    "malayo-ang-palengke-fa18d14d"
+  ],
+  "Nasaan ang palengke?": [
+    "nasaan-ang-palengke-705f3cfd",
+    "nasaan-ang-palengke-6f54394d"
+  ],
+  "Nasaan si Ana?": [
+    "nasaan-si-ana-6244e148",
+    "nasaan-si-ana-95a5dd05"
+  ],
+  "Malaki ang bahay.": [
+    "malaki-ang-bahay-15e72f76",
+    "malaki-ang-bahay-05f4d82f"
+  ],
+  "Kita tayo sa kanto.": [
+    "kita-tayo-sa-kanto-7f5af39c",
+    "kita-tayo-sa-kanto-18237f2f"
+  ],
+  "Paano pumunta sa ospital?": [
+    "paano-pumunta-sa-ospital-f3303897",
+    "paano-pumunta-sa-ospital-3ab221ef"
+  ],
+  "Kumakain ako.": [
+    "kumakain-ako-2e16b662",
+    "kumakain-ako-eb12905b"
+  ],
+  "Kakain tayo mamaya.": [
+    "kakain-tayo-mamaya-6e1c8d9c",
+    "kakain-tayo-mamaya-6393a80a"
+  ],
+  "Gusto ko ng kape": [
+    "gusto-ko-ng-kape-6d0a69f8",
+    "gusto-ko-ng-kape-e607974a"
+  ],
+  "Gutom ka?": [
+    "gutom-ka-7f67446c",
+    "gutom-ka-d1359c24"
+  ],
+  "Malayo?": [
+    "malayo-44c229ab",
+    "malayo-e81131c5"
+  ],
+  "Ha?": [
+    "ha-cfb922b8",
+    "ha-2192f120"
+  ],
+  "Ano po?": [
+    "ano-po-bc52283c",
+    "ano-po-0f65d2be"
+  ],
+  "Ay!": [
+    "ay-b4cf214e",
+    "ay-471da4eb"
+  ],
+  "Ay naku!": [
+    "ay-naku-6b455a97",
+    "ay-naku-e19ac6e2"
+  ],
+  "Kuya, para po!": [
+    "kuya-para-po-05705385",
+    "kuya-para-po-50c8f37d"
+  ],
+  "Ate, magkano ito?": [
+    "ate-magkano-ito-918e37ea",
+    "ate-magkano-ito-ad1651a5"
+  ],
+  "Psst! Kuya!": [
+    "psst-kuya-ef2e0a26",
+    "psst-kuya-261a04f0"
+  ],
+  "Sige, salamat.": [
+    "sige-salamat-eec44c06",
+    "sige-salamat-04cea3c2"
+  ],
+  "Good morning po!": [
+    "good-morning-po-a6f29582",
+    "good-morning-po-992d294c"
+  ],
+  "Thank you po!": [
+    "thank-you-po-5a545e30",
+    "thank-you-po-75acbff5"
+  ],
+  "Sorry, trapik!": [
+    "sorry-trapik-2329c814",
+    "sorry-trapik-c1d4c096"
+  ]
 }

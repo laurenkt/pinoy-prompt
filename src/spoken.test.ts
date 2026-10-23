@@ -8,7 +8,7 @@ import { drillSentence } from './session';
 import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
 
-const CLIPS: Record<string, string> = clips;
+const CLIPS: Record<string, string[]> = clips;
 /** The clip files in public/audio, by name. */
 const onDisk = new Set(Object.keys(import.meta.glob('../public/audio/*')).map((path) => path.split('/').pop()));
 
@@ -31,9 +31,13 @@ describe('recorded clips', () => {
     expect(Object.keys(CLIPS).filter((t) => !spoken.has(t))).toEqual([]);
   });
 
+  it('has a clip in both voices for every text, as the app picks between them', () => {
+    expect(Object.keys(CLIPS).filter((t) => CLIPS[t].length !== 2)).toEqual([]);
+  });
+
   it('has both files of every clip, and nothing else, so all of them can be kept offline', () => {
     const files = allClipUrls().map((url) => url.split('/').pop());
-    expect(files).toHaveLength(2 * Object.keys(CLIPS).length);
+    expect(files).toHaveLength(2 * Object.values(CLIPS).flat().length);
     expect(files.filter((f) => !onDisk.has(f))).toEqual([]);
     expect(onDisk.size).toBe(files.length);
   });
