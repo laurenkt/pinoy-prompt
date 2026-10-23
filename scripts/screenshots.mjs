@@ -106,13 +106,7 @@ const SCREENS = {
         }),
       });
     });
-    await page.click('.drills-btn');
-    await page.click('.filter-toggle');
-    for (const mode of ['listen', 'read', 'recall']) {
-      const chip = page.locator(`#drill-scope .chip[data-mode="${mode}"]`);
-      if ((await chip.getAttribute('aria-pressed')) === 'true') await chip.click();
-    }
-    await page.click('.filter-toggle');
+    await drillOnlySpeak(page);
     await page.click('.speak .btn.mic');
     await page.waitForSelector('.sound-results');
   },
@@ -238,6 +232,14 @@ try {
   await server.close();
 }
 
+/** Drills, asking only Speak. */
+async function drillOnlySpeak(page) {
+  await page.click('.drills-btn');
+  await page.click('.filter-toggle');
+  for (const mode of ['listen', 'read', 'recall']) await page.click(`#drill-scope [data-mode="${mode}"]`);
+  await page.click('.filter-toggle');
+}
+
 /** Drills, asking only Speak, ready to listen. */
 async function speakOnly(page) {
   const { MODEL_URL } = await page.evaluate(() => import('/src/model-cache.ts'));
@@ -267,10 +269,7 @@ async function speakOnly(page) {
       return out.stream;
     };
   });
-  await page.click('.drills-btn');
-  await page.click('.filter-toggle');
-  for (const mode of ['listen', 'read', 'recall']) await page.click(`#drill-scope [data-mode="${mode}"]`);
-  await page.click('.filter-toggle');
+  await drillOnlySpeak(page);
   await page.click('.speak .btn.primary');
   await page.waitForSelector('.speak.ready', { timeout: 60_000 });
 }
