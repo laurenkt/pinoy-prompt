@@ -26,6 +26,8 @@ const root = document.getElementById('app')!;
 watchFit(root);
 let keyHandler: ((e: KeyboardEvent) => void) | null = null;
 let backHandler: (() => void) | null = null;
+/** The screen on show, so Home can be drawn again when the app comes back. */
+let shown: Route | null = null;
 
 let warnedSaveFailed = false;
 
@@ -71,6 +73,7 @@ const screens = backHistory<Route>({
     showDueBadge(app.progress, Date.now());
     // Another tab may have changed quiet mode.
     applyAudioMode(app.progress.settings);
+    shown = route;
     render(route);
     window.scrollTo(0, 0);
   },
@@ -153,6 +156,13 @@ function saved(ok: boolean): void {
 
 // The number on the app's icon, set again as the learner opens or leaves the app.
 keepBadgeCurrent(() => app.progress);
+// Home's Study button says what's due, or how long until more is, as of when it was drawn: draw it again on coming back.
+// Only Home: other screens hold a session or a half-typed answer.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || shown?.name !== 'home') return;
+  app.progress = rollDay(app.progress, Date.now());
+  render(shown);
+});
 
 async function start(): Promise<void> {
   // Another tab saved: pick up its progress in place, so screens holding it see the change.
