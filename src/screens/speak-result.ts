@@ -195,7 +195,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
 
   /**
    * The coaching tip for a sound that needs work. An added sound that counts takes the
-   * tip for the sound before it, which is where the coach puts "leave it out".
+   * tip for the sound before it, which is where the coach puts "leave it out". A tip that
+   * only says what was heard and what to aim for is left out: the labels over the slider say it.
    */
   function tipFor(index: number): string | undefined {
     const p = list[index];
@@ -203,7 +204,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     if (p.result) owner = p.result.verdict === 'good' ? undefined : p;
     else if (p.extraCounts) owner = list.slice(0, index).reverse().find((q) => q.result);
     const want = owner ? letters(owner) : '';
-    return want ? attempt.tips.find((t) => t.letters.toLowerCase() === want)?.text : undefined;
+    return want ? attempt.tips.find((t) => t.letters.toLowerCase() === want && !t.plain)?.text : undefined;
   }
 
   function renderDetail(p: Pair, index: number): void {
@@ -211,7 +212,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const heard = p.heardAt !== undefined ? attempt.heard[p.heardAt] : null;
     const verdict = verdictOf(p);
     const closeness = p.result?.closeness ?? 0;
-    const tip = tipFor(index) ?? (!ipa ? (p.extraCounts ? 'This sound isn’t in the word. Try leaving it out.' : 'A small extra sound like this is a natural part of speech. No need to change it.') : undefined);
+    const tip = tipFor(index) ?? (!ipa && !p.extraCounts ? 'A small extra sound like this is a natural part of speech. No need to change it.' : undefined);
     const drawn = drawChart(ipa ?? null, heard);
     // Right, even if the recogniser wrote it another way (an accepted variant): nothing to slide between.
     const said = p.result?.verdict === 'good';
