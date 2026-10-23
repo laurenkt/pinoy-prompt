@@ -92,6 +92,16 @@ export function releaseMicrophone(released: MediaStream): void {
   closeWhenIdle();
 }
 
+/**
+ * Done with a stream from getMicrophone() that gave no sound at all (iOS can leave a track live but silent):
+ * in place of releaseMicrophone(), it's closed unless something else is using it, so the next getMicrophone()
+ * opens a fresh one.
+ */
+export function dropMicrophone(dead: MediaStream): void {
+  releaseMicrophone(dead);
+  if (dead === stream && users === 0) closeMicrophone();
+}
+
 function closeWhenIdle(): void {
   clearTimeout(idle);
   if (!held && stream && users === 0) idle = setTimeout(closeMicrophone, IDLE_CLOSE_MS);
