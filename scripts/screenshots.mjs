@@ -67,7 +67,23 @@ const SCREENS = {
     await page.click('.drills-btn');
     await page.click('.choice');
   },
+  // A pattern in a drill round, asked as Study asks it: a gap to fill under Read, a sentence to build under Recall.
+  'drills-gap': (page) => drillGuide(page, 'read'),
+  'drills-build': (page) => drillGuide(page, 'recall'),
   study: (page) => page.click('.hub-btn.big:not(.chat-btn)'),
+  // Nothing due and today's new cards in: Study says so and points to Drills.
+  'study-caught-up': async (page) => {
+    await page.evaluate(async () => {
+      const { load, save } = await import('/src/store.ts');
+      const progress = load(Date.now());
+      for (const state of Object.values(progress.cards)) state.due = Date.now() + 86_400_000;
+      progress.today.newCount = progress.settings.dailyNew;
+      save(progress, { replace: true });
+    });
+    await page.reload();
+    await page.waitForSelector('.home');
+    await page.click('.hub-btn.big:not(.chat-btn)');
+  },
   'study-next': async (page) => {
     await page.click('.hub-btn.big:not(.chat-btn)');
     await page.click('.panel .btn.big');
@@ -247,6 +263,31 @@ try {
 } finally {
   await browser.close();
   await server.close();
+}
+
+/** Drills with a pattern still being learned, asking only `mode`, moved on until the pattern comes up. */
+async function drillGuide(page, mode) {
+  await page.evaluate(async () => {
+    const { load, recordAnswer, save } = await import('/src/store.ts');
+    const progress = load(Date.now());
+    // The words held for months, so the pattern stands out.
+    for (const state of Object.values(progress.cards)) Object.assign(state, { interval: 90, reps: 5, reviewed: Date.now() });
+    recordAnswer(progress, 'p-gusto', 'again', Date.now());
+    save(progress, { replace: true });
+  });
+  await page.reload();
+  await page.waitForSelector('.home');
+  await page.click('.drills-btn');
+  await page.click('.filter-toggle');
+  for (const other of ['listen', 'read', 'recall', 'speak']) {
+    const chip = page.locator(`#drill-scope [data-mode="${other}"]`);
+    if (other !== mode && (await chip.getAttribute('aria-pressed')) === 'true' && (await chip.isEnabled())) await chip.click();
+  }
+  await page.click('.filter-toggle');
+  for (let i = 0; i < 40 && !(await page.locator('.drill-q').count()); i++) {
+    if (!(await page.locator('.feedback').count())) await page.locator('.choice').first().click();
+    await page.click('text=Next');
+  }
 }
 
 /** Drills, asking only Speak. */

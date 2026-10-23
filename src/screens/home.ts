@@ -93,9 +93,9 @@ function plural(n: number, one: string, many = `${one}s`): string {
 }
 
 /**
- * Study does one of three things, and the button says which: review what's due,
- * learn new cards, or extra practice once caught up. Each looks different, so
- * it's clear at a glance.
+ * Study does one of two things, and the button says which: review what's due,
+ * or learn new cards. Once caught up it says so (Study then points to Drills).
+ * Each looks different, so it's clear at a glance.
  */
 function studyButton(app: App, isFirstRun: boolean): HTMLElement {
   const { progress } = app;
@@ -106,7 +106,7 @@ function studyButton(app: App, isFirstRun: boolean): HTMLElement {
   if (isFirstRun) mode = { kind: 'learn', icon: 'plus', kicker: 'Start here', title: 'Learn' };
   else if (reviews > 0) mode = { kind: 'review', icon: 'cards', kicker: `${plural(reviews, 'card')} due`, title: 'Review' };
   else if (fresh > 0) mode = { kind: 'learn', icon: 'plus', kicker: plural(fresh, 'new card'), title: 'Learn' };
-  else mode = { kind: 'extra', icon: 'cards', kicker: 'All caught up', title: 'Practice' };
+  else mode = { kind: 'caught-up', icon: 'cards', kicker: 'All caught up', title: 'Study' };
   return h(
     'button',
     { class: `hub-btn big study-btn study-${mode.kind}`, onclick: () => app.navigate({ name: 'study' }) },

@@ -2781,8 +2781,8 @@ p {
   background: var(--saffron);
 }
 
-/* Nothing due: still there for extra practice, but quieter. */
-.study-extra {
+/* Nothing due: still there (it points on to Drills), but quieter. */
+.study-caught-up {
   background: var(--surface);
   color: var(--text);
 }

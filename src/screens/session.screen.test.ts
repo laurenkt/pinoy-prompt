@@ -2,10 +2,10 @@
 // Memory hooks on the study session: shown on introduction, held back in
 // review until the learner asks for one or misses the card.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
 import { sessionScreen } from './session';
-import { button, fakeApp, noMic } from '../test/screen';
+import { button, fakeApp } from '../test/screen';
 
 const hookText = (root: HTMLElement) => root.querySelector('.hook')?.textContent ?? null;
 
@@ -49,7 +49,7 @@ describe('open-ended study', () => {
     const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
     app.progress.settings.dailyNew = 0;
     for (const id of Object.keys(app.progress.cards)) app.progress.cards[id].due = app.now() - 1;
-    const root = sessionScreen(app, null, undefined, noMic);
+    const root = sessionScreen(app, null);
     expect(root.textContent).toContain('0 done');
     const shown: string[] = [];
     // Answer every question wrong: missed words keep coming round.
@@ -75,20 +75,34 @@ describe('open-ended study', () => {
     expect(root.textContent).not.toContain('caught up');
   });
 
-  it('says when it is caught up, and offers practice or new words', () => {
+  it('says when it is caught up, and points to Drills for more practice, or new words', () => {
     const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
     app.progress.settings.dailyNew = 4;
-    const root = sessionScreen(app, null, undefined, noMic);
+    const navigate = vi.spyOn(app, 'navigate');
+    const root = sessionScreen(app, null);
     expect(root.textContent).toContain("You're caught up");
     expect(root.textContent).toContain('Learn something new');
-    button(root, 'Keep practising').click();
-    expect(root.textContent).toContain('Extra practice');
-    expect(root.querySelectorAll('.choice').length).toBe(4);
+    expect(root.querySelector('.choice')).toBeNull();
+    button(root, 'Keep practising in Drills').click();
+    expect(navigate).toHaveBeenCalledWith({ name: 'practice' });
+  });
+
+  it('is caught up once the last due card is answered, and still shows what was done on stopping', () => {
+    const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
+    app.progress.settings.dailyNew = 4;
+    app.progress.cards.salamat = { ...app.progress.cards.salamat, interval: 0, due: app.now() - 1 };
+    const root = sessionScreen(app, null);
+    [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((b) => b.textContent?.includes(getCard('salamat')!.en))!.click();
+    button(root, 'Continue').click();
+    expect(root.textContent).toContain("You're caught up");
+    expect(root.textContent).toContain('1 done');
+    button(root, 'Stop').click();
+    expect(root.textContent).toContain('Session finished');
   });
 
   it('shows what was done when the learner stops', () => {
     const app = fakeApp();
-    const root = sessionScreen(app, null, undefined, noMic);
+    const root = sessionScreen(app, null);
     button(root, "Let's go").click();
     button(root, 'Got it, quiz me').click();
     root.querySelector<HTMLButtonElement>('.choice')!.click();
@@ -100,7 +114,7 @@ describe('open-ended study', () => {
     const app = fakeApp();
     let back = () => {};
     app.onBack = (handler) => (back = handler ?? (() => {}));
-    const root = sessionScreen(app, null, undefined, noMic);
+    const root = sessionScreen(app, null);
     button(root, "Let's go").click();
     button(root, 'Got it, quiz me').click();
     root.querySelector<HTMLButtonElement>('.choice')!.click();
@@ -113,7 +127,7 @@ describe('open-ended study', () => {
     app.progress.settings.dailyNew = 4;
     // Today's new words are used up, but by yesterday's count.
     app.progress.today = { ...app.progress.today, day: '2000-01-01' };
-    const root = sessionScreen(app, null, undefined, noMic);
+    const root = sessionScreen(app, null);
     expect(root.textContent).not.toContain("You're caught up");
     expect(app.progress.today.newCount).toBe(0);
   });

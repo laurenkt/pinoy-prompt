@@ -3,11 +3,10 @@
 
 import { LEARN_ORDER, VOCAB, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
 import { recallChance } from './memory';
-import { isDue, type CardState } from './srs';
+import { DAY_MS, isDue, type CardState } from './srs';
 import type { Progress } from './store';
 
-/** Extra steps are practice beyond the schedule: they never change it. */
-export type StepKind = 'new' | 'review' | 'extra';
+export type StepKind = 'new' | 'review';
 
 export interface Step {
   cardId: string;
@@ -118,8 +117,6 @@ export type Format =
   | 'hear'
   /** See the English, come up with the Tagalog, rate yourself. */
   | 'produce'
-  /** Say it out loud and get coached. Pronunciation only, so it never changes the schedule. */
-  | 'speak'
   /** A guide: answer one of its questions, often filling a gap in a sentence. */
   | 'gap'
   /** A pattern: put a sentence's words in order, from the English. */
@@ -130,7 +127,6 @@ export type Format =
 /** What this device can do, which decides the formats on offer. */
 export interface Abilities {
   listen: boolean;
-  speak: boolean;
 }
 
 /**
@@ -151,8 +147,6 @@ export function pickFormat(state: CardState, can: Abilities, random: () => numbe
 export const MAX_LEARNING = 3;
 /** A card shown in the last few steps isn't shown again yet, so a miss gets a short gap. */
 const RECENT_GAP = 3;
-/** Roughly one in this many practice steps is a speaking one, when the device can do it. */
-const SPEAK_EVERY = 4;
 
 export function learningCount(progress: Progress): number {
   return Object.entries(progress.cards).filter(([id, state]) => state.interval < 1 && getCard(id)).length;
@@ -175,47 +169,68 @@ export function studyQueue(progress: Progress, now: number): string[] {
  * 1. Due reviews, weakest first.
  * 2. A new word, but only once nothing is due, few words are still being
  *    learned, and the daily new-word rate allows it.
- * 3. Extra practice on the weakest words, which doesn't change the schedule.
- * `recent` is the cards shown this session, latest last. `misses` counts
- * extra-practice misses this session, so those words come round again.
+ * Null once caught up: practice beyond that is Drills' (see pickDrillCard).
+ * `recent` is the cards shown this session, latest last.
  */
-export function nextStudyStep(
-  progress: Progress,
-  now: number,
-  recent: string[],
-  can: Abilities,
-  misses: ReadonlyMap<string, number> = new Map(),
-  random: () => number = Math.random,
-): Step | null {
+export function nextStudyStep(progress: Progress, now: number, recent: string[], can: Abilities, random: () => number = Math.random): Step | null {
   const shownRecently = new Set(recent.slice(-RECENT_GAP));
   const last = recent[recent.length - 1];
+  const reviewOf = (id: string): Step => ({ cardId: id, kind: 'review', format: pickFormat(progress.cards[id], can, random, getCard(id)!.kind) });
   // A full gap when there's enough to fill it; otherwise just not the same card twice running.
   const queue = studyQueue(progress, now);
   const review = queue.find((id) => !shownRecently.has(id)) ?? queue.find((id) => id !== last);
-  if (review) return { cardId: review, kind: 'review', format: pickFormat(progress.cards[review], can, random, getCard(review)!.kind) };
+  if (review) return reviewOf(review);
 
   if (newCardsLeftToday(progress) > 0 && learningCount(progress) < MAX_LEARNING) {
     const [fresh] = upcomingNewCards(progress, 1);
     if (fresh) return { cardId: fresh, kind: 'new', format: isVocab(getCard(fresh)!) ? 'read' : 'gap' };
   }
+  // Nothing else to ask: the card just shown again, rather than calling Study caught up while it's still being learned.
+  return queue.length > 0 ? reviewOf(queue[0]) : null;
+}
 
-  const known = Object.entries(progress.cards).filter(([id]) => getCard(id));
-  if (known.length === 0) return null;
-  const ranked = known
-    .map(([id, state]) => ({ id, weakness: recallChance(state, now) - (misses.get(id) ?? 0) }))
-    .sort((a, b) => a.weakness - b.weakness)
-    .map(({ id }) => id);
-  // Small decks can't keep a full gap, but never ask the same card twice in a row unless it's the only one.
-  const cardId = ranked.find((id) => !shownRecently.has(id)) ?? ranked.find((id) => id !== last) ?? ranked[0];
-  const card = getCard(cardId)!;
-  if (!isVocab(card)) {
-    const format = card.kind === 'pattern' && random() < 0.5 ? 'build' : 'gap';
-    return { cardId, kind: 'extra', format };
-  }
-  const formats: Format[] = ['read', 'recall'];
-  if (can.listen) formats.push('listen');
-  const format = can.speak && random() < 1 / SPEAK_EVERY ? 'speak' : formats[Math.floor(random() * formats.length)];
-  return { cardId, kind: 'extra', format };
+/** How many of the last cards drilled are kept out of the next pick, so nothing comes straight back. */
+const DRILL_GAP = 3;
+/** Cards met within this long count as new in a drill round, and come up more. */
+const FRESH_MS = 7 * DAY_MS;
+
+/**
+ * How much a card needs drilling. Every card starts at 1, so the strong ones
+ * still turn up now and then; on top of that come how likely it is to have
+ * been forgotten, being still learned or recently met, how often it has been
+ * forgotten before, and misses this round (`missed`), which count most.
+ */
+export function drillWeight(state: CardState, now: number, missed = 0): number {
+  const fading = 1 - recallChance(state, now);
+  const learning = state.interval < 1 ? 3 : state.interval < 7 ? 1.5 : 0;
+  const fresh = now - state.introduced < FRESH_MS ? 2 : 0;
+  return 1 + 8 * fading + learning + fresh + 2 * Math.min(state.lapses, 3) + 4 * missed;
+}
+
+/**
+ * The next card for a drill round, which runs until the learner stops it: any
+ * card met, words and guides alike, that `askable` allows, picked at random by
+ * drillWeight. The last few cards asked (`recent`, latest last) sit out while
+ * that leaves one to ask. Null with nothing to ask.
+ */
+export function pickDrillCard(
+  progress: Progress,
+  now: number,
+  recent: string[],
+  missed: ReadonlyMap<string, number>,
+  askable: (card: Card) => boolean = () => true,
+  random: () => number = Math.random,
+): Card | null {
+  const pool = Object.entries(progress.cards)
+    .map(([id, state]) => ({ card: getCard(id), state }))
+    .filter((p): p is { card: Card; state: CardState } => !!p.card && askable(p.card))
+    .map(({ card, state }) => ({ card, w: drillWeight(state, now, missed.get(card.id)) }));
+  const keep = Math.min(DRILL_GAP, pool.length - 1);
+  const skip = new Set(keep > 0 ? recent.slice(-keep) : []);
+  const open = pool.filter((p) => !skip.has(p.card.id));
+  if (open.length === 0) return null;
+  let r = random() * open.reduce((sum, p) => sum + p.w, 0);
+  return (open.find((p) => (r -= p.w) <= 0) ?? open[open.length - 1]).card;
 }
 
 /** A few more new cards beyond the daily rate, for when the learner wants them. */

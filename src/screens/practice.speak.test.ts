@@ -8,7 +8,6 @@ import { toPhones } from '../phonetics';
 import type { Take } from '../recorder';
 import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
-import { sessionScreen } from './session';
 import type { SpeakDeps } from './speak';
 import { FakeAudioContext, chimes } from '../test/fake-audio';
 import { FakePlayer, fakeRecognition } from '../test/fake-speech';
@@ -145,15 +144,6 @@ describe('the word before an attempt', () => {
     expect(speaking()).toBe(true);
   });
 
-  it("isn't offered on a speaking step in Study either", async () => {
-    const root = sessionScreen(fakeApp(KNOWN), [{ kind: 'extra', cardId: 'salamat', format: 'speak' }], undefined, deps());
-    document.body.append(root);
-    await flush();
-    button('Keep practising').click();
-    await flush();
-    expect(root.querySelector('.prompt .tl')?.textContent).toBe('Salamat');
-    expect(root.querySelector('.prompt .audio-btn')).toBeNull();
-  });
 });
 
 describe('moving on after a right attempt', () => {
@@ -208,19 +198,4 @@ describe('moving on after a right attempt', () => {
     expect(document.querySelector('.session-count')?.textContent).toBe('0 done');
   });
 
-  it('goes to the next card by itself in Study', async () => {
-    const root = sessionScreen(fakeApp(KNOWN), [
-      { kind: 'extra', cardId: 'salamat', format: 'speak' },
-      { kind: 'extra', cardId: 'kape', format: 'speak' },
-    ], undefined, deps());
-    document.body.append(root);
-    await vi.advanceTimersByTimeAsync(0);
-    button('Keep practising').click();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(shown()).toBe(getCard('salamat')!.tl);
-    await attempt();
-    await vi.advanceTimersByTimeAsync(ADVANCE_MS);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(shown()).toBe(getCard('kape')!.tl);
-  });
 });

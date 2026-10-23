@@ -4,7 +4,6 @@ import { KIND_INFO } from '../guides';
 import {
   buildExtraSession,
   distractors,
-  buildTiles,
   drillSentence,
   isIntroduced,
   nextStudyStep,
@@ -19,13 +18,12 @@ import {
 import { formatInterval, nextInterval, newCardState, type Rating } from '../srs';
 import { canPlay, play, preload, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
-import { audioButton, audioPair, choiceList, h, hookView, iconButton, progressBar } from '../ui';
+import { audioPair, choiceList, h, hookView, iconButton, progressBar } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
+import { answerText, drillPrompt, gapLine, guideAnswer, guideBody, guideQuestion, guideQuestionView, type GuideQuestion } from './guide-question';
 import { isSilent, quietToggle } from './quiet';
-import { endMicrophoneHold } from '../microphone';
-import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
-type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'build' | 'front' | 'back' | 'missed' | 'speak' | 'mic' | 'caught-up' | 'done';
+type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'caught-up' | 'done';
 
 const RATINGS: { rating: Rating; label: string }[] = [
   { rating: 'again', label: 'Again' },
@@ -37,14 +35,14 @@ const RATINGS: { rating: Rating; label: string }[] = [
 const PRAISE = ['Magaling!', 'Galing!', 'Tama!', 'Ayos!'];
 
 /** Phases where the current card hasn't been answered yet, so the one before it can still be looked back at. */
-const UNANSWERED: Phase[] = ['topic-intro', 'intro', 'quiz', 'build', 'front', 'caught-up', 'done'];
+const UNANSWERED: Phase[] = ['topic-intro', 'intro', 'quiz', 'front', 'caught-up', 'done'];
 
 /**
  * A study session. With a list of steps it works through them and finishes;
  * without one it is open-ended study, picking each step as it goes (see
- * nextStudyStep) until the learner stops.
+ * nextStudyStep) until the learner is caught up, then pointing to Drills.
  */
-export function sessionScreen(app: App, steps: Step[] | null, title?: string, deps: SpeakDeps = defaultDeps): HTMLElement {
+export function sessionScreen(app: App, steps: Step[] | null, title?: string): HTMLElement {
   const root = h('div', { class: 'session' });
   const open = steps === null;
   let queue = [...(steps ?? [])];
@@ -56,22 +54,14 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   /** The picked choice: a card id for a word, the answer text for a guide. */
   let picked: string | null = null;
   let hookShown = false;
-  /** For a guide: the question being asked, its choices, and for `build`, its shuffled tiles and the order they were placed in. */
+  /** For a guide: the drill being asked, and while it's a gap or a build, the question as it's asked. */
   let drill: Drill | undefined;
-  let drillChoices: string[] = [];
-  let tiles: string[] = [];
-  let placed: number[] = [];
-  /** How many tiles the right sentence takes; the rest is a decoy. */
-  let tilesNeeded = 0;
+  let guide: GuideQuestion | null = null;
   const lastDrill = new Map<string, Drill>();
   let completed = 0;
-  /** Set once the learner has seen the caught-up note, so it only shows once. */
-  let caughtUpSeen = false;
-  let speak: SpeakPanel | null = null;
   const recent: string[] = [];
-  const misses = new Map<string, number>();
   const topicsIntroduced = new Set<string>();
-  const stats = { learned: 0, reviewed: 0, practised: 0, correct: 0, answered: 0 };
+  const stats = { learned: 0, reviewed: 0, correct: 0, answered: 0 };
   /** Cards missed at least once this session: getting one right later keeps its hook up instead of moving on. */
   const struggled = new Set<string>();
   let praise = PRAISE[0];
@@ -87,36 +77,20 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   /** Everything that makes up the card on screen. */
   type Shown = ReturnType<typeof snapshot>;
   function snapshot() {
-    return { step, card, phase, format, choices, picked, hookShown, drill, drillChoices, tiles, placed, tilesNeeded, praise };
+    return { step, card, phase, format, choices, picked, hookShown, drill, guide, praise };
   }
   function restore(s: Shown): void {
-    ({ step, card, phase, format, choices, picked, hookShown, drill, drillChoices, tiles, placed, tilesNeeded, praise } = s);
+    ({ step, card, phase, format, choices, picked, hookShown, drill, guide, praise } = s);
   }
 
   holdOnTap(root, hold);
 
   /** Listening needs a voice, and quiet mode with headphones in, if it's on. */
   const canListen = () => canPlay() && !isSilent(app.progress.settings);
-  // Speaking joins the mix only once the model is on the device, so study never stops for a download.
-  let speakReady = deps.modelKnownDownloaded?.() ?? false;
-  /** The microphone was refused as practice started, so speaking is left out of this visit. */
-  let speakSkipped = false;
-  /** Whether practice may ask the learner to speak. */
-  const canSpeak = () => speakReady && !app.progress.settings.quiet && !speakSkipped;
-  if (deps.recordingSupported()) {
-    deps.modelDownloaded().then(
-      (ready) => (speakReady ||= ready),
-      () => {},
-    );
-  }
 
-  /**
-   * Play the card, except on a speaking step before an attempt or while the
-   * microphone is open (see `mayPlay`). A guide plays the sentence it is asking about, if there is one,
-   * but only once answered: the sentence is the answer.
-   */
+  /** Play the card. A guide plays the sentence it is asking about, if there is one, but only once answered: the sentence is the answer. */
   const say = (slow = false) => {
-    if (!card || (speak && !speak.mayPlay())) return;
+    if (!card) return;
     if (isVocab(card)) void play(card, slow);
     else if (drill?.tl && (phase === 'feedback' || phase === 'back' || phase === 'missed')) void play({ tl: drillSentence(drill) }, slow);
   };
@@ -126,8 +100,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     if (!open) return queue.shift();
     // Study can run past midnight without leaving the screen, so start the new day's counts here.
     app.progress = rollDay(app.progress, app.now());
-    // Quiet mode leaves speaking out; skipped speaking is extra practice, so the schedule doesn't notice.
-    return nextStudyStep(app.progress, app.now(), recent, { listen: canListen(), speak: canSpeak() }, misses) ?? undefined;
+    return nextStudyStep(app.progress, app.now(), recent, { listen: canListen() }) ?? undefined;
   }
 
   function next(): void {
@@ -138,8 +111,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function moveOn(back: Shown | null): void {
     hold();
     previous = back;
-    speak?.dispose();
-    speak = null;
     stop();
     do {
       step = take();
@@ -149,14 +120,12 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     hookShown = false;
     format = 'read';
     drill = undefined;
+    guide = null;
     if (card) recent.push(card.id);
     if (card && isVocab(card)) preload(card);
     if (!step || !card) {
-      phase = 'done';
-    } else if (step.kind === 'extra' && !caughtUpSeen) {
-      // Say why the session has moved on to practice before the first extra step.
-      caughtUpSeen = true;
-      phase = 'caught-up';
+      // Open-ended study runs until it's caught up, then points on to Drills.
+      phase = open ? 'caught-up' : 'done';
     } else if (step.kind === 'new' && !isIntroduced(app.progress, card.id)) {
       const unit = unitOf(card.id);
       const unitIsFresh = unit && !unit.cards.some((c) => isIntroduced(app.progress, c.id));
@@ -174,46 +143,18 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     draw();
   }
 
-  /** Ask a review or practice step in its format. */
+  /** Ask a review step in its format. */
   function ask(c: Card, s: Step): void {
     const state = app.progress.cards[c.id] ?? newCardState(app.now());
-    format = s.format ?? pickFormat(state, { listen: canListen(), speak: false }, Math.random, c.kind);
-    // A step picked before quiet mode was turned on (say, behind the caught-up note) is asked another way:
-    // the same check, by reading instead of speaking or hearing.
-    if (format === 'speak' && (app.progress.settings.quiet || speakSkipped)) format = 'read';
+    format = s.format ?? pickFormat(state, { listen: canListen() }, Math.random, c.kind);
+    // A step picked before silent mode was turned on is asked another way: the same check, by reading instead of hearing.
     if (format === 'listen' && !canListen()) format = 'read';
     if (format === 'hear' && !canListen()) format = 'remember';
     if (!isVocab(c)) {
       askGuide(c);
       return;
     }
-    if (format === 'speak') {
-      phase = 'speak';
-      speak = speakPanel(c, {
-        say: (slow) => say(slow),
-        silence: () => stop(),
-        onAttempt: (right) => {
-          // A right attempt moves on by itself, even after a miss: getting it right was the point.
-          // There's nothing to look back at on a speaking step, so it moves on without one.
-          if (right && !auto)
-            auto = countdown(root, () => {
-              autoMoved = true;
-              next();
-            });
-          if (picked) return;
-          picked = c.id;
-          stats.practised++;
-          if (right) return;
-          misses.set(c.id, (misses.get(c.id) ?? 0) + 1);
-          struggled.add(c.id);
-        },
-        counting: () => auto !== null,
-        onNext: next,
-        onReady: () => (speakReady = true),
-        autofocus: !autoMoved,
-        deps,
-      });
-    } else if (format === 'remember' || format === 'hear' || format === 'produce') {
+    if (format === 'remember' || format === 'hear' || format === 'produce') {
       phase = 'front';
       if (format === 'hear') say();
       else if (format === 'remember') autoplay();
@@ -227,12 +168,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   function finish(rating: Rating): void {
     if (!card || !step) return;
     if (rating === 'again') struggled.add(card.id);
-    if (step.kind === 'extra') {
-      // Practice beyond the schedule: noted for this session only.
-      stats.practised++;
-      if (rating === 'again') misses.set(card.id, (misses.get(card.id) ?? 0) + 1);
-      return;
-    }
     const wasNew = !isIntroduced(app.progress, card.id);
     recordAnswer(app.progress, card.id, rating, app.now());
     app.commit();
@@ -249,54 +184,23 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   /** Ask a guide one of its drills, in the current format. */
   function askGuide(c: Card): void {
     if (format !== 'build' && format !== 'think') format = 'gap';
-    drill = pickDrill(c, app.progress, format, lastDrill.get(c.id));
-    if (!drill && format === 'build') {
-      format = 'think';
-      drill = pickDrill(c, app.progress, format, lastDrill.get(c.id));
-    }
+    const last = lastDrill.get(c.id);
+    guide = format === 'think' ? null : guideQuestion(c, app.progress, format, last);
+    drill = guide?.drill;
+    if (!guide && format === 'build') format = 'think';
+    if (format === 'think') drill = pickDrill(c, app.progress, format, last);
     // Skip a guide with nothing to ask, still offering the card that moved on before it.
     if (!drill) return moveOn(previous);
     lastDrill.set(c.id, drill);
     if (drill.tl) preload({ tl: drillSentence(drill) });
-    if (format === 'gap') {
-      drillChoices = shuffle([drill.answer, ...drill.wrong]);
-      phase = 'quiz';
-    } else if (format === 'build') {
-      const { words, decoy } = buildTiles(drill);
-      tilesNeeded = words.length;
-      // Never hand over the tiles already in order.
-      do tiles = shuffle(decoy ? [...words, decoy] : words);
-      while (tiles.slice(0, words.length).join(' ') === words.join(' '));
-      placed = [];
-      phase = 'build';
-    } else {
-      phase = 'front';
-    }
+    phase = guide ? 'quiz' : 'front';
     draw();
   }
 
   function pickAnswer(text: string): void {
-    if (!drill || picked) return;
+    if (!guide || picked) return;
     picked = text;
-    answered(text === drill.answer);
-  }
-
-  function place(i: number): void {
-    if (phase !== 'build' || placed.includes(i)) return;
-    placed = [...placed, i];
-    draw();
-  }
-
-  function unplace(i: number): void {
-    if (phase !== 'build') return;
-    placed = placed.filter((p) => p !== i);
-    draw();
-  }
-
-  function checkBuild(): void {
-    if (!drill || phase !== 'build') return;
-    picked = placed.map((i) => tiles[i]).join(' ');
-    answered(picked === buildTiles(drill).words.join(' '));
+    answered(text === guideAnswer(guide));
   }
 
   function startQuiz(): void {
@@ -389,15 +293,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     draw();
   }
 
-  /**
-   * Quiet mode on mid-step skips a speaking step: it's practice only, so nothing
-   * is recorded and the card stays as it was. Going silent mid-step asks an
-   * unanswered listening step again by reading, so the card's review still counts.
-   */
+  /** Going silent mid-step asks an unanswered listening step again by reading, so the card's review still counts. */
   function quietChanged(): void {
     const listening = format === 'listen' || format === 'hear';
-    if (phase === 'speak' && app.progress.settings.quiet) next();
-    else if (listening && !canListen() && card && step && (phase === 'front' || (phase === 'quiz' && !picked))) ask(card, step);
+    if (listening && !canListen() && card && step && (phase === 'front' || (phase === 'quiz' && !picked))) ask(card, step);
     else draw();
   }
 
@@ -406,11 +305,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     hold();
     if (reviewing) returnToCurrent();
     previous = null;
-    if (open && stats.answered + stats.practised > 0 && phase !== 'done') {
-      // The summary asks nothing to be said.
-      endMicrophoneHold();
-      speak?.dispose();
-      speak = null;
+    if (open && stats.answered > 0 && phase !== 'done') {
       stop();
       phase = 'done';
       draw();
@@ -421,13 +316,13 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
 
   function header(): HTMLElement {
     if (open) {
-      const done = stats.answered + stats.practised;
+      const done = stats.answered;
       return h(
         'header',
         { class: 'session-header' },
         iconButton('close', 'Stop studying', close),
         h('span', { class: 'session-count' }, done === 1 ? '1 done' : `${done} done`),
-        h('span', { class: 'session-title' }, step?.kind === 'extra' && phase !== 'done' ? 'Extra practice' : 'Study'),
+        h('span', { class: 'session-title' }, 'Study'),
         quietToggle(app, quietChanged),
       );
     }
@@ -453,6 +348,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   function body(): HTMLElement {
+    if (phase === 'caught-up') return caughtUpView();
     if (phase === 'done' || !card) return doneView();
     switch (phase) {
       case 'topic-intro':
@@ -461,35 +357,13 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         return isVocab(card) ? introView(card) : guideIntroView(card);
       case 'quiz':
       case 'feedback':
-        if (isVocab(card)) return quizView(card);
-        return format === 'build' ? buildView(card) : guideQuizView(card);
-      case 'build':
-        return buildView(card);
+        return isVocab(card) ? quizView(card) : guideQuizView(card);
       case 'front':
       case 'back':
         return isVocab(card) ? flashcardView(card) : guideFlashcardView(card);
       case 'missed':
         return isVocab(card) ? missedView(card) : guideMissedView(card);
-      case 'speak':
-        return speakView(card);
-      case 'mic':
-        return micWaiting();
-      case 'caught-up':
-        return caughtUpView();
     }
-  }
-
-  /** Practice may ask the learner to speak, so the phone asks for the microphone from this tap (see askForMicrophone). */
-  function keepPractising(): void {
-    if (!step || !card) return next();
-    if (!canSpeak() || !needsMicrophone(deps)) return ask(card, step);
-    phase = 'mic';
-    draw();
-    void askForMicrophone(deps).then((answer) => {
-      if (answer === 'left') return;
-      speakSkipped = answer === 'refused';
-      if (phase === 'mic' && card && step) ask(card, step);
-    });
   }
 
   function caughtUpView(): HTMLElement {
@@ -503,12 +377,12 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
         'p',
         null,
         unmet ? "No reviews are due, and today's new cards are in." : "No reviews are due, and you've met every card.",
-        ' You can keep going with practice on your weakest cards. It won\'t change when they come back.',
+        ' You can keep practising in Drills, which leans on your weakest cards. It won\'t change when they come back.',
       ),
       h(
         'div',
         { class: 'stack' },
-        h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: keepPractising }, 'Keep practising'),
+        h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: () => app.navigate({ name: 'practice' }) }, 'Keep practising in Drills'),
         unmet &&
           h(
             'button',
@@ -517,16 +391,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
           ),
         h('button', { class: 'btn secondary', onclick: close }, 'Stop'),
       ),
-    );
-  }
-
-  function speakView(c: Card): HTMLElement {
-    return h(
-      'div',
-      { class: 'panel speak-step' },
-      // No audio until the learner has had a go: the word is played on the result.
-      h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Say this out loud'), h('p', { class: 'tl', lang: 'fil' }, c.tl), h('p', { class: 'prompt-meaning' }, c.en)),
-      speak?.el,
     );
   }
 
@@ -594,7 +458,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     const answered = picked !== null;
     const right = picked === c.id;
     const field = format === 'recall' ? 'tl' : 'en';
-    const extra = step?.kind === 'extra';
     return h(
       'div',
       { class: 'panel' },
@@ -610,7 +473,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
             ? step?.kind === 'new'
               ? 'That one is yours now.'
               : `${c.tl} = ${c.en}`
-            : `"${c.tl}" means "${c.en}".${extra ? '' : ' It will come back shortly.'}`,
+            : `"${c.tl}" means "${c.en}". It will come back shortly.`,
         ),
       answered && (!right || lookAgain(c)) && hookView(c),
       answered && proceed(),
@@ -687,42 +550,18 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     return h(
       'div',
       { class: 'panel center' },
-      h('h2', null, stats.answered + stats.practised ? 'Session finished' : 'Nothing to study right now'),
-      stats.answered + stats.practised > 0 &&
+      h('h2', null, stats.answered ? 'Session finished' : 'Nothing to study right now'),
+      stats.answered > 0 &&
         h(
           'div',
           { class: 'stats' },
           h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, stats.learned), h('span', { class: 'stat-label' }, 'new')),
           h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, stats.reviewed), h('span', { class: 'stat-label' }, 'reviewed')),
-          stats.practised > 0
-            ? h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, stats.practised), h('span', { class: 'stat-label' }, 'practised'))
-            : h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, `${accuracy}%`), h('span', { class: 'stat-label' }, 'first try')),
+          h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, `${accuracy}%`), h('span', { class: 'stat-label' }, 'first try')),
         ),
       h('p', { class: 'muted' }, 'What you just learned will come back for review when you are about to forget it.'),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: () => app.navigate({ name: 'home' }) }, 'Done'),
     );
-  }
-
-  /** A guide's explanation: its rule in plain words, and examples to hear. */
-  function guideBody(c: Card): (HTMLElement | null)[] {
-    return [
-      c.hint ? h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint) : null,
-      c.note ? h('p', { class: 'guide-note' }, c.note) : null,
-      c.examples?.length
-        ? h(
-            'ul',
-            { class: 'examples' },
-            c.examples.map((ex) =>
-              h(
-                'li',
-                null,
-                audioButton(() => void play(ex), `Play ${ex.tl}`),
-                h('span', { class: 'example-text' }, h('span', { class: 'example-tl', lang: 'fil' }, ex.tl), h('span', { class: 'example-en' }, ex.en)),
-              ),
-            ),
-          )
-        : null,
-    ];
   }
 
   function guideHeading(c: Card, eyebrow = KIND_INFO[c.kind].eyebrow): HTMLElement {
@@ -740,90 +579,28 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
     );
   }
 
-  /** A drill's Tagalog with its gap shown, or filled once answered. */
-  function gapLine(d: Drill, filled: boolean): HTMLElement | null {
-    if (!d.tl) return null;
-    const [before, after] = d.tl.split('___');
-    return h(
-      'div',
-      { class: 'tl-row' },
-      h('p', { class: 'tl drill-tl', lang: 'fil' }, before, h('span', { class: `gap ${filled ? 'filled' : ''}` }, filled ? d.answer : '___'), after),
-      filled && audioPair(say),
-    );
-  }
-
-  /** The question, as asked: an English sentence to complete in Tagalog, or a plain question. */
-  function drillPrompt(c: Card, d: Drill, filled: boolean, eyebrow: string, showTl = true): HTMLElement {
-    return d.tl
-      ? h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, eyebrow), h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled))
-      : h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, c.en), h('p', { class: 'drill-q' }, d.q));
-  }
-
-  /** The right answer as a sentence, ending in a full stop if it has no punctuation of its own. */
-  function answerText(): string {
-    const text = drill ? drillSentence(drill) : '';
-    return /[.!?"]$/.test(text) ? text : `${text}.`;
-  }
-
-  function drillFeedback(c: Card, right: boolean): HTMLElement {
-    const extra = step?.kind === 'extra';
+  function drillFeedback(c: Card, d: Drill, right: boolean): HTMLElement {
     return h(
       'div',
       { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
       h('strong', null, right ? praise : 'Not quite.'),
       ' ',
-      right ? (step?.kind === 'new' ? 'That one is yours now.' : '') : `The answer is ${answerText()}${extra ? '' : ' It will come back shortly.'}`,
+      right ? (step?.kind === 'new' ? 'That one is yours now.' : '') : `The answer is ${answerText(d)} It will come back shortly.`,
       !right && c.note && h('p', { class: 'feedback-note' }, c.note),
     );
   }
 
+  /** A gap to fill or a sentence to build. */
   function guideQuizView(c: Card): HTMLElement {
-    const d = drill!;
-    const answered = picked !== null;
-    const right = picked === d.answer;
-    return h(
-      'div',
-      { class: 'panel' },
-      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label),
-      choiceList(drillChoices, { key: (o) => o, label: (o) => o, answer: d.answer, picked, lang: d.tl ? 'fil' : undefined, onPick: pickAnswer }),
-      answered && drillFeedback(c, right),
-      answered && right && lookAgain(c) && hookView(c),
-      answered && proceed(),
-    );
-  }
-
-  function buildView(c: Card): HTMLElement {
-    const d = drill!;
-    const answered = phase === 'feedback';
-    const right = answered && picked === buildTiles(d).words.join(' ');
-    return h(
-      'div',
-      { class: 'panel' },
-      h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, 'Put it in order'), h('p', { class: 'drill-q' }, d.q)),
-      h(
-        'div',
-        { class: `build-line ${answered ? (right ? 'right' : 'wrong') : ''}`, lang: 'fil', 'aria-label': 'Your sentence' },
-        placed.length === 0
-          ? h('span', { class: 'muted small' }, 'Tap the words below in order.')
-          : placed.map((i) => h('button', { class: 'build-tile placed', disabled: answered, onclick: () => unplace(i) }, tiles[i])),
-      ),
-      !answered &&
-        h(
-          'div',
-          { class: 'tile-pool', lang: 'fil' },
-          tiles.map((t, i) => h('button', { class: 'build-tile', disabled: placed.includes(i), onclick: () => place(i) }, t)),
-        ),
-      !answered &&
-        h(
-          'button',
-          { class: 'btn primary big', disabled: placed.length < tilesNeeded, 'data-autofocus': placed.length === tilesNeeded || undefined, onclick: checkBuild },
-          'Check',
-        ),
-      answered && gapLine(d, true),
-      answered && drillFeedback(c, right),
-      answered && right && lookAgain(c) && hookView(c),
-      answered && proceed(),
-    );
+    const q = guide!;
+    const right = picked === guideAnswer(q);
+    return guideQuestionView(c, q, picked, {
+      say,
+      onPick: pickAnswer,
+      onChange: draw,
+      feedback: (right) => drillFeedback(c, q.drill, right),
+      after: [right && lookAgain(c) && hookView(c), proceed()],
+    });
   }
 
   function guideFlashcardView(c: Card): HTMLElement {
@@ -834,7 +611,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       'div',
       { class: 'panel' },
       // Recalling a sentence means saying all of it, so the Tagalog only shows with the answer.
-      drillPrompt(c, d, showBack, d.tl ? 'How do you say…' : KIND_INFO[c.kind].label, showBack),
+      drillPrompt(c, d, showBack, d.tl ? 'How do you say…' : KIND_INFO[c.kind].label, say, showBack),
       !showBack && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: reveal }, 'Show the answer'),
       showBack &&
         h(
@@ -867,7 +644,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
       'div',
       { class: 'panel' },
       guideHeading(c, 'Coming back shortly'),
-      drill?.tl ? gapLine(drill, true) : drill && h('p', { class: 'meaning' }, drill.answer),
+      drill?.tl ? gapLine(drill, true, say) : drill && h('p', { class: 'meaning' }, drill.answer),
       guideBody(c),
       hookView(c),
       h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: next }, 'Continue'),
@@ -884,17 +661,14 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string, de
   }
 
   app.onKey((e) => {
-    // Nothing to answer or hear while the phone asks for the microphone; the word is still to be said.
-    if (phase === 'mic') return;
     if (e.key === 'r' || e.key === 'R') {
       hold();
       return say();
     }
-    if (phase === 'speak') return;
     // Enter and Space activate the focused primary button natively.
     const n = Number(e.key);
     if (phase === 'quiz' && card && !isVocab(card)) {
-      if (n >= 1 && n <= drillChoices.length) pickAnswer(drillChoices[n - 1]);
+      if (guide && n >= 1 && n <= guide.choices.length) pickAnswer(guide.choices[n - 1]);
       return;
     }
     if (phase === 'quiz' && n >= 1 && n <= choices.length) return pick(choices[n - 1]);

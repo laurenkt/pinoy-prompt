@@ -33,7 +33,7 @@ afterEach(() => {
 
 describe('moving on after a right answer in a session', () => {
   it('goes to the next card by itself, with a way back to the one before', () => {
-    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo')));
     answer(root, true);
     expect(root.querySelector('.continue.counting')).not.toBeNull();
     vi.advanceTimersByTime(ADVANCE_MS - 1);
@@ -56,7 +56,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('waits for Continue after a miss', () => {
-    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo')));
     answer(root, false);
     expect(root.querySelector('.counting')).toBeNull();
     vi.advanceTimersByTime(ADVANCE_MS * 5);
@@ -66,7 +66,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('keeps the hook up when a card missed earlier is got right', () => {
-    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat')));
     answer(root, false);
     button(root, 'Continue').click();
     expect(shownCard(root).id).toBe('salamat');
@@ -77,7 +77,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('stops counting down when the learner taps something else', () => {
-    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo')));
     answer(root, true);
     root.querySelector<HTMLButtonElement>('.audio-btn')!.click();
     expect(root.querySelector('.counting')).toBeNull();
@@ -86,7 +86,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('moves on straight away from Continue, without offering the way back', () => {
-    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo')));
     answer(root, true);
     button(root, 'Continue').click();
     expect(shownCard(root).id).toBe('oo');
@@ -96,7 +96,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it("doesn't put focus on the next card's choices, so a late Enter can't answer it", () => {
-    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo')));
     answer(root, true);
     vi.advanceTimersByTime(ADVANCE_MS);
     expect(shownCard(root).id).toBe('oo');
@@ -104,7 +104,7 @@ describe('moving on after a right answer in a session', () => {
   });
 
   it('does nothing once the screen has been left', () => {
-    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo'), undefined, noMic));
+    const root = mount(sessionScreen(fakeApp(KNOWN), reads('salamat', 'oo')));
     answer(root, true);
     document.body.replaceChildren();
     vi.advanceTimersByTime(ADVANCE_MS * 5);

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { getCard } from '../deck';
 import { buildTiles, drillSentence } from '../session';
 import { sessionScreen } from './session';
-import { button, fakeApp, noMic } from '../test/screen';
+import { button, fakeApp } from '../test/screen';
 
 const choices = (root: HTMLElement) => [...root.querySelectorAll<HTMLButtonElement>('.choice')];
 const answerOf = (root: HTMLElement) => {
@@ -18,7 +18,7 @@ const answerOf = (root: HTMLElement) => {
 describe('a new pattern', () => {
   it('is explained in plain words with examples, then checked with a gap', () => {
     const app = fakeApp(['gusto-ko-ito', 'kape']);
-    const root = sessionScreen(app, [{ kind: 'new', cardId: 'p-gusto' }], undefined, noMic);
+    const root = sessionScreen(app, [{ kind: 'new', cardId: 'p-gusto' }]);
     expect(root.textContent).toContain('New pattern');
     expect(root.textContent).toContain(getCard('p-gusto')!.note);
     expect(root.querySelectorAll('.examples li').length).toBe(3);
@@ -32,7 +32,7 @@ describe('a new pattern', () => {
 
   it('shows the rule again after a wrong answer, and brings it back', () => {
     const app = fakeApp(['gusto-ko-ito', 'kape']);
-    const root = sessionScreen(app, [{ kind: 'new', cardId: 'p-gusto' }], undefined, noMic);
+    const root = sessionScreen(app, [{ kind: 'new', cardId: 'p-gusto' }]);
     button(root, 'Got it, try one').click();
     const drill = answerOf(root);
     choices(root).find((c) => !c.textContent!.includes(drill.answer))!.click();
@@ -46,7 +46,7 @@ describe('a new pattern', () => {
 describe('a learned pattern', () => {
   it('can be built from tiles, and counts as right only in order', () => {
     const app = fakeApp(['gusto-ko-ito', 'kape', 'p-gusto']);
-    const root = sessionScreen(app, [{ kind: 'review', cardId: 'p-gusto', format: 'build' }], undefined, noMic);
+    const root = sessionScreen(app, [{ kind: 'review', cardId: 'p-gusto', format: 'build' }]);
     expect(root.textContent).toContain('Put it in order');
     const drill = answerOf(root);
     const { words, decoy } = buildTiles(drill);
@@ -63,7 +63,7 @@ describe('a learned pattern', () => {
 
   it('can be recalled and self-rated, with the explanation on request', () => {
     const app = fakeApp(['gusto-ko-ito', 'kape', 'p-gusto']);
-    const root = sessionScreen(app, [{ kind: 'review', cardId: 'p-gusto', format: 'think' }], undefined, noMic);
+    const root = sessionScreen(app, [{ kind: 'review', cardId: 'p-gusto', format: 'think' }]);
     expect(root.textContent).toContain('How do you say…');
     // The whole sentence is recalled, not just the gap.
     expect(root.querySelector('.gap')).toBeNull();
@@ -79,7 +79,7 @@ describe('a learned pattern', () => {
 
 describe('a know-how card', () => {
   it('asks a plain question rather than a sentence', () => {
-    const root = sessionScreen(fakeApp(['kuya', 'ate']), [{ kind: 'new', cardId: 'k-kuya' }], undefined, noMic);
+    const root = sessionScreen(fakeApp(['kuya', 'ate']), [{ kind: 'new', cardId: 'k-kuya' }]);
     expect(root.textContent).toContain('Good to know');
     button(root, 'Got it, try one').click();
     expect(root.querySelector('.gap')).toBeNull();

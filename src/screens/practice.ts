@@ -1,13 +1,13 @@
 import type { App } from '../app';
-import { VOCAB, getCard, isVocab, type Card } from '../deck';
+import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
 import { canTypeMeaning, judgeMeaning, matchesMeaning, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { distractors, settled, shuffle } from '../session';
-import type { CardState } from '../srs';
+import { distractors, drillSentence, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
+import { answerText, canBuildGuide, guideAnswer, guideQuestion, guideQuestionView, type GuideFormat, type GuideQuestion } from './guide-question';
 import { isSilent, quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, PROBLEMS, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
 
@@ -16,6 +16,12 @@ type Mode = 'listen' | 'read' | 'recall' | 'speak';
 const MIN_CARDS = 4;
 /** How many of the last questions' words are kept out of the next one, so nothing comes straight back. */
 const RECENT = 3;
+
+/**
+ * How a guide is asked under each kind of question: filling a sentence's gap is reading it, building a sentence from
+ * the English is recalling it. Guides aren't heard or said.
+ */
+const GUIDE_FORMATS: Partial<Record<Mode, GuideFormat>> = { read: 'gap', recall: 'build' };
 
 const MODES: { id: Mode; title: string }[] = [
   { id: 'listen', title: 'Listen' },
@@ -30,6 +36,8 @@ let scope = new Set<Mode>(MODES.map((m) => m.id));
 interface Question {
   card: Card;
   mode: Mode;
+  /** For a guide, its question as it's asked; `choices` is then empty. */
+  guide?: GuideQuestion;
   choices: Card[];
   /** Listening to a word that has settled in Study: the meaning is typed (or dictated), not picked. */
   typed: boolean;
@@ -67,26 +75,11 @@ const askOpenAi: MeaningJudge = async (answer, card) => {
   return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer }) : null;
 };
 
-/** Weaker cards (missed often, low ease, short interval) come up more. */
-function weight(state: CardState): number {
-  return 1 + state.lapses * 2 + Math.max(0, 3 - state.ease) * 2 + (state.interval < 3 ? 2 : 0);
-}
-
-/**
- * The next word for a round that runs until the learner stops it. Weak and due words come up more,
- * a word missed this round comes back after a few others, and the last few words asked sit out.
- */
-export function pickNext(app: App, recent: string[], missed: Map<string, number>, random = Math.random): Card | null {
-  // Drills are for words and phrases; guides are practised in Study.
-  const pool = Object.entries(app.progress.cards)
-    .map(([id, state]) => ({ card: getCard(id)!, w: weight(state) + (state.due <= app.now() ? 2 : 0) + (missed.get(id) ?? 0) * 4 }))
-    .filter((p) => p.card && isVocab(p.card));
-  const keep = Math.min(RECENT, pool.length - 1);
-  const skip = new Set(keep > 0 ? recent.slice(-keep) : []);
-  const open = pool.filter((p) => !skip.has(p.card.id));
-  if (open.length === 0) return null;
-  let r = random() * open.reduce((sum, p) => sum + p.w, 0);
-  return (open.find((p) => (r -= p.w) <= 0) ?? open[open.length - 1]).card;
+/** The kinds of question a card can be asked as. */
+function modesFor(card: Card): Mode[] {
+  if (isVocab(card)) return MODES.map((m) => m.id);
+  if (!card.drills?.length) return [];
+  return canBuildGuide(card) ? ['read', 'recall'] : ['read'];
 }
 
 export function practiceScreen(
@@ -128,8 +121,10 @@ export function practiceScreen(
   let distractorPool: Card[] = VOCAB;
   /** The last few words asked, oldest first. */
   let recent: string[] = [];
-  /** Words missed this round and not yet got right since, with how many times. */
+  /** Cards missed this round and not yet got right since, with how many times. */
   let missed = new Map<string, number>();
+  /** Each guide's drill asked last, so the next is another. */
+  const lastDrill = new Map<string, Drill>();
   let speak: SpeakPanel | null = null;
   let spokenRight = false;
   /** Counting down to the next question after a right answer. */
@@ -176,17 +171,33 @@ export function practiceScreen(
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
 
-  /** A question on the next word, asked any way the scope allows right now. Null only with no words to ask. */
+  /** A question on the next card, asked any way the scope allows right now. Null only with nothing to ask. */
   function nextQuestion(): Question | null {
     const ways = modes();
-    const mode = ways[Math.floor(Math.random() * ways.length)];
-    const card = pickNext(app, recent, missed);
+    const card = pickDrillCard(app.progress, app.now(), recent, missed, (c) => modesFor(c).some((m) => ways.includes(m)));
     if (!card) return null;
     recent = [...recent.slice(-RECENT), card.id];
+    const fits = modesFor(card).filter((m) => ways.includes(m));
+    const mode = fits[Math.floor(Math.random() * fits.length)];
+    if (!isVocab(card)) {
+      const guide = guideQuestion(card, app.progress, GUIDE_FORMATS[mode]!, lastDrill.get(card.id))!;
+      lastDrill.set(card.id, guide.drill);
+      return { card, mode, guide, choices: [], typed: false };
+    }
     const field = mode === 'recall' ? 'tl' : 'en';
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
     const typed = mode === 'listen' && settled(app.progress, card.id) && canTypeMeaning(card);
     return { card, mode, choices, typed };
+  }
+
+  /** What a right answer to the question is: the card, or for a guide, its answer. */
+  const answerOf = (q: Question) => (q.guide ? guideAnswer(q.guide) : q.card.id);
+
+  /** Load what the question will play: the word, or a guide's whole sentence. */
+  function load(q: Question | null): void {
+    if (!q) return;
+    if (!q.guide) preload(q.card);
+    else if (q.guide.drill.tl) preload({ tl: drillSentence(q.guide.drill) });
   }
 
   /**
@@ -204,7 +215,7 @@ export function practiceScreen(
       speakSkipped = answer === 'refused';
       if (current && picked === null && !modes().includes(current.mode)) {
         current = nextQuestion();
-        if (current) preload(current.card);
+        load(current);
       }
       // An answered question (the chip tapped after answering) is shown again as it was.
       if (picked !== null) draw();
@@ -217,7 +228,7 @@ export function practiceScreen(
     if (!current || upcoming) return;
     tally(current.card.id, right);
     upcoming = nextQuestion();
-    if (upcoming) preload(upcoming.card);
+    load(upcoming);
   }
 
   function tally(id: string, right: boolean): void {
@@ -235,7 +246,7 @@ export function practiceScreen(
     if (waiting) return draw();
     if (q?.mode === 'speak') {
       speak = speakPanel(q.card, {
-        say: (slow) => sayCard(q.card, slow),
+        say: (slow) => sayCard(q, slow),
         silence: () => stop(),
         onAttempt: (right) => {
           if (!right || spokenRight) return;
@@ -256,20 +267,25 @@ export function practiceScreen(
       });
     }
     draw();
-    if (q && (q.mode === 'listen' || (q.mode === 'read' && app.progress.settings.autoplay))) void play(q.card);
+    if (q && !q.guide && (q.mode === 'listen' || (q.mode === 'read' && app.progress.settings.autoplay))) void play(q.card);
   }
 
-  /** Play a card, except on a speaking question before an attempt or while the microphone is open (see `mayPlay`). */
-  function sayCard(card: Card, slow = false): void {
+  /**
+   * Play the question's word, except on a speaking question before an attempt or while the microphone is open (see
+   * `mayPlay`). A guide's sentence is its answer, so it plays only once answered.
+   */
+  function sayCard(q: Question, slow = false, answered = picked !== null): void {
     // Nor while the meaning is being said into the microphone, which would record it.
     if ((speak && !speak.mayPlay()) || listening) return;
-    void play(card, slow);
+    if (!q.guide) void play(q.card, slow);
+    else if (answered && q.guide.drill.tl) void play({ tl: drillSentence(q.guide.drill) }, slow);
   }
 
-  function choose(choice: Card): void {
+  /** A choice picked: a card, or for a guide, the answer's text (or the sentence built). */
+  function choose(choice: Card | string): void {
     const q = current;
     if (!q || picked !== null) return;
-    answer(q, choice.id);
+    answer(q, typeof choice === 'string' ? choice : choice.id);
   }
 
   /** Check a typed meaning: on the device, then with OpenAI when there's a key. */
@@ -364,10 +380,10 @@ export function practiceScreen(
 
   function answer(q: Question, pick: string): void {
     picked = pick;
-    const right = pick === q.card.id;
+    const right = pick === answerOf(q);
     // The chime first, so the word said back is heard after it.
     if (right) void chime();
-    if (q.mode === 'recall' || q.mode === 'listen') void play(q.card);
+    if (q.guide || q.mode === 'recall' || q.mode === 'listen') sayCard(q);
     settle(right);
     if (right)
       auto = countdown(root, () => {
@@ -435,7 +451,7 @@ export function practiceScreen(
       // Anything settled on the old question (a right spoken attempt picks what's next) goes with it.
       upcoming = null;
       current = nextQuestion();
-      if (current) preload(current.card);
+      load(current);
       return ask();
     }
     draw();
@@ -554,9 +570,37 @@ export function practiceScreen(
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
     const answered = picked !== null;
-    const right = picked === q.card.id;
+    const right = picked === answerOf(q);
     const field = q.mode === 'recall' ? 'tl' : 'en';
-    const say = (slow = false) => sayCard(q.card, slow);
+    const say = (slow = false) => sayCard(q, slow, answered);
+    const onward = () =>
+      reviewing ? continueButton(() => setLookingBack(false), false, 'Back to the current card') : continueButton(() => advance(), auto !== null, 'Next');
+    const back =
+      previousPick && !answered && !checking && !listening && !hearing && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true));
+
+    if (q.guide) {
+      const d = q.guide.drill;
+      return h(
+        'div',
+        { class: 'session' },
+        ...header(),
+        back,
+        guideQuestionView(q.card, q.guide, picked, {
+          say,
+          onPick: choose,
+          onChange: draw,
+          feedback: (right) =>
+            h(
+              'div',
+              { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
+              h('strong', null, right ? 'Tama!' : 'Mali.'),
+              !right && ` The answer is ${answerText(d)}`,
+              !right && q.card.note && h('p', { class: 'feedback-note' }, q.card.note),
+            ),
+          after: [onward()],
+        }),
+      );
+    }
 
     let prompt: HTMLElement;
     if (q.mode === 'speak') {
@@ -591,7 +635,7 @@ export function practiceScreen(
       'div',
       { class: 'session' },
       ...header(),
-      previousPick && !answered && !checking && !listening && !hearing && !reviewing && q.mode !== 'speak' && previousButton(() => setLookingBack(true)),
+      back,
       h(
         'div',
         { class: 'panel' },
@@ -619,8 +663,7 @@ export function practiceScreen(
         q.mode !== 'speak' && answered && (!right || reviewing) &&
           hookView(q.card),
         picked === MISSED && !reviewing && h('button', { class: 'btn secondary claim', onclick: claim }, 'I had it right'),
-        q.mode !== 'speak' && answered &&
-          (reviewing ? continueButton(() => setLookingBack(false), false, 'Back to the current card') : continueButton(() => advance(), auto !== null, 'Next')),
+        q.mode !== 'speak' && answered && onward(),
       ),
     );
   }
@@ -728,18 +771,19 @@ export function practiceScreen(
     if (!q || waiting) return;
     if (e.key === 'r' || e.key === 'R') {
       hold();
-      return sayCard(q.card);
+      return sayCard(q, false, lookingBack || picked !== null);
     }
-    if (q.mode === 'speak' || lookingBack) return;
+    if (q.mode === 'speak' || lookingBack || picked !== null || q.typed) return;
     const n = Number(e.key);
-    if (picked === null && !q.typed && n >= 1 && n <= q.choices.length) choose(q.choices[n - 1]);
+    const choices = q.guide ? q.guide.choices : q.choices;
+    if (n >= 1 && n <= choices.length) choose(choices[n - 1]);
   });
   // Drills open straight into a round; closing it, or going back, goes Home.
   const known = Object.keys(app.progress.cards).map((id) => getCard(id)!).filter((c) => c && isVocab(c));
   distractorPool = known.length >= 6 ? known : VOCAB;
   if (learned >= MIN_CARDS) {
     current = nextQuestion();
-    if (current) preload(current.card);
+    load(current);
     // Still inside the tap that opened Drills.
     askForMicrophoneIfNeeded();
   }
