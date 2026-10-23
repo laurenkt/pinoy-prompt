@@ -130,6 +130,8 @@ export function practiceScreen(
   let autoMoved = false;
   /** The kinds of question are tucked away until asked for. */
   let scopeOpen = false;
+  /** The microphone has been held this visit, or is being (see askForMicrophone). */
+  let micHeld = false;
   /** The phone is asking for the microphone, as the round starts (see askForMicrophone). */
   let waiting = false;
   /** The microphone was refused as the round started, so speaking is left out of this visit. */
@@ -201,18 +203,27 @@ export function practiceScreen(
   }
 
   /**
-   * From a tap that may let the round ask to speak (opening Drills, the Speak chip, quiet mode going off): if the
-   * browser would ask for the microphone, the phone asks now, over a holding screen, rather than over a speaking question.
+   * From a tap that may let the round ask to speak (opening Drills, the Speak chip, quiet mode going off): the
+   * microphone is held for the rest of the visit, so the phone never asks over a speaking question. If the browser
+   * would ask, it asks now, over a holding screen.
    */
   function askForMicrophoneIfNeeded(): void {
-    // Not over an answer being checked or heard, or one counting down to the next: the holding screen would hide it. A later speaking question asks for itself.
-    if (checking || hearing || listening || auto) return;
-    if (waiting || !canSpeak || !current || !modes().includes('speak') || !needsMicrophone(deps)) return;
-    waiting = true;
+    if (waiting || !canSpeak || !current || !modes().includes('speak')) return;
+    // While WebKit still remembers the Allow it goes straight through, with no holding screen. Held anyway, as that
+    // only lasts minutes. Once it has lapsed (a long while in the background closes the stream), the phone asks again.
+    const asks = needsMicrophone(deps);
+    if (!asks && micHeld) return;
+    // Not over an answer being checked or heard, or one counting down to the next: the holding screen would hide it. A later tap asks.
+    if (asks && (checking || hearing || listening || auto)) return;
+    micHeld = true;
+    waiting = asks;
     void askForMicrophone(deps).then((answer) => {
       if (answer === 'left') return;
+      const shown = waiting;
       waiting = false;
       speakSkipped = answer === 'refused';
+      // Nothing was covered up, so there's nothing to show again.
+      if (!shown && !speakSkipped) return;
       if (current && picked === null && !modes().includes(current.mode)) {
         current = nextQuestion();
         load(current);

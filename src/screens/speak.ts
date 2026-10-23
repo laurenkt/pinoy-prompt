@@ -456,7 +456,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         lettersEl,
         tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
       ),
-      judged && h('div', { class: 'row' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
+      judged && h('div', { class: 'row hear-slowly' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
       actions(right),
     ].filter(Boolean) as HTMLElement[];
   }

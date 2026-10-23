@@ -190,29 +190,26 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const p = list[index];
     if (p.heardAt !== undefined) ribbon?.setFocus(span(p.heardAt));
     else ribbon?.setFocus(gapFor(index));
-    renderDetail(p, index);
+    renderDetail(p);
   }
 
   /**
-   * The coaching tip for a sound that needs work. An added sound that counts takes the
-   * tip for the sound before it, which is where the coach puts "leave it out". A tip that
-   * only says what was heard and what to aim for is left out: the labels over the slider say it.
+   * The coaching tip for a sound that needs work. A tip that only says what was heard and what
+   * to aim for is left out: the labels over the slider say it. That includes the coach's "leave it
+   * out" for an added sound, so an added sound has none (the sound before it may have its own).
    */
-  function tipFor(index: number): string | undefined {
-    const p = list[index];
-    let owner: Pair | undefined;
-    if (p.result) owner = p.result.verdict === 'good' ? undefined : p;
-    else if (p.extraCounts) owner = list.slice(0, index).reverse().find((q) => q.result);
-    const at = owner?.result?.phone.from;
-    return at === undefined ? undefined : attempt.tips.find((t) => t.at.includes(at) && !t.plain)?.text;
+  function tipFor(p: Pair): string | undefined {
+    if (!p.result || p.result.verdict === 'good') return undefined;
+    const at = p.result.phone.from;
+    return attempt.tips.find((t) => t.at.includes(at) && !t.plain)?.text;
   }
 
-  function renderDetail(p: Pair, index: number): void {
+  function renderDetail(p: Pair): void {
     const ipa = target(p);
     const heard = p.heardAt !== undefined ? attempt.heard[p.heardAt] : null;
     const verdict = verdictOf(p);
     const closeness = p.result?.closeness ?? 0;
-    const tip = tipFor(index) ?? (!ipa && !p.extraCounts ? 'A small extra sound like this is a natural part of speech. No need to change it.' : undefined);
+    const tip = tipFor(p) ?? (!ipa && !p.extraCounts ? 'A small extra sound like this is a natural part of speech. No need to change it.' : undefined);
     const drawn = drawChart(ipa ?? null, heard);
     // Right, even if the recogniser wrote it another way (an accepted variant): nothing to slide between.
     const said = p.result?.verdict === 'good';

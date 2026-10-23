@@ -13,7 +13,7 @@ What a review of a change to this app should check, beyond "does the code work".
 ## Look and feel
 
 - **Fiesta style.** Bold 3px ink outlines, hard offset shadows (`--shadow`), solid blocks of indigo, saffron, magenta and teal from the `:root` tokens. No smooth gradients (the hard-edged stripes on cards are part of the style), soft blurred shadows, thin hairline UI or new colours outside the tokens.
-- **No duplicated UI.** One control per job on a screen. Don't add a second button, label or heading that repeats one already there, and reuse the shared pieces (`h`, `icon`, `audioButton`, `chip`, `quietToggle`, `progressBar`) instead of copying them.
+- **No duplicated UI.** One control per job on a screen. Don't add a second button, label or heading that repeats one already there (the one exception is Settings' pressed settings toggle beside the back arrow, which the owner asked for: see "Header buttons" in docs/ARCHITECTURE.md), and reuse the shared pieces (`h`, `icon`, `audioButton`, `chip`, `quietToggle`, `progressBar`) instead of copying them.
 - **Plain words.** Copy is short, friendly and free of jargon; grammar is explained without grammar terms.
 
 ## Product

@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { TAP_MS, webAudioPlayer } = await import('./player');
+const { setMuted } = await import('./speech');
 
 /** An AudioParam that takes any automation, remembering where it was last sent. */
 const param = () => {
@@ -84,6 +85,19 @@ afterEach(() => {
 describe('holding a sound', () => {
   it("can't hold a sound it can't make", () => {
     expect(webAudioPlayer().hold('ǃ', 1)).toBeNull();
+  });
+
+  it('plays nothing in silent mode', async () => {
+    setMuted(true);
+    const made = contexts.length;
+    try {
+      const player = webAudioPlayer();
+      expect(player.hold('a', 1)).toBeNull();
+      await player.playSlice(new Float32Array(16000), 16000, 0, 1).done;
+      expect(contexts).toHaveLength(made);
+    } finally {
+      setMuted(false);
+    }
   });
 
   it('plays until let go, then stops its sources', async () => {

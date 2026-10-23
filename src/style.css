@@ -367,8 +367,12 @@ p {
   color: var(--on-accent);
 }
 
-/* Silent quiet mode: nothing can play, so the play buttons go. */
-.silent .audio-btn {
+/* Silent quiet mode: nothing can play, so the play buttons go, and so do the results screen's ways to hear a sound. */
+.silent .audio-btn,
+.silent .word-actions,
+.silent .hear-slowly,
+.silent .hold-btn,
+.silent .sound-slider {
   display: none;
 }
 
@@ -1985,26 +1989,26 @@ p {
   top: 8px;
   bottom: 8px;
   width: 50%;
-  --fill: 0%;
+  --ramp: 0%;
   opacity: 0.85;
 }
 
 .ramp-heard {
   left: 0;
   clip-path: polygon(0 0, 100% 46%, 100% 54%, 0 100%);
-  background: linear-gradient(to left, var(--magenta) var(--fill), var(--line) var(--fill));
+  background: linear-gradient(to left, var(--magenta) var(--ramp), var(--line) var(--ramp));
 }
 
 .ramp-target {
   right: 0;
   clip-path: polygon(0 46%, 100% 0, 100% 100%, 0 54%);
-  background: linear-gradient(to right, var(--teal) var(--fill), var(--line) var(--fill));
+  background: linear-gradient(to right, var(--teal) var(--ramp), var(--line) var(--ramp));
 }
 
 .sound-slider[data-side='heard'] .ramp-heard,
 .sound-slider[data-side='target'] .ramp-target {
   /* Up to the thumb's middle, which stops half its width short of the end. */
-  --fill: calc(var(--reach, 0) * (100% - 20px));
+  --ramp: calc(var(--reach, 0) * (100% - 20px));
 }
 
 .slider-thumb {

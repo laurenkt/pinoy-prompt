@@ -104,6 +104,11 @@ export function lastStartDelay(): Promise<number | null> {
 /** Set by quiet mode without headphones: nothing plays at all. */
 let muted = false;
 
+/** Whether quiet mode without headphones has muted everything, for other players to follow. */
+export function audioMuted(): boolean {
+  return muted;
+}
+
 export function setMuted(on: boolean): void {
   muted = on;
   if (!on) return;
