@@ -21,10 +21,10 @@ export interface Settings {
   dailyNew: number;
   /** Play audio automatically when a card is shown. */
   autoplay: boolean;
-  /** Quiet mode, for public places: nothing asks the learner to speak. */
-  quiet: boolean;
-  /** With quiet mode: headphones are in, so audio can still play. Without them, quiet mode is silent. */
-  headphones: boolean;
+  /** The microphone may be used: off, nothing asks the learner to speak (quiet mode, screens/quiet.ts). */
+  mic: boolean;
+  /** Audio may play: off, nothing plays and nothing asks to be heard. */
+  sound: boolean;
   /** A soft tick when a button is pressed. */
   tapSounds: boolean;
   /** Show how many cards are due on the Home Screen icon (badge.ts). */
@@ -74,7 +74,7 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   2: (data) => ({ history: {}, ...data }),
 };
 
-export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, quiet: false, headphones: false, tapSounds: true, iconBadge: false };
+export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, mic: true, sound: true, tapSounds: true, iconBadge: false };
 
 /** Local calendar day as YYYY-MM-DD. */
 export function dayKey(time: number): string {
@@ -149,7 +149,31 @@ export function decodeValue(value: unknown, now: number): Decoded {
 }
 
 export function encode(envelope: Envelope): string {
-  return JSON.stringify(envelope);
+  const { settings } = envelope.progress;
+  return JSON.stringify({ ...envelope, progress: { ...envelope.progress, settings: { ...settings, ...legacyQuiet(settings) } } });
+}
+
+/**
+ * Quiet mode as builds before the mic and sound switches kept it, written beside them so such a build still open in
+ * another tab or installed app keeps to it: `quiet` meant no speaking, and without `headphones`, no sound either. It
+ * had no way to say sound off but mic on, so that's kept as both off, the side that stays quiet.
+ */
+function legacyQuiet({ mic, sound }: Settings): { quiet: boolean; headphones: boolean } {
+  return { quiet: !mic || !sound, headphones: sound };
+}
+
+/**
+ * The mic and sound switches, or for a copy saved by a build from before them (which may also be open alongside this
+ * one, writing this schema), worked out from its quiet mode: `quiet` meant no speaking, and without `headphones`, no
+ * sound either. Quiet mode from before `headphones` existed kept its audio.
+ */
+function quietSwitches(s: Data): Pick<Settings, 'mic' | 'sound'> {
+  const quiet = s.quiet === true;
+  const headphones = typeof s.headphones === 'boolean' ? s.headphones : quiet;
+  return {
+    mic: typeof s.mic === 'boolean' ? s.mic : !quiet,
+    sound: typeof s.sound === 'boolean' ? s.sound : !quiet || headphones,
+  };
 }
 
 /** Coerce a migrated progress object into a valid one, keeping unknown fields. */
@@ -179,13 +203,13 @@ export function sanitize(data: Data, now: number): Progress {
   }
 
   const s = isObject(data.settings) ? data.settings : {};
+  // Quiet mode as older builds kept it is read into the switches, and written afresh from them by encode.
+  const { quiet: _quiet, headphones: _headphones, ...rest } = s;
   const settings: Settings = {
-    ...s,
+    ...rest,
     dailyNew: isWhole(s.dailyNew) && s.dailyNew >= 1 && s.dailyNew <= 100 ? s.dailyNew : DEFAULT_SETTINGS.dailyNew,
     autoplay: typeof s.autoplay === 'boolean' ? s.autoplay : DEFAULT_SETTINGS.autoplay,
-    quiet: typeof s.quiet === 'boolean' ? s.quiet : DEFAULT_SETTINGS.quiet,
-    // Quiet mode used to keep audio playing, so a quiet copy saved before this setting keeps it.
-    headphones: typeof s.headphones === 'boolean' ? s.headphones : s.quiet === true,
+    ...quietSwitches(s),
     tapSounds: typeof s.tapSounds === 'boolean' ? s.tapSounds : DEFAULT_SETTINGS.tapSounds,
     iconBadge: typeof s.iconBadge === 'boolean' ? s.iconBadge : DEFAULT_SETTINGS.iconBadge,
   };

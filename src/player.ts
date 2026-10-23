@@ -17,7 +17,7 @@ export interface Player {
   playSlice(samples: Float32Array, sampleRate: number, from: number, to: number, onTime?: (t: number) => void): Playback;
   /**
    * Hold a sound made in code at `volume` (0–1, of its full loudness) until released.
-   * Null when it can't be made (canSynthesize), or in silent mode.
+   * Null when it can't be made (canSynthesize), or while the sound is off.
    */
   hold(sound: string, volume: number): Held | null;
   stop(): void;

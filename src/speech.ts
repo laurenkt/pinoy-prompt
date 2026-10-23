@@ -109,10 +109,10 @@ let reportStart: (ms: number | null) => void = () => {};
 export function lastStartDelay(): Promise<number | null> {
   return started;
 }
-/** Set by quiet mode without headphones: nothing plays at all. */
+/** Set while the sound is off (quiet mode): nothing plays at all. */
 let muted = false;
 
-/** Whether quiet mode without headphones has muted everything, for other players to follow. */
+/** Whether the sound being off has muted everything, for other players to follow. */
 export function audioMuted(): boolean {
   return muted;
 }
@@ -190,7 +190,7 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
 
 /**
  * A soft two-note chime for a right answer. It's short and quiet, as praise
- * should stay small, and goes quiet with the words in silent mode. A word
+ * should stay small, and goes quiet with the words while the sound is off. A word
  * played with it (the answer, said back) starts once it's done, not over it.
  */
 export async function chime(): Promise<void> {
@@ -205,7 +205,7 @@ export async function chime(): Promise<void> {
 }
 
 let chimeBuffer: AudioBuffer | null = null;
-/** Stopped by silent mode, but not by a word starting, which waits for it instead. */
+/** Stopped by the sound going off, but not by a word starting, which waits for it instead. */
 let currentChime: Sound | null = null;
 /** When the last chime ends, in its context's time. */
 let lastChime: { ctx: AudioContext; ends: number } | null = null;
@@ -311,7 +311,7 @@ export const DETENT_GAP_MS = 45;
  * chart's days), like a picker wheel: the click at half its level, and a light
  * haptic tick where the phone allows one. Call the returned function with the
  * step under the finger as it moves, and with null when the drag ends.
- * Follows the Tap sounds switch; silent mode leaves only the haptic.
+ * Follows the Tap sounds switch; the sound off leaves only the haptic.
  */
 export function detents(): (step: string | null) => void {
   let at: string | null = null;
@@ -469,7 +469,7 @@ const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
  * Tap for every control pressed under `root`. Two marks change that:
  * - `data-no-tap`: silent, for a control that starts recording, which would catch the tap.
  * - `data-tap="before"`: tapped before its own handler runs, for one that may open the microphone inside the press
- *   (starting a Chat call, opening Drills, choosing Speak or turning quiet mode off in a round), after which nothing
+ *   (starting a Chat call, opening Drills, choosing Speak or turning the mic on in a round), after which nothing
  *   would tap. It reads the mute from before the press, so it's only for presses that don't change it to silent.
  */
 export function tickOnPress(root: Node): void {

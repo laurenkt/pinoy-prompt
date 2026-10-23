@@ -58,8 +58,8 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
-  headphones: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/>',
-  quiet: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 3l16 18"/>',
+  micOff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 3l16 18"/>',
+  soundOff: '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/>',
 };
 
 export type IconName = keyof typeof ICONS;
@@ -157,7 +157,7 @@ export function choiceList<T>(
 }
 
 /**
- * A square icon button for a header: the back arrow, Home's settings, quiet mode.
+ * A square icon button for a header: the back arrow, Home's settings.
  * Given `pressed`, it's a toggle: teal while on.
  */
 export function iconButton(name: IconName, label: string, onclick: () => void, opts: { pressed?: boolean; title?: string } = {}): HTMLButtonElement {

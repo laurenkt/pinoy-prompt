@@ -319,7 +319,7 @@ describe('clips', () => {
     expect(speech.spoken).toHaveLength(0);
   });
 
-  it('reports nothing for a word asked for in silent quiet mode', async () => {
+  it('reports nothing for a word asked for while the sound is off', async () => {
     const { setMuted } = await import('./speech');
     await play({ tl: 'Salamat' });
     setMuted(true);
