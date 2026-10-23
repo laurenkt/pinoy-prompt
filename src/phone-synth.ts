@@ -188,17 +188,17 @@ export function syllableLength(s: Spec): number {
 }
 
 /** The voice: a buzz with its overtones falling away, as the vocal folds make. */
-function voiceWave(ctx: BaseAudioContext): PeriodicWave {
+function makeVoiceWave(ctx: BaseAudioContext): PeriodicWave {
   // Up to about 18 kHz at the voice's pitch.
   const n = 150;
   const real = new Float32Array(n);
   const imag = new Float32Array(n);
-  for (let k = 1; k < n; k++) imag[k] = 1 / k ** 1;
+  for (let k = 1; k < n; k++) imag[k] = 1 / k;
   return ctx.createPeriodicWave(real, imag);
 }
 
 /** A second of white noise, the same every time, looped for hiss and breath. */
-function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
+function makeNoise(ctx: BaseAudioContext): AudioBuffer {
   const buffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = buffer.getChannelData(0);
   let seed = 7;
@@ -207,6 +207,14 @@ function noiseBuffer(ctx: BaseAudioContext): AudioBuffer {
     data[i] = (seed / 2 ** 32) * 2 - 1;
   }
   return buffer;
+}
+
+/** Made once for each context, so a press only has to wire up nodes. */
+const made = new WeakMap<BaseAudioContext, { wave: PeriodicWave; noise: AudioBuffer }>();
+function madeFor(ctx: BaseAudioContext) {
+  let m = made.get(ctx);
+  if (!m) made.set(ctx, (m = { wave: makeVoiceWave(ctx), noise: makeNoise(ctx) }));
+  return m;
 }
 
 export interface Voice {
@@ -227,7 +235,7 @@ const HISS = 0.9;
 /** How wide each resonance is, in Hz. */
 const BANDWIDTHS = [80, 100, 150];
 /** A resonance's peak for a low-pass filter, whose Q is in decibels. */
-const qOf = (_i: number, frequency: number, bandwidth: number) => 20 * Math.log10(Math.max(1, frequency / bandwidth));
+const qOf = (frequency: number, bandwidth: number) => 20 * Math.log10(Math.max(1, frequency / bandwidth));
 /** How quickly a held vowel or hiss follows the slider, in seconds (time constant). */
 const FOLLOW = 0.03;
 
@@ -252,7 +260,7 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
 
   // The buzz, with a slow wobble in pitch so it doesn't sound like a machine.
   const voice = ctx.createOscillator();
-  voice.setPeriodicWave(voiceWave(ctx));
+  voice.setPeriodicWave(madeFor(ctx).wave);
   voice.frequency.value = 120;
   const wobble = ctx.createOscillator();
   wobble.frequency.value = 5.2;
@@ -264,7 +272,7 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
   voice.connect(voiceAmp);
 
   const noise = ctx.createBufferSource();
-  noise.buffer = noiseBuffer(ctx);
+  noise.buffer = madeFor(ctx).noise;
   noise.loop = true;
   const breathAmp = ctx.createGain();
   breathAmp.gain.value = 0;
@@ -283,7 +291,7 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
     // The fourth is fixed, near where it sits in everyone's voice.
     if (i === formants.length - 1) {
       filter.frequency.value = 3500;
-      filter.Q.value = qOf(i, 3500, 250);
+      filter.Q.value = qOf(3500, 250);
     }
     if (i > 0) formants[i - 1].connect(filter);
   });
@@ -324,7 +332,7 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
   const setFormants = (f: Formants, at: number, follow = 0, damp = 1) =>
     BANDWIDTHS.forEach((bandwidth, i) => {
       const { frequency, Q } = formants[i];
-      const q = qOf(i, f[i], bandwidth * (i > 0 ? damp : 1));
+      const q = qOf(f[i], bandwidth * (i > 0 ? damp : 1));
       if (follow) {
         frequency.setTargetAtTime(f[i], at, follow);
         Q.setTargetAtTime(q, at, follow);
@@ -338,12 +346,9 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
       const { frequency, Q } = formants[i];
       frequency.setValueAtTime(a[i], from);
       frequency.linearRampToValueAtTime(b[i], to);
-      Q.setValueAtTime(qOf(i, a[i], bandwidth * (i > 0 ? damp : 1)), from);
-      Q.linearRampToValueAtTime(qOf(i, b[i], bandwidth), to);
+      Q.setValueAtTime(qOf(a[i], bandwidth * (i > 0 ? damp : 1)), from);
+      Q.linearRampToValueAtTime(qOf(b[i], bandwidth), to);
     });
-  const ramp = (param: AudioParam, value: number, at: number, over: number) => {
-    param.setTargetAtTime(value, at, over / 3);
-  };
 
   /** The hiss's own settings, held. */
   const holdHiss = (s: Spec, at: number, follow: number) => {
@@ -379,7 +384,7 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
     voice.frequency.linearRampToValueAtTime(112, t + length);
 
     // Closing: the voice drops to its hum (or nothing) and the resonances go to the consonant's.
-    ramp(voiceAmp.gain, closed, t, 0.015 + into);
+    voiceAmp.gain.setTargetAtTime(closed, t, (0.015 + into) / 3);
     airLevel.gain.setTargetAtTime(AIR * s.sonorant, t, 0.005);
     const shut: Formants =
       s.murmur > 0.5 ? [250, s.hum, s.locus[2]] : s.voiceBar > 0.5 && s.sonorant === 0 ? [200, s.locus[1], s.locus[2]] : s.locus;
@@ -416,11 +421,11 @@ export function phoneVoice(ctx: BaseAudioContext, from: string, to: string, mix:
     }
     // The vowel: the voice comes in and the resonances move from the consonant's to the vowel's.
     const onset = s.breathDur > 0 || s.hissDur > 0 ? voicing : release;
-    ramp(voiceAmp.gain, 1, onset, s.close > 0.03 && s.burst === 0 && s.sonorant === 0 && s.murmur === 0 ? 0.004 : 0.012);
+    voiceAmp.gain.setTargetAtTime(1, onset, (s.close > 0.03 && s.burst === 0 && s.sonorant === 0 && s.murmur === 0 ? 0.004 : 0.012) / 3);
     glideFormants(s.locus, s.vowel, onset, onset + s.glide, 1 + 4 * s.murmur);
     airLevel.gain.setTargetAtTime(AIR, onset, 0.01);
     // And fades a little into the next repeat.
-    ramp(voiceAmp.gain, 0.6, t + length - 0.05, 0.04);
+    voiceAmp.gain.setTargetAtTime(0.6, t + length - 0.05, (0.04) / 3);
     return t + length;
   }
 

@@ -213,6 +213,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const closeness = p.result?.closeness ?? 0;
     const tip = tipFor(index) ?? (!ipa ? (p.extraCounts ? 'This sound isn’t in the word. Try leaving it out.' : 'A small extra sound like this is a natural part of speech. No need to change it.') : undefined);
     const drawn = drawChart(ipa ?? null, heard);
+    // Right, even if the recogniser wrote it another way (an accepted variant): nothing to slide between.
+    const said = p.result?.verdict === 'good';
 
     detail.replaceChildren(
       ...([
@@ -242,10 +244,10 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
           { class: 'sound-ends' },
           // The symbols themselves are on the slider's ends below.
           // Said as aimed for: once is enough.
-          heard !== ipa && h('p', { class: 'end-heard' }, h('span', { class: 'end-label' }, 'You said'), heard ? soundName(heard) : 'nothing here'),
-          h('p', { class: 'end-target' }, h('span', { class: 'end-label' }, 'Aim for'), ipa ? soundName(ipa) : 'nothing here'),
+          !said && h('p', { class: 'end-heard' }, h('span', { class: 'end-label' }, 'You said'), heard ? soundName(heard) : 'nothing here'),
+          h('p', { class: 'end-target' }, h('span', { class: 'end-label' }, 'Aim for'), ipa ? soundName(ipa) : 'leave it out'),
         ),
-        listener(heard, ipa ?? null, drawn),
+        listener(said ? null : heard, ipa ?? null, drawn),
       ].filter(Boolean) as Node[]),
     );
   }

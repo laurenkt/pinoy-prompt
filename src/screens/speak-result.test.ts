@@ -156,6 +156,23 @@ describe('the breakdown', () => {
     expect(player.held!.released).toBe(true);
   });
 
+  it('has one sound to hold when it counts as right though written differently, and no "You said"', () => {
+    // ng before b is just as right said m.
+    show(attempt('ang bata', ['a', 'm', 'b', 'a', 't', 'a']));
+    all('.ribbon-mark')[1].click();
+    expect(q('.sound-detail').textContent).toContain('Spot on');
+    expect(document.querySelector('.sound-slider, .end-heard')).toBeNull();
+    pointer(q('.hold-btn'), 'pointerdown');
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'ŋ', to: 'ŋ', mix: 0 });
+  });
+
+  it('says to leave out an added sound, and holds what was said', () => {
+    show(attempt('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'o']));
+    expect(q('.end-target').textContent).toContain('leave it out');
+    pointer(q('.hold-btn'), 'pointerdown');
+    expect(player.calls.at(-1)).toEqual({ kind: 'hold', from: 'o', to: 'o', mix: 0 });
+  });
+
   it("holds just the target when what was heard can't be made", () => {
     show(attempt('po', ['ǃ', 'o']));
     q<HTMLButtonElement>('.ribbon-mark').click();

@@ -9,6 +9,9 @@ import { growthChart } from './screens/growth-chart';
 import { DAY_MS } from './srs';
 import { DETENT_GAP_MS, chime, detents, play, readyDetents, setMuted, setTapSounds, stop, tickOnPress } from './speech';
 import { FakeAudioContext, chimes, recorded, ticks } from './test/fake-audio';
+import { FakePlayer, fakeRecognition } from './test/fake-speech';
+import { compare, toPhones } from './phonetics';
+import { resultView } from './screens/speak-result';
 import { h } from './ui';
 
 let root: HTMLElement;
@@ -90,6 +93,23 @@ describe('the tap sound', () => {
     press(yours);
     player.stop();
     expect(ticks.count).toBe(0);
+  });
+
+  it("doesn't tick over the results screen's held sounds, which make their own", () => {
+    const heard = ['p', 'u'];
+    const r = fakeRecognition(heard);
+    const view = resultView(
+      { text: 'po', comparison: compare(toPhones('po'), heard), tips: [], heard, timing: r.timing, features: r.features, samples: new Float32Array(16000) },
+      { player: new FakePlayer() },
+    );
+    root.append(view.el);
+    // The slider for the o said as u, then the single button for the p said right.
+    press(root.querySelector<HTMLElement>('.sound-slider')!);
+    press(root.querySelector<HTMLElement>('.mark-good')!);
+    const ticked = ticks.count;
+    press(root.querySelector<HTMLElement>('.hold-btn')!);
+    expect(ticks.count).toBe(ticked);
+    view.dispose();
   });
 
   it('taps for a button that starts a call, before the call opens the microphone', async () => {
