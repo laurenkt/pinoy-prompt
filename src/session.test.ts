@@ -313,6 +313,21 @@ describe('distractors', () => {
       expect(distractors(getCard('ngayon')!, 'tl', 3, pool).map((c) => c.id)).not.toContain('na');
     }
   });
+
+  it('keeps the newer look-alike meanings apart too', () => {
+    const pairs = [
+      ['kayo', 'ikaw'], ['bata', 'anak'], ['luma', 'matanda'], ['kapatid', 'ate'], ['kapatid', 'kuya'],
+      ['walang-problema', 'walang-anuman'], ['walang-problema', 'ayos-lang'], ['maghintay', 'teka'], ['tumulong', 'tulong'],
+    ];
+    const fillers = ['tubig', 'kape', 'kanin', 'isda'];
+    for (const [a, b] of pairs) {
+      const pool = [a, b, ...fillers].map((id) => getCard(id)!);
+      for (let i = 0; i < 20; i++) {
+        expect(distractors(getCard(a)!, 'en', 3, pool).map((c) => c.id), `${a} offers ${b}`).not.toContain(b);
+        expect(distractors(getCard(b)!, 'en', 3, pool).map((c) => c.id), `${b} offers ${a}`).not.toContain(a);
+      }
+    }
+  });
 });
 
 describe('guides', () => {
