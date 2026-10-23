@@ -159,5 +159,10 @@ describe('telling the Tagalog said back from an answer', () => {
 
   it('still takes an English word the card shares with its Tagalog', async () => {
     expect(await judgeMeaning('the bill', card('bill-po'), null)).toEqual({ right: true });
+    // Not matched on the device, but English, so OpenAI is asked.
+    const ask = vi.fn(async () => true);
+    expect(await judgeMeaning('okay', card('okay-lang-ako'), ask)).toEqual({ right: true });
+    expect(ask).toHaveBeenCalledWith('okay', card('okay-lang-ako'));
+    expect(repeatsTagalog('Okay lang ako', card('okay-lang-ako'))).toBe(true);
   });
 });

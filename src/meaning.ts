@@ -63,7 +63,11 @@ function wording(text: string): Wording {
 
 /** Lower case words, with contractions, digits and common shorthands spelled out. */
 export function words(text: string): string[] {
-  let s = text.toLowerCase().replace(/[’‘`]/g, "'");
+  let s = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’‘`]/g, "'");
   s = s
     .replace(/\bcan't\b/g, 'can not')
     .replace(/\bwon't\b/g, 'will not')
@@ -182,29 +186,29 @@ export function matchesMeaning(answer: string, card: Card): boolean {
   );
 }
 
-/** Lower case words, without accents or punctuation: how Tagalog is compared. */
-function plainWords(text: string): string[] {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
-}
-
 /** Respect words that can go with any Tagalog said back. */
 const RESPECT = ['po', 'ho', 'pong', 'hong'];
+
+/** Each card's Tagalog words, worked out once. */
+const cardTagalog = new WeakMap<Card, Set<string>>();
+
+function tagalogOf(card: Card): Set<string> {
+  let found = cardTagalog.get(card);
+  if (!found) cardTagalog.set(card, (found = new Set([card.tl, ...(card.accept ?? [])].flatMap(words))));
+  return found;
+}
 
 /**
  * Whether the answer is the card's Tagalog said back ("salamat", "Salamat po",
  * an accepted spelling), not its meaning in English. It means the same, but
- * the question asks for the English, so it's never right. A loanword the card
- * shares with its English ("bill") still matches that first.
+ * the question asks for the English, so it's never right. An answer needs a
+ * word that's only Tagalog to count: "okay" for "Okay lang ako" is English,
+ * and may still be right in other words.
  */
 export function repeatsTagalog(answer: string, card: Card): boolean {
-  const tagalog = new Set([card.tl, ...(card.accept ?? [])].flatMap(plainWords));
-  const list = plainWords(answer).filter((w) => !RESPECT.includes(w));
-  return list.length > 0 && list.every((w) => tagalog.has(w));
+  const tagalog = tagalogOf(card);
+  const list = words(answer).filter((w) => !RESPECT.includes(w));
+  return list.length > 0 && list.every((w) => tagalog.has(w)) && list.some((w) => !knownWords().has(w));
 }
 
 /**
