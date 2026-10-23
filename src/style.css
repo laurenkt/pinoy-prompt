@@ -715,7 +715,7 @@ p {
 /*
  * In a panel, the prompt grows on phones taller than about 700px (up to 300px), with what's on it centred.
  * Answer choices take the rest of the spare height, on short phones too until one is picked; otherwise what the learner does next (a button, the
- * answer and its ratings) sits at the bottom, under the thumb. The microphone's button sits in the middle instead (see .speak.ready).
+ * answer and its ratings) sits at the bottom, under the thumb. The microphone's button sits in the middle instead (see .speak.listening).
  */
 .panel > .prompt {
   display: flex;
@@ -1346,30 +1346,45 @@ p {
 }
 
 /*
- * Ready to listen, and listening: the speaking question takes the panel's spare height itself, rather than the
- * spacer, and puts one big button in the middle of it, where a resting thumb reaches it, in the same place to
- * start and to stop. What the microphone hears (and the hint) stays above it, in the top row; the bottom row
- * matches it so the button is centred, and gives way first on a short phone.
+ * Ready to listen, listening and checking (.speak.listening): the speaking question takes the panel's spare height
+ * itself, rather than the spacer, and puts one big button in the middle of it, where a resting thumb reaches it, in
+ * the same place to start and to stop. What the microphone hears (and the hint) stays above it; the space below
+ * matches it so the button is centred, and gives way first on a short phone. The meter and status keep their room
+ * while ready, so the button doesn't move when listening starts.
  */
-.panel:has(> .speak:is(.ready, .recording))::after {
+.panel:has(> .speak.listening)::after {
   content: none;
 }
 
-.panel > .speak:is(.ready, .recording) {
+.panel > .speak.listening {
   flex-grow: 1;
-  display: grid;
-  grid-template-rows: 1fr auto 1fr;
+  display: flex;
+  flex-direction: column;
+}
+
+.speak.listening::after {
+  content: '';
+  flex: 1 0 0;
 }
 
 .speak-cue {
-  align-self: end;
+  flex: 1 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   padding-bottom: 12px;
 }
 
-.speak-cue:empty {
-  padding: 0;
+.speak.ready .meter {
+  visibility: hidden;
 }
 
+/* The same line's room before there's anything to say. */
+.speak-cue .listen-status {
+  min-height: 1lh;
+}
+
+/* As big as Drills' play button (.audio-btn.huge), full width. */
 .btn.mic.huge {
   flex-direction: column;
   gap: 8px;
@@ -1384,12 +1399,6 @@ p {
 .btn.mic.huge .icon {
   width: 40px;
   height: 40px;
-}
-
-/* Pressed further than a small button, as big as it is. */
-.btn.mic.huge:active {
-  transform: translate(4px, 4px);
-  box-shadow: 2px 2px 0 var(--ink);
 }
 
 .btn.mic.done:disabled {

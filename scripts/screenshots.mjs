@@ -10,7 +10,7 @@
 // and any screen wider than the phone.
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
@@ -28,6 +28,8 @@ const SIZES = [
 
 /** Where drills-speak keeps the speech model between runs. */
 const MODEL_FILE = 'node_modules/.cache/pinoy-prompt/model.int8.onnx';
+/** The speech model, read once. */
+let model;
 
 /** How to reach each screen from Home. */
 const SCREENS = {
@@ -182,6 +184,8 @@ try {
       else if (scroll > size.height) console.log(`${name} at ${size.name} scrolls by ${scroll - size.height}px`);
       if (wide) console.log(`SIDEWAYS SCROLL: ${name} at ${size.name}`);
       await page.close();
+      // The microphone allowed for the speaking screens is theirs only.
+      await context.clearPermissions();
     }
     await context.close();
   }
@@ -193,12 +197,18 @@ try {
 /** Drills, asking only Speak, ready to listen. */
 async function speakOnly(page) {
   const { MODEL_URL } = await page.evaluate(() => import('/src/model-cache.ts'));
-  if (!existsSync(MODEL_FILE)) {
-    console.log('Downloading the speech model once…');
-    await mkdir(dirname(MODEL_FILE), { recursive: true });
-    await writeFile(MODEL_FILE, Buffer.from(await (await fetch(MODEL_URL)).arrayBuffer()));
+  if (!model) {
+    if (!existsSync(MODEL_FILE)) {
+      console.log('Downloading the speech model once…');
+      const response = await fetch(MODEL_URL);
+      if (!response.ok) throw new Error(`Couldn't download the speech model: ${response.status}`);
+      await mkdir(dirname(MODEL_FILE), { recursive: true });
+      // Kept only once it's all here, so a download cut short is tried again next time.
+      await writeFile(`${MODEL_FILE}.part`, Buffer.from(await response.arrayBuffer()));
+      await rename(`${MODEL_FILE}.part`, MODEL_FILE);
+    }
+    model = await readFile(MODEL_FILE);
   }
-  const model = await readFile(MODEL_FILE);
   await page.route(MODEL_URL, (route) => route.fulfill({ body: model, contentType: 'application/octet-stream' }));
   await page.context().grantPermissions(['microphone']);
   // Headless Chromium has no microphone: a quiet hum stands in for the room.
