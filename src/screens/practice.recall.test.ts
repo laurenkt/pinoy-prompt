@@ -107,6 +107,16 @@ describe("how well the card is known", () => {
     expect(text).toContain('Help in DrillsNeeded twice lately');
   });
 
+  it("leaves out reading's lapses on a way only copied from its schedule", () => {
+    const app = learner(true);
+    Object.assign(app.progress.cards['salamat:recall'], { split: true, lapses: 2, reps: 3 });
+    delete app.progress.cards['salamat:recall'].reviews;
+    const root = (last = recall(app));
+    toggle(root).click();
+    expect(details(root).textContent).toContain('Answered in StudyNot yet');
+    expect(details(root).textContent).not.toContain('forgotten');
+  });
+
   it("says a way Study hasn't asked yet hasn't been answered", () => {
     const root = (last = recall(learner(false)));
     toggle(root).click();

@@ -83,7 +83,11 @@ describe('answers in Study', () => {
   it('starts a card saved before they were counted from what its schedule shows for certain', () => {
     const old = { ...newCardState(0), reps: 3, lapses: 1, interval: 10 };
     expect(answersOf(old)).toEqual({ count: 4, atLeast: true });
-    expect(answersOf(review(old, 'good', DAY_MS))).toEqual({ count: 5, atLeast: false });
+    // Still a floor once counted on, as answers before it are unknown.
+    expect(answersOf(review(old, 'good', DAY_MS))).toEqual({ count: 5, atLeast: true });
+    // Answered only with "again" before, it has no run and no lapses to show, but it was answered.
+    const missed = { ...newCardState(0), reviewed: 0 };
+    expect(answersOf(missed)).toEqual({ count: 1, atLeast: true });
   });
 
   it("starts from none on a way only copied from reading's schedule", () => {

@@ -27,9 +27,11 @@ export interface CardState {
   reviewed?: number;
   /**
    * How many times Study has asked the card this way. Missing on cards saved before it was counted; the first answer
-   * since starts it from what the schedule shows for certain (see answersOf in memory.ts).
+   * since starts it from what the schedule shows for certain, and marks it `reviewsAtLeast` (see answersOf).
    */
   reviews?: number;
+  /** `reviews` started from a card answered before they were counted, so it is a floor, not the whole count. */
+  reviewsAtLeast?: true;
   /**
    * Each time the card moved to a different strength (see memory.ts), as
    * [time, new interval] pairs, oldest first. Missing on cards saved before it
@@ -85,7 +87,9 @@ export function nextInterval(card: CardState, rating: Rating): number {
 export function review(card: CardState, rating: Rating, now: number): CardState {
   const interval = nextInterval(card, rating);
   const { split: _split, ...answered } = card;
-  const next: CardState = { ...answered, interval, reviewed: now, reviews: answersOf(card).count + 1 };
+  const before = answersOf(card);
+  const next: CardState = { ...answered, interval, reviewed: now, reviews: before.count + 1 };
+  if (before.atLeast) next.reviewsAtLeast = true;
 
   switch (rating) {
     case 'again':
@@ -109,15 +113,15 @@ export function review(card: CardState, rating: Rating, now: number): CardState 
 }
 
 /**
- * How many times Study has asked the card this way. A card saved before answers were counted shows at least its
- * current run of right answers and the times it was forgotten (`atLeast`); one only copied from reading's schedule
- * when the ways were split (`split`) hasn't been asked this way at all.
+ * How many times Study has asked the card this way. A card answered before answers were counted has at least its
+ * current run of right answers and the times it was forgotten, and stays "at least" (`atLeast`) as it's counted on;
+ * one only copied from reading's schedule when the ways were split (`split`) hasn't been asked this way at all.
  */
 export function answersOf(card: CardState): { count: number; atLeast: boolean } {
-  if (card.reviews !== undefined) return { count: card.reviews, atLeast: false };
+  if (card.reviews !== undefined) return { count: card.reviews, atLeast: !!card.reviewsAtLeast };
   if (card.split) return { count: 0, atLeast: false };
-  const count = card.reps + card.lapses;
-  return { count, atLeast: count > 0 };
+  const answered = card.reviewed !== undefined || card.reps + card.lapses > 0;
+  return { count: Math.max(card.reps + card.lapses, answered ? 1 : 0), atLeast: answered };
 }
 
 export function isDue(card: CardState, now: number): boolean {
@@ -140,7 +144,7 @@ export function formatInterval(days: number, { up = false } = {}): string {
   return `${up ? Math.ceil(days / 36.5) / 10 : round1(days / 365)}y`;
 }
 
-const MINUTE_MS = 60_000;
+export const MINUTE_MS = 60_000;
 
 /** A short wait, e.g. "25m", "3h", "2d", "2mo": rounded up, so the learner never comes back to find nothing yet. */
 export function formatWait(ms: number): string {

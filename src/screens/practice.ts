@@ -20,8 +20,6 @@ import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PR
  */
 const GUIDE_MODES: Record<GuideFormat, Way> = { gap: 'read', build: 'recall' };
 
-const STRENGTH_DESC = new Map(STRENGTHS.map((s) => [s.id, s.desc]));
-
 const times = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -720,12 +718,13 @@ export function practiceScreen(
       { class: 'card-memory', id: 'card-memory', hidden: memoryFor !== q },
       state
         ? [
-            row('Memory', strengthBadge(state), ' ', STRENGTH_DESC.get(strengthOf(state)) ?? ''),
+            row('Memory', strengthBadge(state), ' ', STRENGTHS.find((s) => s.id === strengthOf(state))!.desc),
             row('Next in Study', state.due <= now ? 'Due now' : `In ${formatWait(state.due - now)}`),
             row(
               'Answered in Study',
               answers!.count ? capital(`${answers!.atLeast ? 'at least ' : ''}${times(answers!.count)}`) : 'Not yet',
-              state.lapses ? `, forgotten ${times(state.lapses)}` : '',
+              // A way only copied from reading's schedule carries reading's lapses too, not its own.
+              answers!.count && state.lapses ? `, forgotten ${times(state.lapses)}` : '',
             ),
           ]
         : row('Memory', studyWays(q.card).includes(q.mode) ? 'Study hasn’t asked it this way yet' : 'Study doesn’t ask it this way'),

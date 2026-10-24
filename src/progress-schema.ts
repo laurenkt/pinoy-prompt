@@ -265,6 +265,7 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
   if (reviewed === undefined) delete card.reviewed;
   else card.reviewed = reviewed;
   if (!isCount(value.reviews)) delete card.reviews;
+  if (value.reviewsAtLeast !== true) delete card.reviewsAtLeast;
   // Builds before reviews ran on elapsed time made a card due at local midnight
   // of the day its interval landed on, so a batch fell due together just after
   // midnight. Such a card comes due a whole interval after its review instead.
