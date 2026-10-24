@@ -178,6 +178,8 @@ describe('telling an answer typed exactly as the card has it', () => {
     ['dahan-dahan', 'dahan dahan lang po', 'tl'],
     ['dahan-dahan', 'Dahan-dahan lang po.', 'tl'],
     ['maraming-salamat', 'MARAMING SALAMAT', 'tl'],
+    ['dahan-dahan', 'dahandahan lang po', 'tl'],
+    ['isang-libo', '1000', 'en'],
   ] as const)('%s: "%s" is exact', (id, answer, language) => {
     expect(exactAnswer(answer, card(id), language)).toBe(true);
   });
@@ -189,7 +191,7 @@ describe('telling an answer typed exactly as the card has it', () => {
     ['salamat', 'thanks', 'en'],
     ['salamat', 'salamat', 'en'],
     ['maraming-salamat', 'Maraming salama', 'tl'],
-    ['dahan-dahan', 'dahandahan lang po', 'tl'],
+    ['dahan-dahan', 'dahan dahan lang', 'tl'],
     ['salamat', '', 'tl'],
   ] as const)('%s: "%s" is not exact', (id, answer, language) => {
     expect(exactAnswer(answer, card(id), language)).toBe(false);

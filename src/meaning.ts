@@ -254,7 +254,7 @@ export function repeatsTagalog(answer: string, card: Card): boolean {
 }
 
 /** A wording's words as written, in Tagalog or English: lower case, without accents or punctuation. */
-function tagalogWords(text: string): string[] {
+function plainWords(text: string): string[] {
   return text
     .toLowerCase()
     .normalize('NFD')
@@ -298,7 +298,7 @@ function sameTagalogWord(typed: string, word: string, own: Set<string>): boolean
  * which might take it for a typo.
  */
 export function swapsTagalog(answer: string, card: Card): boolean {
-  const given = bare(tagalogWords(answer));
+  const given = bare(plainWords(answer));
   const own = ownTagalog(card);
   const swapped = (typed: string, word: string) =>
     !own.has(typed) && knownTagalog().has(typed) && (looksAlike(typed, word) || OTHER_HALF.get(word) === typed);
@@ -373,7 +373,7 @@ function looksAlike(a: string, b: string): boolean {
  * ways of saying most things.
  */
 export function matchesTagalog(answer: string, card: Card): boolean {
-  const given = tagalogWords(answer);
+  const given = plainWords(answer);
   if (given.length === 0) return false;
   const g = bare(given);
   const own = ownTagalog(card);
@@ -398,7 +398,7 @@ const cardTagalogWords = new WeakMap<Card, string[][]>();
 
 function cardWords(card: Card): string[][] {
   let found = cardTagalogWords.get(card);
-  if (!found) cardTagalogWords.set(card, (found = [card.tl, ...(card.accept ?? [])].map(tagalogWords)));
+  if (!found) cardTagalogWords.set(card, (found = [card.tl, ...(card.accept ?? [])].map(plainWords)));
   return found;
 }
 
@@ -417,14 +417,16 @@ function matchesAnswer(answer: string, card: Card, language: AnswerLanguage): bo
 }
 
 /**
- * Whether the answer is one of the card's own wordings in `language`, letter for letter, in any case, punctuation
- * or spacing: "Thank you!" for "thank you", but not "thank yo" or "thanks". Strict enough to take an answer while
- * it's still being typed, which a typo-tolerant match can't be: half a word is often within a typo of the whole.
+ * Whether the answer is one of the card's own wordings in `language`, letter for letter, whatever the case, accents,
+ * punctuation or spacing: "Thank you!" for "thank you", "dahandahan" for "dahan-dahan", "1000" for "1,000", but not
+ * "thank yo" or "thanks". Strict enough to take an answer while it's still being typed, which a typo-tolerant match
+ * can't be: half a word is often within a typo of the whole.
  */
 export function exactAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
-  const given = tagalogWords(answer).join(' ');
-  const texts = language === 'tl' ? [card.tl, ...(card.accept ?? [])] : englishTexts(card);
-  return given !== '' && texts.some((text) => tagalogWords(text).join(' ') === given);
+  const letters = (list: string[]) => list.join('');
+  const given = letters(plainWords(answer));
+  const wanted = language === 'tl' ? cardWords(card) : englishTexts(card).map(plainWords);
+  return given !== '' && wanted.some((list) => letters(list) === given);
 }
 
 /**
