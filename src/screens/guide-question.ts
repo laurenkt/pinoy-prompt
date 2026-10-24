@@ -76,9 +76,21 @@ export function gapLine(d: Drill, filled: boolean, say: (slow: boolean) => void)
   );
 }
 
-/** A prompt's eyebrow, with a badge after it if there is one (Drills shows the card's memory strength). */
-export function eyebrowLine(text: string, badge: HTMLElement | null = null): HTMLElement {
-  return h('p', { class: 'eyebrow' }, text, badge && [' ', badge]);
+/** How well the card is known, on its prompt (Drills): a button beside the eyebrow, and what it opens, at the prompt's foot. */
+export interface PromptMemory {
+  toggle: HTMLElement;
+  details: HTMLElement;
+}
+
+/** A prompt: its eyebrow, with the memory button after it if there is one, then the rest, then what that button opens. */
+export function promptBlock(cls: string, eyebrow: string, memory: PromptMemory | null | undefined, ...rest: (HTMLElement | null | false)[]): HTMLElement {
+  return h(
+    'div',
+    { class: cls },
+    h('p', { class: 'eyebrow' }, eyebrow, memory && [' ', memory.toggle]),
+    ...rest,
+    memory?.details,
+  );
 }
 
 /** The question, as asked: an English sentence to complete in Tagalog, or a plain question. */
@@ -88,11 +100,11 @@ export function drillPrompt(
   filled: boolean,
   eyebrow: string,
   say: (slow: boolean) => void,
-  { showTl = true, badge = null }: { showTl?: boolean; badge?: HTMLElement | null } = {},
+  { showTl = true, memory = null }: { showTl?: boolean; memory?: PromptMemory | null } = {},
 ): HTMLElement {
   return d.tl
-    ? h('div', { class: `prompt kind-${c.kind}` }, eyebrowLine(eyebrow, badge), h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
-    : h('div', { class: `prompt kind-${c.kind}` }, eyebrowLine(c.en, badge), h('p', { class: 'drill-q' }, d.q));
+    ? promptBlock(`prompt kind-${c.kind}`, eyebrow, memory, h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
+    : promptBlock(`prompt kind-${c.kind}`, c.en, memory, h('p', { class: 'drill-q' }, d.q));
 }
 
 /** A guide's explanation: its rule in plain words, and examples to hear. */
@@ -143,8 +155,8 @@ export interface GuideViewOptions {
   feedback: (right: boolean) => HTMLElement;
   /** Anything else to show once it's answered: a hook, the way on. */
   after: (HTMLElement | null | false)[];
-  /** Shown beside the question's eyebrow: Drills puts the card's memory strength there. */
-  badge?: HTMLElement | null;
+  /** How well the card is known, on the prompt (Drills). */
+  memory?: PromptMemory | null;
 }
 
 /** The panel asking a guide's question, with `picked` as the pick so far (null before it's answered). */
@@ -156,7 +168,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
     return h(
       'div',
       { class: 'panel' },
-      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say, { badge: opts.badge }),
+      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say, { memory: opts.memory }),
       choiceList(q.choices, { key: (o) => o, label: (o) => o, answer: d.answer, picked, lang: d.tl ? 'fil' : undefined, onPick: opts.onPick }),
       answered && opts.feedback(right),
       ...(answered ? opts.after : []),
@@ -175,7 +187,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
   return h(
     'div',
     { class: 'panel' },
-    h('div', { class: `prompt kind-${c.kind}` }, eyebrowLine('Put it in order', opts.badge), h('p', { class: 'drill-q' }, d.q)),
+    promptBlock(`prompt kind-${c.kind}`, 'Put it in order', opts.memory, h('p', { class: 'drill-q' }, d.q)),
     h(
       'div',
       { class: `build-line ${answered ? (right ? 'right' : 'wrong') : ''}`, lang: 'fil', 'aria-label': 'Your sentence' },

@@ -9,6 +9,7 @@ import { cardKey, type Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
 import type { RecorderEvents, Take } from '../recorder';
 import { recordAnswer } from '../store';
+import { DAY_MS } from '../srs';
 import { button, drillScope, fakeApp, flush, noMic } from '../test/screen';
 import { practiceScreen, type MeaningHearer } from './practice';
 import type { SpeakDeps } from './speak';
@@ -69,28 +70,59 @@ describe('recalling words still being learned', () => {
   });
 });
 
-describe("the card's memory strength", () => {
-  it('shows beside the question, and stays the same once answered', () => {
+describe("how well the card is known", () => {
+  const toggle = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.prompt .memory-toggle')!;
+  const details = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-memory')!;
+
+  it('stays hidden until the button on the prompt is tapped, and shuts again for the next question', () => {
     const app = learner(false);
     // Recalling it is a card of its own (see Way), started here and still being learned; reading it is held for weeks.
     app.progress.cards['salamat:recall'] = { ...app.progress.cards.salamat, interval: 0 };
     app.progress.cards.salamat.interval = 30;
     const root = (last = recall(app));
-    expect(root.querySelector('.prompt .eyebrow')?.textContent).toBe('How do you say… Memory: Just met');
+    expect(root.querySelector('.prompt .eyebrow')?.textContent).toBe('How do you say… ');
+    expect(details(root).hidden).toBe(true);
+    expect(toggle(root).getAttribute('aria-expanded')).toBe('false');
+    toggle(root).click();
+    expect(details(root).hidden).toBe(false);
+    expect(toggle(root).getAttribute('aria-expanded')).toBe('true');
+    expect(details(root).querySelector('.badge.s-new')?.textContent).toBe('Memory: Just met');
+    // Still open once answered, as nothing about it changed.
     root.querySelector<HTMLButtonElement>('.choice')!.click();
-    expect(root.querySelector('.prompt .eyebrow .badge.s-new')?.textContent).toBe('Memory: Just met');
+    expect(details(root).hidden).toBe(false);
+    button(root, 'Next').click();
+    expect(details(root).hidden).toBe(true);
   });
 
-  it('follows the schedule of the way it is asked', () => {
+  it('follows the schedule of the way it is asked, with how often Study asked it and the drills helped', () => {
     const app = learner(true);
-    app.progress.cards['salamat:recall'].interval = 30;
+    Object.assign(app.progress.cards['salamat:recall'], { interval: 30, due: app.now() + 30 * DAY_MS, reviews: 6, lapses: 1 });
+    app.progress.cards.salamat.help = { recall: 2 };
     const root = (last = recall(app));
-    expect(root.querySelector('.prompt .eyebrow .badge.s-long')?.textContent).toBe('Memory: Long-term');
+    toggle(root).click();
+    const text = details(root).textContent;
+    expect(details(root).querySelector('.badge.s-long')?.textContent).toBe('Memory: Long-term');
+    expect(text).toContain('Next in StudyIn 1mo');
+    expect(text).toContain('Answered in Study6 times, forgotten once');
+    expect(text).toContain('Help in DrillsNeeded twice lately');
   });
 
-  it("isn't shown for a way not studied yet", () => {
+  it("leaves out reading's lapses on a way only copied from its schedule", () => {
+    const app = learner(true);
+    Object.assign(app.progress.cards['salamat:recall'], { split: true, lapses: 2, reps: 3 });
+    delete app.progress.cards['salamat:recall'].reviews;
+    const root = (last = recall(app));
+    toggle(root).click();
+    expect(details(root).textContent).toContain('Answered in StudyNot yet');
+    expect(details(root).textContent).not.toContain('forgotten');
+  });
+
+  it("says a way Study hasn't asked yet hasn't been answered", () => {
     const root = (last = recall(learner(false)));
-    expect(root.querySelector('.prompt .eyebrow .badge')).toBeNull();
+    toggle(root).click();
+    expect(details(root).querySelector('.badge')).toBeNull();
+    expect(details(root).textContent).toContain('MemoryStudy hasn’t asked it this way yet');
+    expect(details(root).textContent).toContain('Help in DrillsNot needed lately');
   });
 });
 
