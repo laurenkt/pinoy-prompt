@@ -63,7 +63,9 @@ async function speakResult(page, mistakes, stress = false) {
     const { NUM_MEL_BINS } = await import('/src/fbank.ts');
     const swap = { a: 'ɛ', i: 'ɛ', u: 'o', o: 'u', ɛ: 'i', s: 'ʃ', ŋ: 'n', ɾ: 'd', k: 'g', t: 'd', p: 'b', l: 'ɾ', m: 'n', n: 'm', b: 'p', d: 't', g: 'k', h: 'k', w: 'b', j: 'dʒ' };
     const vowels = new Set(['a', 'i', 'u', 'o', 'ɛ']);
-    const samples = new Float32Array(16000 * 2).map((_, i) => Math.sin(i / 7) * 0.2 * Math.sin((i / 32000) * Math.PI));
+    // Hiss, with no pitch, so stress isn't judged; with `stress`, each take gets a voice leaning one way (below).
+    let seed = 1;
+    const samples = new Float32Array(16000 * 2).map((_, i) => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 0.3 * Math.sin((i / 32000) * Math.PI));
     Object.assign(defaultDeps, {
       recordingSupported: () => true,
       modelDownloaded: async () => true,
@@ -72,21 +74,27 @@ async function speakResult(page, mistakes, stress = false) {
       holdMicrophone: async () => true,
       record: () => ({ audio: Promise.resolve({ samples, speech: true }), stop() {}, cancel() {} }),
       loadPhoneModel: async () => ({
-        async recognise() {
+        async recognise(heardSamples) {
           const sounds = toPhones(document.querySelector('.prompt .tl').textContent).filter((p) => !p.optional).map((p) => p.ipa);
           const vowel = sounds.findIndex((s) => vowels.has(s));
           const consonant = sounds.findLastIndex((s) => !vowels.has(s) && swap[s]);
           if (mistakes && vowel >= 0) sounds[vowel] = swap[sounds[vowel]];
           if (mistakes && consonant >= 0) sounds[consonant] = swap[sounds[consonant]];
           const frames = 200;
-          const lastVowels = sounds.flatMap((s, i) => (vowels.has(s) ? [i] : [])).slice(-2);
-          const leanOn = lastVowels[(window.leans = (window.leans ?? 0) + 1) % 2];
-          const plain = { length: 0.1, pitch: 200, level: -16 };
+          const timing = sounds.map((_, i) => ({ start: 0.3 + i * 0.12, end: 0.38 + i * 0.12 }));
+          if (stress) {
+            // A voice in each vowel's slot, the leaned-on one higher and louder.
+            const lastVowels = sounds.flatMap((s, i) => (vowels.has(s) ? [i] : [])).slice(-2);
+            const leanOn = lastVowels[(window.leans = (window.leans ?? 0) + 1) % 2];
+            heardSamples.fill(0);
+            for (const i of lastVowels) {
+              const [hz, gain] = i === leanOn ? [270, 0.3] : [190, 0.1];
+              for (let n = 0; n < 0.12 * 16000; n++) heardSamples[Math.round(timing[i].start * 16000) + n] = gain * Math.sin((2 * Math.PI * hz * n) / 16000);
+            }
+          }
           return {
             sounds,
-            timing: sounds.map((_, i) => ({ start: 0.3 + i * 0.12, end: 0.38 + i * 0.12 })),
-            // Measured only for the stress tip: without it, stress isn't judged.
-            prosody: stress ? sounds.map((_, i) => (i === leanOn ? { length: 0.2, pitch: 280, level: -10 } : plain)) : [],
+            timing,
             features: { data: new Float32Array(frames * NUM_MEL_BINS).map((_, i) => Math.sin(i / 9) * 3 - 4), frames },
           };
         },
