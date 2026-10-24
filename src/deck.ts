@@ -842,6 +842,35 @@ export function getCard(id: string): Card | undefined {
   return byId.get(id);
 }
 
+/**
+ * The ways a card is asked: see the Tagalog and know what it means (read), hear it and know what it means (listen),
+ * come up with it from the English (recall), say it (speak). Knowing a word one way says little about another, so
+ * for a word or phrase each way it's studied is a card of its own, with its own schedule: saved under the card's id
+ * for reading (as every card was before the ways were split), and under `id:way` for the others (cardKey). A guide is
+ * one card, asked its own ways (a gap, a build), all under its id.
+ */
+export type Way = 'read' | 'listen' | 'recall' | 'speak';
+export const WAYS: readonly Way[] = ['read', 'listen', 'recall', 'speak'];
+
+/** The ways Study schedules a card: a word or phrase read, heard and recalled; a guide once. */
+export function studyWays(card: Card): readonly Way[] {
+  return isVocab(card) ? STUDY_WAYS : ['read'];
+}
+const STUDY_WAYS: readonly Way[] = ['read', 'listen', 'recall'];
+
+/** Where saved progress keeps a card asked one way (see Way). */
+export function cardKey(id: string, way: Way): string {
+  return way === 'read' ? id : `${id}:${way}`;
+}
+
+/** The card and way a key in saved progress is for, if the card is still in the deck and the way is one this build knows. */
+export function keyed(key: string): { card: Card; way: Way } | undefined {
+  const at = key.lastIndexOf(':');
+  const way = (at < 0 ? 'read' : key.slice(at + 1)) as Way;
+  const card = getCard(at < 0 ? key : key.slice(0, at));
+  return card && WAYS.includes(way) && (way === 'read' || isVocab(card)) ? { card, way } : undefined;
+}
+
 /** The words of some Tagalog, lower case, without punctuation. */
 export function tagalogWords(tl: string): string[] {
   return tl.toLowerCase().split(/[^a-z'-]+/).filter((w) => /[a-z]/.test(w));

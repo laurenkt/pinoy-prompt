@@ -4,7 +4,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
-import type { Card } from '../deck';
+import { cardKey, type Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
 import { recordAnswer } from '../store';
 import { button, fakeApp, flush, noMic } from '../test/screen';
@@ -26,7 +26,8 @@ const KNOWN = ['salamat', 'maraming-salamat', 'magandang-umaga', 'bukas'];
 /** Words just met; settled ones have been remembered again since. */
 function learner(settled: boolean): App {
   const app = fakeApp(KNOWN);
-  if (settled) for (const id of KNOWN) recordAnswer(app.progress, id, 'good', app.now());
+  // Settled the way it's asked here: met, then remembered again since, as its own card (see Way).
+  if (settled) for (const id of KNOWN) for (const key of [id, cardKey(id, 'listen'), cardKey(id, 'listen')]) recordAnswer(app.progress, key, 'good', app.now());
   return app;
 }
 

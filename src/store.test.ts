@@ -102,7 +102,9 @@ describe('review history', () => {
     storage.setItem(STORAGE_KEY, SCHEMA_2);
     const before = JSON.parse(SCHEMA_2).progress;
     const p = load(NOW);
-    expect(p.cards).toEqual(before.cards);
+    // Every card as it was, and the word that had settled now studied each way (progress-schema's MIGRATIONS[3]).
+    const split = { ...before.cards.kumusta, split: true };
+    expect(p.cards).toEqual({ ...before.cards, 'kumusta:listen': split, 'kumusta:recall': split });
     expect(p.settings).toEqual({ ...DEFAULT_SETTINGS, ...before.settings });
     expect(p.history).toEqual({});
 
@@ -111,7 +113,7 @@ describe('review history', () => {
     const after = stored();
     expect(after.schema).toBe(SCHEMA);
     expect(after.rev).toBe(42);
-    expect(Object.keys(after.progress.cards).sort()).toEqual(['isa', 'kumusta']);
+    expect(Object.keys(after.progress.cards).sort()).toEqual(['isa', 'kumusta', 'kumusta:listen', 'kumusta:recall']);
     expect(after.progress.history).toEqual({ [dayKey(NOW)]: { reviews: 1, missed: 0 } });
   });
 });
@@ -152,13 +154,13 @@ describe('upgrading from the first storage format', () => {
   it('reads the old key, drops the streak, and saves under the new key', () => {
     storage.setItem(LEGACY_KEY, LEGACY_V1);
     const p = load(NOW);
-    expect(Object.keys(p.cards).sort()).toEqual(['kumusta', 'oo', 'salamat']);
+    expect(Object.keys(p.cards).sort()).toEqual(['kumusta', 'kumusta:listen', 'kumusta:recall', 'oo', 'salamat']);
     expect(p.settings).toEqual({ dailyNew: 12, autoplay: false, mic: true, sound: true, tapSounds: true, iconBadge: false });
     expect('streak' in p).toBe(false);
 
     recordAnswer(p, 'isa', 'good', NOW);
     save(p);
-    expect(Object.keys(stored().progress.cards).sort()).toEqual(['isa', 'kumusta', 'oo', 'salamat']);
+    expect(Object.keys(stored().progress.cards).sort()).toEqual(['isa', 'kumusta', 'kumusta:listen', 'kumusta:recall', 'oo', 'salamat']);
     expect(storage.items.get(STORAGE_KEY)).not.toContain('streak');
     // The old copy stays as it was, as a fallback.
     expect(storage.items.get(LEGACY_KEY)).toBe(LEGACY_V1);
@@ -431,7 +433,8 @@ describe('backups', () => {
 
   it('reads a copy of the old storage format as a backup', () => {
     const p = emptyProgress(NOW);
-    expect(importBackup(p, LEGACY_V1, NOW)).toBe(3);
+    // Its three cards, and the other two ways of the one that had settled.
+    expect(importBackup(p, LEGACY_V1, NOW)).toBe(5);
   });
 
   it('rejects a file that is not a backup and leaves progress alone', () => {

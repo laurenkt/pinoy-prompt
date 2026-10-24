@@ -10,7 +10,8 @@ import {
   type MemorySummary,
   type Strength,
 } from '../memory';
-import { MAX_LEARNING, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards } from '../session';
+import { MAX_LEARNING, abilities, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards, upcomingWays } from '../session';
+import { canPlay } from '../speech';
 import { DAY_MS, formatInterval } from '../srs';
 import { rollDay } from '../store';
 import { h, icon, settingsToggle } from '../ui';
@@ -150,9 +151,13 @@ function studyButton(app: App, isFirstRun: boolean): { el: HTMLElement; changesI
   // As Study will see it: a new day brings new cards even if Home was drawn the day before.
   const progress = rollDay(app.progress, now);
   // The same checks Study makes for its next step, so the button never promises something else.
-  const reviews = studyQueue(progress, now).length;
-  const fresh = learningCount(progress) < MAX_LEARNING ? Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length) : 0;
-  const next = isFirstRun ? null : nextStudyAt(progress, now);
+  const can = abilities(progress, canPlay());
+  const reviews = studyQueue(progress, now, can).length;
+  const fresh =
+    learningCount(progress) < MAX_LEARNING
+      ? upcomingWays(progress, can).length + Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length)
+      : 0;
+  const next = isFirstRun ? null : nextStudyAt(progress, now, can);
   let mode: { kind: string; icon: 'cards' | 'plus'; kicker: string; title: string };
   // A count changes once the next card falls due; a wait, each time the unit it's counted in runs out.
   let changesIn = next === null ? null : next - now;

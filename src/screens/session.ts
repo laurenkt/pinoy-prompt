@@ -3,6 +3,7 @@ import { VOCAB, getCard, isVocab, unitOf, type Card, type Drill } from '../deck'
 import { KIND_INFO } from '../guides';
 import {
   DRILL_MIN_WORDS,
+  abilities,
   buildExtraSession,
   canDrill,
   distractors,
@@ -12,6 +13,7 @@ import {
   pickFormat,
   requeue,
   shuffle,
+  stepKey,
   unmetCount,
   upcomingNewCards,
   type Format,
@@ -66,7 +68,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   const recent: string[] = [];
   const topicsIntroduced = new Set<string>();
   const stats = { learned: 0, reviewed: 0, correct: 0, answered: 0 };
-  /** Cards missed at least once this session: getting one right later keeps its hook up instead of moving on. */
+  /** Cards missed at least once this session, by key (stepKey): getting one right later keeps its hook up instead of moving on. */
   const struggled = new Set<string>();
   let praise = PRAISE[0];
   /** Counting down to the next card after a right answer. */
@@ -107,7 +109,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     if (!open) return queue.shift();
     // Study can run past midnight without leaving the screen, so start the new day's counts here.
     app.progress = rollDay(app.progress, app.now());
-    return nextStudyStep(app.progress, app.now(), recent, { listen: canListen() }) ?? undefined;
+    return nextStudyStep(app.progress, app.now(), recent, abilities(app.progress, canPlay())) ?? undefined;
   }
 
   /** Go to the next step, keeping the card on screen to look back at once it's been answered. */
@@ -129,7 +131,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     format = 'read';
     drill = undefined;
     guide = null;
-    if (card) recent.push(card.id);
+    if (step && card) recent.push(stepKey(step));
     if (card && isVocab(card)) preload(card);
     // A missed card asked again straight away can't offer its own answer to look back at.
     if (previous && previous.card?.id === card?.id) previous = null;
@@ -155,11 +157,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   /** Ask a review step in its format. */
   function ask(c: Card, s: Step): void {
-    const state = app.progress.cards[c.id] ?? newCardState(app.now());
-    format = s.format ?? pickFormat(state, { listen: canListen() }, Math.random, c.kind);
-    // A step picked before the sound went off is asked another way: the same check, by reading instead of hearing.
-    if (format === 'listen' && !canListen()) format = 'read';
-    if (format === 'hear' && !canListen()) format = 'remember';
+    const state = app.progress.cards[stepKey(s)] ?? newCardState(app.now());
+    format = s.format ?? pickFormat(state, s.way, Math.random, c.kind);
+    // A listening step picked before the sound went off waits, exactly as it is, until it can be heard: reading the
+    // word is a card of its own.
+    if ((format === 'listen' || format === 'hear') && !canListen()) return moveOn(previous);
     if (!isVocab(c)) {
       askGuide(c);
       return;
@@ -177,9 +179,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   function finish(rating: Rating): void {
     if (!card || !step) return;
-    if (rating === 'again') struggled.add(card.id);
-    const wasNew = !isIntroduced(app.progress, card.id);
-    recordAnswer(app.progress, card.id, rating, app.now());
+    const key = stepKey(step);
+    if (rating === 'again') struggled.add(key);
+    const wasNew = !isIntroduced(app.progress, key);
+    recordAnswer(app.progress, key, rating, app.now());
     app.commit();
     stats.answered++;
     if (rating !== 'again') stats.correct++;
@@ -237,7 +240,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   /** Show how a multiple-choice or build answer went. A right one moves on by itself, unless the card has been missed this session. */
   function answered(right: boolean): void {
     if (!card) return;
-    const firstGo = !struggled.has(card.id);
+    const firstGo = !step || !struggled.has(stepKey(step));
     finish(right ? 'good' : 'again');
     phase = 'feedback';
     praise = PRAISE[Math.floor(Math.random() * PRAISE.length)];
@@ -258,7 +261,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   /** Whether the card on screen gets its hook even though it was answered right. */
   function lookAgain(c: Card): boolean {
-    return reviewing !== null || struggled.has(c.id);
+    return reviewing !== null || struggled.has(step ? stepKey(step) : c.id);
   }
 
   function lookBack(): void {
@@ -304,10 +307,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     draw();
   }
 
-  /** The sound going off mid-step asks an unanswered listening step again by reading, so the card's review still counts. */
+  /** The sound going off mid-step leaves an unanswered listening step as it is, for when it can be heard, and moves on. */
   function quietChanged(): void {
     const listening = format === 'listen' || format === 'hear';
-    if (listening && !canListen() && card && step && (phase === 'front' || (phase === 'quiz' && !picked))) ask(card, step);
+    if (listening && !canListen() && card && step && (phase === 'front' || (phase === 'quiz' && !picked))) moveOn(previous);
     else draw();
   }
 
@@ -509,7 +512,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   }
 
   function flashcardView(c: Card): HTMLElement {
-    const state = app.progress.cards[c.id] ?? newCardState(app.now());
+    const state = app.progress.cards[step ? stepKey(step) : c.id] ?? newCardState(app.now());
     const showBack = phase === 'back';
     const reverse = format === 'produce';
     const prompt = reverse

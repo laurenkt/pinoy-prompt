@@ -1,5 +1,5 @@
 import type { App } from '../app';
-import { UNITS, type Card, type CardKind } from '../deck';
+import { UNITS, cardKey, studyWays, type Card, type CardKind } from '../deck';
 import { GUIDES, KIND_INFO } from '../guides';
 import { STRENGTHS, strengthCounts } from '../memory';
 import { play } from '../speech';
@@ -25,7 +25,10 @@ export function wordsScreen(app: App): HTMLElement {
   // The filters stay tucked away until asked for, so the list starts near the top.
   let filtersOpen = false;
 
-  const badge = (card: Card) => strengthBadge(app.progress.cards[card.id]);
+  /** The cards of a word or guide met so far, one for each way Study asks it (see Way). */
+  const studied = (card: Card) => studyWays(card).flatMap((way) => app.progress.cards[cardKey(card.id, way)] ?? []);
+  /** A word is only as firm as its weakest way met: read well, but not yet recalled, shows how well it's recalled. */
+  const badge = (card: Card) => strengthBadge(studied(card).sort((a, b) => a.interval - b.interval)[0]);
 
   function wordItem(card: Card): HTMLElement {
     return h(
@@ -68,21 +71,23 @@ export function wordsScreen(app: App): HTMLElement {
    * cards not met yet, stay the plain card. The title is drawn again in dark
    * ink over the fill, so it reads on both.
    */
-  function memoryFill(cards: Card[], body: () => HTMLElement): HTMLElement[] {
-    const met = cards.flatMap((card) => app.progress.cards[card.id] ?? []);
+  function memoryFill(group: Card[], body: () => HTMLElement): HTMLElement[] {
+    // Counted in cards like Home's chart: each way a word is studied is one.
+    const met = group.flatMap(studied);
+    const total = group.reduce((sum, card) => sum + studyWays(card).length, 0);
     const counts = strengthCounts(met);
     const firmest = [...STRENGTHS].reverse().filter((s) => counts[s.id]);
     const label = met.length
-      ? `${met.length} of ${cards.length} met: ${firmest.map((s) => `${s.label} ${counts[s.id]}`).join(', ')}`
-      : `None of ${cards.length} met yet`;
-    const filled = (met.length / cards.length) * 100;
+      ? `${met.length} of ${total} met: ${firmest.map((s) => `${s.label} ${counts[s.id]}`).join(', ')}`
+      : `None of ${total} met yet`;
+    const filled = (met.length / total) * 100;
     // The title comes first, so a screen reader names the topic before its count.
     return [
       body(),
       h(
         'span',
-        { class: `memory-fill${met.length === cards.length ? ' full' : ''}`, role: 'img', 'aria-label': label },
-        firmest.map((s) => h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / cards.length) * 100}%` } })),
+        { class: `memory-fill${met.length === total ? ' full' : ''}`, role: 'img', 'aria-label': label },
+        firmest.map((s) => h('span', { class: `s-${s.id}`, style: { width: `${(counts[s.id] / total) * 100}%` } })),
       ),
       met.length ? h('span', { class: 'memory-ink', 'aria-hidden': 'true', style: { clipPath: `inset(0 ${100 - filled}% 0 0)` } }, body()) : null,
     ].filter((el): el is HTMLElement => !!el);

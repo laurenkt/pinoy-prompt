@@ -3,6 +3,7 @@
 // holding screen while the phone asks, so its question never comes over a speaking question.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cardKey } from '../deck';
 import { recordAnswer } from '../store';
 import { practiceScreen } from './practice';
 import { quietToggle } from './quiet';
@@ -245,7 +246,7 @@ describe('asking for the microphone around a typed meaning', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {} });
     const app = fakeApp(true);
-    for (const id of KNOWN) recordAnswer(app.progress, id, 'good', app.now());
+    for (const id of KNOWN) for (const key of [id, cardKey(id, 'listen'), cardKey(id, 'listen')]) recordAnswer(app.progress, key, 'good', app.now());
     const mic = micNotYet();
     const root = practiceScreen(app, mic.deps, judge, () => null);
     document.body.append(root);

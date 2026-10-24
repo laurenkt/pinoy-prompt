@@ -3,7 +3,7 @@
 // review until the learner asks for one or misses the card.
 
 import { describe, expect, it, vi } from 'vitest';
-import { LEARN_ORDER, getCard } from '../deck';
+import { LEARN_ORDER, cardKey, getCard, studyWays } from '../deck';
 import { DAY_MS } from '../srs';
 import { sessionScreen } from './session';
 import { button, fakeApp } from '../test/screen';
@@ -92,6 +92,10 @@ describe('open-ended study', () => {
     const app = fakeApp(LEARN_ORDER.filter((id) => id !== 'kumain-na-ako'));
     const tomorrow = app.now() + DAY_MS;
     for (const state of Object.values(app.progress.cards)) Object.assign(state, { interval: 3, reps: 2, due: tomorrow });
+    // Studied every way, so no way of a word is waiting to start.
+    for (const id of Object.keys(app.progress.cards)) {
+      for (const way of studyWays(getCard(id)!)) app.progress.cards[cardKey(id, way)] ??= { ...app.progress.cards[id] };
+    }
     // "Kumain" was met yesterday and hasn't been seen again since.
     Object.assign(app.progress.cards['kumain'], { interval: 1, reps: 1 });
     const root = sessionScreen(app, null);
