@@ -6,9 +6,9 @@ import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
+import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, strengthBadge } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
-import { guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
+import { eyebrowLine, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
 import { quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
@@ -683,6 +683,8 @@ export function practiceScreen(
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
+    // How well the card is held, beside the question. A drill never changes the schedule, so it stays put once answered.
+    const badge = strengthBadge(app.progress.cards[q.card.id]);
     const answered = picked !== null;
     const right = picked === answerOf(q);
     const field = answerLanguage(q);
@@ -705,16 +707,18 @@ export function practiceScreen(
           onChange: draw,
           feedback: (right) => guideFeedback(q.card, d, right, { praise: 'Tama!', miss: 'Mali.' }),
           after: [onward()],
+          badge,
         }),
       );
     }
 
+    const eyebrow = (text: string) => eyebrowLine(text, badge);
     let prompt: HTMLElement;
     if (q.mode === 'speak') {
       prompt = h(
         'div',
         { class: 'prompt' },
-        h('p', { class: 'eyebrow' }, 'Say this out loud'),
+        eyebrow('Say this out loud'),
         // No audio until the learner has had a go: the word is played on the result.
         h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
         h('p', { class: 'prompt-meaning' }, q.card.en),
@@ -723,7 +727,7 @@ export function practiceScreen(
       prompt = h(
         'div',
         { class: 'prompt center' },
-        h('p', { class: 'eyebrow' }, q.typed ? 'What does it mean?' : 'What did you hear?'),
+        eyebrow(q.typed ? 'What does it mean?' : 'What did you hear?'),
         audioPair(say, true),
         answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
       );
@@ -731,11 +735,11 @@ export function practiceScreen(
       prompt = h(
         'div',
         { class: 'prompt' },
-        h('p', { class: 'eyebrow' }, 'What does this mean?'),
+        eyebrow('What does this mean?'),
         h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
       );
     } else {
-      prompt = h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
+      prompt = h('div', { class: 'prompt' }, eyebrow('How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
     }
 
     return h(

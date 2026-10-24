@@ -68,6 +68,24 @@ describe('recalling words still being learned', () => {
   });
 });
 
+describe("the card's memory strength", () => {
+  it('shows beside the question, and stays the same once answered', () => {
+    const app = learner(false);
+    app.progress.cards.salamat.interval = 0;
+    const root = (last = recall(app));
+    expect(root.querySelector('.prompt .eyebrow')?.textContent).toBe('How do you say… Memory: Just met');
+    root.querySelector<HTMLButtonElement>('.choice')!.click();
+    expect(root.querySelector('.prompt .eyebrow .badge.s-new')?.textContent).toBe('Memory: Just met');
+  });
+
+  it('follows the schedule', () => {
+    const app = learner(true);
+    app.progress.cards.salamat.interval = 30;
+    const root = (last = recall(app));
+    expect(root.querySelector('.prompt .eyebrow .badge.s-long')?.textContent).toBe('Memory: Long-term');
+  });
+});
+
 describe('recalling words that have settled', () => {
   it('asks for the Tagalog to be typed, and takes it with a "po" or a typo', async () => {
     const judge = vi.fn<MeaningJudge>(async () => null);

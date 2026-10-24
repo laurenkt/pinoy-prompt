@@ -2,10 +2,14 @@
 // without pulling in a framework.
 
 import type { App } from './app';
+import { STRENGTHS, strengthOf } from './memory';
 import { speaking } from './speech';
+import type { CardState } from './srs';
 
 type Child = Node | string | number | null | undefined | false | Child[];
 type Props = Record<string, unknown>;
+
+const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
 
 export function h<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -209,4 +213,11 @@ export function progressBar(value: number, max: number, label?: string): HTMLEle
 /** A card's memory hook, for the moments it helps: introduction and after a miss. */
 export function hookView(card: { hook: string }): HTMLElement {
   return h('div', { class: 'hook' }, h('p', { class: 'hook-label' }, 'Remember it by'), h('p', null, card.hook));
+}
+
+/** How well a card is held, as a pill in its strength's colour: the Library's words and Drills' questions. None before it's met. */
+export function strengthBadge(state: CardState | undefined): HTMLElement | null {
+  if (!state) return null;
+  const strength = strengthOf(state);
+  return h('span', { class: `badge s-${strength}` }, h('span', { class: 'sr-only' }, 'Memory: '), STRENGTH_LABEL.get(strength));
 }
