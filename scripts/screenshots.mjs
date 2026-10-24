@@ -464,7 +464,9 @@ async function typedOnly(page, mode, live = true) {
       const timer = setInterval(() => {
         n++;
         if (n === 2) onListening?.();
-        onLevel?.(n < 6 ? 0.02 : Math.abs(Math.sin(n / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(n / 7))));
+        const level = n < 6 ? 0.02 : Math.abs(Math.sin(n / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(n / 7)));
+        // The recorder's speech level (0.02 RMS) as onLevel reports it, so the room and the pauses draw nothing.
+        onLevel?.(level, level > 0.16);
       }, 85);
       const end = () => {
         clearInterval(timer);

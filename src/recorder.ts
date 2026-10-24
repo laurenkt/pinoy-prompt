@@ -36,8 +36,8 @@ export class RecordError extends Error {
 }
 
 export interface RecorderEvents {
-  /** Input level, 0–1, a few times a second. */
-  onLevel?: (level: number) => void;
+  /** Input level, 0–1, a few times a second, and whether that block counts as speech (rather than the room). */
+  onLevel?: (level: number, speech: boolean) => void;
   /**
    * Called once the microphone is giving sound, so what's said from now on is in the take. Until then (the
    * microphone switching on, iOS handing over the audio session) anything said is lost, so screens show the
@@ -343,10 +343,11 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
         }
         if (signal && !before) onListening?.();
         const level = Math.sqrt(sum / block.length);
-        onLevel?.(Math.min(1, level * 8));
+        const speech = level > SPEECH_LEVEL;
+        onLevel?.(Math.min(1, level * 8), speech);
         const blockMs = (block.length / context.sampleRate) * 1000;
         elapsedMs += blockMs;
-        if (level > SPEECH_LEVEL) {
+        if (speech) {
           if (!heardSpeech) onSpeech?.();
           heardSpeech = true;
           silentMs = 0;
