@@ -351,8 +351,12 @@ export function practiceScreen(
     // The word playing would be recorded too.
     stop();
     q.unheard = undefined;
-    // Starts empty and grows from the left, a bar for each moment of speech, so silence draws nothing.
+    // Starts empty and grows from the left, a bar for each moment of speech, so silence draws nothing. Each bar is the
+    // loudest of `span` moments; once the box is full, neighbouring bars merge in pairs and span doubles, so the whole
+    // of what was said stays in the box, and a bar, once whole, stays as it is until the next squeeze.
     const wave: number[] = (q.wave = []);
+    let span = 1;
+    let inLast = 0;
     q.thinkingSince = undefined;
     micLive = false;
     const recording = deps.record({
@@ -364,10 +368,22 @@ export function practiceScreen(
         const status = root.querySelector('.meaning-status');
         if (status) status.textContent = listeningText(q);
       },
-      onLevel: (level, speech) => {
+      onLevel: (_level, speech, parts) => {
         if (listening !== recording || !speech) return;
-        wave.push(level);
-        // Redraw the bars in place rather than the round, many times a second.
+        for (const part of parts) {
+          if (inLast > 0 && inLast < span) {
+            wave[wave.length - 1] = Math.max(wave[wave.length - 1], part);
+            inLast++;
+            continue;
+          }
+          if (wave.length === WAVE_BARS) {
+            wave.splice(0, WAVE_BARS, ...Array.from({ length: WAVE_BARS / 2 }, (_, i) => Math.max(wave[2 * i], wave[2 * i + 1])));
+            span *= 2;
+          }
+          wave.push(part);
+          inLast = 1;
+        }
+        // Redraw the bars in place rather than the round, a dozen times a second.
         root.querySelector('.meaning-wave')?.replaceChildren(...waveBars(wave));
       },
     });
@@ -789,15 +805,7 @@ export function practiceScreen(
     );
   }
 
-  /**
-   * A bar for each level, from the left, until the box is full; then the whole wave squeezed into the box, each bar
-   * the loudest of the levels it stands for, so the start of what was said stays in sight.
-   */
-  function waveBars(levels: number[]): HTMLElement[] {
-    const n = levels.length;
-    const bars = n <= WAVE_BARS ? levels : Array.from({ length: WAVE_BARS }, (_, c) => Math.max(...levels.slice(Math.floor((c * n) / WAVE_BARS), Math.floor(((c + 1) * n) / WAVE_BARS))));
-    return bars.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` }));
-  }
+  const waveBars = (levels: number[]) => levels.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` }));
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
@@ -905,7 +913,7 @@ export function practiceScreen(
   return root;
 }
 
-/** Bars the box holds while a meaning is said, each a slot of its width: under two seconds of speech at about fifty levels a second, before it squeezes. */
+/** Bars the box holds while a meaning is said, each a slot of its width: under two seconds of speech at about fifty levels a second, before they merge in pairs. Even, so they can. */
 const WAVE_BARS = 80;
 
 /** How long typing has to pause before a meaning the device can tell is right is taken without Check. */

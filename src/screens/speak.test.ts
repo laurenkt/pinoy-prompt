@@ -193,7 +193,7 @@ describe('an attempt', () => {
     mic.events.onSpeech?.();
     expect(text('.listen-status')).toBe('Hearing you…');
     expect(panel.el.classList).toContain('phase-sound');
-    mic.events.onLevel?.(0.8, true);
+    mic.events.onLevel?.(0.8, true, [0.8, 0.8, 0.8, 0.8]);
     expect(panel.el.querySelector<HTMLElement>('.meter span')!.style.height).not.toBe('');
     button("I'm done").click();
     expect(mic.stopped).toBe(true);

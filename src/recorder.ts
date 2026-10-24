@@ -11,8 +11,10 @@ import { closeMicrophone, dropMicrophone, getMicrophone, liveMicrophone, microph
 
 /** Level (RMS, 0–1) above which a block counts as speech. */
 const SPEECH_LEVEL = 0.02;
-/** Levels reported for each block the recorder takes (about 85 ms): one every 20 ms or so. */
+/** Finer levels reported with each block the recorder takes (about 85 ms): one every 20 ms or so. */
 const LEVELS_PER_BLOCK = 4;
+/** An RMS level as a meter shows it, 0–1. */
+const meter = (rms: number) => Math.min(1, rms * 8);
 /** Stop this long after speech ends. */
 const TRAILING_SILENCE_MS = 900;
 /** Never record longer than this, counted from when the microphone gave sound (it may be reopened first: SIGNAL_WAIT_MS). */
@@ -38,8 +40,11 @@ export class RecordError extends Error {
 }
 
 export interface RecorderEvents {
-  /** Input level, 0–1, about fifty times a second, and whether that moment counts as speech (rather than the room). */
-  onLevel?: (level: number, speech: boolean) => void;
+  /**
+   * Input level, 0–1, for each block (about twelve a second); whether the block counts as speech (rather than the
+   * room), as the take does; and the levels of its parts, in order, for a meter finer than the block.
+   */
+  onLevel?: (level: number, speech: boolean, parts: number[]) => void;
   /**
    * Called once the microphone is giving sound, so what's said from now on is in the take. Until then (the
    * microphone switching on, iOS handing over the audio session) anything said is lost, so screens show the
@@ -338,22 +343,24 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
         const block = new Float32Array(e.inputBuffer.getChannelData(0));
         chunks.push(block);
         const before = signal;
+        // The block's level, and a finer one for each part of it, in one pass.
+        const parts = new Array<number>(LEVELS_PER_BLOCK).fill(0);
+        const partLength = Math.ceil(block.length / LEVELS_PER_BLOCK);
         let sum = 0;
-        for (const v of block) {
+        for (let i = 0; i < block.length; i++) {
+          const v = block[i];
           sum += v * v;
+          parts[Math.floor(i / partLength)] += v * v;
           if (!signal && Math.abs(v) > SIGNAL_LEVEL) signal = true;
         }
         if (signal && !before) onListening?.();
         const level = Math.sqrt(sum / block.length);
         const speech = level > SPEECH_LEVEL;
-        // The meter gets a level for each part of the block, so a wave drawn from it can be finer than the block.
-        if (onLevel) {
-          const part = block.length / LEVELS_PER_BLOCK;
-          for (let p = 0; p < LEVELS_PER_BLOCK; p++) {
-            const rms = Math.sqrt(block.subarray(p * part, (p + 1) * part).reduce((a, v) => a + v * v, 0) / part);
-            onLevel(Math.min(1, rms * 8), rms > SPEECH_LEVEL);
-          }
-        }
+        onLevel?.(
+          meter(level),
+          speech,
+          parts.map((part, p) => meter(Math.sqrt(part / Math.max(1, Math.min(partLength, block.length - p * partLength))))),
+        );
         const blockMs = (block.length / context.sampleRate) * 1000;
         elapsedMs += blockMs;
         if (speech) {
