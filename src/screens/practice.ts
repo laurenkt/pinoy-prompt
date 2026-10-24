@@ -1,6 +1,6 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
-import { canTypeMeaning, judgeMeaning, matchesAnswer, type AnswerLanguage, type MeaningJudge } from '../meaning';
+import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
@@ -761,7 +761,7 @@ export function practiceScreen(
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
-   * wrong. An answer the device can tell is right is taken as it's typed, without Check. With a key for OpenAI, and
+   * wrong. An answer that is the card's own wording, exactly, is taken as it's typed, without Check. With a key for OpenAI, and
    * with the mic on, a microphone button beside it records the answer said out loud instead.
    */
   function typedAnswer(q: Question, picked: string | null): HTMLElement {
@@ -784,14 +784,14 @@ export function practiceScreen(
       'data-autofocus': (!answered && !q.offered) || undefined,
       oninput: () => {
         q.draft = input.value;
-        // Only a meaning the device is sure of, once typing pauses: "no" is right for Hindi, but not on the way to "now".
-        // Anything else waits for Check, so a wrong answer is never sent.
+        // Only the card's own wording, exactly, once typing pauses: "no" is right for Hindi, but not on the way to "now",
+        // and "thank you very muc" is close enough for Check, but not finished. Anything else waits for Check.
         clearTimeout(typingPause);
         // Goes by the question, not this box: a redraw meanwhile (the filter opening, say) replaces the box.
         typingPause = setTimeout(() => {
           // Not while it's being said instead, or behind the microphone's holding screen.
           const busy = listening !== null || hearing !== null || waiting || lookingBack;
-          if (current === q && q.typed && !busy && root.isConnected && q.draft && matchesAnswer(q.draft, q.card, answerLanguage(q))) send(q.draft);
+          if (current === q && q.typed && !busy && root.isConnected && q.draft && exactAnswer(q.draft, q.card, answerLanguage(q))) send(q.draft);
         }, TYPING_PAUSE_MS);
       },
       // The keyboard takes the bottom of the screen; keep the box in sight above it.

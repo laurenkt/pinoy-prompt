@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { VOCAB, getCard, type Card } from './deck';
-import { canTypeMeaning, judgeMeaning, matchesMeaning, matchesTagalog, meanings, repeatsTagalog, swapsTagalog, words } from './meaning';
+import { canTypeMeaning, exactAnswer, judgeMeaning, matchesMeaning, matchesTagalog, meanings, repeatsTagalog, swapsTagalog, words } from './meaning';
 
 const card = (id: string) => getCard(id)!;
 
@@ -166,6 +166,35 @@ describe('telling the Tagalog said back from an answer', () => {
     expect(await judgeMeaning('okay', card('okay-lang-ako'), ask)).toEqual({ right: true });
     expect(ask).toHaveBeenCalledWith('okay', card('okay-lang-ako'), 'en');
     expect(repeatsTagalog('Okay lang ako', card('okay-lang-ako'))).toBe(true);
+  });
+});
+
+describe('telling an answer typed exactly as the card has it', () => {
+  it.each([
+    ['salamat', 'Thank you!', 'en'],
+    ['salamat', '  thank   you ', 'en'],
+    ['dalawampu', 'twenty', 'en'],
+    ['dalawampu', '20', 'en'],
+    ['dahan-dahan', 'dahan dahan lang po', 'tl'],
+    ['dahan-dahan', 'Dahan-dahan lang po.', 'tl'],
+    ['maraming-salamat', 'MARAMING SALAMAT', 'tl'],
+    ['dahan-dahan', 'dahandahan lang po', 'tl'],
+    ['isang-libo', '1000', 'en'],
+  ] as const)('%s: "%s" is exact', (id, answer, language) => {
+    expect(exactAnswer(answer, card(id), language)).toBe(true);
+  });
+
+  it.each([
+    // Close enough for Check, but not finished, or not as written.
+    ['maraming-salamat', 'thank you very muc', 'en'],
+    ['salamat', 'thnak you', 'en'],
+    ['salamat', 'thanks', 'en'],
+    ['salamat', 'salamat', 'en'],
+    ['maraming-salamat', 'Maraming salama', 'tl'],
+    ['dahan-dahan', 'dahan dahan lang', 'tl'],
+    ['salamat', '', 'tl'],
+  ] as const)('%s: "%s" is not exact', (id, answer, language) => {
+    expect(exactAnswer(answer, card(id), language)).toBe(false);
   });
 });
 
