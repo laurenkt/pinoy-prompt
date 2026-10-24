@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { VOCAB, getCard, type Card } from './deck';
-import { canTypeMeaning, exactAnswer, judgeMeaning, matchesMeaning, matchesTagalog, meanings, repeatsTagalog, swapsTagalog, words } from './meaning';
+import { canTypeMeaning, exactAnswer, judgeMeaning, matchesMeaning, matchesTagalog, meanings, leavesOutPo, repeatsTagalog, swapsTagalog, words } from './meaning';
 
 const card = (id: string) => getCard(id)!;
 
@@ -134,6 +134,8 @@ describe('judging a typed meaning', () => {
     expect(await judgeMeaning('salamat po.', card('salamat'), ask)).toEqual({ right: false });
     expect(await judgeMeaning('Kamusta', card('kumusta'), ask)).toEqual({ right: false });
     expect(await judgeMeaning('maraming salamat', card('maraming-salamat'), ask)).toEqual({ right: false });
+    // OpenAI took this for "repeat this" more often than not.
+    expect(await judgeMeaning('paliulit ito', card('pakiulit'), ask)).toEqual({ right: false });
     expect(ask).not.toHaveBeenCalled();
   });
 });
@@ -146,6 +148,9 @@ describe('telling the Tagalog said back from an answer', () => {
     ['kumusta', 'kamusta'],
     ['mabuti', 'mabuti naman'],
     ['mabuti', 'Mabuti'],
+    // Misspelt, with another Tagalog word: still not English.
+    ['pakiulit', 'paliulit ito'],
+    ['maraming-salamat', 'maramng slamat'],
   ])('%s: "%s" is the Tagalog', (id, answer) => {
     expect(repeatsTagalog(answer, card(id))).toBe(true);
   });
@@ -311,6 +316,24 @@ describe('telling a mixed-up Tagalog word from a typo', () => {
     ['paano-pumunta', 'Paano pupunta sa palengke?'],
   ])('%s: "%s" does not', (id, answer) => {
     expect(swapsTagalog(answer, card(id))).toBe(false);
+  });
+
+  it('turns down the Tagalog without the "po" the card has, without asking OpenAI, which can miss it', async () => {
+    const ask = vi.fn(async () => true);
+    expect(await judgeMeaning('paliulit ito', card('pakiulit'), ask, 'tl')).toEqual({ right: false });
+    expect(await judgeMeaning('Pakiulit', card('pakiulit'), ask, 'tl')).toEqual({ right: false });
+    expect(ask).not.toHaveBeenCalled();
+    expect(leavesOutPo('pakiulit po', card('pakiulit'))).toBe(false);
+    expect(leavesOutPo('pakiulit ho', card('pakiulit'))).toBe(false);
+    // Another wording is OpenAI's to judge.
+    expect(leavesOutPo('ulitin mo nga', card('pakiulit'))).toBe(false);
+    // Polite another way.
+    expect(leavesOutPo('Salamat sa inyo', card('salamat-po'))).toBe(false);
+    expect(leavesOutPo('Pakiulit ninyo', card('pakiulit'))).toBe(false);
+    // Joined up, as the card's own wording is matched.
+    expect(leavesOutPo('dahandahan lang', card('dahan-dahan'))).toBe(true);
+    // A card without a "po" has none to leave out.
+    expect(leavesOutPo('salamat', card('salamat'))).toBe(false);
   });
 
   it("turns a swapped word down without asking OpenAI, which can take it for a typo", async () => {
