@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeMicrophone, getMicrophone, releaseMicrophone } from './microphone';
-import { cancelRecording, record, RecordError, resample, SIGNAL_WAIT_MS, toWav, warmRecorder } from './recorder';
+import { cancelRecording, record, RecordError, resample, SIGNAL_WAIT_MS, toWav, WARM_MS, warmRecorder } from './recorder';
 
 const sine = (hz: number, rate: number, seconds = 0.5) =>
   Float32Array.from({ length: rate * seconds }, (_, i) => Math.sin((2 * Math.PI * hz * i) / rate));
@@ -73,6 +73,7 @@ class FakeRecorderContext {
   };
   createMediaStreamSource = () => ({ connect() {}, disconnect() {} });
   createScriptProcessor = () => this.processor;
+  createGain = () => ({ gain: { value: 1 }, connect() {}, disconnect() {} });
   /** One block of 4096 samples at the given level (0 is exact silence, as a dead microphone gives). */
   feed(level: number) {
     const block = Float32Array.from({ length: 4096 }, (_, i) => (i % 2 ? level : -level));
@@ -268,7 +269,7 @@ describe('warming the microphone up ahead of a take', () => {
 
   it("never opens the microphone itself, so it can't ask for it", async () => {
     const before = FakeRecorderContext.count;
-    warmRecorder();
+    expect(warmRecorder()).toBeNull();
     await vi.advanceTimersByTimeAsync(0);
     expect(opened).toHaveLength(0);
     expect(FakeRecorderContext.count).toBe(before);
@@ -277,25 +278,28 @@ describe('warming the microphone up ahead of a take', () => {
   it('switches the held microphone on ahead of a take, and off again when cooled', async () => {
     const track = await held();
     expect(track.enabled).toBe(false);
-    const cool = warmRecorder();
+    const warmth = warmRecorder()!;
     await vi.advanceTimersByTimeAsync(0);
     expect(track.enabled).toBe(true);
+    expect(warmth.warm).toBe(true);
     const context = FakeRecorderContext.last;
-    cool();
+    warmth.cool();
+    expect(warmth.warm).toBe(false);
     expect(track.enabled).toBe(false);
     expect(context.state).toBe('suspended');
   });
 
   it('hands the warm microphone and context to the take, so it starts with sound and nothing switches off', async () => {
     const track = await held();
-    const cool = warmRecorder();
+    const warmth = warmRecorder()!;
     await vi.advanceTimersByTimeAsync(0);
     const context = FakeRecorderContext.last;
     const made = FakeRecorderContext.count;
     const onListening = vi.fn();
     const recording = record({ onListening });
     // Cooling after the take adopted it does nothing.
-    cool();
+    expect(warmth.warm).toBe(false);
+    warmth.cool();
     expect(track.enabled).toBe(true);
     await vi.advanceTimersByTimeAsync(0);
     expect(FakeRecorderContext.count).toBe(made);
@@ -307,6 +311,55 @@ describe('warming the microphone up ahead of a take', () => {
     expect(track.enabled).toBe(false);
     expect(context.state).toBe('suspended');
     expect(opened).toHaveLength(1);
+  });
+
+  it('only warms a live stream, never opening another for a muted one', async () => {
+    const track = await held();
+    track.muted = true;
+    expect(warmRecorder()).toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(opened).toHaveLength(1);
+  });
+
+  it('gives up after a minute unused, so a question left up does not keep the microphone on', async () => {
+    const track = await held();
+    const warmth = warmRecorder()!;
+    await vi.advanceTimersByTimeAsync(WARM_MS);
+    expect(warmth.warm).toBe(false);
+    expect(track.enabled).toBe(false);
+  });
+
+  it("doesn't keep the context past the stream it was made under", async () => {
+    await held();
+    warmRecorder()!.cool();
+    const first = FakeRecorderContext.last;
+    // The stream closes (the app was in the background a while) and a new one opens.
+    closeMicrophone();
+    releaseMicrophone(await getMicrophone());
+    warmRecorder();
+    expect(FakeRecorderContext.last).not.toBe(first);
+    expect(first.state).toBe('closed');
+  });
+
+  it("doesn't rest the context under a newer take when a cancelled one finishes late", async () => {
+    await held();
+    const first = record();
+    const context = FakeRecorderContext.last;
+    // The first take waits on the context starting (iOS can be slow to), and is cancelled meanwhile.
+    let started: () => void = () => {};
+    context.state = 'suspended';
+    context.resume = () => new Promise<void>((resolve) => (started = () => resolve(void (context.state = 'running'))));
+    first.cancel();
+    await vi.advanceTimersByTimeAsync(0);
+    // The next tap starts it and records on it.
+    context.resume = async () => void (context.state = 'running');
+    const second = record();
+    await vi.advanceTimersByTimeAsync(0);
+    started();
+    await first.audio;
+    expect(context.state).toBe('running');
+    second.cancel();
+    await second.audio;
   });
 
   it('lets the microphone and context go when the screen is left', async () => {

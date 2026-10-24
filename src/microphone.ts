@@ -44,9 +44,12 @@ export function microphoneOpen(): boolean {
   return stream !== null || opening !== null;
 }
 
-/** Whether a stream is open now, not just being asked for: the hardware has taken on the microphone's rate. */
-export function microphoneStreaming(): boolean {
-  return stream !== null;
+/**
+ * The stream open now, if it's live: not just being asked for, so the hardware has taken on the microphone's rate,
+ * and not cut off, so switching it on won't open (or ask for) another.
+ */
+export function liveMicrophone(): MediaStream | null {
+  return stream && live(stream) ? stream : null;
 }
 
 /** Whether something is recording or on a call now, rather than the stream waiting switched off. */

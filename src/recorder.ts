@@ -7,7 +7,7 @@
 // (warmRecorder): the audio runs, and is thrown away, until the take begins.
 
 import { SAMPLE_RATE } from './fbank';
-import { closeMicrophone, dropMicrophone, getMicrophone, microphoneInUse, microphoneStreaming, releaseMicrophone } from './microphone';
+import { closeMicrophone, dropMicrophone, getMicrophone, liveMicrophone, microphoneInUse, releaseMicrophone } from './microphone';
 
 /** Level (RMS, 0–1) above which a block counts as speech. */
 const SPEECH_LEVEL = 0.02;
@@ -102,55 +102,88 @@ export function resample(input: Float32Array, fromRate: number): Float32Array {
 }
 
 /**
- * The recorder's context, kept between takes while the microphone is held, so the next take (or warmRecorder) doesn't
- * wait for one to start. Only one made while the microphone was already open is kept: iOS can change the hardware's
- * rate as the microphone opens, under a context made before. Once a tap has started it, WebKit lets it resume
- * without one, so a card that came up by itself can warm it too.
+ * The recorder's context, kept between takes, so the next take (or warmRecorder) doesn't wait for one to start. It's
+ * kept only for the stream it was made under (keptFor): iOS can change the hardware's rate as a stream opens, under a
+ * context made before. Once a tap has started it, WebKit lets it resume without one, so a question that came up by
+ * itself can warm it too.
  */
 let kept: AudioContext | null = null;
+let keptFor: MediaStream | null = null;
+
+/** The kept context, if it still suits the microphone open now; otherwise it's let go. */
+function keptContext(): AudioContext | null {
+  if (kept && (kept.state === 'closed' || keptFor !== liveMicrophone())) {
+    void kept.close().catch(() => {});
+    kept = null;
+  }
+  return kept;
+}
+
+/** How long a question may keep the microphone warm unused: past this, the tap wakes it as it would without. */
+export const WARM_MS = 60_000;
 
 /** The microphone running into the kept context, its sound thrown away, until a take adopts it or it's cooled. */
 interface Warm {
   stream: MediaStream | null;
   source: MediaStreamAudioSourceNode | null;
-  sink: ScriptProcessorNode | null;
+  sink: GainNode | null;
   cooled: boolean;
+  limit: ReturnType<typeof setTimeout>;
 }
 let warm: Warm | null = null;
 
 function unwire(w: Warm): void {
+  clearTimeout(w.limit);
   w.source?.disconnect();
   w.sink?.disconnect();
+}
+
+/** A warm-up from warmRecorder. */
+export interface Warmth {
+  /** Whether it's still running: not cooled, adopted by a take, timed out or ended by the app going into the background. */
+  readonly warm: boolean;
+  cool(): void;
 }
 
 /**
  * Get the microphone and the recorder's context going ahead of a take, so it starts with sound already flowing rather
  * than after they wake up. Call it from the tap that brings up a question that will ask for a take, if there is one;
- * without one it only works once a take has started the kept context. Never asks for the microphone: only an open
- * (held) one is warmed. Returns the way to cool it again, which record() makes a no-op by adopting it.
+ * without one it only works once a take has started the kept context. Never opens or asks for the microphone: only a
+ * live, held one is warmed. Null if there was nothing to warm.
  */
-export function warmRecorder(): () => void {
-  if (!recordingSupported() || !microphoneStreaming() || globalThis.document?.visibilityState === 'hidden') return () => {};
+export function warmRecorder(): Warmth | null {
+  const stream = liveMicrophone();
+  if (!recordingSupported() || !stream || globalThis.document?.visibilityState === 'hidden') return null;
   coolRecorder();
-  if (!kept || kept.state === 'closed') kept = new AudioContext();
-  const context = kept;
+  if (!keptContext()) {
+    kept = new AudioContext();
+    keptFor = stream;
+  }
+  const context = kept!;
   if (context.state !== 'running') void context.resume().catch(() => {});
-  const mine: Warm = { stream: null, source: null, sink: null, cooled: false };
+  const mine: Warm = { stream: null, source: null, sink: null, cooled: false, limit: setTimeout(() => warm === mine && coolRecorder(), WARM_MS) };
   warm = mine;
+  // Already open and live, so this only switches its tracks on.
   void getMicrophone().then(
     (stream) => {
       if (mine.cooled || warm !== mine) return releaseMicrophone(stream);
       mine.stream = stream;
       mine.source = context.createMediaStreamSource(stream);
-      // Some browsers only pull audio through a node connected to an output; this one's output is silence.
-      mine.sink = context.createScriptProcessor(4096, 1, 1);
+      // Pulled through to the output, so it runs, but silent.
+      mine.sink = context.createGain();
+      mine.sink.gain.value = 0;
       mine.source.connect(mine.sink);
       mine.sink.connect(context.destination);
     },
     () => {},
   );
-  return () => {
-    if (warm === mine) coolRecorder();
+  return {
+    get warm() {
+      return warm === mine;
+    },
+    cool: () => {
+      if (warm === mine) coolRecorder();
+    },
   };
 }
 
@@ -184,12 +217,24 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
   if (adopted) unwire(adopted);
   // Made (and resumed) right away, while still inside the learner's tap: iOS keeps an audio
   // context created later, after the permission prompt, suspended, and then nothing records.
-  const reuse = kept !== null && kept.state !== 'closed';
-  const context = reuse ? kept : recordingSupported() ? new AudioContext() : null;
-  if (!reuse && context && microphoneStreaming()) kept = context;
+  const reuse = keptContext();
+  const context = reuse ?? (recordingSupported() ? new AudioContext() : null);
+  const open = liveMicrophone();
+  if (!reuse && context && open) {
+    kept = context;
+    keptFor = open;
+  }
+  /** This take, once made: a cancelled take still opening mustn't rest the context a newer one is using. */
+  let self: Recording | null = null;
   void context?.resume().catch(() => {});
-  /** Done with the context: the kept one rests for the next take, any other is closed. */
-  const letGo = (c: AudioContext) => void (c === kept ? (warm ? undefined : c.suspend()) : c.close())?.catch(() => {});
+  /**
+   * Done with the context: any but the kept one is closed. The kept one rests for the next take, unless something
+   * newer is using it (a warm-up, or a take that started while this cancelled one was still opening).
+   */
+  const letGo = (c: AudioContext) => {
+    if (c !== kept) return void c.close().catch(() => {});
+    if (!warm && (!active || active === self)) void c.suspend().catch(() => {});
+  };
   const audio = (async () => {
     if (!context) throw new RecordError('unsupported');
     const problem = (err: unknown) => {
@@ -327,6 +372,7 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
       finish();
     },
   };
+  self = recording;
   active?.cancel();
   active = recording;
   void audio.catch(() => {}).finally(() => {
@@ -368,9 +414,8 @@ if (typeof document !== 'undefined') {
   // iOS cuts the microphone off in the background, and a warmed one would keep the stream from closing (microphone.ts).
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden' || active) return;
-    const warmed = warm !== null;
     closeRecorder();
-    // microphone.ts's own listener ran first and left the stream open for the warm-up's sake.
-    if (warmed && !microphoneInUse()) closeMicrophone();
+    // Whichever of this and microphone.ts's own listener runs first, nothing is left holding the stream open.
+    if (!microphoneInUse()) closeMicrophone();
   });
 }

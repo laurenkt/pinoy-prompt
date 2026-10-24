@@ -106,9 +106,14 @@ describe('Speak mode', () => {
     const warmRecorder = () => {
       running++;
       let cooled = false;
-      return () => {
-        if (!cooled) running--;
-        cooled = true;
+      return {
+        get warm() {
+          return !cooled;
+        },
+        cool: () => {
+          if (!cooled) running--;
+          cooled = true;
+        },
       };
     };
     const app = fakeApp(KNOWN);

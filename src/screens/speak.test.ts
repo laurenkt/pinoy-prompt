@@ -370,9 +370,14 @@ describe('warming the microphone up', () => {
       w.running++;
       w.started++;
       let cooled = false;
-      return () => {
-        if (!cooled) w.running--;
-        cooled = true;
+      return {
+        get warm() {
+          return !cooled;
+        },
+        cool: () => {
+          if (!cooled) w.running--;
+          cooled = true;
+        },
       };
     };
     return { w, warmRecorder };
@@ -413,6 +418,18 @@ describe('warming the microphone up', () => {
     expect(w.running).toBe(1);
     panel.dispose();
     expect(w.running).toBe(0);
+  });
+
+  it('tries again once ready if there was nothing to warm as it came up (the microphone still opening)', async () => {
+    const { w, warmRecorder } = warmth();
+    let open = false;
+    const later = () => (open ? warmRecorder() : null);
+    panel = speakPanel(getCard('salamat')!, { say, silence: () => {}, onAttempt, onNext, deps: deps({ warmRecorder: later, modelKnownDownloaded: () => true }) });
+    expect(w.running).toBe(0);
+    open = true;
+    await flush();
+    expect(panel.el.classList).toContain('ready');
+    expect(w.running).toBe(1);
   });
 
   it("doesn't warm while offering the download", async () => {

@@ -495,7 +495,7 @@ export function practiceScreen(
   function rescope({ mayAsk = true } = {}): void {
     // With the mic off nothing listens, not even warming up for Speak.
     if (!app.progress.settings.mic) stopListening();
-    speak?.setWarm(app.progress.settings.mic && !lookingBack);
+    speak?.setWarm(app.progress.settings.mic);
     // Only a tap that may let the round ask to speak asks for the microphone, and only that one taps first (quiet.ts).
     if (mayAsk) askForMicrophoneIfNeeded();
     if (waiting) return draw();
@@ -532,9 +532,8 @@ export function practiceScreen(
     stop();
     lookingBack = on;
     // The mic, the sound or the scope may have changed while looking back.
-    if (!on) return rescope();
-    speak?.setWarm(false);
-    draw();
+    if (!on) rescope();
+    else draw();
   }
 
   function draw(): void {
