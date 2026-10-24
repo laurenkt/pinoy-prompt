@@ -86,7 +86,8 @@ svg,
 .chips,
 .segmented,
 .stat,
-.strength-card {
+.strength-card,
+.badge {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -2472,7 +2473,6 @@ p {
 
 /* On a drill's prompt, the card's strength sits after the eyebrow, outlined so it shows on the prompt's own colour. */
 .prompt .eyebrow .badge {
-  margin-left: 8px;
   border: 2px solid var(--ink);
 }
 

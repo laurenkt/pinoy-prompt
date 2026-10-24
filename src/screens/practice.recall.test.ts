@@ -73,7 +73,7 @@ describe("the card's memory strength", () => {
     const app = learner(false);
     app.progress.cards.salamat.interval = 0;
     const root = (last = recall(app));
-    expect(root.querySelector('.prompt .eyebrow .badge.s-new')?.textContent).toBe('Memory: Just met');
+    expect(root.querySelector('.prompt .eyebrow')?.textContent).toBe('How do you say… Memory: Just met');
     root.querySelector<HTMLButtonElement>('.choice')!.click();
     expect(root.querySelector('.prompt .eyebrow .badge.s-new')?.textContent).toBe('Memory: Just met');
   });

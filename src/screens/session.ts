@@ -636,7 +636,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       'div',
       { class: 'panel' },
       // Recalling a sentence means saying all of it, so the Tagalog only shows with the answer.
-      drillPrompt(c, d, showBack, d.tl ? 'How do you say…' : KIND_INFO[c.kind].label, say, showBack),
+      drillPrompt(c, d, showBack, d.tl ? 'How do you say…' : KIND_INFO[c.kind].label, say, { showTl: showBack }),
       !showBack && h('button', { class: 'btn primary big', 'data-autofocus': true, onclick: reveal }, 'Show the answer'),
       showBack &&
         h(

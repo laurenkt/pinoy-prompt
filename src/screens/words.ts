@@ -1,11 +1,9 @@
 import type { App } from '../app';
 import { UNITS, type Card, type CardKind } from '../deck';
 import { GUIDES, KIND_INFO } from '../guides';
-import { STRENGTHS, strengthCounts, strengthOf } from '../memory';
+import { STRENGTHS, strengthCounts } from '../memory';
 import { play } from '../speech';
-import { audioButton, chip, h, icon, pageHeader } from '../ui';
-
-const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
+import { audioButton, chip, h, icon, pageHeader, strengthBadge } from '../ui';
 
 type Filter = 'all' | 'vocab' | Exclude<CardKind, 'word' | 'phrase'>;
 
@@ -27,11 +25,7 @@ export function wordsScreen(app: App): HTMLElement {
   // The filters stay tucked away until asked for, so the list starts near the top.
   let filtersOpen = false;
 
-  function badge(card: Card): HTMLElement | null {
-    const state = app.progress.cards[card.id];
-    const strength = state && strengthOf(state);
-    return strength ? h('span', { class: `badge s-${strength}` }, STRENGTH_LABEL.get(strength)) : null;
-  }
+  const badge = (card: Card) => strengthBadge(app.progress.cards[card.id]);
 
   function wordItem(card: Card): HTMLElement {
     return h(

@@ -1,15 +1,14 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
-import { STRENGTHS, strengthOf } from '../memory';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
+import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, strengthBadge } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
-import { guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
+import { eyebrowLine, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
 import { quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
@@ -21,8 +20,6 @@ type Mode = 'listen' | 'read' | 'recall' | 'speak';
  * sentence from the English is recalling it. Guides aren't heard or said.
  */
 const GUIDE_MODES: Record<GuideFormat, Mode> = { gap: 'read', build: 'recall' };
-
-const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
 
 const MODES: { id: Mode; title: string }[] = [
   { id: 'listen', title: 'Listen' },
@@ -683,20 +680,11 @@ export function practiceScreen(
     ];
   }
 
-  /**
-   * How well the card is held right now, in the Library's strength pills, so the learner knows what they're being
-   * asked. A drill never changes the schedule, so it reads the same before and after the answer.
-   */
-  function strengthBadge(card: Card): HTMLElement | null {
-    const state = app.progress.cards[card.id];
-    if (!state) return null;
-    const strength = strengthOf(state);
-    return h('span', { class: `badge s-${strength}` }, h('span', { class: 'sr-only' }, 'Memory: '), STRENGTH_LABEL.get(strength));
-  }
-
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
+    // How well the card is held, beside the question. A drill never changes the schedule, so it stays put once answered.
+    const badge = strengthBadge(app.progress.cards[q.card.id]);
     const answered = picked !== null;
     const right = picked === answerOf(q);
     const field = answerLanguage(q);
@@ -719,12 +707,12 @@ export function practiceScreen(
           onChange: draw,
           feedback: (right) => guideFeedback(q.card, d, right, { praise: 'Tama!', miss: 'Mali.' }),
           after: [onward()],
-          badge: strengthBadge(q.card),
+          badge,
         }),
       );
     }
 
-    const eyebrow = (text: string) => h('p', { class: 'eyebrow' }, text, strengthBadge(q.card));
+    const eyebrow = (text: string) => eyebrowLine(text, badge);
     let prompt: HTMLElement;
     if (q.mode === 'speak') {
       prompt = h(
