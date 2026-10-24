@@ -306,7 +306,7 @@ export function swapsTagalog(answer: string, card: Card): boolean {
 /**
  * Whether a typed word is plainly not a slip for the card's, so the answer can't pass as a typo joined up either:
  * another word the deck uses ("marumi" for "mabuti", "saan" for "naman"), unless it's the card's word cut short
- * ("marami" for "maraming", "san" for "saan", "ko" for "ako"); or a slip of five letters or more nearer another of
+ * (`cutShort`); or a slip of five letters or more nearer another of
  * the deck's words than the card's ("maganghang" is "maanghang"). Two words written as one are left to the joined-up
  * check ("walana anuman").
  */
@@ -317,11 +317,15 @@ function notATypo(typed: string, word: string, own: Set<string>): boolean {
   return nearerElsewhere(typed, distance(typed, word), knownTagalog(), own);
 }
 
-/** Whether `typed` is `word` with letters left out. */
+/**
+ * Whether `typed` is `word` cut short the way people write it: without the "-ng" that links it to the next word
+ * ("marami" for "maraming"), or one letter left out before its end ("san" for "saan", "ko" for "ako"). Not a letter
+ * off the end, which makes another word as often as not: "kanin" (rice) isn't "kanino" (whose).
+ */
 function cutShort(typed: string, word: string): boolean {
-  let i = 0;
-  for (const letter of word) if (letter === typed[i]) i++;
-  return i === typed.length;
+  if (word === `${typed}ng` || word === `${typed}g`) return true;
+  if (word.length !== typed.length + 1 || word.at(-1) !== typed.at(-1)) return false;
+  return [...word].some((_, i) => word.slice(0, i) + word.slice(i + 1) === typed);
 }
 
 let tagalogWordSet: Set<string> | undefined;
