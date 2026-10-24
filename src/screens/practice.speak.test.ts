@@ -67,6 +67,39 @@ describe('Speak mode', () => {
     expect(button('Tap and speak')).toBeTruthy();
   });
 
+  it('brings a word not said right up more to be said in later rounds, and lets it go once it is', async () => {
+    const mumble = deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition(['ʃ']) }) });
+    const app = fakeApp(KNOWN);
+    const asked = () => KNOWN.find((k) => getCard(k)!.tl === document.querySelector('.prompt .tl')?.textContent)!;
+    const say = async () => {
+      button('Tap and speak').click();
+      recorder.onListening?.();
+      button("I'm done").click();
+      await flush();
+    };
+    // Missed, then moved on: one more answer needing help, asked to be said, and no other way.
+    let root = practiceScreen(app, mumble);
+    document.body.replaceChildren(root);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    const word = asked();
+    await say();
+    expect(app.progress.cards[word].help).toBeUndefined();
+    button('Next').click();
+    expect(app.progress.cards[word].help).toEqual({ speak: 1 });
+    // Said right first time: one off.
+    for (const id of KNOWN) app.progress.cards[id].help = { speak: 1 };
+    root = practiceScreen(app, deps());
+    document.body.replaceChildren(root);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    const said = asked();
+    await say();
+    expect(app.progress.cards[said].help).toBeUndefined();
+  });
+
   it('starts and stops listening with one big button in the same place, under what the mic hears', async () => {
     const root = practiceScreen(fakeApp(KNOWN), deps());
     document.body.append(root);

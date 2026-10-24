@@ -3,7 +3,7 @@
 
 import { LEARN_ORDER, VOCAB, buildsOn, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
 import { recallChance } from './memory';
-import { DAY_MS, MAX_HINTED, START_EASE, isDue, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, MAX_HELP, START_EASE, isDue, startOfDayAfter, type CardState, type DrillWay } from './srs';
 import type { Progress } from './store';
 
 export type StepKind = 'new' | 'review';
@@ -50,11 +50,7 @@ export function guideEvery(met: number): number {
  */
 export function settled(progress: Progress, id: string): boolean {
   const state = progress.cards[id];
-  return !!state && hasSettled(state);
-}
-
-function hasSettled(state: CardState): boolean {
-  return state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
+  return !!state && state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
 }
 
 /** How many cards in the deck the learner hasn't met, guides that aren't ready yet included. */
@@ -224,9 +220,9 @@ export const DRILL_MIN_WORDS = 4;
 export function canDrill(progress: Progress): boolean {
   return Object.keys(progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length >= DRILL_MIN_WORDS;
 }
-/** Cards met within this long that haven't settled yet count as new in a drill round, and come up more. */
+/** Cards met within this long that haven't held yet count as new in a drill round, and come up more. */
 const FRESH_MS = 7 * DAY_MS;
-/** Cards met within this long that haven't settled yet are still settling in, and share the focus part of a round (see pickDrillCard). */
+/** Cards met within this long that haven't held yet are still settling in, and share the focus part of a round (see pickDrillCard). */
 const SETTLING_MS = 3 * DAY_MS;
 /**
  * The share of a drill round kept for cards still settling in, so they come up as often in a big deck as in a
@@ -236,68 +232,93 @@ const SETTLING_MS = 3 * DAY_MS;
 const FOCUS_SHARE = 0.5;
 const FOCUS_PER_CARD = 0.1;
 
+/** A card and a way of asking it: what a drill round picks, and what it keeps count of. */
+export interface DrillPick {
+  card: Card;
+  way: DrillWay;
+}
+
+/** The key for a card asked one way, as a round's `missed` holds it. */
+export const drillKey = (id: string, way: DrillWay): string => `${id} ${way}`;
+
 /**
- * How much a card needs drilling. Every card starts at 1, so the strong ones
- * still turn up now and then; on top of that come how likely it is to have
- * been forgotten, being still learned or recently met and not yet settled,
- * how often it has been forgotten before, a hard start (answered Again or Hard
- * while it hasn't yet held a week, which lowers its ease), and misses this
- * round (`missed`) and, most of all, answers the drills had to help with
- * (`hinted`, kept across rounds): what was seen to go wrong outweighs what the
- * calendar guesses.
+ * Whether a card has held in Study: remembered twice in a row, the second time a day or more after the first. A card
+ * relearned after a lapse holds again only once it has been remembered twice since.
  */
-export function drillWeight(state: CardState, now: number, missed = 0): number {
+function held(state: CardState): boolean {
+  return state.interval >= 1 && state.reps >= 2;
+}
+
+/**
+ * How much a card needs drilling, by its schedule, whichever way it's asked. Every card starts at 1, so the strong
+ * ones still turn up now and then; on top of that come how likely it is to have been forgotten, being still learned
+ * or recently met and not yet held, how often it has been forgotten before, and a hard start (answered Again or Hard
+ * while it hasn't yet held a week, which lowers its ease). How each way of asking it has gone in drills comes on top
+ * (see pickDrillCard).
+ */
+export function drillWeight(state: CardState, now: number): number {
   const fading = 1 - recallChance(state, now);
   const learning = state.interval < 1 ? 3 : state.interval < 7 ? 1.5 : 0;
-  // Once it has settled (remembered a day after it was met), how long ago it was met says nothing more.
-  const fresh = !hasSettled(state) && now - state.introduced < FRESH_MS ? 2 : 0;
+  // Once it has held, how long ago it was met says nothing more.
+  const fresh = !held(state) && now - state.introduced < FRESH_MS ? 2 : 0;
   // Ease never comes back up on Good, so a hard start stops counting once the card has held a week. A lapse counts on its own.
   const struggled = state.interval < 7 && state.lapses === 0 ? Math.min(3, 10 * Math.max(0, START_EASE - state.ease)) : 0;
-  return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * missed + 8 * (state.hinted ?? 0);
+  return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3);
+}
+
+/** How many answers asked this way needed help, less those got right unaided since (CardState.help). */
+export function drillHelp(state: CardState, way: DrillWay): number {
+  return state.help?.[way] ?? 0;
+}
+
+/** Whether a card's schedule puts it in the focus part of a drill round: still being learned, or met in the last few days and not yet held. */
+function settlingIn(state: CardState, now: number): boolean {
+  return state.interval < 1 || (!held(state) && now - state.introduced < SETTLING_MS);
 }
 
 /**
- * Whether a card is in the focus part of a drill round: still being learned, met in the last few days and not yet
- * settled, missed this round, or one the drills had to help with (`hinted`).
- */
-function settlingIn(state: CardState, now: number, missed = 0): boolean {
-  return state.interval < 1 || (!hasSettled(state) && now - state.introduced < SETTLING_MS) || missed > 0 || !!state.hinted;
-}
-
-/**
- * The next card for a drill round, which runs until the learner stops it: any
- * card met, words and guides alike, that `askable` allows, picked at random by
- * drillWeight. A share of the picks (see FOCUS_SHARE) are among cards
- * settling in (settlingIn) while there are any, the rest among the others. The last few
- * cards asked (`recent`, latest last) sit out while that leaves one to ask.
- * Null with nothing to ask.
+ * The next question for a drill round, which runs until the learner stops it: any card met, words and guides alike,
+ * asked any way `ways` allows it, picked at random by weight. Each way of asking a card is weighed on its own: the
+ * card's drillWeight shared between its ways (so a word asked four ways comes up no more than a guide asked one),
+ * plus, most of all, misses this round asked that way (`missed`, by drillKey) and answers asked that way the drills
+ * had to help with (drillHelp): what was seen to go wrong outweighs what the calendar guesses. So a word read easily
+ * but never recalled from the English is asked for its Tagalog, not read again.
+ *
+ * A share of the picks (see FOCUS_SHARE) are among cards settling in (settlingIn), or ways missed or helped with,
+ * while there are any, the rest among the others. The last few cards asked (`recent`, latest last) sit out, every
+ * way, while that leaves one to ask. Null with nothing to ask.
  */
 export function pickDrillCard(
   progress: Progress,
   now: number,
   recent: string[],
   missed: ReadonlyMap<string, number>,
-  askable: (card: Card) => boolean = () => true,
+  ways: (card: Card) => readonly DrillWay[],
   random: () => number = Math.random,
-): Card | null {
-  const pool = Object.entries(progress.cards)
-    .map(([id, state]) => ({ card: getCard(id), state }))
-    .filter((p): p is { card: Card; state: CardState } => !!p.card && askable(p.card))
-    .map(({ card, state }) => {
-      const misses = missed.get(card.id);
-      return { card, w: drillWeight(state, now, misses), focus: settlingIn(state, now, misses) };
+): DrillPick | null {
+  const pool = Object.entries(progress.cards).flatMap(([id, state]) => {
+    const card = getCard(id);
+    const asks = card ? ways(card) : [];
+    const base = drillWeight(state, now) / asks.length;
+    const settling = settlingIn(state, now);
+    return asks.map((way) => {
+      const misses = missed.get(drillKey(id, way)) ?? 0;
+      const help = drillHelp(state, way);
+      return { pick: { card: card!, way }, w: base + 4 * misses + 8 * help, focus: settling || misses > 0 || help > 0 };
     });
-  const keep = Math.min(DRILL_GAP, pool.length - 1);
+  });
+  const cards = (ps: typeof pool) => new Set(ps.map((p) => p.pick.card.id));
+  const keep = Math.min(DRILL_GAP, cards(pool).size - 1);
   const skip = new Set(keep > 0 ? recent.slice(-keep) : []);
-  const open = pool.filter((p) => !skip.has(p.card.id));
+  const open = pool.filter((p) => !skip.has(p.pick.card.id));
   if (open.length === 0) return null;
   const focus = open.filter((p) => p.focus);
   const total = (ps: typeof open) => ps.reduce((sum, p) => sum + p.w, 0);
   // Never less than the cards settling in would get by weight alone.
   // Counted before the sit-out, which so often holds cards settling in that it would shrink their share.
-  const settling = pool.filter((p) => p.focus).length;
+  const settling = cards(pool.filter((p) => p.focus)).size;
   const share = Math.max(total(focus) / total(open), Math.min(FOCUS_SHARE, FOCUS_PER_CARD * settling));
-  // One draw decides both which part of the round and which card in it.
+  // One draw decides both which part of the round and which question in it.
   let r = random();
   let from = open;
   if (focus.length > 0 && focus.length < open.length) {
@@ -310,22 +331,32 @@ export function pickDrillCard(
     }
   }
   r *= total(from);
-  return (from.find((p) => (r -= p.w) <= 0) ?? from[from.length - 1]).card;
+  return (from.find((p) => (r -= p.w) <= 0) ?? from[from.length - 1]).pick;
 }
 
 /**
- * Note how a typed drill question on a card went, for drillWeight: helped (`hinted`: answered from the choices after
- * "Show choices", or typed wrong), or typed right without help. Only `hinted` changes, never the schedule. Whether
- * progress changed, to be saved.
+ * Note how a drill question asked one way went, for pickDrillCard: helped (got wrong, or picked from the choices
+ * after "Show choices") adds one, up to MAX_HELP; right unaided takes one off. Only `help` changes, never the
+ * schedule. Whether progress changed, to be saved.
  */
-export function noteDrillAnswer(progress: Progress, cardId: string, hinted: boolean): boolean {
+export function noteDrillAnswer(progress: Progress, cardId: string, way: DrillWay, helped: boolean, now: number): boolean {
+  return setDrillHelp(progress, cardId, way, (n) => (helped ? Math.min(n + 1, MAX_HELP) : Math.max(n - 1, 0)), now);
+}
+
+/** Set how many answers asked this way needed help, from what it was. Whether that changed it. */
+export function setDrillHelp(progress: Progress, cardId: string, way: DrillWay, to: (before: number) => number, now: number): boolean {
   const state = progress.cards[cardId];
   if (!state) return false;
-  const before = state.hinted ?? 0;
-  const after = hinted ? Math.min(before + 1, MAX_HINTED) : Math.max(before - 1, 0);
+  const before = drillHelp(state, way);
+  const after = to(before);
   if (after === before) return false;
-  if (after) state.hinted = after;
-  else delete state.hinted;
+  const help = { ...state.help };
+  if (after) help[way] = after;
+  else delete help[way];
+  if (Object.keys(help).length) state.help = help;
+  else delete state.help;
+  // Kept even once it's back to none, so a sync keeps the clearing too.
+  state.helpAt = now;
   return true;
 }
 

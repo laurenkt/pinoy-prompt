@@ -30,15 +30,22 @@ export interface CardState {
    */
   log?: [number, number][];
   /**
-   * Drills only, never the schedule: how many times a typed question on it needed help, its answer picked from the
-   * choices after "Show choices" or typed wrong (MAX_HINTED at most), less the times it has been typed right since.
-   * Brings it up more in drill rounds until it's answered without help (see drillWeight). Missing means none.
+   * Drills only, never the schedule: for each way the card is asked (DrillWay), how many answers needed help (got
+   * wrong, or picked from the choices after "Show choices"; MAX_HELP at most), less those got right unaided since.
+   * Knowing a word one way says little about another (reading it, but not saying it or recalling it from the English),
+   * so each way is counted, and drilled, on its own (see pickDrillCard). Missing ways, or a missing `help`, mean none.
    */
-  hinted?: number;
+  help?: Partial<Record<DrillWay, number>>;
+  /** When `help` last changed, so a copy synced from elsewhere keeps the later count (see mergeInto). */
+  helpAt?: number;
 }
 
-/** Most answers needing help a card's `hinted` holds, so a few answers typed right are enough to clear it. */
-export const MAX_HINTED = 3;
+/** The ways a drill round asks a card: see the Tagalog, hear it, come up with it from the English, say it. */
+export type DrillWay = 'read' | 'listen' | 'recall' | 'speak';
+export const DRILL_WAYS: readonly DrillWay[] = ['read', 'listen', 'recall', 'speak'];
+
+/** Most answers needing help one way of asking a card holds, so a few right answers are enough to clear it. */
+export const MAX_HELP = 3;
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const MIN_EASE = 1.3;
