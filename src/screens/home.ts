@@ -40,19 +40,12 @@ export function homeScreen(app: App): HTMLElement {
     h(
       'header',
       { class: 'home-header' },
-      h(
-        'div',
-        null,
-        h('h1', { class: 'greeting', lang: 'fil' }, hello.tl.slice(0, split + 1), h('span', { class: 'accent' }, hello.tl.slice(split + 1))),
-        h('p', { class: 'muted' }, hello.en),
-      ),
-      // Settings above quiet mode, stacked so the greeting keeps its width and Home still fits one screen.
-      h(
-        'div',
-        { class: 'home-actions' },
-        settingsToggle(app, false),
-        quietSwitch(app),
-      ),
+      // Settings above quiet mode, at the right, with the greeting flowing around them: its first word keeps the width
+      // beside Settings, and the wider quiet mode sits beside the shorter last word, so Home still fits one screen.
+      settingsToggle(app, false),
+      quietSwitch(app),
+      h('h1', { class: 'greeting', lang: 'fil' }, hello.tl.slice(0, split + 1), h('span', { class: 'accent' }, hello.tl.slice(split + 1))),
+      h('p', { class: 'muted' }, hello.en),
     ),
 
     isFirstRun ? welcomeCard() : null,
@@ -74,7 +67,7 @@ export function homeScreen(app: App): HTMLElement {
   );
 }
 
-/** The quiet toggle, redrawn in place so the page doesn't jump. */
+/** The mic and sound toggle, redrawn in place so the page doesn't jump. */
 function quietSwitch(app: App): HTMLElement {
   const el: HTMLElement = quietToggle(app, () => el.replaceWith(quietSwitch(app)));
   return el;

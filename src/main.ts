@@ -71,7 +71,7 @@ const screens = backHistory<Route>({
   draw(route) {
     app.progress = rollDay(app.progress, Date.now());
     showDueBadge(app.progress, Date.now());
-    // Another tab may have changed quiet mode.
+    // Another tab may have turned the sound on or off.
     applyAudioMode(app.progress.settings);
     shown = route;
     render(route);
@@ -110,7 +110,7 @@ function render(route: Route): void {
   root.replaceChildren(h('main', { class: 'screen' }, screen));
 }
 
-// A soft tick for every button press, quiet in silent mode (speech.ts).
+// A soft tick for every button press, quiet while the sound is off (speech.ts).
 tickOnPress(document);
 
 // A held Enter or Space would otherwise click through several screens at once.

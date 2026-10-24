@@ -95,7 +95,7 @@ describe('Speak mode', () => {
     vi.unstubAllGlobals();
   });
 
-  it('asks another way when quiet mode comes on mid-round', async () => {
+  it('asks another way when the mic goes off mid-round', async () => {
     const app = fakeApp(KNOWN);
     const root = practiceScreen(app, deps());
     document.body.append(root);
@@ -105,11 +105,11 @@ describe('Speak mode', () => {
     button('Tap and speak').click();
     button("I'm done").click();
     await flush();
-    app.progress.settings.quiet = true;
+    app.progress.settings.mic = false;
     button('Next').click();
     expect(document.querySelector('.session-header')).not.toBeNull();
     expect(document.querySelector('.choice')).not.toBeNull();
-    expect(document.body.textContent).toContain('Speak is off in quiet mode.');
+    expect(document.body.textContent).toContain('Speak is off while the mic is off.');
   });
 
   it('is offered but explained when the browser cannot record', async () => {
