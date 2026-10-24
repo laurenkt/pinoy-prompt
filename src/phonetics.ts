@@ -736,3 +736,22 @@ export function englishReadings(text: string, heard: string[]): { letters: strin
     return soft ? [{ letters: text.normalize('NFC').slice(phone.from, phone.to + 1), heard: soft }] : [];
   });
 }
+
+/**
+ * The first sound of a recording's text, if the recording doesn't start with it, for scripts/generate-audio.mjs to
+ * reject a take: the voice model often starts a take a moment into its first word, so "Kailan" comes out "ailan"
+ * and "Pabili" "abili", the consonant gone. A vowel at the start is left to the take's own check for that
+ * (`cut` in scripts/clip-edges.mjs), and a first sound heard as a near one (k as g) still counts as said.
+ */
+export function lostFirstSound(text: string, heard: string[]): { letters: string; heard: string } | null {
+  const spelled = text.toLowerCase().normalize('NFC');
+  // The catch before a first vowel is optional, so a text starting with a vowel starts at the vowel.
+  const sounds = compare(toPhones(spelled), heard).sounds.filter((s) => !s.phone.optional);
+  const [first, second] = sounds;
+  if (!first || isVowelSound(first.phone.ipa) || first.verdict === 'good' || first.verdict === 'close') return null;
+  // A p before an s that was heard is barely sounded at all; a t before r ("Trapik") is.
+  if (first.verdict === 'missing' && second?.phone.ipa === 's' && second.verdict !== 'missing') return null;
+  // A first word with no vowel ("Psst!") is a hiss, not speech: the voice barely sounds it, and the recogniser rarely hears it.
+  if (!/[aeiou]/.test(spelled.match(/[\p{L}]+/u)?.[0] ?? '')) return null;
+  return { letters: text.normalize('NFC').slice(first.phone.from, first.phone.to), heard: first.heard ?? 'nothing' };
+}
