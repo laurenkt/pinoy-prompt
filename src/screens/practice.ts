@@ -493,8 +493,9 @@ export function practiceScreen(
    * the one showing, while it's unanswered, so the change shows straight away.
    */
   function rescope({ mayAsk = true } = {}): void {
-    // With the mic off nothing listens.
+    // With the mic off nothing listens, not even warming up for Speak.
     if (!app.progress.settings.mic) stopListening();
+    speak?.setWarm(app.progress.settings.mic);
     // Only a tap that may let the round ask to speak asks for the microphone, and only that one taps first (quiet.ts).
     if (mayAsk) askForMicrophoneIfNeeded();
     if (waiting) return draw();

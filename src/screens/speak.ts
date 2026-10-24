@@ -7,7 +7,7 @@ import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-c
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, toPhones, type Comparison } from '../phonetics';
-import { record, RecordError, recordingSupported, type RecordProblem, type Recording } from '../recorder';
+import { record, RecordError, recordingSupported, warmRecorder, type RecordProblem, type Recording, type Warmth } from '../recorder';
 import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
 import { continueButton } from './auto-advance';
@@ -40,6 +40,8 @@ export interface SpeakDeps {
   microphoneAllowed?(): boolean;
   /** Open the microphone and keep it until the screen is left; false if it was left meanwhile. */
   holdMicrophone?(): Promise<boolean>;
+  /** Get the held microphone going ahead of a take, its sound thrown away until then; null if there was nothing to warm. */
+  warmRecorder?(): Warmth | null;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -52,6 +54,7 @@ export const defaultDeps: SpeakDeps = {
   modelKnownDownloaded,
   microphoneAllowed,
   holdMicrophone,
+  warmRecorder,
 };
 let sharedPlayer: Player | null = null;
 
@@ -110,6 +113,8 @@ export interface SpeakPanel {
    * repeat it; and not while the microphone is open.
    */
   mayPlay(): boolean;
+  /** Whether the microphone may be warmed ahead of a take: not with the mic off. */
+  setWarm(allowed: boolean): void;
   dispose(): void;
 }
 
@@ -173,9 +178,28 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       .map((v) => ({ text: v.text, comparison: compare(v.phones, heard) }))
       .reduce((best, next) => (next.comparison.score > best.comparison.score ? next : best));
 
+  /**
+   * The microphone warmed for this question. It's warmed from the tap that brought the question up (or, once
+   * the model is ready, as it can be without one) and while ready to listen, so a take starts with sound already
+   * flowing; anything else (a result, a problem, the question going) lets it go.
+   */
+  let warmth: Warmth | null = null;
+  let mayWarm = true;
+  /** Again if the last one ended by itself (timed out, or the app went into the background). */
+  const warmUp = () => {
+    if (warmth?.warm || disposed || !mayWarm) return;
+    warmth = deps.warmRecorder?.() ?? null;
+  };
+  const coolDown = () => {
+    warmth?.cool();
+    warmth = null;
+  };
+
   const set = (next: State) => {
     if (disposed) return;
     state = next;
+    if (next.name === 'ready') warmUp();
+    else if (next.name !== 'checking' && next.name !== 'loading' && next.name !== 'recording') coolDown();
     draw();
   };
 
@@ -244,6 +268,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         el.querySelector('.listen-status')!.textContent = 'Still getting the mic ready…';
       },
     });
+    // The take has adopted the warmed microphone, so this only forgets it.
+    coolDown();
     recording = current;
     try {
       const take = await current.audio;
@@ -490,13 +516,21 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   }
 
   draw();
+  // Inside the tap that brought the question up, if one did: a model already on the device means a take is coming.
+  if (deps.modelKnownDownloaded?.()) warmUp();
   void prepare();
 
   return {
     el,
     mayPlay: () => judged && state.name !== 'recording',
+    setWarm: (allowed) => {
+      mayWarm = allowed;
+      if (!allowed) coolDown();
+      else if (state.name === 'ready') warmUp();
+    },
     dispose: () => {
       disposed = true;
+      coolDown();
       recording?.cancel();
       breakdown?.dispose();
     },

@@ -101,6 +101,34 @@ describe('Speak mode', () => {
     vi.unstubAllGlobals();
   });
 
+  it('warms the microphone on a spoken question, and lets it go as the mic goes off', async () => {
+    let running = 0;
+    const warmRecorder = () => {
+      running++;
+      let cooled = false;
+      return {
+        get warm() {
+          return !cooled;
+        },
+        cool: () => {
+          if (!cooled) running--;
+          cooled = true;
+        },
+      };
+    };
+    const app = fakeApp(KNOWN);
+    const root = practiceScreen(app, deps({ warmRecorder, modelKnownDownloaded: () => true }));
+    document.body.append(root);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    expect(running).toBe(1);
+    document.querySelector<HTMLButtonElement>('.split-toggle [aria-label="Mic off"]')!.click();
+    await flush();
+    expect(app.progress.settings.mic).toBe(false);
+    expect(running).toBe(0);
+  });
+
   it('asks another way when the mic goes off mid-round', async () => {
     const app = fakeApp(KNOWN);
     const root = practiceScreen(app, deps());
