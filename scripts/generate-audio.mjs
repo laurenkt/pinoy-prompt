@@ -25,6 +25,12 @@
 // English way (src/phonetics.ts, englishReadings) is made again too. `--check`
 // runs that over the clips already made and remakes the ones that fail. The
 // recogniser (about 71 MB) is downloaded once into node_modules/.cache.
+//
+// The voice model sometimes starts or stops a take mid-sound (a word that
+// starts with a vowel often comes already sounding), and a take like that is
+// made again as well. Each clip keeps a little silence before and after its
+// sound (scripts/clip-edges.mjs), so soft starts and fading ends are heard
+// whole; `--check` also remakes clips trimmed closer than that.
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -33,6 +39,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { createServer } from 'vite';
+import { edges, trimPlan, trimmedClose } from './clip-edges.mjs';
 
 const run = promisify(execFile);
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -98,10 +105,15 @@ let session;
 /** One recording at a time, as in the app: takes finish together, and the runtime isn't made to run in parallel. */
 let listening = Promise.resolve();
 
+/** A sound file's samples, mono at `rate`. */
+async function samplesOf(file, rate) {
+  const { stdout } = await run('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', String(rate), '-f', 'f32le', '-'], { encoding: 'buffer', maxBuffer: 1 << 26 });
+  return new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.length));
+}
+
 /** Letters a clip says the English way, as the recogniser hears them. */
 async function misread(text, file) {
-  const { stdout } = await run('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', '16000', '-f', 'f32le', '-'], { encoding: 'buffer', maxBuffer: 1 << 26 });
-  const samples = new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.length));
+  const samples = await samplesOf(file, 16000);
   const heard = listening.then(async () => recognise(await (session ??= recogniser()), samples));
   listening = heard.catch(() => {});
   return englishReadings(text, (await heard).sounds);
@@ -164,19 +176,28 @@ async function transcribe(wav) {
   return (await response.json()).text;
 }
 
-/** Trim the silence at each end, even out loudness, and save as mono MP3 in `work`: once as said, and once slowed down. */
+/**
+ * Trim the silence at each end down to LEAD and TAIL, even out loudness, and save as mono MP3 in `work`: once as
+ * said, and once slowed down. Returns which end of the take, if either, the voice cut off mid-sound.
+ */
 async function encode(wav, name, work) {
   const input = join(work, `${name}.wav`);
   await writeFile(input, wav);
-  const trim = 'silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.02';
-  const clean = `${trim},areverse,${trim},areverse,loudnorm=I=-16:TP=-1.5:LRA=11`;
+  // Measured against the take's own peak: takes come at different levels, so a fixed threshold cut into some words.
+  const sound = edges(await samplesOf(input, 24000), 24000);
+  const { from, to, before, after } = trimPlan(sound);
+  // A take cut mid-sound gets a 5 ms fade at that end, so it doesn't click.
+  const trim = `atrim=${from}:${to},asetpts=PTS-STARTPTS,afade=t=in:d=0.005,afade=t=out:st=${Math.max(0, to - from - 0.005).toFixed(3)}:d=0.005`;
+  const pad = `adelay=${Math.round(before * 1000)}:all=1,apad=pad_dur=${after}`;
+  const clean = `${trim},loudnorm=I=-16:TP=-1.5:LRA=11,${pad}`;
   // The voice comes at 24 kHz, which is plenty for speech, so clips stay at that rate. MP3, as
   // every browser decodes it (open-source Chromium builds can't decode AAC).
   const mp3 = ['-ar', '24000', '-ac', '1', '-c:a', 'libmp3lame', '-b:a', '32k'];
   for (const [suffix, tempo] of [['', ''], ['-slow', `,atempo=${SLOW_TEMPO}`]]) {
-    await run('ffmpeg', ['-v', 'error', '-y', '-i', input, '-af', `${clean}${tempo},apad=pad_dur=0.05`, ...mp3, join(work, `${name}${suffix}.mp3`)]);
+    await run('ffmpeg', ['-v', 'error', '-y', '-i', input, '-af', `${clean}${tempo}`, ...mp3, join(work, `${name}${suffix}.mp3`)]);
   }
   await rm(input);
+  return sound.cut;
 }
 
 const words = (s) =>
@@ -222,17 +243,21 @@ async function makeClip(text, voice, work, unsure, keepOld) {
       return null;
     }
     const draft = `take-${createHash('sha1').update(take).digest('hex')}`;
-    await encode(take, draft, work);
+    const cut = await encode(take, draft, work);
+    // A take cut short is made again before paying to transcribe it.
+    const whole = saidRight && !cut.length;
+    if (!whole && attempt < ATTEMPTS) continue;
     let heard;
     let checked = true;
     try {
-      heard = saidRight ? await transcribe(take) : said;
+      heard = whole ? await transcribe(take) : said;
     } catch (error) {
       // Not worth paying for more takes when the check itself failed.
       checked = false;
       heard = `(couldn't transcribe: ${error.message.split('\n')[0]})`;
     }
-    let right = saidRight && (!checked || heardRight(text, heard));
+    if (cut.length) heard = `${heard}, cut off at the ${cut.join(' and ')}`;
+    let right = whole && (!checked || heardRight(text, heard));
     if (right) {
       try {
         const found = await misread(text, join(work, `${draft}.mp3`));
@@ -261,22 +286,25 @@ await mkdir(AUDIO_DIR, { recursive: true });
 const work = await mkdtemp(join(ROOT, 'node_modules', '.pinoy-audio-'));
 // One job per text and voice. A text listed with a single name (made before there were two voices) needs all of them.
 const missing = (t, v) => all || manifest[t]?.length !== VOICES.length || !manifest[t][v];
-/** With --check, the clips already made that say a letter the English way, as "voice:text". */
-const misreadClips = new Set();
+/** With --check, the clips already made that say a letter the English way or are trimmed too close, as "voice:text". */
+const failedCheck = new Set();
 if (check) {
-  console.log('Listening for letters said the English way...');
+  console.log('Listening for letters said the English way, and clips cut close...');
   for (const text of texts) {
     for (const [v, name] of (manifest[text] ?? []).entries()) {
-      const found = name ? await misread(text, join(AUDIO_DIR, `${name}.mp3`)) : [];
-      if (!found.length) continue;
-      console.log(`  "${text}" (${VOICES[v][0]}): ${describeMisread(found)}`);
-      misreadClips.add(`${v}:${text}`);
+      if (!name) continue;
+      const file = join(AUDIO_DIR, `${name}.mp3`);
+      const found = await misread(text, file);
+      const close = trimmedClose(await samplesOf(file, 24000), 24000);
+      if (!found.length && !close) continue;
+      console.log(`  "${text}" (${VOICES[v][0]}): ${[describeMisread(found), close && 'trimmed too close'].filter(Boolean).join(', ')}`);
+      failedCheck.add(`${v}:${text}`);
     }
   }
 }
 const todo = (redo.length ? redo : texts)
   .flatMap((text) => VOICES.map((_, v) => ({ text, v })))
-  .filter(({ text, v }) => redo.length || missing(text, v) || misreadClips.has(`${v}:${text}`))
+  .filter(({ text, v }) => redo.length || missing(text, v) || failedCheck.has(`${v}:${text}`))
   .slice(0, limit);
 const unknown = redo.filter((t) => !texts.includes(t));
 if (unknown.length) throw new Error(`Not a text the app says: ${unknown.join(', ')}`);
