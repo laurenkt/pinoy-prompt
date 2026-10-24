@@ -44,6 +44,8 @@ interface Question {
   typed: boolean;
   /** "Show choices" was tapped on a typed question, so an answer to it was picked rather than recalled. */
   hinted?: boolean;
+  /** A typed answer marked wrong was counted on the card as needing help, to take back if "I had it right". */
+  missNoted?: boolean;
   /** What's typed so far, kept while the screen is redrawn. */
   draft?: string;
   /** What was typed, once it's sent. */
@@ -486,9 +488,9 @@ export function practiceScreen(
     if (right) void chime();
     if (q.guide || q.mode === 'recall' || q.mode === 'listen') sayCard(q);
     settle(right);
-    // Got from the choices, it comes up more in later rounds too, until it's typed right without them.
+    // Got from the choices or typed wrong, it comes up more in later rounds too, until it's typed right without help.
     if (q.hinted) noteHint(q.card.id, true);
-    else if (q.typed && right) noteHint(q.card.id, false);
+    else if (q.typed) q.missNoted = noteHint(q.card.id, !right) && !right;
     if (right)
       auto = countdown(root, () => {
         autoMoved = true;
@@ -507,12 +509,17 @@ export function practiceScreen(
     if (misses > 1) missed.set(q.card.id, misses - 1);
     else missed.delete(q.card.id);
     tally(q.card.id, true);
+    // Take back the help the miss counted, then count it typed right.
+    if (q.missNoted) noteHint(q.card.id, false);
     noteHint(q.card.id, false);
     draw();
   }
 
-  function noteHint(id: string, hinted: boolean): void {
-    if (noteDrillAnswer(app.progress, id, hinted)) app.commit();
+  /** Whether it changed anything. */
+  function noteHint(id: string, hinted: boolean): boolean {
+    const changed = noteDrillAnswer(app.progress, id, hinted);
+    if (changed) app.commit();
+    return changed;
   }
 
   /** Not sure enough to type it, or tired of waiting for the check: pick from choices instead. */

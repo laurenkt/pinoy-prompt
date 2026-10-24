@@ -30,14 +30,14 @@ export interface CardState {
    */
   log?: [number, number][];
   /**
-   * Drills only, never the schedule: how many times its answer was picked from the choices after "Show choices"
-   * (MAX_HINTED at most), less the times it has been typed right since. Brings it up more in drill rounds until
-   * it's answered without them (see drillWeight). Missing means none.
+   * Drills only, never the schedule: how many times a typed question on it needed help, its answer picked from the
+   * choices after "Show choices" or typed wrong (MAX_HINTED at most), less the times it has been typed right since.
+   * Brings it up more in drill rounds until it's answered without help (see drillWeight). Missing means none.
    */
   hinted?: number;
 }
 
-/** Most "Show choices" answers a card's `hinted` holds, so a few answers typed right are enough to clear it. */
+/** Most answers needing help a card's `hinted` holds, so a few answers typed right are enough to clear it. */
 export const MAX_HINTED = 3;
 
 export const DAY_MS = 24 * 60 * 60 * 1000;

@@ -496,6 +496,40 @@ describe('picking the next card to drill', () => {
     expect(asked / 4000).toBeLessThan(0.55);
   });
 
+  it('lets words met this week that have settled take their turn with the rest, and keeps the focus for ones that have not', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 100), 30);
+    const meet = (ids: string[], settle: boolean) => {
+      for (const id of ids) {
+        recordAnswer(progress, id, 'good', LATER - 3 * DAY_MS);
+        if (settle) recordAnswer(progress, id, 'good', LATER - 2 * DAY_MS);
+        progress.cards[id] = { ...progress.cards[id], introduced: LATER - 3 * DAY_MS + 1 };
+      }
+    };
+    const known = VOCAB_ORDER.slice(100, 105);
+    const unsure = VOCAB_ORDER.slice(105, 110);
+    meet(known, true);
+    meet(unsure, false);
+    const seen = counts(progress);
+    const each = (ids: string[]) => ids.reduce((sum, id) => sum + (seen.get(id) ?? 0), 0) / ids.length;
+    const old = each(VOCAB_ORDER.slice(0, 100));
+    // Remembered a day after they were met, they come up about as often as words held for weeks.
+    expect(each(known)).toBeLessThan(old * 2.5);
+    // Not remembered since, they still share the focus part of the round.
+    expect(each(unsure)).toBeGreaterThan(each(known) * 3);
+  });
+
+  it('asks a word the drills had to help with more often than one met yesterday', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 100), 30);
+    const yesterday = VOCAB_ORDER.slice(100, 105);
+    for (const id of yesterday) recordAnswer(progress, id, 'good', LATER - DAY_MS);
+    const [helped] = VOCAB_ORDER;
+    noteDrillAnswer(progress, helped, true);
+    const seen = counts(progress);
+    for (const id of yesterday) expect(seen.get(helped)!).toBeGreaterThan(seen.get(id)! * 1.3);
+  });
+
   it('brings a card only answered from the choices back much more often, in later rounds too, until it is typed right', () => {
     const progress = settledProgress();
     const plain = counts(progress).get('kape')!;

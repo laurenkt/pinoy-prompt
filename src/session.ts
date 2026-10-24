@@ -50,7 +50,11 @@ export function guideEvery(met: number): number {
  */
 export function settled(progress: Progress, id: string): boolean {
   const state = progress.cards[id];
-  return !!state && state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
+  return !!state && hasSettled(state);
+}
+
+function hasSettled(state: CardState): boolean {
+  return state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
 }
 
 /** How many cards in the deck the learner hasn't met, guides that aren't ready yet included. */
@@ -220,9 +224,9 @@ export const DRILL_MIN_WORDS = 4;
 export function canDrill(progress: Progress): boolean {
   return Object.keys(progress.cards).filter((id) => getCard(id) && isVocab(getCard(id)!)).length >= DRILL_MIN_WORDS;
 }
-/** Cards met within this long count as new in a drill round, and come up more. */
+/** Cards met within this long that haven't settled yet count as new in a drill round, and come up more. */
 const FRESH_MS = 7 * DAY_MS;
-/** Cards met within this long are still settling in, and share the focus part of a round (see pickDrillCard). */
+/** Cards met within this long that haven't settled yet are still settling in, and share the focus part of a round (see pickDrillCard). */
 const SETTLING_MS = 3 * DAY_MS;
 /**
  * The share of a drill round kept for cards still settling in, so they come up as often in a big deck as in a
@@ -235,27 +239,29 @@ const FOCUS_PER_CARD = 0.1;
 /**
  * How much a card needs drilling. Every card starts at 1, so the strong ones
  * still turn up now and then; on top of that come how likely it is to have
- * been forgotten, being still learned or recently met, how often it has been
- * forgotten before, a hard start (answered Again or Hard while it hasn't yet
- * held a week, which lowers its ease), and misses this round (`missed`) and
- * answers only got from the choices (`hinted`, kept across rounds), which
- * count most.
+ * been forgotten, being still learned or recently met and not yet settled,
+ * how often it has been forgotten before, a hard start (answered Again or Hard
+ * while it hasn't yet held a week, which lowers its ease), and misses this
+ * round (`missed`) and, most of all, answers the drills had to help with
+ * (`hinted`, kept across rounds): what was seen to go wrong outweighs what the
+ * calendar guesses.
  */
 export function drillWeight(state: CardState, now: number, missed = 0): number {
   const fading = 1 - recallChance(state, now);
   const learning = state.interval < 1 ? 3 : state.interval < 7 ? 1.5 : 0;
-  const fresh = now - state.introduced < FRESH_MS ? 2 : 0;
+  // Once it has settled (remembered a day after it was met), how long ago it was met says nothing more.
+  const fresh = !hasSettled(state) && now - state.introduced < FRESH_MS ? 2 : 0;
   // Ease never comes back up on Good, so a hard start stops counting once the card has held a week. A lapse counts on its own.
   const struggled = state.interval < 7 && state.lapses === 0 ? Math.min(3, 10 * Math.max(0, START_EASE - state.ease)) : 0;
-  return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * (missed + (state.hinted ?? 0));
+  return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * missed + 8 * (state.hinted ?? 0);
 }
 
 /**
- * Whether a card is in the focus part of a drill round: still being learned, met in the last few days, missed this
- * round, or last answered from the choices.
+ * Whether a card is in the focus part of a drill round: still being learned, met in the last few days and not yet
+ * settled, missed this round, or one the drills had to help with (`hinted`).
  */
 function settlingIn(state: CardState, now: number, missed = 0): boolean {
-  return state.interval < 1 || now - state.introduced < SETTLING_MS || missed > 0 || !!state.hinted;
+  return state.interval < 1 || (!hasSettled(state) && now - state.introduced < SETTLING_MS) || missed > 0 || !!state.hinted;
 }
 
 /**
@@ -308,8 +314,9 @@ export function pickDrillCard(
 }
 
 /**
- * Note how a drill question on a card was answered, for drillWeight: from the choices after "Show choices" (`hinted`),
- * or typed right without them. Only `hinted` changes, never the schedule. Whether progress changed, to be saved.
+ * Note how a typed drill question on a card went, for drillWeight: helped (`hinted`: answered from the choices after
+ * "Show choices", or typed wrong), or typed right without help. Only `hinted` changes, never the schedule. Whether
+ * progress changed, to be saved.
  */
 export function noteDrillAnswer(progress: Progress, cardId: string, hinted: boolean): boolean {
   const state = progress.cards[cardId];

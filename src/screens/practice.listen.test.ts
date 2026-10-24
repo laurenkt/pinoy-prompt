@@ -178,6 +178,29 @@ describe('listening to words that have settled', () => {
     expect(app.progress.cards.salamat.hinted).toBeUndefined();
   });
 
+  it('brings a word typed wrong up more in later rounds too, unless the learner had it right after all', async () => {
+    const app = learner(true);
+    const root = listen(app);
+    type(root, 'good night');
+    await flush();
+    expect(app.progress.cards.salamat.hinted).toBe(1);
+    // "I had it right" takes the miss back and counts it typed right.
+    app.progress.cards.salamat.hinted = 2;
+    const again = listen(app);
+    type(again, 'good night');
+    await flush();
+    expect(app.progress.cards.salamat.hinted).toBe(3);
+    button(again, 'I had it right').click();
+    expect(app.progress.cards.salamat.hinted).toBe(1);
+    // A miss that couldn't count (three already) has nothing to take back.
+    app.progress.cards.salamat.hinted = 3;
+    const full = listen(app);
+    type(full, 'good night');
+    await flush();
+    button(full, 'I had it right').click();
+    expect(app.progress.cards.salamat.hinted).toBe(2);
+  });
+
   it("drops a check that comes back after the round has ended", async () => {
     let answer: (right: boolean) => void = () => {};
     const app = learner(true);
