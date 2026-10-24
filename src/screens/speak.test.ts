@@ -196,6 +196,11 @@ describe('an attempt', () => {
     expect(text('.feedback strong')).toBe('Tama!');
     expect(onAttempt).toHaveBeenCalledWith(true);
     expect(panel.el.querySelectorAll('.sound-off, .sound-missing')).toHaveLength(0);
+    // A full ring holds a check, not "100%", which doesn't fit inside it.
+    const dial = panel.el.querySelector('.dial')!;
+    expect(dial.getAttribute('aria-label')).toBe('100% of the way there');
+    expect(dial.querySelector('span .icon')).not.toBeNull();
+    expect(dial.querySelector('span')!.textContent).toBe('');
   });
 
   it('marks the letters that were off and coaches on them', async () => {
@@ -206,6 +211,8 @@ describe('an attempt', () => {
     await flush();
     expect(onAttempt).toHaveBeenCalledWith(false);
     expect(panel.el.querySelector('.sound-off')?.textContent).toBe('ng');
+    expect(panel.el.querySelector('.dial span')!.textContent).toMatch(/^\d{1,2}%$/);
+    expect(panel.el.querySelector('.dial .icon')).toBeNull();
     // The breakdown marks the ng and the n that was heard, and starts on it with its tip.
     expect(text('.mark-off .mark-target')).toBe('ŋ');
     expect(text('.mark-off .mark-heard')).toBe('n');

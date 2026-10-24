@@ -1653,6 +1653,13 @@ p {
   font-size: 0.65rem;
 }
 
+/* A full ring: a bold check in place of "100%". */
+.dial .icon {
+  width: 52%;
+  height: 52%;
+  stroke-width: 3.4;
+}
+
 /* Sound-by-sound breakdown. */
 /* After an attempt with a breakdown, the result card stands in for the prompt
    card: same word, now coloured by how each sound came out. */
