@@ -222,6 +222,20 @@ const SCREENS = {
     await page.press('.meaning-input', 'Enter');
     await page.waitForSelector('.feedback');
   },
+  // The same, typed with a letter missing: wrong, with a note to check the spelling.
+  'drills-recall-misspelt': async (page) => {
+    await typedOnly(page, 'recall');
+    const tl = await page.evaluate(async () => {
+      const { VOCAB } = await import('/src/deck.ts');
+      const en = document.querySelector('.prompt-en').textContent;
+      return VOCAB.find((c) => c.en === en).tl;
+    });
+    // A letter dropped from its longest word, still near enough to tell what was meant.
+    const word = tl.split(' ').reduce((a, b) => (b.length > a.length ? b : a));
+    await page.fill('.meaning-input', tl.replace(word, word.slice(0, 2) + word.slice(3)));
+    await page.press('.meaning-input', 'Enter');
+    await page.waitForSelector('.feedback');
+  },
   'drills-hearing': async (page) => {
     await sayMeaning(page);
     await page.click('.meaning-mic');
@@ -468,9 +482,13 @@ async function typedOnly(page, mode, live = true) {
   await page.route('https://api.openai.com/**', () => {});
   await page.evaluate(async () => {
     const { load, recordAnswer, save } = await import('/src/store.ts');
+    const { cardKey } = await import('/src/deck.ts');
     const progress = load(Date.now());
-    // A second good answer, a day on, settles each word (settled in session.ts).
-    for (const id of Object.keys(progress.cards)) recordAnswer(progress, id, 'good', Date.now() - 2 * 86_400_000);
+    // Two good answers a day apart settle each word, each way it's typed (settled in session.ts).
+    for (const id of Object.keys(progress.cards)) {
+      for (const way of ['listen', 'recall']) recordAnswer(progress, cardKey(id, way), 'good', Date.now() - 3 * 86_400_000);
+      for (const key of [id, cardKey(id, 'listen'), cardKey(id, 'recall')]) recordAnswer(progress, key, 'good', Date.now() - 2 * 86_400_000);
+    }
     save(progress, { replace: true });
     (await import('/src/openai.ts')).setApiKey('sk-proj-screenshotsonly0123456789');
   });
