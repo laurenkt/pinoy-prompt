@@ -448,10 +448,9 @@ function matchesAnswer(answer: string, card: Card, language: AnswerLanguage): bo
  * can't be: half a word is often within a typo of the whole.
  */
 export function exactAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
-  const letters = (list: string[]) => list.join('');
-  const given = letters(plainWords(answer));
-  const wanted = language === 'tl' ? cardWords(card) : englishTexts(card).map(plainWords);
-  return given !== '' && wanted.some((list) => letters(list) === given);
+  if (language === 'tl') return spellsTagalog(answer, card);
+  const given = plainWords(answer).join('');
+  return given !== '' && englishTexts(card).some((text) => plainWords(text).join('') === given);
 }
 
 /**
@@ -463,6 +462,24 @@ export function spellsTagalog(answer: string, card: Card): boolean {
   if (given.length === 0) return false;
   const g = bare(given).join('');
   return cardWords(card).some((want) => want.length > 0 && !(polite(want) && !polite(given)) && bare(want).join('') === g);
+}
+
+/**
+ * Whether typed Tagalog is the card's wording misspelt: a letter wrong, missing,
+ * extra or swapped (two from nine letters), however short ("hidi" for "hindi"),
+ * and with no word the deck uses elsewhere, which would be a different word,
+ * not a misspelling ("iyo" for "ito").
+ */
+function nearlySpells(answer: string, card: Card): boolean {
+  const given = plainWords(answer);
+  if (given.length === 0) return false;
+  const own = ownTagalog(card);
+  if (given.some((w) => !own.has(w) && !RESPECT.includes(w) && deckTagalogWords().has(w))) return false;
+  const g = bare(given).join('');
+  return cardWords(card).some((want) => {
+    const w = bare(want).join('');
+    return w.length > 0 && distance(g, w) <= (Math.min(g.length, w.length) >= 9 ? 2 : 1);
+  });
 }
 
 /**
@@ -488,7 +505,7 @@ export async function judgeMeaning(
   if (!answer.trim()) return { right: false };
   const spelled = language === 'tl' && typed;
   if (spelled ? spellsTagalog(answer, card) : matchesAnswer(answer, card, language)) return { right: true };
-  if (spelled && matchesTagalog(answer, card)) return { right: false, misspelt: true };
+  if (spelled && nearlySpells(answer, card)) return { right: false, misspelt: true };
   // Not asked: OpenAI would see that it means the same.
   if (language === 'en' && repeatsTagalog(answer, card)) return { right: false };
   // Not asked either: two words that look alike can pass for a typo, and a missing "po" can go unseen.

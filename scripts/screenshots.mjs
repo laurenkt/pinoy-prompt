@@ -232,7 +232,8 @@ const SCREENS = {
     });
     // A letter dropped from its longest word, still near enough to tell what was meant.
     const word = tl.split(' ').reduce((a, b) => (b.length > a.length ? b : a));
-    await page.fill('.meaning-input', tl.replace(word, word.slice(0, 2) + word.slice(3)));
+    const at = Math.min(2, word.length - 1);
+    await page.fill('.meaning-input', tl.replace(word, word.slice(0, at) + word.slice(at + 1)));
     await page.press('.meaning-input', 'Enter');
     await page.waitForSelector('.feedback');
   },

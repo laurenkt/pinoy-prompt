@@ -375,6 +375,13 @@ describe('typed Tagalog, spelled right', () => {
     expect(ask).not.toHaveBeenCalled();
     // Said, speech-to-text did the spelling.
     expect(await judgeMeaning('Maraming slamat', card('maraming-salamat'), ask, 'tl', false)).toEqual({ right: true });
+    // However short the word.
+    expect(await judgeMeaning('hidi', card('hindi'), ask, 'tl', true)).toEqual({ right: false, misspelt: true });
+    expect(await judgeMeaning('Sie', card('sige'), ask, 'tl', true)).toEqual({ right: false, misspelt: true });
+    expect(ask).not.toHaveBeenCalled();
+    // A word the deck uses elsewhere is a different word, not a misspelling: OpenAI judges it.
+    expect(await judgeMeaning('iyan', card('ito'), ask, 'tl', true)).toEqual({ right: true });
+    expect(ask).toHaveBeenCalledTimes(1);
     // Typed English is still judged on meaning, not spelling.
     expect(await judgeMeaning('I do not undrestand', card('hindi-maintindihan'), ask, 'en', true)).toEqual({ right: true });
   });
