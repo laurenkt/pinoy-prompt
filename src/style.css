@@ -3047,94 +3047,90 @@ p {
   display: none;
 }
 
-.back-title {
-  font-size: 0.85rem;
+/* The headline: a big figure in cream, then what it means and when Study asks again. */
+.back-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--line);
+}
+
+.hero-n {
+  font-size: 3rem;
   font-weight: 800;
-  color: var(--saffron);
-  margin: 0 0 12px;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
-.back-note {
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin: 12px 0 0;
-}
-
-.way-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.way-tile {
+.hero-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
-  padding: 8px 6px 6px;
-  border: var(--outline);
-  border-radius: 14px;
-  color: var(--on-accent);
-}
-
-.way-tile.none {
-  background: repeating-linear-gradient(45deg, var(--surface) 0 6px, var(--surface-dim) 6px 12px);
-  border-color: var(--line);
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.25;
   color: var(--muted);
 }
 
-/* The way asked now stands up off the card. */
-.way-tile.asked {
-  box-shadow: 4px 4px 0 var(--cream);
-  transform: translate(-2px, -2px);
+.hero-text strong {
+  font-size: 1rem;
+  color: var(--cream);
 }
 
-.way-name {
-  font-size: 0.7rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.back-note {
+  font-size: 0.8rem;
+  color: var(--faint);
+  margin: 8px 0 0;
 }
 
-.way-held {
-  font-size: 0.85rem;
-  font-weight: 800;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
+/* Each part of the back: what it shows, how to read it, then the chart. */
+.back-fig {
+  margin: 14px 0 0;
 }
 
-.pips {
+.back-fig figcaption {
   display: flex;
-  gap: 3px;
-  margin-top: auto;
-  padding-top: 4px;
-}
-
-.pip {
-  width: 8px;
-  height: 8px;
-  border: 2px solid currentColor;
-  border-radius: 2px;
-}
-
-.pip.on {
-  background: currentColor;
-}
-
-.back-section {
-  margin-top: 14px;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
 }
 
 .back-label {
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   font-weight: 800;
-  margin: 0 0 6px;
+}
+
+.back-how {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* The chart beside a gutter holding its scale. */
+.back-plot {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.back-ticks {
+  position: relative;
+}
+
+.back-ticks span {
+  position: absolute;
+  right: 6px;
+  transform: translateY(50%);
+  font-size: 0.65rem;
+  line-height: 1;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
 }
 
 .back-chart {
   display: block;
   width: 100%;
-  height: 72px;
+  height: 64px;
   overflow: visible;
 }
 
@@ -3143,25 +3139,51 @@ p {
   stroke: none;
 }
 
-.back-chart .edge {
+.back-chart .area {
+  fill-opacity: 0.22;
+}
+
+.back-chart .line {
   fill: none;
-  stroke: var(--cream);
   stroke-width: 3;
   stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.back-chart .line.s-new {
+  stroke: var(--cream);
+}
+
+.back-chart .line.s-days {
+  stroke: var(--pink);
+}
+
+.back-chart .line.s-weeks {
+  stroke: var(--saffron);
+}
+
+.back-chart .line.s-long {
+  stroke: var(--teal);
+}
+
+.back-chart .grid {
+  stroke: var(--line);
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
 .back-chart .ground {
   stroke: var(--cream);
-  stroke-width: 3;
+  stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
-/* Where Study asks it again: a saffron post. Now: an ink dot ringed in cream (round caps on a line of no length). */
+/* Where Study asks it again: a saffron post. Now: a cream dot ringed in the card's night (round caps on a line of no
+   length). The key under the chart draws both the same way. */
 .back-chart .post {
   stroke: var(--saffron);
-  stroke-width: 10;
-  opacity: 0.85;
+  stroke-width: 3;
   vector-effect: non-scaling-stroke;
 }
 
@@ -3172,45 +3194,160 @@ p {
 }
 
 .back-chart .now-ring {
-  stroke: var(--cream);
+  stroke: var(--on-accent);
   stroke-width: 16;
 }
 
 .back-chart .now {
-  stroke: var(--ink);
-  stroke-width: 10;
+  stroke: var(--cream);
+  stroke-width: 11;
 }
 
 .back-axis {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 4px;
-  font-size: 0.75rem;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 0 34px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.back-axis > :first-child {
+  margin-right: auto;
+}
+
+.back-axis span {
+  white-space: nowrap;
+}
+
+.back-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.key-now {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--cream);
+}
+
+.key-post {
+  width: 3px;
+  height: 12px;
+  background: var(--saffron);
+}
+
+/* Each way a row along the ladder of strengths, the rungs named above, filled up to where it stands. */
+.ladder {
+  display: grid;
+  grid-template-columns: 56px repeat(4, minmax(0, 1fr));
+  gap: 6px 3px;
+  align-items: center;
+}
+
+.rung-name {
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--faint);
+  text-align: center;
+}
+
+.way-tile {
+  display: contents;
+}
+
+.way-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* The way asked now, in cream with a saffron marker. */
+.way-tile.asked .way-name {
+  font-weight: 800;
+  color: var(--cream);
+}
+
+.way-tile.asked .way-name::before {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-right: 5px;
+  border-block: 5px solid transparent;
+  border-left: 7px solid var(--saffron);
+}
+
+.rung {
+  height: 14px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+.rung.on.s-new {
+  background: var(--cream);
+}
+
+.rung.on.s-days {
+  background: var(--pink);
+}
+
+.rung.on.s-weeks {
+  background: var(--saffron);
+}
+
+.rung.on.s-long {
+  background: var(--teal);
+}
+
+.rung-none {
+  grid-column: span 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  border: 2px dashed var(--line);
+  border-radius: 4px;
+  font-size: 0.65rem;
+  line-height: 1;
+  color: var(--faint);
+}
+
+.back-help {
+  margin: 10px 0 0;
+  font-size: 0.78rem;
   color: var(--muted);
 }
 
 .counts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .count {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface);
 }
 
 .count-n {
-  font-size: 1.9rem;
+  font-size: 1.5rem;
   font-weight: 800;
   line-height: 1;
-  color: var(--saffron);
 }
 
 .count-label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
   color: var(--muted);
 }

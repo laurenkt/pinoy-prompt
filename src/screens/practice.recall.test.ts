@@ -117,7 +117,7 @@ describe("how well the card is known, on its back", () => {
     const root = (last = recall(app));
     card(root).click();
     expect(root.querySelector('.way-tile.asked')?.className).toContain('s-long');
-    expect(root.querySelectorAll('.way-tile.asked .pip.on')).toHaveLength(2);
+    expect(root.querySelector('.back-help')?.textContent).toBe('Lately the drills had to help with Recall twice.');
     expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent)).toEqual(['6', '1', '0']);
     expect(root.querySelector('.fading')?.getAttribute('aria-label')).toContain('Study asks in 1mo');
     expect(root.querySelector('.skyline .step.s-long')).not.toBeNull();
@@ -128,7 +128,7 @@ describe("how well the card is known, on its back", () => {
     Object.assign(app.progress.cards['salamat:recall'], { split: true, lapses: 2, reps: 3 });
     const root = (last = recall(app));
     card(root).click();
-    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so this is reading it.');
+    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so this is Read’s.');
     expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent)[1]).toBe('0');
   });
 
@@ -136,7 +136,7 @@ describe("how well the card is known, on its back", () => {
     const root = (last = recall(learner(false)));
     card(root).click();
     expect(root.querySelector('.way-tile.asked')?.classList.contains('none')).toBe(true);
-    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so this is reading it.');
+    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so this is Read’s.');
   });
 });
 
