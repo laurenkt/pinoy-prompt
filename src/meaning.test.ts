@@ -255,6 +255,10 @@ describe('telling a mixed-up Tagalog word from a typo', () => {
     ['magandang-umaga', 'Maraming umaga po'],
     ['maraming-salamat', 'magandang salamat'],
     ['kumanan-ka', 'Kumaliwa ka.'],
+    // The other half of a pair, too short to look alike.
+    ['tita', 'Tito'],
+    ['ninong', 'ninang'],
+    ['lola', 'Lolo po'],
   ])('%s: "%s" swaps in another word', (id, answer) => {
     expect(swapsTagalog(answer, card(id))).toBe(true);
   });

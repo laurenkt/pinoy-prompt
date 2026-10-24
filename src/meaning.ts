@@ -288,13 +288,15 @@ function sameTagalogWord(typed: string, word: string, own: Set<string>): boolean
 /**
  * Whether the answer is the card's Tagalog with a word swapped for one the
  * deck uses elsewhere that looks like it: "maraming umaga" for "Magandang
- * umaga". That's mixing up two words, not another way of saying it, so it's
- * wrong without asking OpenAI, which might take it for a typo.
+ * umaga", or for its other half, "Tito" for "Tita". That's mixing up two
+ * words, not another way of saying it, so it's wrong without asking OpenAI,
+ * which might take it for a typo.
  */
 export function swapsTagalog(answer: string, card: Card): boolean {
   const given = bare(tagalogWords(answer));
   const own = ownTagalog(card);
-  const swapped = (typed: string, word: string) => !own.has(typed) && knownTagalog().has(typed) && looksAlike(typed, word);
+  const swapped = (typed: string, word: string) =>
+    !own.has(typed) && knownTagalog().has(typed) && (looksAlike(typed, word) || OTHER_HALF.get(word) === typed);
   return cardWords(card).some((want) => {
     const w = bare(want);
     if (given.length !== w.length) return false;
@@ -335,6 +337,14 @@ function deckTagalogWords(): Set<string> {
   tagalogWordSet ??= new Set(VOCAB.flatMap((card) => cardWords(card).flat()));
   return tagalogWordSet;
 }
+
+/** Family words for her and for him, too short and too alike to be caught by `looksAlike`. */
+const OTHER_HALF = new Map(
+  [['nanay', 'tatay'], ['lola', 'lolo'], ['tita', 'tito'], ['ninang', 'ninong'], ['ate', 'kuya'], ['babae', 'lalaki']].flatMap(([her, him]) => [
+    [her, him],
+    [him, her],
+  ]),
+);
 
 /**
  * Two different words that look alike: five letters or more, the same first
