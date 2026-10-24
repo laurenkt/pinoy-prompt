@@ -8,7 +8,7 @@ import { studyWays, type Card, type Way } from '../deck';
 import { STRENGTHS, intervalSteps, lastSeen, recallChance, strengthOf, type Strength } from '../memory';
 import type { Progress } from '../progress-schema';
 import { drillHelp, wayState } from '../session';
-import { DAY_MS, answersOf, formatInterval, formatWait, type CardState } from '../srs';
+import { DAY_MS, MINUTE_MS, answersOf, formatInterval, formatWait, type CardState } from '../srs';
 import { h, svg } from '../ui';
 
 const LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
@@ -83,12 +83,13 @@ function hero(state: CardState, title: string, now: number): HTMLElement {
   const angle = Math.PI * (1 - chance);
   const dial = svg(
     'svg',
-    { class: 'dial', viewBox: '0 0 120 68', 'aria-hidden': 'true' },
-    svg('path', { class: 'dial-rim', d: arc }),
-    svg('path', { class: 'dial-track', d: arc }),
-    svg('path', { class: `dial-fill s-${strengthOf(state)}`, d: arc, pathLength: 100, 'stroke-dasharray': `${percent} 100` }),
-    svg('line', { class: 'dial-needle', x1: 60, y1: 60, x2: f(60 + 38 * Math.cos(angle)), y2: f(60 - 38 * Math.sin(angle)) }),
-    svg('circle', { class: 'dial-hub', cx: 60, cy: 60, r: 6 }),
+    { class: 'gauge', viewBox: '0 0 120 68', 'aria-hidden': 'true' },
+    svg('path', { class: 'gauge-rim', d: arc }),
+    svg('path', { class: 'gauge-track', d: arc }),
+    // Nothing at 0%: a dash of no length would still draw a round cap.
+    ...(percent > 0 ? [svg('path', { class: `gauge-fill s-${strengthOf(state)}`, d: arc, pathLength: 100, 'stroke-dasharray': `${percent} 100` })] : []),
+    svg('line', { class: 'gauge-needle', x1: 60, y1: 60, x2: f(60 + 38 * Math.cos(angle)), y2: f(60 - 38 * Math.sin(angle)) }),
+    svg('circle', { class: 'gauge-hub', cx: 60, cy: 60, r: 6 }),
   );
   return h(
     'div',
@@ -117,7 +118,9 @@ function slope(state: CardState, now: number): HTMLElement {
   const until = Math.max(state.due, now);
   // A day at the least, so a card asked again within the hour still shows how it would fade.
   const end = seen + Math.max((until - seen) * 1.2, DAY_MS);
-  const x = (t: number) => GUTTER + ((t - seen) / (end - seen)) * (W - GUTTER);
+  // Clear of the scale, so a ball at the very start doesn't sit on it.
+  const left = GUTTER + 8;
+  const x = (t: number) => left + ((t - seen) / (end - seen)) * (W - left);
   const y = (p: number) => base - p * (base - top);
   const points = Array.from({ length: 49 }, (_, i) => {
     const t = seen + ((end - seen) * i) / 48;
@@ -129,13 +132,13 @@ function slope(state: CardState, now: number): HTMLElement {
   const ball = { x: x(now), y: y(chance) };
   const flag = Math.min(x(state.due), W - 2);
   // The flag flies away from the edge it's near; its words sit beside it, the same side.
-  const side = flag > W - 70 ? -1 : 1;
+  const side = flag > W - 90 ? -1 : 1;
   const asks = state.due <= now ? 'Study asks it now' : `Study asks in ${formatWait(state.due - now)}`;
   // The ball's words go under it, on the hill, unless it has slid too near the ground.
   const under = base - ball.y > 30;
   return figure(
     'The slope it slides down',
-    'Since you last answered, the chance it comes to mind slides downhill. Study asks again at the flag, and each review makes the next slope gentler.',
+    'Since you last answered, the chance it comes to mind slides downhill. Study asks again at the flag, and each good answer makes the next slope gentler.',
     picture(
       'slope',
       H,
@@ -144,14 +147,14 @@ function slope(state: CardState, now: number): HTMLElement {
       svg('line', { class: 'grid', x1: GUTTER, x2: W, y1: f(y(0.5)), y2: f(y(0.5)) }),
       text('tick', GUTTER - 6, y(1) + 4, 'end', '100%'),
       text('tick', GUTTER - 6, y(0.5) + 4, 'end', '50%'),
-      svg('path', { class: `hill s-${strength}`, d: `M${GUTTER},${base} L${points.join(' L')} L${W},${base} Z` }),
+      svg('path', { class: `hill s-${strength}`, d: `M${f(left)},${base} L${points.join(' L')} L${W},${base} Z` }),
       svg('line', { class: 'pole', x1: f(flag), x2: f(flag), y1: 6, y2: base }),
       svg('path', { class: 'flag', d: `M${f(flag)},6 l${side * 16},6 l${-side * 16},6 Z` }),
       text('flag-label', flag + side * 20, 16, side > 0 ? 'start' : 'end', 'Study asks'),
       svg('circle', { class: 'ball', cx: f(ball.x), cy: f(ball.y), r: 7 }),
-      text(under ? 'on-hill' : 'over-hill', ball.x + { start: 8, middle: 0, end: -8 }[anchorAt(ball.x)], under ? ball.y + 22 : ball.y - 12, anchorAt(ball.x), `${percent}% now`),
+      text(under ? 'on-hill' : 'over-hill', ball.x + { start: 8, middle: 0, end: -8 }[anchorAt(ball.x)], under ? ball.y + 22 : ball.y - 12, anchorAt(ball.x), 'now'),
     ),
-    h('div', { class: 'back-axis' }, h('span', null, `Answered ${ago(now - seen)}`), h('span', null, asks)),
+    h('div', { class: 'back-axis' }, h('span', null, `Answered ${ago(now - seen)}`)),
   );
 }
 
@@ -220,7 +223,8 @@ function skyline(state: CardState, now: number): HTMLElement {
   const x = (t: number) => GUTTER + ((t - start) / span) * (W - GUTTER);
   const marks = MARKS.filter(([days]) => y(days) >= roof);
   const buildings = steps.flatMap(([at, interval], i) => {
-    const from = x(at) + (i ? 1 : 0);
+    // A step taken just now still stands, as a sliver at the right edge.
+    const from = Math.min(x(at) + (i ? 1 : 0), W - 3);
     const to = i + 1 < steps.length ? x(steps[i + 1][0]) - 1 : W;
     const width = Math.max(to - from, 3);
     // Still settling in stands a little off the ground, so it shows.
@@ -268,7 +272,7 @@ function counts(state: CardState, now: number): HTMLElement {
     'div',
     { class: 'counts' },
     count(`${answers.count}${answers.atLeast ? '+' : ''}`, answers.count === 1 && !answers.atLeast ? 'answer in Study' : 'answers in Study'),
-    count(String(lapses), 'times forgotten'),
+    count(String(lapses), lapses === 1 ? 'time forgotten' : 'times forgotten'),
     count(String(days), days === 1 ? 'day known' : 'days known'),
   );
 }
@@ -279,7 +283,10 @@ function times(n: number): string {
 
 /** How long ago, rounded down (formatWait rounds up, for a wait still to come), so it agrees with the days counted. */
 function ago(ms: number): string {
-  return `${ms < DAY_MS ? formatWait(ms) : formatInterval(Math.floor(ms / DAY_MS))} ago`;
+  const minutes = Math.max(1, Math.floor(ms / MINUTE_MS));
+  const days = Math.floor(ms / DAY_MS);
+  const since = minutes < 60 ? `${minutes}m` : days < 1 ? `${Math.floor(minutes / 60)}h` : days < 30 ? `${days}d` : days < 365 ? `${Math.floor(days / 30)}mo` : `${Math.floor(days / 365)}y`;
+  return `${since} ago`;
 }
 
 function list(items: string[]): string {

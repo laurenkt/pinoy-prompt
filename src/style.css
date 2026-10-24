@@ -3061,38 +3061,38 @@ p {
   gap: 14px;
 }
 
-.dial {
+.gauge {
   flex: 0 0 112px;
   width: 112px;
   overflow: visible;
 }
 
-.dial path {
+.gauge path {
   fill: none;
   stroke-linecap: round;
 }
 
-.dial-rim {
+.gauge-rim {
   stroke: var(--ink);
   stroke-width: 22;
 }
 
-.dial-track {
+.gauge-track {
   stroke: var(--surface);
   stroke-width: 16;
 }
 
-.dial-fill {
+.gauge-fill {
   stroke-width: 16;
 }
 
-.dial-needle {
+.gauge-needle {
   stroke: var(--cream);
   stroke-width: 4;
   stroke-linecap: round;
 }
 
-.dial-hub {
+.gauge-hub {
   fill: var(--cream);
   stroke: var(--ink);
   stroke-width: 3;
@@ -3131,7 +3131,7 @@ p {
 
 /* Each picture: its title, how to read it, then the picture framed like Home's chart. */
 .back-fig {
-  margin: 20px 0 0;
+  margin: 14px 0 0;
 }
 
 .back-fig figcaption {
@@ -3198,19 +3198,19 @@ p {
   stroke-linejoin: round;
 }
 
-.dial-fill.s-new {
+.gauge-fill.s-new {
   stroke: var(--cream);
 }
 
-.dial-fill.s-days {
+.gauge-fill.s-days {
   stroke: var(--pink);
 }
 
-.dial-fill.s-weeks {
+.gauge-fill.s-weeks {
   stroke: var(--saffron);
 }
 
-.dial-fill.s-long {
+.gauge-fill.s-long {
   stroke: var(--teal);
 }
 
@@ -3290,7 +3290,7 @@ p {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 14px;
 }
 
 .count {
