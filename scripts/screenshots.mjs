@@ -192,6 +192,11 @@ const SCREENS = {
     await lookBack(page);
   },
   library: (page) => page.click('.library-btn'),
+  // A topic opened, so its heading shows in its open colours.
+  'library-open': async (page) => {
+    await page.click('.library-btn');
+    await page.click('.unit-list summary');
+  },
   // The filter chips, open on All, then open again with another filter chosen.
   'library-filters': async (page) => {
     await page.click('.library-btn');

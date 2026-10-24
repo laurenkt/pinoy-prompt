@@ -2276,6 +2276,7 @@ p {
 
 .unit-list summary {
   position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -2310,22 +2311,44 @@ p {
   color: var(--muted);
 }
 
-/* The group's cards by memory strength, in the heading's bottom padding so the heading keeps its height: clear of the rounded corners and above the focus ring. Unmet cards are the empty track. */
-.memory-strip {
+/* The heading is the group's memory bar: its cards by strength fill it from the left, behind the title, and an ink edge ends the fill. The title is repeated in ink over the fill (.memory-ink, clipped to it). Open, a heading with a fill keeps it as it is (saffron would hide the Weeks colour); one with none turns saffron as before. */
+.memory-fill {
   position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 7px;
-  height: 8px;
+  inset: 0;
+  z-index: -1;
   display: flex;
-  overflow: hidden;
-  background: var(--line);
-  border: 2px solid var(--ink);
-  border-radius: 99px;
+  pointer-events: none;
 }
 
-.memory-strip > span {
-  height: 100%;
+.memory-fill > span {
+  min-width: 6px;
+}
+
+.memory-fill:not(.full) > span:last-child {
+  border-right: 3px solid var(--ink);
+}
+
+.memory-ink {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: inherit;
+  color: var(--on-accent);
+  pointer-events: none;
+}
+
+.memory-ink .unit-tl {
+  color: var(--on-accent);
+}
+
+.unit-list[open] summary:has(.memory-ink) {
+  background: none;
+  color: inherit;
+}
+
+.unit-list[open] summary:has(.memory-ink) > .unit-body .unit-tl {
+  color: var(--muted);
 }
 
 .word-list {
