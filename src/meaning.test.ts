@@ -211,6 +211,13 @@ describe('checking typed Tagalog', () => {
     ['magandang-umaga', 'maraming umaga'],
     // Two letters off "magandang", but one off "maanghang" (spicy).
     ['magandang-umaga', 'maganghang umaga'],
+    // Another word the deck uses, too near to be a swap but no typo either: left to OpenAI.
+    ['mabuti', 'marumi naman'],
+    ['mabuti', 'mabuti saan'],
+    ['ano-pangalan', 'anong pangalan ko'],
+    ['magandang-gabi', 'magandang grabe'],
+    ['isang-daan', 'ilang daan'],
+    ['gaano-kalayo', 'gaano malayo'],
   ])('%s: "%s" is not, or not for sure', (id, answer) => {
     expect(matchesTagalog(answer, card(id))).toBe(false);
   });

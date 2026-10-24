@@ -304,6 +304,35 @@ export function swapsTagalog(answer: string, card: Card): boolean {
 }
 
 /**
+ * Whether a typed word is plainly not a slip for the card's, so the answer can't pass as a typo joined up either:
+ * another word the deck uses ("marumi" for "mabuti", "saan" for "naman"), unless it's the card's word cut short
+ * ("marami" for "maraming", "san" for "saan", "ko" for "ako"); or a slip of five letters or more nearer another of
+ * the deck's words than the card's ("maganghang" is "maanghang"). Two words written as one are left to the joined-up
+ * check ("walana anuman").
+ */
+function notATypo(typed: string, word: string, own: Set<string>): boolean {
+  if (typed === word || own.has(typed)) return false;
+  if (deckTagalogWords().has(typed)) return !cutShort(typed, word);
+  if (typed.length < 5 || word.length < 5 || knownTagalog().has(typed)) return false;
+  return nearerElsewhere(typed, distance(typed, word), knownTagalog(), own);
+}
+
+/** Whether `typed` is `word` with letters left out. */
+function cutShort(typed: string, word: string): boolean {
+  let i = 0;
+  for (const letter of word) if (letter === typed[i]) i++;
+  return i === typed.length;
+}
+
+let tagalogWordSet: Set<string> | undefined;
+
+/** Every word the deck's Tagalog uses, without the joined-up wordings `knownTagalog` adds. */
+function deckTagalogWords(): Set<string> {
+  tagalogWordSet ??= new Set(VOCAB.flatMap((card) => cardWords(card).flat()));
+  return tagalogWordSet;
+}
+
+/**
  * Two different words that look alike: five letters or more, the same first
  * letter, and three letters changed or more, but no more than half. Shorter
  * words are left alone, as typos are: "san" is how "saan" is often written.
@@ -333,12 +362,9 @@ export function matchesTagalog(answer: string, card: Card): boolean {
     if (want.length === 0 || (polite(want) && !polite(given))) return false;
     const w = bare(want);
     if (g.length === w.length && g.every((typed, i) => sameTagalogWord(typed, w[i], own))) return true;
-    // A slip of five letters or more nearer another of the deck's words than the card's isn't a typo, even inside a
-    // longer typo: "maganghang" is "maanghang". Shorter ones are often shortened ("san" for "saan", "na ko"), and
-    // a word the deck uses is left to the joined-up check and `swapsTagalog` ("marami salamat", "maraming umaga").
-    const nearer = (typed: string, word: string) =>
-      typed.length >= 5 && word.length >= 5 && !knownTagalog().has(typed) && nearerElsewhere(typed, distance(typed, word), knownTagalog(), own);
-    if (g.length === w.length && g.some((typed, i) => nearer(typed, w[i]))) return false;
+    if (g.length === w.length && g.some((typed, i) => notATypo(typed, w[i], own))) return false;
+    // Split up differently, the deck's other words still aren't typos: "anong pangalan ko" isn't "Ano ang pangalan mo?".
+    if (g.some((typed) => !own.has(typed) && deckTagalogWords().has(typed) && !w.some((word) => cutShort(typed, word)))) return false;
     // Joined up, a typo still counts: "dahandahn lang" for "dahan-dahan lang", "Magandang umga".
     return sameTagalogWord(g.join(''), w.join(''), own);
   });
