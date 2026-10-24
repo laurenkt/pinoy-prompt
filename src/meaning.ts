@@ -128,8 +128,13 @@ function wordings(card: Card): Wording[] {
 }
 
 function wordingsOf(card: Card): Wording[] {
+  return englishTexts(card).map(wording).filter((alt) => alt.words.length > 0);
+}
+
+/** The card's meanings as written: each "/" alternative without its notes in brackets, and a number in brackets. */
+function englishTexts(card: Card): string[] {
   const numbers = [...card.en.matchAll(/\(([\d,]+)\)/g)].map((m) => m[1]);
-  return [...card.en.replace(/\([^)]*\)/g, ' ').split('/'), ...numbers].map(wording).filter((alt) => alt.words.length > 0);
+  return [...card.en.replace(/\([^)]*\)/g, ' ').split('/'), ...numbers];
 }
 
 /** Whether a card can be answered by typing its meaning. Not one that only has a note, like "(makes a word plural)". */
@@ -248,7 +253,7 @@ export function repeatsTagalog(answer: string, card: Card): boolean {
   return list.length > 0 && list.every((w) => tagalog.has(w)) && list.some((w) => !knownWords().has(w));
 }
 
-/** A Tagalog wording's words: lower case, without accents or punctuation. */
+/** A wording's words as written, in Tagalog or English: lower case, without accents or punctuation. */
 function tagalogWords(text: string): string[] {
   return text
     .toLowerCase()
@@ -407,8 +412,19 @@ function ownTagalog(card: Card): Set<string> {
 }
 
 /** Whether the answer plainly says the card in `language`, checked on the device. */
-export function matchesAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
+function matchesAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
   return language === 'tl' ? matchesTagalog(answer, card) : matchesMeaning(answer, card);
+}
+
+/**
+ * Whether the answer is one of the card's own wordings in `language`, letter for letter, in any case, punctuation
+ * or spacing: "Thank you!" for "thank you", but not "thank yo" or "thanks". Strict enough to take an answer while
+ * it's still being typed, which a typo-tolerant match can't be: half a word is often within a typo of the whole.
+ */
+export function exactAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
+  const given = tagalogWords(answer).join(' ');
+  const texts = language === 'tl' ? [card.tl, ...(card.accept ?? [])] : englishTexts(card);
+  return given !== '' && texts.some((text) => tagalogWords(text).join(' ') === given);
 }
 
 /**

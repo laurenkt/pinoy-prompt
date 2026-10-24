@@ -282,6 +282,37 @@ describe('accepting a typed meaning as it is typed', () => {
       vi.useRealTimers();
     }
   });
+
+  it('takes it exactly as written, in any case or punctuation, and leaves a typo for Check', async () => {
+    vi.useFakeTimers();
+    try {
+      const root = listen(learner(true));
+      // Close enough for Check, and on the way to the meaning, but not it yet.
+      typing(root, 'thank yo');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      typing(root, 'Thank you!');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('still takes a typo once it is checked', async () => {
+    vi.useFakeTimers();
+    try {
+      const root = listen(learner(true));
+      typing(root, 'thnak you');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(root.querySelector('.feedback')).toBeNull();
+      type(root, 'thnak you');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('saying the meaning out loud', () => {
