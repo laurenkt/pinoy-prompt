@@ -62,7 +62,7 @@ describe('talkInstructions', () => {
     progress.cards.salamat.interval = 0;
     const text = talkInstructions(talkPlan(progress, 'greetings'), new Date(NOW));
     expect(text).toContain('Greetings');
-    expect(text).toMatch(/know well, use it freely: Kumusta\? \(How are you\? \/ Hello\)/);
+    expect(text).toMatch(/know well, use it whenever it fits: Kumusta\? \(How are you\? \/ Hello\)/);
     expect(text).toMatch(/last day or so; say the English meaning straight after it the first time: Salamat \(Thank you\)/);
     expect(text).toContain('new word');
   });
@@ -156,12 +156,25 @@ describe('the mix of English and Tagalog', () => {
     expect(talkInstructions(talkPlan(progressWith(['salamat']), null), new Date(NOW))).toContain('Never tack one onto the end');
   });
 
-  it('mixes in more Tagalog as more words are known', () => {
+  it('treats the words as a limit, not a list to get through', () => {
+    const progress = progressWith(['salamat', 'kumusta']);
+    progress.cards.kumusta.interval = 10;
+    const text = talkInstructions(talkPlan(progress, null), new Date(NOW));
+    expect(text).toContain('not a list to get through');
+    expect(text).toContain('many sentences will have no Tagalog at all');
+    expect(text).toContain('Never steer the conversation, change the subject or ask a question just to make room for a word.');
+    expect(text).toContain('when a sentence does need the meaning of a listed word, say it in Tagalog rather than English');
+    expect(text).toMatch(/new word they could pick up.*if none comes, leave it out/);
+    expect(text).not.toMatch(/use it freely|every sentence is an English sentence with|reply using their Tagalog/);
+  });
+
+  it('caps the Tagalog in a sentence, raising the cap as more words are known', () => {
     expect(mixLevel(19)).toMatch(/^at most one/);
-    expect(mixLevel(20)).toMatch(/^up to two or three/);
-    expect(mixLevel(59)).toMatch(/^up to two or three/);
-    expect(mixLevel(60)).toMatch(/most of each sentence English/);
-    expect(talkInstructions(talkPlan(progressWith(['salamat', 'kape']), null), new Date(NOW))).toContain(`Use ${mixLevel(2)}.`);
+    expect(mixLevel(20)).toMatch(/^at most two or three/);
+    expect(mixLevel(59)).toMatch(/^at most two or three/);
+    expect(mixLevel(60)).toMatch(/^at most three or four.*most of each sentence English/);
+    expect([19, 20, 60].map(mixLevel).join(' ')).not.toMatch(/wherever it fits|up to/);
+    expect(talkInstructions(talkPlan(progressWith(['salamat', 'kape']), null), new Date(NOW))).toContain(`Use ${mixLevel(2)}; that is a limit, not a target.`);
   });
 
   it("shows the style with one of the learner's own words, not other Tagalog", () => {
