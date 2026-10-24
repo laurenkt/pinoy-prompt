@@ -148,10 +148,13 @@ describe('listening to words that have settled', () => {
   });
 
   it('says what to fix when OpenAI turns the key down', async () => {
-    const root = listen(learner(true), async () => Promise.reject(new AiError('key', 'bad key')));
+    const app = learner(true);
+    const root = listen(app, async () => Promise.reject(new AiError('key', 'bad key')));
     type(root, 'thanks a lot');
     await flush();
     expect(root.querySelector('.feedback-note')?.textContent).toContain("didn't accept the API key");
+    // The answer may well have been right, so the drills don't count it as needing help.
+    expect(app.progress.cards.salamat.help).toBeUndefined();
   });
 
   it('offers the choices instead, for a word the learner is unsure of', () => {
@@ -168,14 +171,37 @@ describe('listening to words that have settled', () => {
     button(root, 'Show choices').click();
     [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((c) => c.textContent?.endsWith('Thank you'))!.click();
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
-    expect(app.progress.cards.salamat.hinted).toBe(1);
+    expect(app.progress.cards.salamat.help?.listen).toBe(1);
     expect(commit).toHaveBeenCalled();
     // Typed right next time, it's back to how often it came up before.
     const again = listen(app);
     type(again, 'thanks');
     await flush();
     expect(again.querySelector('.feedback')?.textContent).toContain('Tama!');
-    expect(app.progress.cards.salamat.hinted).toBeUndefined();
+    expect(app.progress.cards.salamat.help?.listen).toBeUndefined();
+  });
+
+  it('brings a word typed wrong up more in later rounds too, unless the learner had it right after all', async () => {
+    const app = learner(true);
+    const root = listen(app);
+    type(root, 'good night');
+    await flush();
+    expect(app.progress.cards.salamat.help?.listen).toBe(1);
+    // "I had it right" takes the miss back and counts it typed right.
+    app.progress.cards.salamat.help = { listen: 2 };
+    const again = listen(app);
+    type(again, 'good night');
+    await flush();
+    expect(app.progress.cards.salamat.help?.listen).toBe(3);
+    button(again, 'I had it right').click();
+    expect(app.progress.cards.salamat.help?.listen).toBe(1);
+    // A miss that couldn't count (three already) has nothing to take back.
+    app.progress.cards.salamat.help = { listen: 3 };
+    const full = listen(app);
+    type(full, 'good night');
+    await flush();
+    button(full, 'I had it right').click();
+    expect(app.progress.cards.salamat.help?.listen).toBe(2);
   });
 
   it("drops a check that comes back after the round has ended", async () => {

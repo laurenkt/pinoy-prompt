@@ -92,16 +92,36 @@ describe('reviews scheduled by the old midnight rule', () => {
   });
 });
 
-describe("a card's count of answers from the choices", () => {
+describe("a card's count of drill answers needing help", () => {
   const card = newCardState(NOW);
 
-  it('is kept, up to the most it counts', () => {
-    expect(sanitizeCard({ ...card, hinted: 2 }, NOW)!.hinted).toBe(2);
-    expect(sanitizeCard({ ...card, hinted: 9 }, NOW)!.hinted).toBe(3);
+  it('is kept for each way of asking, up to the most it counts', () => {
+    const read = sanitizeCard({ ...card, help: { recall: 2, speak: 9, read: -1, sideways: 4 }, helpAt: NOW }, NOW)!;
+    // A way a newer build asks is kept as it is.
+    expect(read.help).toEqual({ recall: 2, speak: 3, sideways: 4 });
+    expect(read.helpAt).toBe(NOW);
   });
 
-  it('is dropped when there are none or it is broken', () => {
-    for (const hinted of [0, -1, 1.5, '2', null]) expect(sanitizeCard({ ...card, hinted }, NOW)).toEqual(card);
+  it('is dropped when there are none or it is broken, keeping when it was cleared', () => {
+    for (const count of [0, -1, 1.5, '2', null]) {
+      expect(sanitizeCard({ ...card, help: { listen: count } }, NOW)).toEqual(card);
+    }
+    expect(sanitizeCard({ ...card, help: 'lots' }, NOW)).toEqual(card);
+    expect(sanitizeCard({ ...card, helpAt: NOW }, NOW)).toEqual({ ...card, helpAt: NOW });
+  });
+
+  it("reads a whole-card count from October 24's builds as needing help typing the meaning and the Tagalog", () => {
+    // Half each, so the card isn't asked more than it was; dated as old as can be, so any count kept since wins in a merge.
+    const read = sanitizeCard({ ...card, hinted: 3 }, NOW)!;
+    expect(read.help).toEqual({ listen: 2, recall: 2 });
+    expect(read.helpAt).toBe(0);
+    expect(sanitizeCard({ ...card, hinted: 9 }, NOW)!.help).toEqual({ listen: 2, recall: 2 });
+    // Kept for an older build still open elsewhere.
+    expect((read as { hinted?: number }).hinted).toBe(3);
+    for (const hinted of [0, -1, 1.5, '2', null]) expect(sanitizeCard({ ...card, hinted }, NOW)).toEqual({ ...card, hinted });
+    // Once this build has counted for itself, the old count is left out, even after its counts are cleared.
+    expect(sanitizeCard({ ...card, hinted: 2, help: { read: 1 }, helpAt: NOW }, NOW)!.help).toEqual({ read: 1 });
+    expect(sanitizeCard({ ...card, hinted: 2, helpAt: NOW }, NOW)!.help).toBeUndefined();
   });
 });
 
@@ -296,6 +316,37 @@ describe('merging two copies', () => {
     old.history = { '2026-10-18': { reviews: 9, missed: 2 }, '2026-10-20': { reviews: 2, missed: 0 } };
     mergeInto(reset, old, { since: new Date(2026, 9, 19, 9).getTime() });
     expect(reset.history).toEqual({ '2026-10-20': { reviews: 2, missed: 0 } });
+  });
+
+  it("keeps the later drill counts apart from the later schedule, as a drill never changes the schedule", () => {
+    const a = emptyProgress(NOW);
+    const b = emptyProgress(NOW);
+    // Reviewed in Study on one copy, drilled later on the other.
+    a.cards.isa = review(newCardState(NOW), 'good', NOW + 5000);
+    b.cards.isa = { ...review(newCardState(NOW), 'good', NOW), help: { speak: 2 }, helpAt: NOW + 9000 };
+    expect(mergeInto(a, b)).toBe(1);
+    expect(a.cards.isa.reviewed).toBe(NOW + 5000);
+    expect(a.cards.isa.help).toEqual({ speak: 2 });
+    // Drilled on this copy after the other's newer review: the review comes in, the counts stay.
+    a.cards.dalawa = { ...review(newCardState(NOW), 'good', NOW), help: { read: 1 }, helpAt: NOW + 9000 };
+    b.cards.dalawa = review(newCardState(NOW), 'again', NOW + 5000);
+    mergeInto(a, b);
+    expect(a.cards.dalawa.reviewed).toBe(NOW + 5000);
+    expect(a.cards.dalawa.help).toEqual({ read: 1 });
+    // Cleared later on the other copy: cleared here too.
+    b.cards.dalawa = { ...a.cards.dalawa, help: undefined, helpAt: NOW + 10_000 };
+    mergeInto(a, b);
+    expect(a.cards.dalawa.help).toBeUndefined();
+    // A count from before a reset doesn't bring back a card the reset cleared.
+    const reset = emptyProgress(NOW);
+    const old = emptyProgress(NOW);
+    old.cards.isa = { ...review(newCardState(NOW), 'good', NOW), help: { recall: 1 }, helpAt: NOW + 20_000 };
+    mergeInto(reset, old, { since: NOW + 10_000 });
+    expect(reset.cards.isa).toBeUndefined();
+    // Nor do they join the card met again since.
+    reset.cards.isa = review(newCardState(NOW + 15_000), 'good', NOW + 15_000);
+    mergeInto(reset, old, { since: NOW + 10_000 });
+    expect(reset.cards.isa.help).toBeUndefined();
   });
 
   it('keeps the newer day counters', () => {

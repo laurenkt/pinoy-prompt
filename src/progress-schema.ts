@@ -14,7 +14,7 @@
 // progress object into the new shape, and add a fixture for the new version
 // under src/test/fixtures/. The tests fail until both exist.
 
-import { DAY_MS, MAX_HINTED, MIN_EASE, START_EASE, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, DRILL_WAYS, MAX_HELP, MIN_EASE, START_EASE, startOfDayAfter, type CardState, type DrillWay } from './srs';
 
 export interface Settings {
   /** New cards introduced per day. */
@@ -257,30 +257,64 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
     : [];
   if (log.length) card.log = log;
   else delete card.log;
-  if (isCount(value.hinted) && value.hinted > 0) card.hinted = Math.min(value.hinted, MAX_HINTED);
-  else delete card.hinted;
+  // Ways a newer build added are kept as they are; the ways this build asks are checked.
+  const help: Partial<Record<DrillWay, number>> = isObject(value.help) ? { ...value.help } : {};
+  for (const way of DRILL_WAYS) {
+    const count = help[way];
+    if (isCount(count) && count > 0) help[way] = Math.min(count, MAX_HELP);
+    else delete help[way];
+  }
+  let helpAt = time(value.helpAt);
+  // Builds of October 24 2026 kept one count for the whole card (`hinted`), only ever from a typed meaning or a typed
+  // Tagalog: half of it is read as each until this build has counted anything itself (`helpAt`). It's dated as old
+  // as can be, so any count this build kept wins over it in a merge. The old field is left as it is, for an older
+  // build still open elsewhere.
+  if (helpAt === undefined && !isObject(value.help) && isCount(value.hinted) && value.hinted > 0) {
+    help.listen = help.recall = Math.ceil(Math.min(value.hinted, MAX_HELP) / 2);
+    helpAt = 0;
+  }
+  if (Object.keys(help).length) {
+    card.help = help;
+    card.helpAt = helpAt ?? changedAt(card);
+  } else {
+    delete card.help;
+    if (helpAt === undefined) delete card.helpAt;
+    else card.helpAt = helpAt;
+  }
   return card;
 }
 
-/** When a card last changed; later wins when two copies disagree. */
+/** A card's drill help, with its time; a copy without any still has these keys, so spreading it clears the other's. */
+function helpOf(card: CardState): Pick<CardState, 'help' | 'helpAt'> {
+  return { help: card.help, helpAt: card.helpAt };
+}
+
+/** When a card's schedule last changed; later wins when two copies disagree. */
 function changedAt(card: CardState): number {
   return card.reviewed ?? card.introduced;
 }
 
 /**
  * Fold another copy of progress into `target`, so no card in either is lost.
- * Where both have a card, the more recently reviewed one wins. Settings stay
- * as they are in `target`. With `since`, only cards from `other` reviewed after
- * that time are taken (used to keep answers given after a reset). Returns how
- * many cards were added or updated.
+ * Where both have a card, the more recently reviewed schedule wins, and apart
+ * from it the more recently changed drill counts (`helpAt`) of the same card
+ * (met at the same time: not one met again after a reset). Settings stay as
+ * they are in `target`. With `since`, only what `other` changed after that time
+ * is taken (used to keep answers given after a reset). Returns how many cards
+ * were added or updated.
  */
 export function mergeInto(target: Progress, other: Progress, { since = -Infinity } = {}): number {
   let changed = 0;
   for (const [id, card] of Object.entries(other.cards)) {
-    if (changedAt(card) <= since) continue;
     const mine = target.cards[id];
-    if (!mine || changedAt(card) > changedAt(mine)) {
-      target.cards[id] = card;
+    // A card's schedule and its drill help change separately (a drill never touches the schedule), so each keeps the later copy.
+    const theirHelp =
+      (card.helpAt ?? -Infinity) > Math.max(since, mine?.helpAt ?? -Infinity) && (!mine || mine.introduced === card.introduced);
+    if (changedAt(card) > since && (!mine || changedAt(card) > changedAt(mine))) {
+      target.cards[id] = theirHelp || !mine ? card : { ...card, ...helpOf(mine) };
+      changed++;
+    } else if (mine && theirHelp) {
+      target.cards[id] = { ...mine, ...helpOf(card) };
       changed++;
     }
   }

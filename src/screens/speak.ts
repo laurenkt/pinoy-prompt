@@ -97,8 +97,8 @@ export interface SpeakOptions {
   say(slow?: boolean): void;
   /** Stop any audio that's playing. */
   silence(): void;
-  /** Called after each judged attempt; `right` is true for a good one. */
-  onAttempt(right: boolean): void;
+  /** Called after each judged attempt; `right` is true for a good one, `heard` false when no sound of it was recognised. */
+  onAttempt(right: boolean, heard: boolean): void;
   /** Whether the screen is counting down to the next word after a right attempt. */
   counting?(): boolean;
   onNext(): void;
@@ -284,7 +284,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       const { text, comparison } = judge(texts, recognition);
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
-      options.onAttempt(isRight(comparison));
+      options.onAttempt(isRight(comparison), sounds.length > 0);
       // Pitch takes a moment to find, so only the two vowels a judged card compares are measured.
       const stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
       set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples });

@@ -227,7 +227,7 @@ describe('an attempt', () => {
     button("I'm done").click();
     await flush();
     expect(text('.feedback strong')).toBe('Tama!');
-    expect(onAttempt).toHaveBeenCalledWith(true);
+    expect(onAttempt).toHaveBeenCalledWith(true, true);
     expect(panel.el.querySelectorAll('.sound-off, .sound-missing')).toHaveLength(0);
     // A full ring holds a check, not "100%", which doesn't fit inside it.
     const dial = panel.el.querySelector('.dial')!;
@@ -253,7 +253,7 @@ describe('an attempt', () => {
     mic.finish({ samples, speech: true });
     await flush();
     expect(text('.feedback strong')).toBe('Tama!');
-    expect(onAttempt).toHaveBeenCalledWith(true);
+    expect(onAttempt).toHaveBeenCalledWith(true, true);
     expect(panel.el.querySelector('.dial')!.getAttribute('aria-label')).toBe('100% of the way there');
     expect(text('.result-card .stress-tip')).toBe('Lean on LAH, not MAHT: higher and longer.');
   });
@@ -275,7 +275,7 @@ describe('an attempt', () => {
     mic.events.onListening?.();
     button("I'm done").click();
     await flush();
-    expect(onAttempt).toHaveBeenCalledWith(false);
+    expect(onAttempt).toHaveBeenCalledWith(false, true);
     expect(panel.el.querySelector('.sound-off')?.textContent).toBe('ng');
     expect(panel.el.querySelector('.dial span')!.textContent).toMatch(/^\d{1,2}%$/);
     expect(panel.el.querySelector('.dial .icon')).toBeNull();
@@ -383,7 +383,7 @@ describe('an attempt', () => {
     button("I'm done").click();
     await flush();
     expect(onAttempt).toHaveBeenCalledOnce();
-    expect(onAttempt).toHaveBeenCalledWith(true);
+    expect(onAttempt).toHaveBeenCalledWith(true, true);
   });
 
   it('stops recording when the question goes away', async () => {

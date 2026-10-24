@@ -4,7 +4,8 @@ import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type Me
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
+import type { DrillWay } from '../srs';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, strengthBadge } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -12,16 +13,13 @@ import { eyebrowLine, guideAnswer, guideFeedback, guideFormats, guideQuestion, g
 import { quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
-type Mode = 'listen' | 'read' | 'recall' | 'speak';
-
-
 /**
  * The kind of question each way of asking a guide counts as: filling a sentence's gap is reading it, building a
  * sentence from the English is recalling it. Guides aren't heard or said.
  */
-const GUIDE_MODES: Record<GuideFormat, Mode> = { gap: 'read', build: 'recall' };
+const GUIDE_MODES: Record<GuideFormat, DrillWay> = { gap: 'read', build: 'recall' };
 
-const MODES: { id: Mode; title: string }[] = [
+const MODES: { id: DrillWay; title: string }[] = [
   { id: 'listen', title: 'Listen' },
   { id: 'read', title: 'Read' },
   { id: 'recall', title: 'Recall' },
@@ -29,11 +27,11 @@ const MODES: { id: Mode; title: string }[] = [
 ];
 
 /** The kinds of question a round may ask. Kept across visits, as the Library's filter is, and back to all of them when the app opens. */
-let scope = new Set<Mode>(MODES.map((m) => m.id));
+let scope = new Set<DrillWay>(MODES.map((m) => m.id));
 
 interface Question {
   card: Card;
-  mode: Mode;
+  mode: DrillWay;
   /** For a guide, its question as it's asked; `choices` is then empty. */
   guide?: GuideQuestion;
   choices: Card[];
@@ -44,6 +42,8 @@ interface Question {
   typed: boolean;
   /** "Show choices" was tapped on a typed question, so an answer to it was picked rather than recalled. */
   hinted?: boolean;
+  /** How many answers asked this way had needed help before this one, to go back to if "I had it right". */
+  helpBefore?: number;
   /** What's typed so far, kept while the screen is redrawn. */
   draft?: string;
   /** What was typed, once it's sent. */
@@ -79,11 +79,11 @@ const askOpenAi: MeaningJudge = async (answer, card, language) => {
 };
 
 /** What a typed answer to the question is given in: the meaning when listening, the Tagalog when recalling. */
-const languageOf = (mode: Mode): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
+const languageOf = (mode: DrillWay): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
 const answerLanguage = (q: Question): AnswerLanguage => languageOf(q.mode);
 
 /** The kinds of question a card can be asked as. */
-function modesFor(card: Card): Mode[] {
+function modesFor(card: Card): DrillWay[] {
   return isVocab(card) ? MODES.map((m) => m.id) : guideFormats(card).map((f) => GUIDE_MODES[f]);
 }
 
@@ -131,12 +131,14 @@ export function practiceScreen(
   let distractorPool: Card[] = VOCAB;
   /** The last few words asked, oldest first. */
   let recent: string[] = [];
-  /** Cards missed this round and not yet got right since, with how many times. */
+  /** Cards missed this round, by the way they were asked (drillKey), and not yet got right since, with how many times. */
   let missed = new Map<string, number>();
   /** Each guide's drill asked last, so the next is another. */
   const lastDrill = new Map<string, Drill>();
   let speak: SpeakPanel | null = null;
   let spokenRight = false;
+  /** An attempt at the current spoken question was heard and judged wrong. */
+  let spokeWrong = false;
   /** Counting down to the next question after a right answer. */
   let auto: Countdown | null = null;
   /** What was picked on the question before; null when there's nothing to look back at (a spoken question has no pick). */
@@ -156,7 +158,7 @@ export function practiceScreen(
   holdOnTap(root, hold);
 
   /** Why a kind of question can't be asked right now, if it can't: the mic or sound may have gone off mid-round, here or in another tab. */
-  function unavailable(mode: Mode): string | null {
+  function unavailable(mode: DrillWay): string | null {
     if (mode === 'listen' && !canListen) return 'Listen needs a voice, and this device has none.';
     if (mode === 'listen' && !app.progress.settings.sound) return 'Listen is off while the sound is off.';
     if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
@@ -166,7 +168,7 @@ export function practiceScreen(
   }
 
   /** The kinds in scope that can be asked right now, before the speaking model is taken into account. */
-  function chosen(): Mode[] {
+  function chosen(): DrillWay[] {
     return MODES.map((m) => m.id).filter((m) => scope.has(m) && unavailable(m) === null);
   }
 
@@ -175,10 +177,10 @@ export function practiceScreen(
    * to be on the device, so a round never stops for a download, unless Speak is all that's chosen: then it asks for it.
    * When nothing in scope can be asked (only Listen, then the sound goes off), it falls back to everything that can.
    */
-  function modes(): Mode[] {
+  function modes(): DrillWay[] {
     const picks = chosen();
     if (picks.length === 1 && picks[0] === 'speak') return picks;
-    const ready = (m: Mode) => m !== 'speak' || speakReady || (modelFound && micHeld);
+    const ready = (m: DrillWay) => m !== 'speak' || speakReady || (modelFound && micHeld);
     const ways = picks.filter(ready);
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
@@ -186,11 +188,10 @@ export function practiceScreen(
   /** A question on the next card, asked any way the scope allows right now. Null only with nothing to ask. */
   function nextQuestion(): Question | null {
     const ways = modes();
-    const card = pickDrillCard(app.progress, app.now(), recent, missed, (c) => modesFor(c).some((m) => ways.includes(m)));
-    if (!card) return null;
+    const pick = pickDrillCard(app.progress, app.now(), recent, missed, (c) => modesFor(c).filter((m) => ways.includes(m)));
+    if (!pick) return null;
+    const { card, way: mode } = pick;
     recent = [...recent.slice(-DRILL_GAP), card.id];
-    const fits = modesFor(card).filter((m) => ways.includes(m));
-    const mode = fits[Math.floor(Math.random() * fits.length)];
     if (!isVocab(card)) {
       const format = guideFormats(card).find((f) => GUIDE_MODES[f] === mode)!;
       const guide = guideQuestion(card, app.progress, format, lastDrill.get(card.id));
@@ -254,31 +255,40 @@ export function practiceScreen(
   /** Note how the current question went, so a miss comes back soon, and pick the one after it. */
   function settle(right: boolean): void {
     if (!current || upcoming) return;
-    tally(current.card.id, right);
+    tally(current, right);
     upcoming = nextQuestion();
     load(upcoming);
   }
 
-  function tally(id: string, right: boolean): void {
-    const misses = missed.get(id) ?? 0;
-    if (!right) missed.set(id, misses + 1);
-    else if (misses > 1) missed.set(id, misses - 1);
-    else missed.delete(id);
+  function tally(q: Question, right: boolean): void {
+    const key = drillKey(q.card.id, q.mode);
+    const misses = missed.get(key) ?? 0;
+    if (!right) missed.set(key, misses + 1);
+    else if (misses > 1) missed.set(key, misses - 1);
+    else missed.delete(key);
   }
 
   function ask(): void {
     speak?.dispose();
     speak = null;
     spokenRight = false;
+    spokeWrong = false;
     const q = current;
     if (waiting) return draw();
     if (q?.mode === 'speak') {
       speak = speakPanel(q.card, {
         say: (slow) => sayCard(q, slow),
         silence: () => stop(),
-        onAttempt: (right) => {
+        onAttempt: (right, heard) => {
+          // A miss heard as some other sounds comes up more to be said in later rounds, counted once a question, as it
+          // happens. Nothing recognised says nothing about the word. Said right first time, it takes one off.
+          if (!right && heard && !spokeWrong && !spokenRight) {
+            spokeWrong = true;
+            noteHelp(q, true);
+          }
           if (!right || spokenRight) return;
           spokenRight = true;
+          if (!spokeWrong) noteHelp(q, false);
           void chime();
           // Pick what's next now, so its word loads while the coaching is up.
           settle(true);
@@ -486,9 +496,10 @@ export function practiceScreen(
     if (right) void chime();
     if (q.guide || q.mode === 'recall' || q.mode === 'listen') sayCard(q);
     settle(right);
-    // Got from the choices, it comes up more in later rounds too, until it's typed right without them.
-    if (q.hinted) noteHint(q.card.id, true);
-    else if (q.typed && right) noteHint(q.card.id, false);
+    // Got wrong, or from the choices, it comes up more asked this way in later rounds too, until it's got right unaided.
+    // Not when the check itself failed (offline, say): the answer may well have been right.
+    q.helpBefore = drillHelp(app.progress.cards[q.card.id], q.mode);
+    if (q.failure === undefined || right) noteHelp(q, q.hinted || !right);
     if (right)
       auto = countdown(root, () => {
         autoMoved = true;
@@ -503,16 +514,19 @@ export function practiceScreen(
     if (!q || picked !== MISSED) return;
     picked = q.card.id;
     // Count it as the right answer it was: take back the miss, then tally it right.
-    const misses = missed.get(q.card.id) ?? 0;
-    if (misses > 1) missed.set(q.card.id, misses - 1);
-    else missed.delete(q.card.id);
-    tally(q.card.id, true);
-    noteHint(q.card.id, false);
+    const key = drillKey(q.card.id, q.mode);
+    const misses = missed.get(key) ?? 0;
+    if (misses > 1) missed.set(key, misses - 1);
+    else missed.delete(key);
+    tally(q, true);
+    // And on the card: back to before the miss, less one for a right answer.
+    const before = q.helpBefore ?? 0;
+    if (setDrillHelp(app.progress, q.card.id, q.mode, () => Math.max(before - 1, 0), app.now())) app.commit();
     draw();
   }
 
-  function noteHint(id: string, hinted: boolean): void {
-    if (noteDrillAnswer(app.progress, id, hinted)) app.commit();
+  function noteHelp(q: Question, helped: boolean): void {
+    if (noteDrillAnswer(app.progress, q.card.id, q.mode, helped, app.now())) app.commit();
   }
 
   /** Not sure enough to type it, or tired of waiting for the check: pick from choices instead. */
@@ -569,7 +583,7 @@ export function practiceScreen(
     draw();
   }
 
-  function toggleScope(mode: Mode): void {
+  function toggleScope(mode: DrillWay): void {
     // The last kind left in that can be asked stays on, so the round asks what was chosen.
     const picks = chosen();
     if (picks.length === 1 && picks[0] === mode) return;
