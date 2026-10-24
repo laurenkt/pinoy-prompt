@@ -167,7 +167,8 @@ export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise
   return loading;
 }
 
-async function recognise(session: ort.InferenceSession, samples: Float32Array): Promise<Recognition> {
+/** The sounds in a recording. Also run by scripts/generate-audio.mjs, in Node, to check the card clips. */
+export async function recognise(session: ort.InferenceSession, samples: Float32Array): Promise<Recognition> {
   const features = fbank(samples);
   const { data, frames } = features;
   if (frames === 0) return { sounds: [], timing: [], features };

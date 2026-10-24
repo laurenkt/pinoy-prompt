@@ -4,7 +4,8 @@
 // vocabulary (sentence patterns, sounds, intonation, know-how) live in
 // guides.ts and share the same order and schedule.
 //
-// Pronunciation hints use CAPS for the stressed syllable. To add a recorded
+// Pronunciation hints use CAPS for the stressed syllable, and "gh" for a g
+// before e or i ("ghee"), as English reads "gee" like "jee". To add a recorded
 // clip for a card, drop the file in public/audio/ and set `audio` to its name;
 // it will be played instead of the browser's speech voice.
 
@@ -120,7 +121,7 @@ export const UNITS: Unit[] = [
       { id: 'salamat-po', tl: 'Salamat po', en: 'Thank you (polite)', kind: 'phrase', hint: 'sah-LAH-maht poh', hook: '"Salamat" plus "po": the respect word just slots in after, like adding "sir" or "ma\'am".' },
       { id: 'pasensya-na', tl: 'Pasensya na', en: "Sorry / I'm sorry", kind: 'phrase', hint: 'pah-SEN-shah nah', note: 'Used for small apologies, like bumping into someone. A plain "Sorry!" in English is just as common.', hook: 'From Spanish "paciencia", patience. You are asking them to bear with you.' },
       { id: 'makikiraan-po', tl: 'Makikiraan po', en: 'Excuse me (to pass by)', kind: 'phrase', hint: 'mah-kee-kee-rah-AHN poh', hook: 'Built on "daan" (road, path), with the d softened to r. Roughly "may I share your path?"' },
-      { id: 'sige', tl: 'Sige', en: 'Okay / Go ahead', kind: 'word', hint: 'SEE-geh', note: 'Very common. "Sige, salamat!" is a friendly way to end a chat.', hook: 'From Spanish "sigue", "go on, carry on". That is why it means both "okay" and "go ahead".' },
+      { id: 'sige', tl: 'Sige', en: 'Okay / Go ahead', kind: 'word', hint: 'SEE-gheh', note: 'Very common. "Sige, salamat!" is a friendly way to end a chat.', hook: 'From Spanish "sigue", "go on, carry on". That is why it means both "okay" and "go ahead".' },
       { id: 'tuloy-po-kayo', tl: 'Tuloy po kayo.', en: 'Come in, please.', kind: 'phrase', hint: 'too-LOY poh kah-YOH', note: 'What a host says at the door, often to answer "Tao po!".', hook: '"Tuloy" means carry on, as in "Tuloy ba tayo?": carry on in, you (polite).' },
       { id: 'tao-po', tl: 'Tao po!', en: 'Hello, anyone home?', kind: 'phrase', hint: 'tah-OH poh', note: 'Called out at someone\'s gate or door, as many homes have no doorbell.', hook: '"Tao" means person: "a person is here, po!". You\'re announcing yourself.' },
     ],
@@ -194,7 +195,7 @@ export const UNITS: Unit[] = [
       { id: 'kanino', tl: 'Kanino ito?', en: 'Whose is this?', kind: 'phrase', hint: 'kah-NEE-noh ee-TOH', hook: '"Sino" is who, and "kanino" is its "whose, to whom" form. The "-no" ending ties the two together.' },
       { id: 'gaano-katagal', tl: 'Gaano katagal?', en: 'How long does it take?', kind: 'phrase', hint: 'gah-AH-noh kah-tah-GAHL', hook: '"Tagal" is a long while. "Gaano ka-" asks "how much" of anything: "gaano kalayo?" is how far.' },
       { id: 'gaano-kalayo', tl: 'Gaano kalayo?', en: 'How far is it?', kind: 'phrase', hint: 'gah-AH-noh kah-LAH-yoh', hook: '"Layo" is distance, as in "malayo" (far). Same "gaano ka-" pattern as "Gaano katagal?".' },
-      { id: 'anong-ginagawa-mo', tl: 'Anong ginagawa mo?', en: 'What are you doing?', kind: 'phrase', hint: 'ah-NONG gee-nah-GAH-wah moh', hook: '"Gawa" means do or make. In "gi-na-gawa" the doubled "ga" marks it as happening right now.' },
+      { id: 'anong-ginagawa-mo', tl: 'Anong ginagawa mo?', en: 'What are you doing?', kind: 'phrase', hint: 'ah-NONG ghee-nah-GAH-wah moh', hook: '"Gawa" means do or make. In "gi-na-gawa" the doubled "ga" marks it as happening right now.' },
       { id: 'para-saan', tl: 'Para saan ito?', en: 'What is this for?', kind: 'phrase', hint: 'PAH-rah sah-AHN ee-TOH', hook: '"Para" is Spanish for "for", so "para saan" is literally "for where?", meaning "for what purpose?".' },
       { id: 'ano-ibig-sabihin', tl: 'Anong ibig sabihin nito?', accept: ['Ano ang ibig sabihin nito?'], en: 'What does this mean?', kind: 'phrase', hint: 'ah-NONG EE-big sah-bee-HIN nee-TOH', hook: '"Ibig" is want and "sabihin" is to say: "what does it want to say?", just like French "qu\'est-ce que ça veut dire?".' },
       { id: 'paano-sabihin', tl: 'Paano sabihin ito sa Tagalog?', en: 'How do you say this in Tagalog?', kind: 'phrase', hint: 'pah-AH-noh sah-bee-HIN ee-TOH sah tah-GAH-log', hook: '"Paano" (how) + "sabihin" (to say). Point at anything and ask: the most useful learning question there is.' },
@@ -277,7 +278,7 @@ export const UNITS: Unit[] = [
       { id: 'taon', tl: 'taon', en: 'year', kind: 'word', hint: 'tah-ON', hook: 'You will hear it every January: "Manigong Bagong Taon!", Happy New Year.' },
       { id: 'susunod-na-linggo', tl: 'sa susunod na linggo', en: 'next week', kind: 'phrase', hint: 'sah soo-SOO-nod nah ling-GOH', hook: '"Sunod" means follow, so "susunod" is the following one. The same root gives "Sunod!", "Next!"' },
       { id: 'noong-isang-linggo', tl: 'noong isang linggo', en: 'last week', kind: 'phrase', hint: 'noh-ONG ee-SAHNG ling-GOH', hook: '"Noong" points to the past and "isang" is "one": back in the other week.' },
-      { id: 'lagi', tl: 'lagi', en: 'always', kind: 'word', hint: 'LAH-gee', hook: 'Sounds like "lag": the jeepney is always lagging. "Lagi na lang!" is "every single time!"' },
+      { id: 'lagi', tl: 'lagi', en: 'always', kind: 'word', hint: 'LAH-ghee', hook: 'Sounds like "lag": the jeepney is always lagging. "Lagi na lang!" is "every single time!"' },
       { id: 'minsan', tl: 'minsan', en: 'sometimes / once', kind: 'word', hint: 'min-SAHN', hook: '"Isa" (one) is worn down inside it: minsan is "one time", once, and so sometimes.' },
       { id: 'kaagad', tl: 'kaagad', en: 'right away / immediately', kind: 'word', hint: 'kah-AH-gahd', hook: '"Agad" means at once, and "ka-" adds emphasis. "Agad-agad" is in a big hurry, no waiting.' },
       { id: 'lunes', tl: 'Lunes', en: 'Monday', kind: 'word', hint: 'LOO-nes', hook: 'Spanish "lunes", the moon\'s day, just as English Monday is moon-day.' },
@@ -398,7 +399,7 @@ export const UNITS: Unit[] = [
       { id: 'karne-ng-baka', tl: 'karne ng baka', en: 'beef', kind: 'phrase', hint: 'KAHR-neh nahng BAH-kah', hook: '"Karne" (meat, Spanish "carne") + "ng" (of) + "baka", the cow that "baka" also means: meat of cow.' },
       { id: 'gulay', tl: 'gulay', en: 'vegetables', kind: 'word', hint: 'GOO-lai', hook: '"Bahay kubo", the folk song about the bamboo hut, is one long list of the "gulay" growing round it.' },
       { id: 'prutas', tl: 'prutas', en: 'fruit', kind: 'word', hint: 'PROO-tahs', hook: 'Spanish "frutas", with the f turned to p, as in "pamilya".' },
-      { id: 'saging', tl: 'saging', en: 'banana', kind: 'word', hint: 'SAH-ging', hook: '"Banana cue" is a "saging" fried in brown sugar on a stick, sold on every corner.' },
+      { id: 'saging', tl: 'saging', en: 'banana', kind: 'word', hint: 'SAH-ghing', hook: '"Banana cue" is a "saging" fried in brown sugar on a stick, sold on every corner.' },
       { id: 'mangga', tl: 'mangga', en: 'mango', kind: 'word', hint: 'mahng-GAH', hook: 'Sounds like "mango", and comes from the same South Indian word. Philippine mangoes are famously sweet.' },
       { id: 'gatas', tl: 'gatas', en: 'milk', kind: 'word', hint: 'GAH-tahs', hook: 'Sounds like "got us": the baby got us up at night for "gatas".' },
       { id: 'asukal', tl: 'asukal', en: 'sugar', kind: 'word', hint: 'ah-SOO-kahl', hook: 'Spanish "azúcar". Filipino cooking loves it: even spaghetti here is sweet.' },
@@ -507,7 +508,7 @@ export const UNITS: Unit[] = [
       { id: 'kumain-ka-na-ba', tl: 'Kumain ka na ba?', en: 'Have you eaten?', kind: 'phrase', hint: 'koo-mah-EEN kah nah bah', note: 'Often a greeting, the way English asks "How are you?".', hook: '"Kain" (eat) from "Kain tayo!" + "ka" + "na" (already) + "ba": eaten, you, already? Care, shown through food.' },
       { id: 'kumain-na-ako', tl: 'Kumain na ako.', en: "I've already eaten.", kind: 'phrase', hint: 'koo-mah-EEN nah ah-KOH', hook: 'The answer to "Kumain ka na ba?": drop "ba", and "ako" goes last, as in "Gutom na ako".' },
       { id: 'matutulog-na-ako', tl: 'Matutulog na ako.', en: "I'm off to bed.", kind: 'phrase', hint: 'mah-too-TOO-log nah ah-KOH', hook: '"Tulog" is sleep. Doubling "tu" makes it "about to", as in "Mahuhuli ako": about to sleep already, me.' },
-      { id: 'gising-ka-na-ba', tl: 'Gising ka na ba?', en: 'Are you awake?', kind: 'phrase', hint: 'gee-SING kah nah bah', hook: '"Gising" means awake. "Gising na!" is how every mother says "wake up!"' },
+      { id: 'gising-ka-na-ba', tl: 'Gising ka na ba?', en: 'Are you awake?', kind: 'phrase', hint: 'ghee-SING kah nah bah', hook: '"Gising" means awake. "Gising na!" is how every mother says "wake up!"' },
     ],
   },
   {

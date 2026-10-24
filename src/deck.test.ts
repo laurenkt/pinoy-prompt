@@ -83,6 +83,10 @@ describe('deck', () => {
     for (const card of ALL_CARDS) expect(card.hook.trim(), card.id).not.toBe('');
   });
 
+  it('writes a hard g before e or i as "gh" in pronunciation hints, as English reads "gee" like "jee"', () => {
+    for (const card of ALL_CARDS) expect(card.hint ?? '', card.id).not.toMatch(/(?<!n)g[ei]/i);
+  });
+
   it('keeps every card id that saved progress may point at', () => {
     for (const id of SHIPPED_IDS) expect(getCard(id), id).toBeDefined();
   });

@@ -469,3 +469,22 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   const added = extra.filter((e) => e.counts).length * EXTRA_WEIGHT;
   return { sounds, extra, score: counted.length ? points / (counted.length + added) : 0 };
 }
+
+// --- Checking recorded clips ------------------------------------------------
+
+/** How English reads a g before e or i ("gem", "giant"), which Tagalog never does. */
+const SOFT_G = new Set(['dʒ', 'ʒ', 'dʑ', 'ʑ', 'ɟ', 'j', 'd']);
+
+/**
+ * Letters a recording said the English way rather than the Tagalog way, for
+ * scripts/generate-audio.mjs to reject a take: a voice that sees "Gising"
+ * can read it like "giant". Tagalog g is always hard, as in "go".
+ */
+export function englishReadings(text: string, heard: string[]): { letters: string; heard: string }[] {
+  return compare(toPhones(text), heard)
+    .sounds.filter(({ phone, verdict, heard: said }) => {
+      if (phone.ipa !== 'ɡ' || verdict === 'good' || said === undefined) return false;
+      return /[ei]/i.test(text[phone.to] ?? '') && SOFT_G.has(baseSound(said));
+    })
+    .map(({ phone, heard: said }) => ({ letters: text.slice(phone.from, phone.to + 1), heard: said! }));
+}
