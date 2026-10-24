@@ -5,18 +5,14 @@ import type { Recognition } from '../phone-model';
 import { canSynthesize } from '../phone-synth';
 import type { Held, Player } from '../player';
 
-/**
- * What the recogniser would return for these sounds: one every 100 ms from 0.2 s, over a 1 s recording. Without
- * `prosody` nothing was measured, so stress isn't judged.
- */
-export function fakeRecognition(sounds: string[], prosody: Recognition['prosody'] = []): Recognition {
+/** What the recogniser would return for these sounds: one every 100 ms from 0.2 s, over a 1 s recording. */
+export function fakeRecognition(sounds: string[]): Recognition {
   const frames = 100;
   return {
     sounds,
     timing: sounds.map((_, i) => ({ start: 0.2 + i * 0.1, end: 0.24 + i * 0.1 })),
     runnersUp: sounds.map(() => []),
     odds: [],
-    prosody,
     features: { data: new Float32Array(frames * NUM_MEL_BINS).map((_, i) => Math.sin(i)), frames },
   };
 }

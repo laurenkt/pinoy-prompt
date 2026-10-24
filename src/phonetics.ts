@@ -449,7 +449,7 @@ const RUNNER_UP = 0.1;
 /** Sounds a speaker (or the recogniser) adds at the very end without it being a mistake: a breath, a released consonant. */
 const TRAILING = new Set(['h', 'ə', 'ɨ', 'ɐ', 'ʔ']);
 
-const isVowelSound = (ipa: string | undefined) => ipa !== undefined && FEATURES[baseSound(ipa)[0]]?.kind === 'vowel';
+export const isVowelSound = (ipa: string | undefined) => ipa !== undefined && FEATURES[baseSound(ipa)[0]]?.kind === 'vowel';
 
 /** Whether an added sound is a natural part of speech rather than a mistake. */
 function harmless(heard: string[], index: number): boolean {

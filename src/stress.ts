@@ -9,11 +9,11 @@
 // outweighs each word's stress.
 
 import type { Card } from './deck';
-import type { Comparison, SoundResult } from './phonetics';
-import type { SoundProsody } from './prosody';
+import { isVowelSound, type Comparison } from './phonetics';
+import type { Measure } from './prosody';
 
 /** How each difference between the last two syllables (second-to-last over last) counts towards "second-to-last". */
-const WEIGHTS = { bias: -1.27, length: 1.28, pitch: 1.25, level: 0.79 };
+const WEIGHTS = { bias: -1.36, length: 1.37, pitch: 1.52, level: 0.56 };
 /**
  * How sure it must be, in log odds, that the attempt leaned on the other syllable before saying so. Set so takes said
  * with the stress moved are mostly caught (src/stress.test.ts) and hardly any said as the card's clips are.
@@ -26,12 +26,12 @@ export const SURE = 1;
  * gently. Never judged. Kept in step with the clips by src/spoken.test.ts.
  */
 export const UNJUDGED = new Set<string>([
-  'anim', 'apatnapu', 'apo', 'araw', 'asukal', 'ayoko', 'baboy', 'bagyo', 'bakit', 'bangko', 'barya', 'baso',
-  'bumaba', 'dalawampu', 'hatinggabi', 'hindi', 'ingat', 'kahapon', 'kaibigan', 'kainan', 'kanin', 'kulay', 'kumain',
-  'kumusta', 'labindalawa', 'labing-isa', 'labinlima', 'lalaki', 'lima', 'linggo', 'luma', 'mabaho', 'magluto',
-  'magpahinga', 'magsalita', 'malapit', 'malayo', 'maligo', 'mamaya', 'mangga', 'masaya', 'matulog', 'minsan',
-  'ninong', 'paalam', 'paaralan', 'panganay', 'pula', 'pumunta', 'saging', 'sila', 'sunog', 'tag-init', 'tag-ulan',
-  'tanghalian', 'taon', 'tatay', 'tatlumpu', 'tayo', 'tinapay', 'tubig', 'tulong',
+  'anim', 'apatnapu', 'apo', 'asukal', 'ayoko', 'bagyo', 'bangko', 'barya', 'baso', 'bumaba', 'dalawampu', 'gusto',
+  'hindi', 'ingat', 'kahapon', 'kailangan', 'kainan', 'kulay', 'kumain', 'kumusta', 'labindalawa', 'labing-isa',
+  'labinlima', 'lalaki', 'lima', 'linggo', 'mabaho', 'maghintay', 'magluto', 'magpahinga', 'magsalita', 'magtrabaho',
+  'malapit', 'maligo', 'mamaya', 'mangga', 'masaya', 'matulog', 'ninong', 'paalam', 'paaralan', 'panganay', 'pero',
+  'pula', 'pumunta', 'sabihin', 'sige', 'sunog', 'tag-init', 'tag-ulan', 'tanghalian', 'tatlumpu', 'tayo', 'teka',
+  'tinapay', 'tinidor', 'tubig', 'uminom',
 ]);
 
 /** A pronunciation hint's syllables, and which is stressed (written in capitals), if exactly one is. */
@@ -52,25 +52,22 @@ export interface Stress {
   lean: number;
 }
 
-const isVowel = (r: SoundResult) => /^[aeiou]$/.test(r.phone.ipa);
-
 /**
  * How a single-word attempt was stressed, against its hint, or null where it can't be told: a phrase, a hint
- * stressing an earlier syllable, or either of the last two vowels not heard clearly.
+ * stressing an earlier syllable, or either of the last two vowels not heard clearly or with no pitch to compare.
  */
-export function measureStress(text: string, hint: string, comparison: Comparison, prosody: SoundProsody[]): Stress | null {
+export function measureStress(text: string, hint: string, comparison: Comparison, measure: Measure): Stress | null {
   if (!/^[a-zñ'-]+$/i.test(text.replace(/[?!.,]/g, '').trim()) || /\s/.test(hint.trim())) return null;
   const parsed = hintSyllables(hint.trim());
   if (!parsed) return null;
   const { syllables, stressed } = parsed;
   const n = syllables.length;
-  const vowels = comparison.sounds.filter(isVowel);
+  const vowels = comparison.sounds.filter((r) => isVowelSound(r.phone.ipa));
   if (n < 2 || stressed < n - 2 || vowels.length !== n) return null;
-  const said = vowels.slice(-2).map((r) => (r.heardAt !== undefined && (r.verdict === 'good' || r.verdict === 'close') ? prosody[r.heardAt] : undefined));
-  const [before, last] = said;
-  if (!before || !last) return null;
+  const [before, last] = vowels.slice(-2).map((r) => (r.heardAt !== undefined && (r.verdict === 'good' || r.verdict === 'close') ? measure(r.heardAt) : undefined));
+  if (!before?.pitch || !last?.pitch) return null;
   const length = Math.log(Math.max(before.length, 0.01) / Math.max(last.length, 0.01));
-  const pitch = before.pitch > 0 && last.pitch > 0 ? (12 * Math.log2(before.pitch / last.pitch)) / 6 : 0;
+  const pitch = (12 * Math.log2(before.pitch / last.pitch)) / 6;
   const level = (before.level - last.level) / 6;
   const lean = WEIGHTS.bias + WEIGHTS.length * length + WEIGHTS.pitch * pitch + WEIGHTS.level * level;
   return { syllables, expected: stressed, differences: { length, pitch, level }, lean };
@@ -82,7 +79,7 @@ export function leanAgainst(stress: Stress): number {
 }
 
 /** The stress of an attempt at a card, when the card is one that's judged and the attempt was said as its main spelling. */
-export function cardStress(card: Pick<Card, 'id' | 'tl' | 'hint'>, text: string, comparison: Comparison, prosody: SoundProsody[]): Stress | null {
+export function cardStress(card: Pick<Card, 'id' | 'tl' | 'hint'>, text: string, comparison: Comparison, measure: Measure): Stress | null {
   if (!card.hint || text !== card.tl || UNJUDGED.has(card.id)) return null;
-  return measureStress(text, card.hint, comparison, prosody);
+  return measureStress(text, card.hint, comparison, measure);
 }

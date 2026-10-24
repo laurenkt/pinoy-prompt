@@ -5,8 +5,8 @@
 // both ends of the audio with reflected samples ("snip_edges = false").
 
 export const SAMPLE_RATE = 16000;
-const FRAME_LENGTH = 400;
-const FRAME_SHIFT = 160;
+export const FRAME_LENGTH = 400;
+export const FRAME_SHIFT = 160;
 const FFT_SIZE = 512;
 export const NUM_MEL_BINS = 80;
 const LOW_FREQ = 20;

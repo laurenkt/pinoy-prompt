@@ -238,14 +238,19 @@ describe('an attempt', () => {
 
   it('says which syllable to lean on, apart from the score, when the attempt clearly leaned on the other', async () => {
     heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
-    // Every sound right, but the last "a" the longest, highest and loudest: "sa-la-MAT".
-    const vowel = (length: number, pitch: number, level: number) => ({ length, pitch, level });
-    const consonant = vowel(0.06, 0, -30);
-    const prosody = [consonant, vowel(0.08, 200, -14), consonant, vowel(0.08, 190, -16), consonant, vowel(0.17, 270, -11), consonant];
-    await open('salamat', { loadPhoneModel: async () => ({ recognise: async () => fakeRecognition(heard, prosody) }) });
+    // Every sound right, but the last "a" higher and louder than the one before: "sa-la-MAT". The stand-in recogniser
+    // hears sound i from 0.2 + 0.1i seconds.
+    const samples = new Float32Array(16000);
+    const vowel = (at: number, hz: number, gain: number) => {
+      for (let i = 0; i < 1600; i++) samples[(0.2 + 0.1 * at) * 16000 + i] = gain * Math.sin((2 * Math.PI * hz * i) / 16000);
+    };
+    vowel(1, 200, 0.1);
+    vowel(3, 190, 0.1);
+    vowel(5, 270, 0.3);
+    await open('salamat');
     button('Tap and speak').click();
     mic.events.onListening?.();
-    button("I'm done").click();
+    mic.finish({ samples, speech: true });
     await flush();
     expect(text('.feedback strong')).toBe('Tama!');
     expect(onAttempt).toHaveBeenCalledWith(true);

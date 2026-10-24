@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { stressTip } from './coach';
 import { getCard } from './deck';
 import { compare, toPhones } from './phonetics';
-import type { SoundProsody } from './prosody';
+import type { Measure } from './prosody';
 import { cardStress, hintSyllables, leanAgainst, measureStress, SURE, UNJUDGED } from './stress';
 import takes from './test/fixtures/stress-takes.json';
 
 /** Sounds as heard, each [ms, Hz, dB], as clip-sounds.json and the fixture keep them. */
-const unpack = (measured: number[][]): SoundProsody[] => measured.map(([ms, pitch, level]) => ({ length: ms / 1000, pitch, level }));
+const unpack = (measured: number[][]): Measure => (i) => measured[i] && { length: measured[i][0] / 1000, pitch: measured[i][1], level: measured[i][2] };
 
 /** A careful "salamat": each vowel heard, with how long, high and loud it was. */
 function salamat(vowels: [number, number, number][]) {
@@ -47,7 +47,17 @@ describe('measureStress', () => {
     const missing = compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'm', 't']);
     expect(measureStress('Salamat', 'sah-LAH-maht', missing, prosody)).toBeNull();
     const card = { id: 'kumusta', tl: 'Kumusta?', hint: 'koo-moos-TAH' };
-    expect(cardStress(card, 'Kamusta?', compare(toPhones('Kamusta?'), []), [])).toBeNull();
+    expect(cardStress(card, 'Kamusta?', compare(toPhones('Kamusta?'), []), () => undefined)).toBeNull();
+    // A whispered vowel has no pitch to compare.
+    const whispered = salamat([[80, 200, -14], [80, 0, -16], [170, 270, -11]]);
+    expect(measureStress('Salamat', 'sah-LAH-maht', whispered.comparison, whispered.prosody)).toBeNull();
+  });
+
+  it('counts e among the vowels', () => {
+    const comparison = compare(toPhones('kape'), ['k', 'a', 'p', 'ɛ']);
+    const stress = measureStress('kape', 'kah-PEH', comparison, unpack([[60, 0, -30], [80, 190, -16], [60, 0, -30], [170, 270, -11]]));
+    expect(stress?.expected).toBe(1);
+    expect(leanAgainst(stress!)).toBeLessThan(0);
   });
 });
 

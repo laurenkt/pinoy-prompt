@@ -7,6 +7,7 @@ import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-c
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, judge, passes, toPhones, type Comparison } from '../phonetics';
+import { measurer } from '../prosody';
 import { cardStress } from '../stress';
 import { record, RecordError, recordingSupported, warmRecorder, type RecordProblem, type Recording, type Warmth } from '../recorder';
 import { audioButton, h, icon } from '../ui';
@@ -284,7 +285,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
       options.onAttempt(isRight(comparison));
-      const stress = stressTip(cardStress(card, text, comparison, recognition.prosody));
+      // Pitch takes a moment to find, so only the two vowels a judged card compares are measured.
+      const stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
       set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples });
     } catch (err) {
       if (stale()) return;
@@ -473,8 +475,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
         h('div', { class: 'feedback-head' }, h('div', null, h('strong', null, title), ' ', detail), heard.length > 0 && dial(comparison.score, `${pct}% of the way there`)),
         lettersEl,
-        (tips.length > 0 || stress) &&
-          h('ul', { class: 'tips' }, [...tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text)), stress && h('li', { class: 'stress-tip' }, stress)]),
+        tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
       ),
       judged && h('div', { class: 'row hear-slowly' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
       actions(right),

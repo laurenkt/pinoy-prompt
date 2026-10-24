@@ -11,6 +11,7 @@ import { compare, englishReadings, judge, lostFirstSound, PASS, passes, ROUGHLY,
 import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
 import { stressTip } from './coach';
+import type { Measure } from './prosody';
 import { cardStress, leanAgainst, measureStress, UNJUDGED } from './stress';
 
 const CLIPS: Record<string, string[]> = clips;
@@ -136,7 +137,10 @@ describe('recorded clips, heard by Speak', () => {
 describe('recorded clips, measured for stress', () => {
   const files = (text: string) => (CLIPS[text] ?? []).flatMap((name) => [name, `${name}-slow`]);
   /** How long (ms), high (Hz) and loud (dB) each sound in a clip was, as scripts/generate-audio.mjs measured it. */
-  const prosodyOf = (file: string) => (HEARD[file]?.prosody ?? []).map(([ms, pitch, level]) => ({ length: ms / 1000, pitch, level }));
+  const prosodyOf = (file: string): Measure => (i) => {
+    const measured = HEARD[file]?.prosody?.[i];
+    return measured && { length: measured[0] / 1000, pitch: measured[1], level: measured[2] };
+  };
   const measured = (card: Card) =>
     files(spokenText(card)).map((file) => ({ file, comparison: compare(toPhones(card.tl), HEARD[file]?.sounds ?? [], HEARD[file]?.runnersUp) }));
 
