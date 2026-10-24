@@ -62,7 +62,7 @@ interface Question {
 /** Turns a spoken answer, in the language asked for, into text. */
 export type MeaningHearer = (audio: Blob, language: AnswerLanguage) => Promise<string>;
 
-/** OpenAI's speech-to-text, when the learner has given a key for Chat; without one, answers are typed. */
+/** OpenAI's speech-to-text, when the learner has given a key for Chat; without one, meanings are typed (see canSay). */
 const hearWithOpenAi = (): MeaningHearer | null => {
   const key = getApiKey();
   return key ? (audio, language) => transcribe(key, audio, language) : null;
@@ -351,13 +351,19 @@ export function practiceScreen(
   }
 
   /**
+   * Whether the answer to `q` can be said into the box: through OpenAI's speech-to-text, or for Tagalog without a key,
+   * on the device alone once the pronunciation model is there (see saidOnDevice).
+   */
+  const canSay = (q: Question): boolean => hearMeaning() !== null || (answerLanguage(q) === 'tl' && (speakReady || modelFound));
+
+  /**
    * The box's microphone button: record the meaning said out loud, turn it into text, and check that. A second tap
    * stops early, or before the microphone gives sound (when nothing could have been heard) throws the take away.
    */
   function sayMeaning(q: Question): void {
     if (listening) return micLive ? listening.stop() : cancelSaying(q);
     const hearer = hearMeaning();
-    if (!hearer || picked !== null || checking || hearing) return;
+    if (!canSay(q) || picked !== null || checking || hearing) return;
     // The word playing would be recorded too.
     stop();
     q.unheard = undefined;
@@ -427,6 +433,8 @@ export function practiceScreen(
             return answer(q, q.card.id);
           }
         }
+        // Without a key there's nothing to write out what else was said.
+        if (!hearer) return unheard("That didn't sound like it. Tap the microphone and try again, or type it.");
         let text: string;
         try {
           text = await hearer(toWav(take.samples), answerLanguage(q));
@@ -608,7 +616,7 @@ export function practiceScreen(
 
   function draw(): void {
     if (!current) root.replaceChildren(tooFew());
-    // An answer can be said into the box only on a listening or recall question, and with a way to hear it.
+    // An answer said into the box goes to OpenAI only on a listening or recall question, and with a key to send it.
     else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting((modes().includes('listen') || modes().includes('recall')) && hearMeaning() !== null)));
     else if (lookingBack && previous && previousPick !== null) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
@@ -871,7 +879,7 @@ export function practiceScreen(
       app.progress.settings.mic &&
       canSpeak &&
       !speakSkipped &&
-      hearMeaning() !== null &&
+      canSay(q) &&
       micButton(q);
     const status = listening
       ? micLive
