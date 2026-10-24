@@ -367,10 +367,8 @@ export function practiceScreen(
       onLevel: (level, speech) => {
         if (listening !== recording || !speech) return;
         wave.push(level);
-        // Once the box is full, the oldest goes off the left.
-        if (wave.length > WAVE_BARS) wave.shift();
-        // Redraw the bars in place rather than the round, a dozen times a second.
-        root.querySelector('.meaning-wave')?.replaceChildren(...wave.map(waveBar));
+        // Redraw the bars in place rather than the round, many times a second.
+        root.querySelector('.meaning-wave')?.replaceChildren(...waveBars(wave));
       },
     });
     listening = recording;
@@ -787,11 +785,19 @@ export function practiceScreen(
         'aria-hidden': 'true',
         style: `--bars: ${WAVE_BARS}${thinking ? `; --since: ${Date.now() - thinkingSince}ms` : ''}`,
       },
-      levels.map(waveBar),
+      waveBars(levels),
     );
   }
 
-  const waveBar = (level: number, i: number) => h('span', { style: `--level: ${level}; --i: ${i}` });
+  /**
+   * A bar for each level, from the left, until the box is full; then the whole wave squeezed into the box, each bar
+   * the loudest of the levels it stands for, so the start of what was said stays in sight.
+   */
+  function waveBars(levels: number[]): HTMLElement[] {
+    const n = levels.length;
+    const bars = n <= WAVE_BARS ? levels : Array.from({ length: WAVE_BARS }, (_, c) => Math.max(...levels.slice(Math.floor((c * n) / WAVE_BARS), Math.floor(((c + 1) * n) / WAVE_BARS))));
+    return bars.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` }));
+  }
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
@@ -899,8 +905,8 @@ export function practiceScreen(
   return root;
 }
 
-/** Bars the box holds while a meaning is said, each a slot of its width: four seconds of speech at about twelve levels a second. */
-const WAVE_BARS = 48;
+/** Bars the box holds while a meaning is said, each a slot of its width: under two seconds of speech at about fifty levels a second, before it squeezes. */
+const WAVE_BARS = 80;
 
 /** How long typing has to pause before a meaning the device can tell is right is taken without Check. */
 const TYPING_PAUSE_MS = 700;

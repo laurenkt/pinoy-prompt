@@ -515,19 +515,24 @@ describe('saying the meaning out loud', () => {
     onLevel!(0.01, false);
     onLevel!(0.25, true);
     expect(bars()).toEqual([0.5, 0.25]);
-    // Once it's full, the oldest goes off the left.
-    for (let i = 0; i < 60; i++) onLevel!(0.75, true);
-    expect(bars()).toHaveLength(48);
-    expect(bars().every((v) => v === 0.75)).toBe(true);
+    // Once it reaches the right of the box, the whole wave is squeezed to fit, each bar the loudest it stands for.
+    for (let i = 0; i < 78; i++) onLevel!(0.75, true);
+    expect(bars()).toHaveLength(80);
+    expect(bars()[0]).toBe(0.5);
+    for (let i = 0; i < 80; i++) onLevel!(0.1, true);
+    expect(bars()).toHaveLength(80);
+    expect(bars()[0]).toBe(0.5);
+    expect(bars().slice(-2)).toEqual([0.1, 0.1]);
     for (let i = 0; i < 60; i++) onLevel!(0.01, false);
+    expect(bars()).toHaveLength(80);
     onLevel!(0.5, true);
     onLevel!(0.25, true);
     finish({ samples: new Float32Array(160), speech: true });
     await flush();
     // Hearing it: the same wave, kept across the redraw, with the beat running along it.
     expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
-    expect(bars()).toHaveLength(48);
-    expect(bars().slice(-2)).toEqual([0.5, 0.25]);
+    expect(bars()).toHaveLength(80);
+    expect(bars().at(-1)).toBe(0.5);
     heard('Many thanks.');
     await flush();
     expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();

@@ -453,7 +453,7 @@ async function typedOnly(page, mode, live = true) {
   await page.waitForSelector('.home');
   await page.evaluate(async (live) => {
     const { defaultDeps } = await import('/src/screens/speak.ts');
-    // A voice that rises and falls, a dozen levels a second, until it's stopped.
+    // A voice that rises and falls, about fifty levels a second as the recorder gives them, until it's stopped.
     defaultDeps.recordingSupported = () => true;
     defaultDeps.microphoneAllowed = () => true;
     defaultDeps.record = ({ onLevel, onListening } = {}) => {
@@ -463,11 +463,12 @@ async function typedOnly(page, mode, live = true) {
       let n = 0;
       const timer = setInterval(() => {
         n++;
-        if (n === 2) onListening?.();
-        const level = n < 6 ? 0.02 : Math.abs(Math.sin(n / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(n / 7)));
+        if (n === 8) onListening?.();
+        const t = n / 4;
+        const level = t < 6 ? 0.02 : Math.abs(Math.sin(t / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(t / 7))) * (0.8 + 0.2 * Math.sin(n * 1.7));
         // The recorder's speech level (0.02 RMS) as onLevel reports it, so the room and the pauses draw nothing.
         onLevel?.(level, level > 0.16);
-      }, 85);
+      }, 21);
       const end = () => {
         clearInterval(timer);
         finish();

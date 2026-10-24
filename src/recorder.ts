@@ -11,6 +11,8 @@ import { closeMicrophone, dropMicrophone, getMicrophone, liveMicrophone, microph
 
 /** Level (RMS, 0–1) above which a block counts as speech. */
 const SPEECH_LEVEL = 0.02;
+/** Levels reported for each block the recorder takes (about 85 ms): one every 20 ms or so. */
+const LEVELS_PER_BLOCK = 4;
 /** Stop this long after speech ends. */
 const TRAILING_SILENCE_MS = 900;
 /** Never record longer than this, counted from when the microphone gave sound (it may be reopened first: SIGNAL_WAIT_MS). */
@@ -36,7 +38,7 @@ export class RecordError extends Error {
 }
 
 export interface RecorderEvents {
-  /** Input level, 0–1, a few times a second, and whether that block counts as speech (rather than the room). */
+  /** Input level, 0–1, about fifty times a second, and whether that moment counts as speech (rather than the room). */
   onLevel?: (level: number, speech: boolean) => void;
   /**
    * Called once the microphone is giving sound, so what's said from now on is in the take. Until then (the
@@ -344,7 +346,14 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
         if (signal && !before) onListening?.();
         const level = Math.sqrt(sum / block.length);
         const speech = level > SPEECH_LEVEL;
-        onLevel?.(Math.min(1, level * 8), speech);
+        // The meter gets a level for each part of the block, so a wave drawn from it can be finer than the block.
+        if (onLevel) {
+          const part = block.length / LEVELS_PER_BLOCK;
+          for (let p = 0; p < LEVELS_PER_BLOCK; p++) {
+            const rms = Math.sqrt(block.subarray(p * part, (p + 1) * part).reduce((a, v) => a + v * v, 0) / part);
+            onLevel(Math.min(1, rms * 8), rms > SPEECH_LEVEL);
+          }
+        }
         const blockMs = (block.length / context.sampleRate) * 1000;
         elapsedMs += blockMs;
         if (speech) {
