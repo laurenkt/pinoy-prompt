@@ -1,14 +1,19 @@
 // Every piece of Tagalog the app can say has its recorded clip, and every clip listed is there to keep offline.
+// Every card's clips pass Speak as that card, and never as a different one.
 
 import { describe, expect, it } from 'vitest';
 import clips from './clips.json';
-import { VOCAB } from './deck';
+import clipSounds from './clip-sounds.json';
+import { VOCAB, type Card } from './deck';
 import { GUIDES } from './guides';
 import { drillSentence } from './session';
+import { englishReadings, judge, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
 import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
 
 const CLIPS: Record<string, string[]> = clips;
+/** What Speak's recogniser hears in each clip file, as scripts/generate-audio.mjs listened to it. */
+const HEARD: Record<string, { sounds: string[]; runnersUp?: string[][]; odds?: string }> = clipSounds;
 /** The clip files in public/audio, by name. */
 const onDisk = new Set(Object.keys(import.meta.glob('../public/audio/*')).map((path) => path.split('/').pop()));
 
@@ -41,4 +46,59 @@ describe('recorded clips', () => {
     expect(files.filter((f) => !onDisk.has(f))).toEqual([]);
     expect(onDisk.size).toBe(files.length);
   });
+});
+
+describe('recorded clips, heard by Speak', () => {
+  /** Every clip file of a text: each voice, at both speeds. */
+  const files = (text: string) => (CLIPS[text] ?? []).flatMap((name) => [name, `${name}-slow`]);
+  const texts = (card: { tl: string; accept?: string[] }) => [card.tl, ...(card.accept ?? [])];
+  const said = (file: string): Heard => {
+    const { sounds = [], runnersUp, odds } = HEARD[file] ?? {};
+    return { sounds, runnersUp, odds: odds === undefined ? undefined : unpackOdds(odds) };
+  };
+
+  it('has heard every clip (run `npm run audio` to listen to new ones)', () => {
+    const all = Object.keys(CLIPS).flatMap(files);
+    expect(all.filter((f) => !HEARD[f])).toEqual([]);
+    expect(Object.keys(HEARD).filter((f) => !all.includes(f))).toEqual([]);
+  });
+
+  it("passes every card's own clips, so a learner who says it like them passes too", () => {
+    const failing = VOCAB.flatMap((card) =>
+      files(spokenText(card)).flatMap((file) => {
+        const heard = said(file);
+        const { comparison } = judge(texts(card), heard);
+        return passes(comparison) ? [] : [`${file}: ${Math.round(comparison.score * 100)}%, heard ${heard.sounds.join(' ')}`];
+      }),
+    );
+    expect(failing).toEqual([]);
+  });
+
+  it('never says a letter the English way', () => {
+    const misread = Object.keys(CLIPS).flatMap((text) =>
+      files(text).flatMap((file) => englishReadings(text, said(file).sounds).map((r) => `${file}: "${r.letters}" said ${r.heard}`)),
+    );
+    expect(misread).toEqual([]);
+  });
+
+  it("doesn't pass a card's clip as a different card, so a wrong word still fails", () => {
+    // Clearly different: one said perfectly is less than ROUGHLY the other, so it couldn't pass as it however likely.
+    // Words closer than that (kanan and kanin, Salamat and Salamat po) are left to how likely the recording is each.
+    const perfectly = (text: string) => toPhones(text).filter((p) => !p.optional).map((p) => p.ipa);
+    const different = (a: Card, b: Card) => texts(a).every((t) => judge(texts(b), { sounds: perfectly(t) }).comparison.score < ROUGHLY);
+    // At natural speed: the slow clips are the same takes.
+    let pairs = 0;
+    const passing = VOCAB.flatMap((card) => {
+      const others = VOCAB.filter((other) => other !== card && different(card, other));
+      return (CLIPS[spokenText(card)] ?? []).flatMap((file) => {
+        const heard = said(file);
+        pairs += others.length;
+        return others.filter((other) => passes(judge(texts(other), heard).comparison)).map((other) => `${file} passes as "${other.tl}"`);
+      });
+    });
+    // A few short words the recogniser itself can't tell apart in these voices (opo and apo, doon and taon) are
+    // allowed, as long as they stay rare: about one in 20,000 pairs. More than that means scoring got too lenient.
+    expect(passing.length, passing.join('\n')).toBeLessThan(pairs / 20_000);
+    // Judging every clip as every card takes a few seconds.
+  }, 30_000);
 });

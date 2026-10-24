@@ -6,7 +6,7 @@ import { holdMicrophone, microphoneAllowed } from '../microphone';
 import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
-import { compare, toPhones, type Comparison } from '../phonetics';
+import { compare, judge, passes, toPhones, type Comparison } from '../phonetics';
 import { record, RecordError, recordingSupported, warmRecorder, type RecordProblem, type Recording, type Warmth } from '../recorder';
 import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
@@ -15,15 +15,7 @@ import { colouredWord, resultView as soundResults, type ResultView } from './spe
 
 /** Download size shown to the learner before they agree to it. */
 const MODEL_MB = 71;
-/**
- * At or above this score the attempt counts as right: clearly understood and
- * fairly natural, not native-perfect. A sound said well scores 1 and a nearly
- * there one half, so a phrase can pass with about one sound in ten off (from
- * 10 sounds one, from 20 two: in context a listener still gets it), and any word with one sound in five
- * nearly there. A short word with a sound off, which can turn it into another
- * word, still needs another go.
- */
-export const GOOD = 0.9;
+/** Below PASS, at or above this an attempt is close. */
 const CLOSE = 0.65;
 
 /** What the Speak question needs from the outside, so tests can stand in for the microphone and model. */
@@ -153,9 +145,7 @@ export function micWaiting(dictation = false): HTMLElement {
 }
 
 /** True when the attempt was good enough to count as right. */
-export function isRight(comparison: Comparison): boolean {
-  return comparison.score >= GOOD;
-}
+export const isRight = passes;
 
 export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   const deps = options.deps ?? defaultDeps;
@@ -171,12 +161,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   /** Whether a redraw may move focus to its main button. */
   let takeFocus = options.autofocus ?? true;
   // The card's spelling and any other accepted pronunciations (e.g. Kamusta for Kumusta).
-  const variants = [card.tl, ...(card.accept ?? [])].map((text) => ({ text, phones: toPhones(text) }));
-  /** Judge what was heard against the closest accepted pronunciation. */
-  const judge = (heard: string[]) =>
-    variants
-      .map((v) => ({ text: v.text, comparison: compare(v.phones, heard) }))
-      .reduce((best, next) => (next.comparison.score > best.comparison.score ? next : best));
+  const texts = [card.tl, ...(card.accept ?? [])];
 
   /**
    * The microphone warmed for this question. It's warmed from the tap that brought the question up (or, once
@@ -276,13 +261,13 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       if (stale()) return;
       recording = null;
       if (!take.speech) {
-        return set({ name: 'result', text: card.tl, comparison: compare(variants[0].phones, []), tips: [], heard: [] });
+        return set({ name: 'result', text: card.tl, comparison: compare(toPhones(card.tl), []), tips: [], heard: [] });
       }
       set({ name: 'analysing' });
       const recognition = await model.recognise(take.samples);
       if (stale()) return;
       const { sounds } = recognition;
-      const { text, comparison } = judge(sounds);
+      const { text, comparison } = judge(texts, recognition);
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
       options.onAttempt(isRight(comparison));

@@ -96,14 +96,14 @@ describe('the tap sound', () => {
   });
 
   it("doesn't tick over the results screen's held sounds, which make their own", () => {
-    const heard = ['p', 'u'];
+    const heard = ['p', 'ʌ'];
     const r = fakeRecognition(heard);
     const view = resultView(
       { text: 'po', comparison: compare(toPhones('po'), heard), tips: [], heard, timing: r.timing, features: r.features, samples: new Float32Array(16000) },
       { player: new FakePlayer() },
     );
     root.append(view.el);
-    // The slider for the o said as u, then the single button for the p said right.
+    // The slider for the o said as "uh", then the single button for the p said right.
     press(root.querySelector<HTMLElement>('.detail-page.open .sound-slider')!);
     press(root.querySelector<HTMLElement>('.mark-good')!);
     const ticked = ticks.count;

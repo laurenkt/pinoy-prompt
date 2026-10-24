@@ -11,6 +11,8 @@ export function fakeRecognition(sounds: string[]): Recognition {
   return {
     sounds,
     timing: sounds.map((_, i) => ({ start: 0.2 + i * 0.1, end: 0.24 + i * 0.1 })),
+    runnersUp: sounds.map(() => []),
+    odds: [],
     features: { data: new Float32Array(frames * NUM_MEL_BINS).map((_, i) => Math.sin(i)), frames },
   };
 }

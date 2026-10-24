@@ -22,8 +22,12 @@
 // A transcript can't tell how a letter was said ("Gising" read like "giant" is
 // still written "Gising"), so each take is also put through the app's own sound
 // recogniser (src/phone-model.ts, as Speak uses), and one that says a letter the
-// English way (src/phonetics.ts, englishReadings) is made again too. `--check`
-// runs that over the clips already made and remakes the ones that fail. The
+// English way (src/phonetics.ts, englishReadings), or that Speak wouldn't pass as
+// its card (judge and passes), is made again too. What the recogniser heard in
+// each clip file is kept in src/clip-sounds.json, which src/spoken.test.ts checks
+// every clip against, so a change to Speak's scoring that would fail a card's own
+// clips fails the tests. A run listens to any clip not in there yet (needing no
+// key), and `--check` listens to them all again and remakes the ones that fail. The
 // recogniser (about 71 MB) is downloaded once into node_modules/.cache.
 //
 // The voice model sometimes starts or stops a take mid-sound (a word that
@@ -45,6 +49,7 @@ const run = promisify(execFile);
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const AUDIO_DIR = join(ROOT, 'public/audio');
 const MANIFEST = join(ROOT, 'src/clips.json');
+const HEARD = join(ROOT, 'src/clip-sounds.json');
 const RECOGNISER = join(ROOT, 'node_modules/.cache/zipa/model.int8.onnx');
 
 // OpenAI's conversational voice model rather than its text-to-speech one, which sounds
@@ -77,8 +82,9 @@ const key = process.env.OPENAI_API_KEY;
 
 // The app's own modules, loaded through Vite as the app loads them.
 const vite = await createServer({ root: ROOT, server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
-const { allSpoken } = await vite.ssrLoadModule('/src/spoken.ts');
-const { englishReadings } = await vite.ssrLoadModule('/src/phonetics.ts');
+const { allSpoken, spokenText } = await vite.ssrLoadModule('/src/spoken.ts');
+const { VOCAB } = await vite.ssrLoadModule('/src/deck.ts');
+const { englishReadings, judge, packOdds, passes, unpackOdds } = await vite.ssrLoadModule('/src/phonetics.ts');
 const { recognise } = await vite.ssrLoadModule('/src/phone-model.ts');
 const { MODEL_URL } = await vite.ssrLoadModule('/src/model-cache.ts');
 await vite.close();
@@ -111,14 +117,43 @@ async function samplesOf(file, rate) {
   return new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.length));
 }
 
-/** Letters a clip says the English way, as the recogniser hears them. */
-async function misread(text, file) {
+/**
+ * What Speak's recogniser hears in a clip file, as src/clip-sounds.json keeps it: its sounds, the ones it nearly
+ * wrote instead (if any), and its odds at each moment (packed into a line of text).
+ */
+async function listen(file) {
   const samples = await samplesOf(file, 16000);
   const heard = listening.then(async () => recognise(await (session ??= recogniser()), samples));
   listening = heard.catch(() => {});
-  return englishReadings(text, (await heard).sounds);
+  const { sounds, runnersUp, odds } = await heard;
+  return { sounds, ...(runnersUp.some((r) => r.length) && { runnersUp }), odds: packOdds(odds) };
 }
-const describeMisread = (found) => found.map((f) => `"${f.letters}" said ${f.heard}`).join(', ');
+
+/** The spellings Speak takes for each text, from every card that says it (Speak asks words and phrases, not guides). */
+const speakAs = new Map();
+for (const card of VOCAB) speakAs.set(spokenText(card), [...(speakAs.get(spokenText(card)) ?? []), [card.tl, ...(card.accept ?? [])]]);
+
+/** What's wrong with a clip of the text, as Speak hears it: letters said the English way, or a card it wouldn't pass as. */
+function soundProblems(text, heard) {
+  const found = englishReadings(text, heard.sounds).map((f) => `"${f.letters}" said ${f.heard}`);
+  if (!heard.odds) return found;
+  for (const spellings of speakAs.get(text) ?? []) {
+    const { comparison } = judge(spellings, { ...heard, odds: unpackOdds(heard.odds) });
+    if (!passes(comparison)) found.push(`Speak wouldn't pass it as "${spellings[0]}" (${Math.round(comparison.score * 100)}%, heard ${heard.sounds.join(' ')})`);
+  }
+  return found;
+}
+
+/** Listen to a clip at both speeds, as `clipSounds` keeps them, and say what's wrong with either. */
+async function listenToClip(text, dir, name) {
+  const heard = {};
+  for (const suffix of ['', '-slow']) {
+    heard[`${name}${suffix}`] = await listen(join(dir, `${name}${suffix}.mp3`));
+    // Only what Speak asks needs its odds.
+    if (!speakAs.has(text)) delete heard[`${name}${suffix}`].odds;
+  }
+  return { heard, problems: [...new Set(Object.values(heard).flatMap((h) => soundProblems(text, h)))] };
+}
 
 /** A readable file name: the text's first letters, and a hash of the take so a new take gets a new name. */
 function clipName(text, take) {
@@ -258,12 +293,13 @@ async function makeClip(text, voice, work, unsure, keepOld) {
     }
     if (cut.length) heard = `${heard}, cut off at the ${cut.join(' and ')}`;
     let right = whole && (!checked || heardRight(text, heard));
+    let listened = null;
     if (right) {
       try {
-        const found = await misread(text, join(work, `${draft}.mp3`));
-        if (found.length) {
+        listened = await listenToClip(text, work, draft);
+        if (listened.problems.length) {
           right = false;
-          heard = `${heard}, with ${describeMisread(found)}`;
+          heard = `${heard}, with ${listened.problems.join(', ')}`;
         }
       } catch (error) {
         checked = false;
@@ -274,30 +310,35 @@ async function makeClip(text, voice, work, unsure, keepOld) {
     if (!right || !checked) unsure.push({ text, voice: voice[0], heard, kept: !right && keepOld });
     if (!right && keepOld) return null;
     const name = clipName(text, await readFile(join(work, `${draft}.mp3`)));
-    for (const suffix of ['', '-slow']) await rename(join(work, `${draft}${suffix}.mp3`), join(AUDIO_DIR, `${name}${suffix}.mp3`));
+    for (const suffix of ['', '-slow']) {
+      await rename(join(work, `${draft}${suffix}.mp3`), join(AUDIO_DIR, `${name}${suffix}.mp3`));
+      if (listened) clipSounds[`${name}${suffix}`] = listened.heard[`${draft}${suffix}`];
+    }
     return name;
   }
 }
 
 const texts = allSpoken();
 const manifest = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
+/** What the recogniser heard in each clip file, by name. */
+const clipSounds = JSON.parse(await readFile(HEARD, 'utf8').catch(() => '{}'));
 await mkdir(AUDIO_DIR, { recursive: true });
 // Inside the repo, not the system temp folder, so takes can be moved into public/audio (a move can't cross disks).
 const work = await mkdtemp(join(ROOT, 'node_modules', '.pinoy-audio-'));
 // One job per text and voice. A text listed with a single name (made before there were two voices) needs all of them.
 const missing = (t, v) => all || manifest[t]?.length !== VOICES.length || !manifest[t][v];
-/** With --check, the clips already made that say a letter the English way or are trimmed too close, as "voice:text". */
+/** With --check, the clips already made that Speak hears wrong or are trimmed too close, as "voice:text". */
 const failedCheck = new Set();
 if (check) {
-  console.log('Listening for letters said the English way, and clips cut close...');
+  console.log("Listening for clips Speak hears wrong, and clips cut close...");
   for (const text of texts) {
     for (const [v, name] of (manifest[text] ?? []).entries()) {
       if (!name) continue;
-      const file = join(AUDIO_DIR, `${name}.mp3`);
-      const found = await misread(text, file);
-      const close = trimmedClose(await samplesOf(file, 24000), 24000);
-      if (!found.length && !close) continue;
-      console.log(`  "${text}" (${VOICES[v][0]}): ${[describeMisread(found), close && 'trimmed too close'].filter(Boolean).join(', ')}`);
+      const { heard, problems } = await listenToClip(text, AUDIO_DIR, name);
+      Object.assign(clipSounds, heard);
+      const close = trimmedClose(await samplesOf(join(AUDIO_DIR, `${name}.mp3`), 24000), 24000);
+      if (!problems.length && !close) continue;
+      console.log(`  "${text}" (${VOICES[v][0]}): ${[...problems, close && 'trimmed too close'].filter(Boolean).join(', ')}`);
       failedCheck.add(`${v}:${text}`);
     }
   }
@@ -321,6 +362,9 @@ async function write(prune) {
   // Only texts with every voice made, so the app never picks a missing one.
   const kept = Object.fromEntries(texts.filter((t) => VOICES.every((_, v) => manifest[t]?.[v])).map((t) => [t, manifest[t]]));
   await writeFile(MANIFEST, `${JSON.stringify(kept, null, 2)}\n`);
+  // One line per clip file, in deck order, for clips still listed.
+  const heard = Object.values(kept).flat().flatMap((name) => [name, `${name}-slow`]).filter((file) => clipSounds[file]);
+  await writeFile(HEARD, `{\n${heard.map((file) => `${JSON.stringify(file)}: ${JSON.stringify(clipSounds[file])}`).join(',\n')}\n}\n`);
   if (!prune) return;
   // Every clip here is one this script made, so one no longer listed can go.
   // Takes made for only some voices of a text are kept too, for the run that makes the rest.
@@ -346,6 +390,15 @@ await Promise.all(
   }),
 );
 await rm(work, { recursive: true });
+
+// Clips made before what they sound like was kept, or kept by hand: listened to here, with no key needed.
+const unheard = Object.entries(manifest).flatMap(([text, names]) => (texts.includes(text) && Array.isArray(names) ? names.filter((name) => name && !clipSounds[name]).map((name) => ({ text, name })) : []));
+if (unheard.length) console.log(`Listening to ${unheard.length} clips not heard yet...`);
+for (const { text, name } of unheard) {
+  const { heard, problems } = await listenToClip(text, AUDIO_DIR, name);
+  Object.assign(clipSounds, heard);
+  if (problems.length) unsure.push({ text, voice: VOICES[manifest[text].indexOf(name)][0], heard: problems.join(', '), kept: true });
+}
 await save(true);
 
 if (unsure.length) {

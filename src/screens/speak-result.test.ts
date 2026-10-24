@@ -221,7 +221,7 @@ describe('the breakdown', () => {
   });
 
   it('lets go of a finger left on a sound when another opens, so it stops nothing later', () => {
-    show(attempt('po', ['p', 'u']));
+    show(attempt('po', ['p', 'ʌ']));
     layOut();
     const slider = q('.sound-slider');
     pointer(slider, 'pointerdown', 0);
@@ -240,7 +240,7 @@ describe('the breakdown', () => {
   });
 
   it('says which sound opened, as the pages are only shown and hidden', () => {
-    show(attempt('po', ['p', 'u']));
+    show(attempt('po', ['p', 'ʌ']));
     const live = q('.sound-results [aria-live]');
     expect(live.textContent).toContain('Aim for o');
     q<HTMLButtonElement>('.mark-good').click();
@@ -248,7 +248,7 @@ describe('the breakdown', () => {
   });
 
   it('has one sound to hold when it was spot on, with no slider', () => {
-    show(attempt('po', ['p', 'u']));
+    show(attempt('po', ['p', 'ʌ']));
     q<HTMLButtonElement>('.mark-good').click();
     expect(q('.sound-slider')).toBeNull();
     const hold = q('.hold-btn');
@@ -285,7 +285,7 @@ describe('the breakdown', () => {
   });
 
   it('draws vowels on the vowel map and consonants on the consonant map', () => {
-    show(attempt('po', ['p', 'u']));
+    show(attempt('po', ['p', 'ʌ']));
     q<HTMLButtonElement>('.mark-close').click();
     expect(q('.sound-chart').classList).toContain('chart-vowel');
     q<HTMLButtonElement>('.mark-good').click();
@@ -314,17 +314,17 @@ describe('the breakdown', () => {
   });
 
   it("doesn't give one sound the advice meant for another spelled the same", () => {
-    // The first a said as e (only says what was heard), the last as "uh" (advice on opening up).
-    show(attempt('salamat', ['s', 'ɛ', 'l', 'a', 'm', 'ə', 't']));
-    expect(q('.ribbon-mark.selected .mark-heard').textContent).toBe('ɛ');
+    // The first t said as d (only says what was heard), the second with a puff of air (advice on how not to).
+    show(attempt('tatlo', ['d', 'a', 'tʰ', 'l', 'o']));
+    expect(q('.ribbon-mark.selected .mark-heard').textContent).toBe('d');
     expect(q('.detail-page.open .detail-tip')).toBeNull();
-    all('.ribbon-mark')[5].click();
-    expect(q('.detail-page.open .detail-tip').textContent).toContain('Open your mouth wide');
+    all('.ribbon-mark')[2].click();
+    expect(q('.detail-page.open .detail-tip').textContent).toContain('puff of air');
   });
 
   it('gives an added sound no advice, not even the advice meant for the sound before it', () => {
-    // The o slid towards "u" (advice on keeping it pure), then an added s.
-    show(attempt('po', ['p', 'u', 's']));
+    // The o slid into "w" (advice on keeping it pure), then an added s.
+    show(attempt('po', ['p', 'oʊ', 's']));
     expect(q('.detail-page.open .detail-tip').textContent).toContain('Keep the "o" pure');
     q<HTMLButtonElement>('.mark-extra').click();
     expect(q('.detail-page.open').textContent).toMatch(/Added/);
@@ -332,17 +332,17 @@ describe('the breakdown', () => {
   });
 
   it('shows a tip on every sound it fits, even past the first two kinds', () => {
-    // Two kinds of tip for the first two a's, then the last a shares the first one's.
-    show(attempt('salamat', ['s', 'ə', 'l', 'ɛ', 'm', 'ə', 't']));
-    all('.ribbon-mark')[5].click();
-    expect(q('.detail-page.open .detail-tip').textContent).toContain('Open your mouth wide');
+    // Two kinds of tip for the a and the first t, then the last t shares the first one's.
+    show(attempt('tatlo', ['tʰ', 'ɛ', 'tʰ', 'l', 'o']));
+    all('.ribbon-mark')[2].click();
+    expect(q('.detail-page.open .detail-tip').textContent).toContain('puff of air');
   });
 
   it('only shows a tip on the sound that needs it, not on every sound spelled the same', () => {
-    const a = attempt('Salamat', ['s', 'ɐ', 'l', 'a', 'm', 'a', 't']);
+    const a = attempt('tatlo', ['tʰ', 'a', 't', 'l', 'o']);
     show(a);
     expect(q('.detail-page.open .detail-tip')).toBeTruthy();
-    all('.ribbon-mark')[3].click();
+    all('.ribbon-mark')[2].click();
     expect(q('.detail-page.open').textContent).toContain('Spot on');
     expect(q('.detail-page.open .detail-tip')).toBeNull();
   });
