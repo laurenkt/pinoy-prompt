@@ -547,19 +547,23 @@ p {
   stroke: none;
 }
 
-.growth-svg .layer.s-new {
+.growth-svg .layer.s-new,
+.back-chart .s-new {
   fill: var(--cream);
 }
 
-.growth-svg .layer.s-days {
+.growth-svg .layer.s-days,
+.back-chart .s-days {
   fill: var(--pink);
 }
 
-.growth-svg .layer.s-weeks {
+.growth-svg .layer.s-weeks,
+.back-chart .s-weeks {
   fill: var(--saffron);
 }
 
-.growth-svg .layer.s-long {
+.growth-svg .layer.s-long,
+.back-chart .s-long {
   fill: var(--teal);
 }
 
@@ -3139,22 +3143,6 @@ p {
   stroke: none;
 }
 
-.back-chart .s-new {
-  fill: var(--cream);
-}
-
-.back-chart .s-days {
-  fill: var(--pink);
-}
-
-.back-chart .s-weeks {
-  fill: var(--saffron);
-}
-
-.back-chart .s-long {
-  fill: var(--teal);
-}
-
 .back-chart .edge {
   fill: none;
   stroke: var(--cream);
@@ -3169,17 +3157,28 @@ p {
   vector-effect: non-scaling-stroke;
 }
 
-/* Where Study asks it again: a saffron post. */
+/* Where Study asks it again: a saffron post. Now: an ink dot ringed in cream (round caps on a line of no length). */
 .back-chart .post {
-  fill: var(--saffron);
+  stroke: var(--saffron);
+  stroke-width: 10;
   opacity: 0.85;
+  vector-effect: non-scaling-stroke;
+}
+
+.back-chart .now-ring,
+.back-chart .now {
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.back-chart .now-ring {
+  stroke: var(--cream);
+  stroke-width: 16;
 }
 
 .back-chart .now {
-  fill: var(--ink);
-  stroke: var(--cream);
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
+  stroke: var(--ink);
+  stroke-width: 10;
 }
 
 .back-axis {

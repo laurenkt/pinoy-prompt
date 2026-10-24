@@ -72,7 +72,8 @@ describe('recalling words still being learned', () => {
 
 describe("how well the card is known, on its back", () => {
   const card = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt')!;
-  const back = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-back')!;
+  // Drawn only once the card is first turned.
+  const back = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-back') ?? { hidden: true, click() {} };
   const front = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-front')!;
 
   it('turns over with a tap anywhere on the card, back again with another, and is face up for the next question', () => {
@@ -122,13 +123,13 @@ describe("how well the card is known, on its back", () => {
     expect(root.querySelector('.skyline .step.s-long')).not.toBeNull();
   });
 
-  it("leaves out reading's lapses on a way only copied from its schedule", () => {
+  it("draws a way only copied from reading's schedule from reading, and says so", () => {
     const app = learner(true);
     Object.assign(app.progress.cards['salamat:recall'], { split: true, lapses: 2, reps: 3 });
-    delete app.progress.cards['salamat:recall'].reviews;
     const root = (last = recall(app));
     card(root).click();
-    expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent).slice(0, 2)).toEqual(['0', '0']);
+    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so this is reading it.');
+    expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent)[1]).toBe('0');
   });
 
   it("draws a way Study hasn't asked yet from reading, and says so", () => {

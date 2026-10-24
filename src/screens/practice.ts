@@ -19,6 +19,12 @@ import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PR
  */
 const GUIDE_MODES: Record<GuideFormat, Way> = { gap: 'read', build: 'recall' };
 
+/** A guide's ways, by what Drills asks: filling a gap is reading it, building a sentence recalling it. */
+const GUIDE_WAYS: { id: Way; title: string }[] = [
+  { id: 'read', title: 'Gap' },
+  { id: 'recall', title: 'Build' },
+];
+
 const MODES: { id: Way; title: string }[] = [
   { id: 'listen', title: 'Listen' },
   { id: 'read', title: 'Read' },
@@ -720,7 +726,7 @@ export function practiceScreen(
    */
   function backOf(q: Question): CardBack {
     return {
-      back: cardBack(app.progress, q.card, q.mode, q.guide ? MODES.filter((m) => m.id === 'read' || m.id === 'recall') : MODES, app.now()),
+      back: () => cardBack(app.progress, q.card, q.mode, q.guide ? GUIDE_WAYS : MODES, app.now()),
       turned: memoryFor === q,
       onTurn: (turned) => {
         memoryFor = turned ? q : null;

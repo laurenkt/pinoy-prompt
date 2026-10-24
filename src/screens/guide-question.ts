@@ -76,9 +76,9 @@ export function gapLine(d: Drill, filled: boolean, say: (slow: boolean) => void)
   );
 }
 
-/** The back of a card that turns over when tapped (Drills: how well it's known), whether it's turned now, and what to tell when it turns. */
+/** The back of a card that turns over when tapped (Drills: how well it's known), drawn when first turned; whether it's turned now, and what to tell when it turns. */
 export interface CardBack {
-  back: HTMLElement;
+  back: () => HTMLElement;
   turned: boolean;
   onTurn: (turned: boolean) => void;
 }
@@ -95,13 +95,15 @@ export function promptBlock(cls: string, eyebrow: string, back: CardBack | null 
   const face = [h('p', { class: 'eyebrow' }, eyebrow), ...rest];
   if (!back) return h('div', { class: cls }, ...face);
   let turned = back.turned;
+  let drawn: HTMLElement | null = null;
   const front = h('div', { class: 'card-front' }, ...face);
   const button = h('button', { class: 'sr-only', type: 'button' }, 'How well you know it');
-  const card = h('div', { class: cls, 'data-turnable': '' }, front, back.back, button);
+  const card = h('div', { class: cls, 'data-turnable': '' }, front, button);
   const show = () => {
+    if (turned && !drawn) card.insertBefore((drawn = back.back()), button);
     card.classList.toggle('turned', turned);
     front.hidden = turned;
-    back.back.hidden = !turned;
+    if (drawn) drawn.hidden = !turned;
     button.setAttribute('aria-expanded', String(turned));
   };
   card.addEventListener('click', (e) => {

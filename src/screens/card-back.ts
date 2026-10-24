@@ -18,7 +18,9 @@ const LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
  * doesn't keep a schedule for (Speak, or one not started yet) is drawn from reading's, and says so.
  */
 export function cardBack(progress: Progress, card: Card, way: Way, ways: { id: Way; title: string }[], now: number): HTMLElement {
-  const own = wayState(progress, card, way);
+  // A way only copied from reading's schedule when the ways were split has no past of its own yet.
+  const found = wayState(progress, card, way);
+  const own = found && !found.split ? found : undefined;
   const state = own ?? progress.cards[card.id];
   const shown = ways.find((w) => w.id === way)?.title ?? way;
   return h(
@@ -73,12 +75,13 @@ function waysStrip(progress: Progress, card: Card, asked: Way, ways: { id: Way; 
  */
 function skyline(state: CardState, now: number): Element[] {
   const steps = intervalSteps(state, now);
-  // The last step holds today's interval, which can have grown within one strength since the move was logged.
+  const longest = Math.max(state.interval, ...steps.map(([, i]) => i));
+  // The last step holds today's interval, which can have changed within one strength since the move was logged.
   steps[steps.length - 1] = [steps[steps.length - 1][0], state.interval];
   const start = steps[0][0];
   const span = Math.max(now - start, DAY_MS);
   // The tallest step reaches near the top, a week at the least, so a young card's days still stand up.
-  const top = Math.log2(1 + Math.max(7, ...steps.map(([, i]) => i)));
+  const top = Math.log2(1 + Math.max(7, longest));
   const x = (t: number) => ((t - start) / span) * W;
   const y = (interval: number) => H - 6 - (Math.log2(1 + interval) / top) * (H - 12);
   const bars = steps.map(([at, interval], i) => {
@@ -96,7 +99,7 @@ function skyline(state: CardState, now: number): Element[] {
     .map(([at, interval], i) => `${i ? 'L' : 'M'}${x(at).toFixed(1)},${y(interval).toFixed(1)} H${(i + 1 < steps.length ? x(steps[i + 1][0]) : W).toFixed(1)}`)
     .join(' ');
   const days = Math.floor((now - start) / DAY_MS);
-  const label = `Over ${days ? `${days} days` : 'today'}, the longest it was expected to hold was ${formatInterval(Math.max(...steps.map(([, i]) => i)))}; now ${formatInterval(state.interval)}.`;
+  const label = `Over ${days ? `${days} days` : 'today'}, the longest it was expected to hold was ${formatInterval(longest)}; now ${formatInterval(state.interval)}.`;
   return [
     svg(
       'svg',
@@ -145,9 +148,10 @@ function fading(state: CardState, now: number): Element[] {
       },
       svg('path', { class: `area s-${strength}`, d: `M0,${H} L${points.join(' L')} L${W},${H} Z` }),
       svg('path', { class: 'edge', d: `M${points.join(' L')}` }),
-      svg('rect', { class: 'post', x: (Math.min(due, W) - 5).toFixed(1), y: 0, width: 10, height: H }),
+      // Drawn as strokes that don't scale, so the chart can stretch to the card's width and these keep their shape.
+      svg('line', { class: 'post', x1: Math.min(due, W).toFixed(1), x2: Math.min(due, W).toFixed(1), y1: 0, y2: H }),
       svg('line', { class: 'ground', x1: 0, x2: W, y1: H - 1.5, y2: H - 1.5 }),
-      svg('circle', { class: 'now', cx: x(now).toFixed(1), cy: y(chance).toFixed(1), r: 6 }),
+      ...['now-ring', 'now'].map((cls) => svg('line', { class: cls, x1: x(now).toFixed(1), x2: x(now).toFixed(1), y1: y(chance).toFixed(1), y2: y(chance).toFixed(1) })),
     ),
     h('div', { class: 'back-axis' }, h('span', null, `${percent}% likely now`), h('span', null, asks)),
   ];
