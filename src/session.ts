@@ -237,8 +237,8 @@ export function drillWeight(state: CardState, now: number, missed = 0): number {
   const fading = 1 - recallChance(state, now);
   const learning = state.interval < 1 ? 3 : state.interval < 7 ? 1.5 : 0;
   const fresh = now - state.introduced < FRESH_MS ? 2 : 0;
-  // Ease never comes back up on Good, so a hard start stops counting once the card has held a week.
-  const struggled = state.interval < 7 ? Math.min(3, 10 * Math.max(0, START_EASE - state.ease)) : 0;
+  // Ease never comes back up on Good, so a hard start stops counting once the card has held a week. A lapse counts on its own.
+  const struggled = state.interval < 7 && state.lapses === 0 ? Math.min(3, 10 * Math.max(0, START_EASE - state.ease)) : 0;
   return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * missed;
 }
 
@@ -277,7 +277,9 @@ export function pickDrillCard(
   const focus = open.filter((p) => p.focus);
   const total = (ps: typeof open) => ps.reduce((sum, p) => sum + p.w, 0);
   // Never less than the cards settling in would get by weight alone.
-  const share = Math.max(total(focus) / total(open), Math.min(FOCUS_SHARE, FOCUS_PER_CARD * focus.length));
+  // Counted before the sit-out, which so often holds cards settling in that it would shrink their share.
+  const settling = pool.filter((p) => p.focus).length;
+  const share = Math.max(total(focus) / total(open), Math.min(FOCUS_SHARE, FOCUS_PER_CARD * settling));
   // One draw decides both which part of the round and which card in it.
   let r = random();
   let from = open;

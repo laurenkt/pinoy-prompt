@@ -16,6 +16,8 @@ import {
   newCardsLeftToday,
   nextStudyAt,
   nextStudyStep,
+  DRILL_GAP,
+  drillWeight,
   pickDrillCard,
   pickFormat,
   requeue,
@@ -443,6 +445,17 @@ describe('picking the next card to drill', () => {
     expect(share).toBeGreaterThan(0.45);
     // The rest of the round still goes round the others.
     expect(share).toBeLessThan(0.55);
+    // So does a real round, where the last few asked sit out.
+    let recent: string[] = [];
+    let seed = 1;
+    let asked = 0;
+    for (let i = 0; i < 4000; i++) {
+      const id = pickDrillCard(progress, LATER, recent, new Map(), undefined, () => (seed = (seed * 16807) % 2147483647) / 2147483647)!.id;
+      recent = [...recent.slice(-DRILL_GAP), id];
+      if (yesterday.includes(id)) asked++;
+    }
+    expect(asked / 4000).toBeGreaterThan(0.42);
+    expect(asked / 4000).toBeLessThan(0.55);
   });
 
   it("doesn't bring one new word round every few questions", () => {
@@ -460,12 +473,11 @@ describe('picking the next card to drill', () => {
     const progress = settledProgress();
     for (const id of ['kape', 'oo']) progress.cards[id] = { ...progress.cards[id], interval: 3, reviewed: LATER };
     progress.cards.kape.ease = 2.1;
-    let seen = counts(progress);
+    const seen = counts(progress);
     expect(seen.get('kape')!).toBeGreaterThan(seen.get('oo')! * 1.5);
     // Held for months since: its hard start no longer counts.
     for (const id of ['kape', 'oo']) progress.cards[id] = { ...progress.cards[id], interval: 90 };
-    seen = counts(progress);
-    expect(seen.get('kape')).toBe(seen.get('oo'));
+    expect(drillWeight(progress.cards.kape, LATER)).toBe(drillWeight(progress.cards.oo, LATER));
   });
 
   it('drills guides as well as words, as far as the round can ask them', () => {
