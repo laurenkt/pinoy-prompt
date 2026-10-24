@@ -34,6 +34,12 @@ export class RecordError extends Error {
 export interface RecorderEvents {
   /** Input level, 0–1, a few times a second. */
   onLevel?: (level: number) => void;
+  /**
+   * Called once the microphone is giving sound, so what's said from now on is in the take. Until then (the
+   * microphone switching on, iOS handing over the audio session) anything said is lost, so screens show the
+   * learner they're listening only from here.
+   */
+  onListening?: () => void;
   /** Called once when speech is first detected. */
   onSpeech?: () => void;
   /** The microphone gave no sound and has been opened afresh, so anything said so far wasn't heard. */
@@ -92,7 +98,7 @@ export function resample(input: Float32Array, fromRate: number): Float32Array {
 }
 
 /** Start recording. Asks for the microphone if it hasn't been allowed yet. */
-export function record({ onLevel, onSpeech, onRestart }: RecorderEvents = {}): Recording {
+export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEvents = {}): Recording {
   let finish: () => void = () => {};
   let cancelled = false;
   // stop() can come before the microphone is open (e.g. during the permission prompt).
@@ -200,11 +206,13 @@ export function record({ onLevel, onSpeech, onRestart }: RecorderEvents = {}): R
       processor.onaudioprocess = (e) => {
         const block = new Float32Array(e.inputBuffer.getChannelData(0));
         chunks.push(block);
+        const before = signal;
         let sum = 0;
         for (const v of block) {
           sum += v * v;
           if (!signal && Math.abs(v) > SIGNAL_LEVEL) signal = true;
         }
+        if (signal && !before) onListening?.();
         const level = Math.sqrt(sum / block.length);
         onLevel?.(Math.min(1, level * 8));
         const blockMs = (block.length / context.sampleRate) * 1000;

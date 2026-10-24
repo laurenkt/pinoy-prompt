@@ -126,12 +126,21 @@ const SCREENS = {
     await page.click('.drills-btn');
   },
   // A round of Speak only, with the real speech model (about 70 MB, downloaded once into node_modules/.cache) and a
-  // stand-in microphone: ready to listen, then listening.
+  // stand-in microphone: ready to listen, getting the mic ready (a microphone that never gives sound), then listening.
   'drills-speak': (page) => speakOnly(page),
+  'drills-speak-starting': async (page) => {
+    await speakOnly(page);
+    await page.evaluate(async () => {
+      const { defaultDeps } = await import('/src/screens/speak.ts');
+      defaultDeps.record = () => ({ audio: new Promise(() => {}), stop() {}, cancel() {} });
+    });
+    await page.click('.btn.mic');
+    await page.waitForSelector('.speak.phase-starting');
+  },
   'drills-speaking': async (page) => {
     await speakOnly(page);
     await page.click('.btn.mic');
-    await page.waitForSelector('.speak.recording');
+    await page.waitForSelector('.speak.live');
   },
   'drills-answered': async (page) => {
     await page.click('.drills-btn');
@@ -169,8 +178,12 @@ const SCREENS = {
   // The same, dragging along the recording instead.
   'speak-result-ribbon': (page) => scrubAlong(page, 'speak-result-ribbon', '.ribbon'),
   // Listen only, on settled words, with a key for OpenAI: the meaning said into the box, as a wave of levels from a
-  // stand-in microphone, then being heard (OpenAI never answers here).
+  // stand-in microphone, then being heard (OpenAI never answers here). Before that, the microphone getting ready.
   'drills-saying': (page) => sayMeaning(page),
+  'drills-saying-starting': async (page) => {
+    await typedOnly(page, 'listen', false);
+    await page.click('.meaning-mic');
+  },
   // Recall only, on settled words, with a key for OpenAI: the Tagalog to type (or say), then typed right.
   'drills-recall': (page) => typedOnly(page, 'recall'),
   'drills-recall-answered': async (page) => {
@@ -423,9 +436,10 @@ async function sayMeaning(page) {
 
 /**
  * Drills, asking only `mode` (Listen or Recall) on words settled in Study, so the answer is typed, with a key for
- * OpenAI (which never answers here) and a stand-in microphone, so the box offers to hear it said.
+ * OpenAI (which never answers here) and a stand-in microphone, so the box offers to hear it said. The microphone
+ * gives sound a moment after it's tapped, unless `live` is false.
  */
-async function typedOnly(page, mode) {
+async function typedOnly(page, mode, live = true) {
   await page.route('https://api.openai.com/**', () => {});
   await page.evaluate(async () => {
     const { load, recordAnswer, save } = await import('/src/store.ts');
@@ -437,17 +451,19 @@ async function typedOnly(page, mode) {
   });
   await page.reload();
   await page.waitForSelector('.home');
-  await page.evaluate(async () => {
+  await page.evaluate(async (live) => {
     const { defaultDeps } = await import('/src/screens/speak.ts');
     // A voice that rises and falls, a dozen levels a second, until it's stopped.
     defaultDeps.recordingSupported = () => true;
     defaultDeps.microphoneAllowed = () => true;
-    defaultDeps.record = ({ onLevel } = {}) => {
+    defaultDeps.record = ({ onLevel, onListening } = {}) => {
+      if (!live) return { audio: new Promise(() => {}), stop() {}, cancel() {} };
       let finish = () => {};
       const audio = new Promise((resolve) => (finish = () => resolve({ samples: new Float32Array(16000), speech: true })));
       let n = 0;
       const timer = setInterval(() => {
         n++;
+        if (n === 2) onListening?.();
         onLevel?.(n < 6 ? 0.02 : Math.abs(Math.sin(n / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(n / 7))));
       }, 85);
       const end = () => {
@@ -456,7 +472,7 @@ async function typedOnly(page, mode) {
       };
       return { audio, stop: end, cancel: end };
     };
-  });
+  }, live);
   await page.click('.drills-btn');
   await page.click('.filter-toggle');
   for (const other of ['listen', 'read', 'recall', 'speak']) {

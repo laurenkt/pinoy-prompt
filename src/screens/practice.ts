@@ -117,6 +117,8 @@ export function practiceScreen(
   let checking = false;
   /** Recording a spoken meaning, from a tap on the box's microphone button. */
   let listening: Recording | null = null;
+  /** Whether that recording's microphone gives sound yet (onListening); until then, anything said is lost. */
+  let micLive = false;
   /** The recording whose spoken meaning is being turned into text; a reply for any other is dropped. */
   let hearing: Recording | null = null;
   /** Waiting for a pause in typing before taking a right meaning without Check. */
@@ -346,7 +348,13 @@ export function practiceScreen(
     // Starts flat and fills from the right as the level comes in.
     const wave = (q.wave = new Array<number>(WAVE_BARS).fill(0));
     q.thinkingSince = undefined;
+    micLive = false;
     const recording = deps.record({
+      onListening: () => {
+        if (listening !== recording) return;
+        micLive = true;
+        draw();
+      },
       onLevel: (level) => {
         if (listening !== recording) return;
         wave.push(level);
@@ -713,15 +721,16 @@ export function practiceScreen(
   }
 
   /**
-   * What the microphone heard, as bars, in place of the box while the meaning is said; they run across while what
-   * was said is heard and checked.
+   * What the microphone heard, as bars, in place of the box while the meaning is said: faint until the microphone
+   * gives sound, then on saffron. They run across while what was said is heard and checked.
    */
   function waveBox(levels: number[], thinkingSince: number | undefined): HTMLElement {
     const thinking = thinkingSince !== undefined;
+    const live = listening !== null && micLive;
     return h(
       'div',
       {
-        class: `meaning-wave${thinking ? ' thinking' : ''}`,
+        class: `meaning-wave${thinking ? ' thinking' : ''}${live ? ' live' : ''}`,
         'aria-hidden': 'true',
         style: thinking ? `--since: ${Date.now() - thinkingSince}ms` : undefined,
       },
@@ -777,7 +786,9 @@ export function practiceScreen(
       hearMeaning() !== null &&
       micButton(q);
     const status = listening
-      ? tagalog
+      ? !micLive
+        ? 'Getting the mic ready…'
+        : tagalog
         ? 'Listening… say it in Tagalog.'
         : 'Listening… say what it means.'
       : hearing

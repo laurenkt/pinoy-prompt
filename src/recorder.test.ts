@@ -140,6 +140,33 @@ describe('a microphone that gives no sound', () => {
     expect(opened[0].track.readyState).toBe('ended');
   });
 
+  it('says it is listening only once the microphone gives sound, and only once', async () => {
+    const onListening = vi.fn();
+    const recording = record({ onListening });
+    await started();
+    // Switching on: exact silence, so anything said now would be lost.
+    FakeRecorderContext.last.feed(0);
+    FakeRecorderContext.last.feed(0);
+    expect(onListening).not.toHaveBeenCalled();
+    FakeRecorderContext.last.feed(0.0005);
+    expect(onListening).toHaveBeenCalledOnce();
+    FakeRecorderContext.last.feed(0.2);
+    expect(onListening).toHaveBeenCalledOnce();
+    recording.stop();
+    await recording.audio;
+  });
+
+  it('says it is listening only once the reopened microphone gives sound', async () => {
+    const onListening = vi.fn();
+    const recording = record({ onListening });
+    await started();
+    await vi.advanceTimersByTimeAsync(SIGNAL_WAIT_MS);
+    expect(onListening).not.toHaveBeenCalled();
+    FakeRecorderContext.last.feed(0.0005);
+    expect(onListening).toHaveBeenCalledOnce();
+    recording.cancel();
+  });
+
   it('tells the learner to say it again once the microphone is reopened', async () => {
     const onRestart = vi.fn();
     const recording = record({ onRestart });
