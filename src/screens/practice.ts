@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
-import { RecordError, SPEECH_METER, toWav, type Recording } from '../recorder';
+import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
@@ -363,16 +363,13 @@ export function practiceScreen(
         const status = root.querySelector('.meaning-status');
         if (status) status.textContent = listeningText(q);
       },
-      onLevel: (level) => {
-        if (listening !== recording || level < SPEECH_METER) return;
+      onLevel: (level, speech) => {
+        if (listening !== recording || !speech) return;
         wave.push(level);
         // Once the box is full, the oldest goes off the left.
         if (wave.length > WAVE_BARS) wave.shift();
-        // Add the bar in place rather than redraw the round, a dozen times a second.
-        const box = root.querySelector('.meaning-wave');
-        if (!box) return;
-        box.append(waveBar(level, wave.length - 1));
-        if (box.children.length > WAVE_BARS) box.firstElementChild?.remove();
+        // Redraw the bars in place rather than the round, a dozen times a second.
+        root.querySelector('.meaning-wave')?.replaceChildren(...wave.map(waveBar));
       },
     });
     listening = recording;

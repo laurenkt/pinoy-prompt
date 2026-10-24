@@ -1315,7 +1315,7 @@ p {
   min-width: 0;
 }
 
-/* While the meaning is said, the box shows the microphone's level as bars coming in from the right, sharing its width. */
+/* While the meaning is said, the box shows the microphone's level as bars, growing from the left while there's speech. */
 .meaning-wave {
   flex: 1;
   min-width: 0;
@@ -1339,7 +1339,6 @@ p {
   height: calc(4px + var(--level, 0) * 30px);
   border-radius: 2px;
   background: var(--on-accent);
-  transition: height 0.08s linear;
 }
 
 /*

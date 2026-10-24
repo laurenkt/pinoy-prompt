@@ -491,9 +491,9 @@ describe('saying the meaning out loud', () => {
   });
 
   it('draws what the microphone hears in the box, and runs along it while that is heard and checked', async () => {
-    let onLevel: ((level: number) => void) | undefined;
+    let onLevel: ((level: number, speech: boolean) => void) | undefined;
     let finish: (t: Take) => void = () => {};
-    const record = vi.fn((events?: { onLevel?: (level: number) => void }) => {
+    const record = vi.fn((events?: { onLevel?: (level: number, speech: boolean) => void }) => {
       onLevel = events?.onLevel;
       return { audio: new Promise<Take>((r) => (finish = r)), stop: () => {}, cancel: () => {} };
     });
@@ -509,19 +509,19 @@ describe('saying the meaning out loud', () => {
     expect(box(root)).toBeNull();
     expect(root.querySelector('.meaning-wave.thinking')).toBeNull();
     expect(bars()).toEqual([]);
-    onLevel!(0.01);
+    onLevel!(0.01, false);
     expect(bars()).toEqual([]);
-    onLevel!(0.5);
-    onLevel!(0.01);
-    onLevel!(0.25);
+    onLevel!(0.5, true);
+    onLevel!(0.01, false);
+    onLevel!(0.25, true);
     expect(bars()).toEqual([0.5, 0.25]);
     // Once it's full, the oldest goes off the left.
-    for (let i = 0; i < 60; i++) onLevel!(0.75);
+    for (let i = 0; i < 60; i++) onLevel!(0.75, true);
     expect(bars()).toHaveLength(48);
     expect(bars().every((v) => v === 0.75)).toBe(true);
-    for (let i = 0; i < 60; i++) onLevel!(0.01);
-    onLevel!(0.5);
-    onLevel!(0.25);
+    for (let i = 0; i < 60; i++) onLevel!(0.01, false);
+    onLevel!(0.5, true);
+    onLevel!(0.25, true);
     finish({ samples: new Float32Array(160), speech: true });
     await flush();
     // Hearing it: the same wave, kept across the redraw, with the beat running along it.
