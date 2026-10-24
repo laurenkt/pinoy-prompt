@@ -1331,7 +1331,8 @@ p {
 }
 
 .meaning-wave span {
-  flex: 1 1 0;
+  /* Each bar its slot of the box (--bars of them), so the wave grows from the left without the bars resizing. */
+  flex: 0 0 calc((100% - (var(--bars) - 1) * 2px) / var(--bars));
   min-width: 0;
   max-width: 5px;
   /* At most 34px, and 44px as the beat passes, inside the box's 50px. */
@@ -1382,13 +1383,9 @@ p {
 }
 
 /*
- * Saying a meaning: the box stays cream with faint bars while the microphone gets ready, and turns saffron once it
+ * Saying a meaning: the box stays cream and empty while the microphone gets ready, and turns saffron once it
  * gives sound (.live), as Speak's big button does, so it's plain when to start.
  */
-.meaning-wave:not(.live, .thinking) span {
-  opacity: 0.35;
-}
-
 .meaning-wave.live {
   background: var(--saffron);
 }

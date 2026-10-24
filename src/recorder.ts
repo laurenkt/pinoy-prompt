@@ -11,6 +11,10 @@ import { closeMicrophone, dropMicrophone, getMicrophone, liveMicrophone, microph
 
 /** Level (RMS, 0–1) above which a block counts as speech. */
 const SPEECH_LEVEL = 0.02;
+/** onLevel reports RMS scaled by this, so speech fills a meter. */
+const METER_GAIN = 8;
+/** The level onLevel reports for a block that counts as speech: below it, a meter is hearing only the room. */
+export const SPEECH_METER = SPEECH_LEVEL * METER_GAIN;
 /** Stop this long after speech ends. */
 const TRAILING_SILENCE_MS = 900;
 /** Never record longer than this, counted from when the microphone gave sound (it may be reopened first: SIGNAL_WAIT_MS). */
@@ -343,7 +347,7 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
         }
         if (signal && !before) onListening?.();
         const level = Math.sqrt(sum / block.length);
-        onLevel?.(Math.min(1, level * 8));
+        onLevel?.(Math.min(1, level * METER_GAIN));
         const blockMs = (block.length / context.sampleRate) * 1000;
         elapsedMs += blockMs;
         if (level > SPEECH_LEVEL) {

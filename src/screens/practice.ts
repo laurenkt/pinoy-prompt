@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
-import { RecordError, toWav, type Recording } from '../recorder';
+import { RecordError, SPEECH_METER, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
@@ -350,8 +350,8 @@ export function practiceScreen(
     // The word playing would be recorded too.
     stop();
     q.unheard = undefined;
-    // Starts flat and fills from the right as the level comes in.
-    const wave = (q.wave = new Array<number>(WAVE_BARS).fill(0));
+    // Starts empty and grows from the left, a bar for each moment of speech, so silence draws nothing.
+    const wave: number[] = (q.wave = []);
     q.thinkingSince = undefined;
     micLive = false;
     const recording = deps.record({
@@ -364,12 +364,15 @@ export function practiceScreen(
         if (status) status.textContent = listeningText(q);
       },
       onLevel: (level) => {
-        if (listening !== recording) return;
+        if (listening !== recording || level < SPEECH_METER) return;
         wave.push(level);
-        wave.shift();
-        const bars = root.querySelectorAll<HTMLElement>('.meaning-wave span');
-        // Move each bar's height one along rather than redraw the box, a dozen times a second.
-        bars.forEach((bar, i) => bar.style.setProperty('--level', String(wave[i])));
+        // Once the box is full, the oldest goes off the left.
+        if (wave.length > WAVE_BARS) wave.shift();
+        // Add the bar in place rather than redraw the round, a dozen times a second.
+        const box = root.querySelector('.meaning-wave');
+        if (!box) return;
+        box.append(waveBar(level, wave.length - 1));
+        if (box.children.length > WAVE_BARS) box.firstElementChild?.remove();
       },
     });
     listening = recording;
@@ -742,8 +745,9 @@ export function practiceScreen(
   }
 
   /**
-   * What the microphone heard, as bars, in place of the box while the meaning is said: faint until the microphone
-   * gives sound, then on saffron. They run across while what was said is heard and checked.
+   * What the microphone heard, as bars, in place of the box while the meaning is said: empty and cream until the
+   * microphone gives sound, then saffron, with a bar added from the left only while there's speech. A beat runs
+   * along them while what was said is heard and checked.
    */
   function waveBox(levels: number[], thinkingSince: number | undefined): HTMLElement {
     const thinking = thinkingSince !== undefined;
@@ -753,11 +757,13 @@ export function practiceScreen(
       {
         class: `meaning-wave${thinking ? ' thinking' : ''}${live ? ' live' : ''}`,
         'aria-hidden': 'true',
-        style: thinking ? `--since: ${Date.now() - thinkingSince}ms` : undefined,
+        style: `--bars: ${WAVE_BARS}${thinking ? `; --since: ${Date.now() - thinkingSince}ms` : ''}`,
       },
-      levels.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` })),
+      levels.map(waveBar),
     );
   }
+
+  const waveBar = (level: number, i: number) => h('span', { style: `--level: ${level}; --i: ${i}` });
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
@@ -865,7 +871,7 @@ export function practiceScreen(
   return root;
 }
 
-/** Bars in the box while a meaning is said, sharing its width: four seconds at about twelve levels a second. */
+/** Bars the box holds while a meaning is said, each a slot of its width: four seconds of speech at about twelve levels a second. */
 const WAVE_BARS = 48;
 
 /** How long typing has to pause before a meaning the device can tell is right is taken without Check. */

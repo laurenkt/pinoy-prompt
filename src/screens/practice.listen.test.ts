@@ -504,17 +504,29 @@ describe('saying the meaning out loud', () => {
     document.body.replaceChildren(root);
     const bars = () => [...root.querySelectorAll<HTMLElement>('.meaning-wave span')].map((b) => Number(b.style.getPropertyValue('--level')));
     micButton(root)!.click();
-    // The box gives way to a flat line, which fills from the right as the level comes in.
+    // The box gives way to an empty wave, which grows from the left only while there's speech: the room's hiss and
+    // the pauses draw nothing.
     expect(box(root)).toBeNull();
     expect(root.querySelector('.meaning-wave.thinking')).toBeNull();
-    expect(bars().every((v) => v === 0)).toBe(true);
+    expect(bars()).toEqual([]);
+    onLevel!(0.01);
+    expect(bars()).toEqual([]);
+    onLevel!(0.5);
+    onLevel!(0.01);
+    onLevel!(0.25);
+    expect(bars()).toEqual([0.5, 0.25]);
+    // Once it's full, the oldest goes off the left.
+    for (let i = 0; i < 60; i++) onLevel!(0.75);
+    expect(bars()).toHaveLength(48);
+    expect(bars().every((v) => v === 0.75)).toBe(true);
+    for (let i = 0; i < 60; i++) onLevel!(0.01);
     onLevel!(0.5);
     onLevel!(0.25);
-    expect(bars().slice(-2)).toEqual([0.5, 0.25]);
     finish({ samples: new Float32Array(160), speech: true });
     await flush();
     // Hearing it: the same wave, kept across the redraw, with the beat running along it.
     expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
+    expect(bars()).toHaveLength(48);
     expect(bars().slice(-2)).toEqual([0.5, 0.25]);
     heard('Many thanks.');
     await flush();
