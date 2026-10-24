@@ -70,41 +70,56 @@ describe('recalling words still being learned', () => {
   });
 });
 
-describe("how well the card is known", () => {
-  const toggle = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('.prompt .memory-toggle')!;
-  const details = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-memory')!;
+describe("how well the card is known, on its back", () => {
+  const card = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt')!;
+  const back = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-back')!;
+  const front = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-front')!;
 
-  it('stays hidden until the button on the prompt is tapped, and shuts again for the next question', () => {
+  it('turns over with a tap anywhere on the card, back again with another, and is face up for the next question', () => {
     const app = learner(false);
     // Recalling it is a card of its own (see Way), started here and still being learned; reading it is held for weeks.
     app.progress.cards['salamat:recall'] = { ...app.progress.cards.salamat, interval: 0 };
     app.progress.cards.salamat.interval = 30;
     const root = (last = recall(app));
-    expect(root.querySelector('.prompt .eyebrow')?.textContent).toBe('How do you say… ');
-    expect(details(root).hidden).toBe(true);
-    expect(toggle(root).getAttribute('aria-expanded')).toBe('false');
-    toggle(root).click();
-    expect(details(root).hidden).toBe(false);
-    expect(toggle(root).getAttribute('aria-expanded')).toBe('true');
-    expect(details(root).querySelector('.badge.s-new')?.textContent).toBe('Memory: Just met');
-    // Still open once answered, as nothing about it changed.
+    expect(back(root).hidden).toBe(true);
+    expect(root.querySelector('.prompt button')?.getAttribute('aria-expanded')).toBe('false');
+    root.querySelector<HTMLElement>('.prompt-en')!.click();
+    expect(back(root).hidden).toBe(false);
+    expect(front(root).hidden).toBe(true);
+    expect(card(root).classList.contains('turned')).toBe(true);
+    expect(root.querySelector('.prompt button')?.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('.way-tile.asked')?.className).toContain('s-new');
+    expect(root.querySelector('.way-tile.s-long .way-name')?.textContent).toBe('Read');
+    // Still turned once answered, as nothing on it changed.
     root.querySelector<HTMLButtonElement>('.choice')!.click();
-    expect(details(root).hidden).toBe(false);
+    expect(back(root).hidden).toBe(false);
+    back(root).click();
+    expect(back(root).hidden).toBe(true);
+    back(root).click();
     button(root, 'Next').click();
-    expect(details(root).hidden).toBe(true);
+    expect(back(root).hidden).toBe(true);
   });
 
-  it('follows the schedule of the way it is asked, with how often Study asked it and the drills helped', () => {
+  it("doesn't turn for a tap on one of the card's own controls", () => {
+    const app = learner(true);
+    const root = (last = practiceScreen(app, noMic));
+    document.body.replaceChildren(root);
+    drillScope(root, ['read']);
+    root.querySelector<HTMLButtonElement>('.prompt .audio-btn')!.click();
+    expect(back(root).hidden).toBe(true);
+  });
+
+  it('draws the way asked from its own schedule, with how often Study asked it and the drills helped', () => {
     const app = learner(true);
     Object.assign(app.progress.cards['salamat:recall'], { interval: 30, due: app.now() + 30 * DAY_MS, reviews: 6, lapses: 1 });
     app.progress.cards.salamat.help = { recall: 2 };
     const root = (last = recall(app));
-    toggle(root).click();
-    const text = details(root).textContent;
-    expect(details(root).querySelector('.badge.s-long')?.textContent).toBe('Memory: Long-term');
-    expect(text).toContain('Next in StudyIn 1mo');
-    expect(text).toContain('Answered in Study6 times, forgotten once');
-    expect(text).toContain('Help in DrillsNeeded twice lately');
+    card(root).click();
+    expect(root.querySelector('.way-tile.asked')?.className).toContain('s-long');
+    expect(root.querySelectorAll('.way-tile.asked .pip.on')).toHaveLength(2);
+    expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent)).toEqual(['6', '1', '0']);
+    expect(root.querySelector('.fading')?.getAttribute('aria-label')).toContain('Study asks in 1mo');
+    expect(root.querySelector('.skyline .step.s-long')).not.toBeNull();
   });
 
   it("leaves out reading's lapses on a way only copied from its schedule", () => {
@@ -112,17 +127,15 @@ describe("how well the card is known", () => {
     Object.assign(app.progress.cards['salamat:recall'], { split: true, lapses: 2, reps: 3 });
     delete app.progress.cards['salamat:recall'].reviews;
     const root = (last = recall(app));
-    toggle(root).click();
-    expect(details(root).textContent).toContain('Answered in StudyNot yet');
-    expect(details(root).textContent).not.toContain('forgotten');
+    card(root).click();
+    expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent).slice(0, 2)).toEqual(['0', '0']);
   });
 
-  it("says a way Study hasn't asked yet hasn't been answered", () => {
+  it("draws a way Study hasn't asked yet from reading, and says so", () => {
     const root = (last = recall(learner(false)));
-    toggle(root).click();
-    expect(details(root).querySelector('.badge')).toBeNull();
-    expect(details(root).textContent).toContain('MemoryStudy hasn’t asked it this way yet');
-    expect(details(root).textContent).toContain('Help in DrillsNot needed lately');
+    card(root).click();
+    expect(root.querySelector('.way-tile.asked')?.classList.contains('none')).toBe(true);
+    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so this is reading it.');
   });
 });
 

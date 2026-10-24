@@ -169,14 +169,14 @@ const SCREENS = {
     await page.click('.drills-btn');
     await page.click('.choice');
   },
-  // How well the card is known, opened from the button on the prompt.
+  // How well the card is known, on the back of the card, turned over with a tap.
   'drills-memory': async (page) => {
     await page.click('.drills-btn');
-    await page.click('.memory-toggle');
+    await page.click('.prompt .eyebrow');
   },
   'drills-gap-memory': async (page) => {
     await drillGuide(page, 'read');
-    await page.click('.memory-toggle');
+    await page.click('.prompt .eyebrow');
   },
   // A pattern in a drill round, asked as Study asks it: a gap to fill under Read, a sentence to build under Recall.
   'drills-gap': (page) => drillGuide(page, 'read'),

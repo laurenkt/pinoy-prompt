@@ -461,7 +461,8 @@ export function clickSamples(rate: number, level = 0.1): Float32Array {
  * Everything that can be tapped: buttons, a section opening (`summary`), links, checkboxes and radios.
  * A label isn't listed, as tapping one clicks its checkbox too.
  */
-const TAPPABLE = 'button, summary, a[href], [role="button"], input[type="checkbox"], input[type="radio"]';
+/** A drill card that turns over when tapped anywhere on it (`data-turnable`) clicks like a pill. */
+const TAPPABLE = 'button, summary, a[href], [role="button"], input[type="checkbox"], input[type="radio"], [data-turnable]';
 /** The big chunky buttons, which thock; everything else tappable (chips, pills, small and text controls) clicks. */
 const CHUNKY = '.btn:not(.small), .hub-btn, .choice, .rate, .icon-btn';
 

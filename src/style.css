@@ -87,7 +87,8 @@ svg,
 .segmented,
 .stat,
 .strength-card,
-.badge {
+.badge,
+.card-back {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -2471,63 +2472,6 @@ p {
   background: var(--teal);
 }
 
-/* Drills: how well the card is known, out of sight until the small button after the prompt's eyebrow is tapped. The
-   button is drawn smaller than a tap target, so the eyebrow line and the card stay as tall as before, and its tap area
-   reaches out to 44px around it. */
-.memory-toggle {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  margin: -6px 0;
-  display: inline-grid;
-  place-items: center;
-  vertical-align: middle;
-  background: var(--cream);
-  color: var(--on-accent);
-  border: var(--outline);
-  border-radius: 99px;
-  box-shadow: 3px 3px 0 var(--ink);
-  font-size: 0.9rem;
-}
-
-.memory-toggle::before {
-  content: '';
-  position: absolute;
-  inset: -7px;
-}
-
-.memory-toggle[aria-expanded='true'] {
-  background: var(--ink);
-  color: var(--cream);
-}
-
-.card-memory {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 12px;
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: var(--outline);
-  font-size: 0.85rem;
-  text-align: left;
-}
-
-.card-memory[hidden] {
-  display: none;
-}
-
-.card-memory dt {
-  font-weight: 800;
-}
-
-.card-memory dd {
-  margin: 0;
-}
-
-/* Outlined, so a strength's colour shows on the prompt's own. */
-.card-memory .badge {
-  border: 2px solid var(--ink);
-}
 
 /* Talk */
 
@@ -3061,4 +3005,213 @@ p {
 /* Settings: how long the test word took to be heard, under the Test voice button. */
 .voice-lag {
   margin: 12px 0 0;
+}
+
+/* A drill card turns over when tapped (promptBlock in guide-question.ts): its back is the night side of the card, how
+   well it's known in the strength colours of Home's chart. */
+.prompt[data-turnable] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prompt.turning {
+  animation: card-turn 0.28s ease-out;
+}
+
+@keyframes card-turn {
+  from {
+    transform: perspective(900px) rotateY(80deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt.turning {
+    animation: none;
+  }
+}
+
+.prompt.turned {
+  background: var(--on-accent);
+  color: var(--cream);
+}
+
+.card-back {
+  text-align: left;
+}
+
+.card-back[hidden] {
+  display: none;
+}
+
+.back-title {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--saffron);
+  margin: 0 0 12px;
+}
+
+.back-note {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 12px 0 0;
+}
+
+.way-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.way-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 6px 6px;
+  border: var(--outline);
+  border-radius: 14px;
+  color: var(--on-accent);
+}
+
+.way-tile.none {
+  background: repeating-linear-gradient(45deg, var(--surface) 0 6px, var(--surface-dim) 6px 12px);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* The way asked now stands up off the card. */
+.way-tile.asked {
+  box-shadow: 4px 4px 0 var(--cream);
+  transform: translate(-2px, -2px);
+}
+
+.way-name {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.way-held {
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.pips {
+  display: flex;
+  gap: 3px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.pip {
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.pip.on {
+  background: currentColor;
+}
+
+.back-section {
+  margin-top: 14px;
+}
+
+.back-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+
+.back-chart {
+  display: block;
+  width: 100%;
+  height: 72px;
+  overflow: visible;
+}
+
+.back-chart .step,
+.back-chart .area {
+  stroke: none;
+}
+
+.back-chart .s-new {
+  fill: var(--cream);
+}
+
+.back-chart .s-days {
+  fill: var(--pink);
+}
+
+.back-chart .s-weeks {
+  fill: var(--saffron);
+}
+
+.back-chart .s-long {
+  fill: var(--teal);
+}
+
+.back-chart .edge {
+  fill: none;
+  stroke: var(--cream);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.back-chart .ground {
+  stroke: var(--cream);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Where Study asks it again: a saffron post. */
+.back-chart .post {
+  fill: var(--saffron);
+  opacity: 0.85;
+}
+
+.back-chart .now {
+  fill: var(--ink);
+  stroke: var(--cream);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.back-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.count-n {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--saffron);
+}
+
+.count-label {
+  font-size: 0.75rem;
+  color: var(--muted);
 }
