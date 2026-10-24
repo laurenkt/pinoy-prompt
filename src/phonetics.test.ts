@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coach } from './coach';
 import { ALL_CARDS } from './deck';
-import { compare, groupTokens, soundDistance, toPhones } from './phonetics';
+import { compare, englishReadings, groupTokens, soundDistance, toPhones } from './phonetics';
 
 /** The required sounds, joined, for compact assertions. */
 const sounds = (text: string) =>
@@ -166,6 +166,22 @@ describe('compare', () => {
 
   it("doesn't penalise leaving out an optional catch", () => {
     expect(compare(toPhones('Oo'), ['o', 'o']).score).toBe(1);
+  });
+});
+
+describe('englishReadings', () => {
+  it('finds a g before e or i said the English way, as in "giant"', () => {
+    expect(englishReadings('Gising ka na ba?', ['dʒ', 'i', 's', 'i', 'ŋ', 'k', 'a', 'n', 'a', 'b', 'a'])).toEqual([{ letters: 'Gi', heard: 'dʒ' }]);
+    expect(englishReadings('saging', ['s', 'a', 'ʒ', 'i', 'ŋ'])).toEqual([{ letters: 'gi', heard: 'ʒ' }]);
+    // Lined up as a missing g, with the soft g beside it or in the vowel's place.
+    expect(englishReadings('gising', ['ʒ', 'dʒ', 'i'])).toEqual([{ letters: 'gi', heard: 'ʒ' }]);
+  });
+
+  it('passes a hard g, and leaves other slips to the transcript check', () => {
+    expect(englishReadings('Gising ka na ba?', ['ɡ', 'i', 's', 'e', 'n', 'k', 'a', 'n', 'ə', 'b', 'a'])).toEqual([]);
+    // Before a, o or u English says g hard too, so a slip there is the recogniser's, not an English reading.
+    expect(englishReadings('Magandang umaga', ['m', 'a', 'd', 'a', 'n', 'd', 'a', 'ŋ', 'u', 'm', 'a', 'ɡ', 'a'])).toEqual([]);
+    expect(englishReadings('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 'd'])).toEqual([]);
   });
 });
 

@@ -469,3 +469,30 @@ export function compare(expected: Phone[], heard: string[]): Comparison {
   const added = extra.filter((e) => e.counts).length * EXTRA_WEIGHT;
   return { sounds, extra, score: counted.length ? points / (counted.length + added) : 0 };
 }
+
+// --- Checking recorded clips ------------------------------------------------
+
+/**
+ * How English reads a g before e or i ("gem", "giant"), which Tagalog never does.
+ * The recogniser also hears a soft g as d at times: it heard both "jising" and
+ * "dising" in one clip at two speeds, while every hard g in the deck came out ɡ.
+ */
+const SOFT_G = new Set(['dʒ', 'ʒ', 'dʑ', 'ʑ', 'd']);
+
+/**
+ * Letters a recording said the English way rather than the Tagalog way, for
+ * scripts/generate-audio.mjs to reject a take: a voice that sees "Gising" can
+ * read it like "giant". Tagalog g is always hard, as in "go".
+ */
+export function englishReadings(text: string, heard: string[]): { letters: string; heard: string }[] {
+  const spelled = text.toLowerCase().normalize('NFC');
+  const { sounds, extra } = compare(toPhones(spelled), heard);
+  return sounds.flatMap(({ phone, verdict, heard: said }, k) => {
+    if (phone.ipa !== 'ɡ' || verdict === 'good' || !/[ei]/.test(spelled[phone.to] ?? '')) return [];
+    // A sound so far off can instead be lined up with the vowel after a missing g, or as an added one beside it.
+    const near = [...extra.filter((e) => e.before === k || e.before === k + 1).map((e) => e.ipa), verdict === 'missing' ? sounds[k + 1]?.heard : undefined];
+    const candidates = [said, ...near];
+    const soft = candidates.find((ipa) => ipa !== undefined && SOFT_G.has(baseSound(ipa)));
+    return soft ? [{ letters: text.normalize('NFC').slice(phone.from, phone.to + 1), heard: soft }] : [];
+  });
+}

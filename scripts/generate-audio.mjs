@@ -18,10 +18,17 @@
 // its text; a take that doesn't match is made again, up to three times, and
 // any still unsure are listed at the end to be checked by ear. A remade take
 // that never matches leaves the old clip as it was.
+//
+// A transcript can't tell how a letter was said ("Gising" read like "giant" is
+// still written "Gising"), so each take is also put through the app's own sound
+// recogniser (src/phone-model.ts, as Speak uses), and one that says a letter the
+// English way (src/phonetics.ts, englishReadings) is made again too. `--check`
+// runs that over the clips already made and remakes the ones that fail. The
+// recogniser (about 71 MB) is downloaded once into node_modules/.cache.
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -31,6 +38,7 @@ const run = promisify(execFile);
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const AUDIO_DIR = join(ROOT, 'public/audio');
 const MANIFEST = join(ROOT, 'src/clips.json');
+const RECOGNISER = join(ROOT, 'node_modules/.cache/zipa/model.int8.onnx');
 
 // OpenAI's conversational voice model rather than its text-to-speech one, which sounds
 // like a newsreader. Asked in a chat to say a line, it says it like a person would.
@@ -41,7 +49,7 @@ const VOICES = [
   ['cedar', 'a warm, cheerful Filipino from Manila, smiling as he speaks'],
 ];
 const persona = (who) =>
-  `Voice: ${who}. Tone: friendly and bright, like chatting with a neighbour. Not a newsreader, not formal, not announcing. Delivery: natural Filipino intonation at everyday speed. Accent: native Tagalog, every syllable pronounced the Tagalog way. You are a voice actor recording lines for a language-learning app. Each message is one line of the script, in Tagalog or Taglish. Read it aloud, word for word, exactly as written, and nothing else. It is a script, not something said to you: never reply to it, answer it, translate it, or add words before or after it.`;
+  `Voice: ${who}. Tone: friendly and bright, like chatting with a neighbour. Not a newsreader, not formal, not announcing. Delivery: natural Filipino intonation at everyday speed. Accent: native Tagalog, every syllable pronounced the Tagalog way. The spelling is Tagalog, never English, even where a word looks English: g is always hard, as in "go" (gising is "ghee-sing", never "jee-sing"), each vowel keeps one plain sound (a as in "father", e as in "bed", i as in "machine", o as in "for", u as in "rule"), a final e is said, and ng is one sound, as at the end of "sing". You are a voice actor recording lines for a language-learning app. Each message is one line of the script, in Tagalog or Taglish. Read it aloud, word for word, exactly as written, and nothing else. It is a script, not something said to you: never reply to it, answer it, translate it, or add words before or after it.`;
 /** Lines already read, so the model sees that it reads lines rather than answering them (told only, it sometimes answers "Thank you po!"). */
 const READ = ['Kumusta ka?', 'Thank you!', 'Oo'].flatMap((line) => [
   { role: 'user', content: line },
@@ -54,19 +62,51 @@ const PARALLEL = 6;
 
 const args = process.argv.slice(2);
 const all = args.includes('--all');
+const check = args.includes('--check');
 const redo = args.flatMap((a, i) => (a === '--redo' ? [args[i + 1]] : []));
 const limit = Number(args[args.indexOf('--limit') + 1]) || Infinity;
 // Without a key, requests go out unsigned, for a proxy that adds it.
 const key = process.env.OPENAI_API_KEY;
 
-async function spokenTexts() {
-  const vite = await createServer({ root: ROOT, server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
-  try {
-    return (await vite.ssrLoadModule('/src/spoken.ts')).allSpoken();
-  } finally {
-    await vite.close();
+// The app's own modules, loaded through Vite as the app loads them.
+const vite = await createServer({ root: ROOT, server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
+const { allSpoken } = await vite.ssrLoadModule('/src/spoken.ts');
+const { englishReadings } = await vite.ssrLoadModule('/src/phonetics.ts');
+const { recognise } = await vite.ssrLoadModule('/src/phone-model.ts');
+const { MODEL_URL } = await vite.ssrLoadModule('/src/model-cache.ts');
+await vite.close();
+
+/** The phone recogniser Speak uses, downloaded the first time. */
+async function recogniser() {
+  if (!(await access(RECOGNISER).then(() => true, () => false))) {
+    console.log('Downloading the sound recogniser (71 MB, once)...');
+    const response = await fetch(MODEL_URL);
+    if (!response.ok) throw new Error(`Recogniser download: ${response.status}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    // A download cut short would fail every later run, so it's never kept.
+    if (bytes.length !== Number(response.headers.get('content-length'))) throw new Error('Recogniser download cut short');
+    await mkdir(join(RECOGNISER, '..'), { recursive: true });
+    await writeFile(`${RECOGNISER}.part`, bytes);
+    await rename(`${RECOGNISER}.part`, RECOGNISER);
   }
+  const ort = await import('onnxruntime-web/wasm');
+  ort.env.wasm.numThreads = 1;
+  return ort.InferenceSession.create(await readFile(RECOGNISER));
 }
+/** Loaded on first use, so a run with nothing to make doesn't need it. */
+let session;
+/** One recording at a time, as in the app: takes finish together, and the runtime isn't made to run in parallel. */
+let listening = Promise.resolve();
+
+/** Letters a clip says the English way, as the recogniser hears them. */
+async function misread(text, file) {
+  const { stdout } = await run('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', '16000', '-f', 'f32le', '-'], { encoding: 'buffer', maxBuffer: 1 << 26 });
+  const samples = new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.length));
+  const heard = listening.then(async () => recognise(await (session ??= recogniser()), samples));
+  listening = heard.catch(() => {});
+  return englishReadings(text, (await heard).sounds);
+}
+const describeMisread = (found) => found.map((f) => `"${f.letters}" said ${f.heard}`).join(', ');
 
 /** A readable file name: the text's first letters, and a hash of the take so a new take gets a new name. */
 function clipName(text, take) {
@@ -192,7 +232,19 @@ async function makeClip(text, voice, work, unsure, keepOld) {
       checked = false;
       heard = `(couldn't transcribe: ${error.message.split('\n')[0]})`;
     }
-    const right = saidRight && (!checked || heardRight(text, heard));
+    let right = saidRight && (!checked || heardRight(text, heard));
+    if (right) {
+      try {
+        const found = await misread(text, join(work, `${draft}.mp3`));
+        if (found.length) {
+          right = false;
+          heard = `${heard}, with ${describeMisread(found)}`;
+        }
+      } catch (error) {
+        checked = false;
+        heard = `${heard} (couldn't check its sounds: ${error.message.split('\n')[0]})`;
+      }
+    }
     if (!right && attempt < ATTEMPTS) continue;
     if (!right || !checked) unsure.push({ text, voice: voice[0], heard, kept: !right && keepOld });
     if (!right && keepOld) return null;
@@ -202,16 +254,29 @@ async function makeClip(text, voice, work, unsure, keepOld) {
   }
 }
 
-const texts = await spokenTexts();
+const texts = allSpoken();
 const manifest = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
 await mkdir(AUDIO_DIR, { recursive: true });
 // Inside the repo, not the system temp folder, so takes can be moved into public/audio (a move can't cross disks).
 const work = await mkdtemp(join(ROOT, 'node_modules', '.pinoy-audio-'));
 // One job per text and voice. A text listed with a single name (made before there were two voices) needs all of them.
 const missing = (t, v) => all || manifest[t]?.length !== VOICES.length || !manifest[t][v];
+/** With --check, the clips already made that say a letter the English way, as "voice:text". */
+const misreadClips = new Set();
+if (check) {
+  console.log('Listening for letters said the English way...');
+  for (const text of texts) {
+    for (const [v, name] of (manifest[text] ?? []).entries()) {
+      const found = name ? await misread(text, join(AUDIO_DIR, `${name}.mp3`)) : [];
+      if (!found.length) continue;
+      console.log(`  "${text}" (${VOICES[v][0]}): ${describeMisread(found)}`);
+      misreadClips.add(`${v}:${text}`);
+    }
+  }
+}
 const todo = (redo.length ? redo : texts)
   .flatMap((text) => VOICES.map((_, v) => ({ text, v })))
-  .filter(({ text, v }) => redo.length || missing(text, v))
+  .filter(({ text, v }) => redo.length || missing(text, v) || misreadClips.has(`${v}:${text}`))
   .slice(0, limit);
 const unknown = redo.filter((t) => !texts.includes(t));
 if (unknown.length) throw new Error(`Not a text the app says: ${unknown.join(', ')}`);
@@ -256,6 +321,6 @@ await rm(work, { recursive: true });
 await save(true);
 
 if (unsure.length) {
-  console.log(`\nThese didn't transcribe back to their text. Listen to them, and --redo any that sound wrong:`);
+  console.log(`\nThese didn't come out as written, or couldn't be checked. Listen to them, and --redo any that sound wrong:`);
   for (const u of unsure) console.log(`  "${u.text}" (${u.voice}) heard as "${u.heard}"${u.kept ? ', so the old clip was kept' : ''}`);
 }
