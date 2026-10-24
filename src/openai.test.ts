@@ -500,7 +500,7 @@ describe('hearing a spoken answer', () => {
     expect(await transcribe(KEY, new Blob(['x']), 'tl', fetchFn as unknown as typeof fetch)).toBe('Salamat po.');
     const form = (fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData;
     expect(form.get('language')).toBe('tl');
-    expect(form.get('prompt')).toMatch(/^Someone saying a Tagalog word or phrase\. Write down exactly what they say, in Tagalog spelling/);
+    expect(form.get('prompt')).toBe('Someone saying a Tagalog word or phrase, written down exactly as said, in Tagalog spelling.');
     expect(form.get('prompt')).not.toContain('Salamat');
   });
 

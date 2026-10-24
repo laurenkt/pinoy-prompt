@@ -2,7 +2,7 @@ import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
-import { judge, passes } from '../phonetics';
+import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
@@ -10,7 +10,7 @@ import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
 import { quietToggle } from './quiet';
-import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, PROBLEMS, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
 
@@ -427,15 +427,17 @@ export function practiceScreen(
   }
 
   /**
-   * The card's Tagalog (or an accepted spelling) the recording passes as, judged by Speak's recogniser and judge, or
-   * null when it doesn't pass or can't be heard on the device: without the model there, it isn't downloaded for this.
+   * The card's Tagalog (or an accepted spelling) the recording passes as, judged as Speak judges it, with every word
+   * said, or null when it doesn't pass or can't be heard on the device: the model is never downloaded for this, and
+   * checked for again in case the phone has cleared it since.
    */
   async function saidOnDevice(card: Card, samples: Float32Array): Promise<string | null> {
     if (!speakReady && !modelFound) return null;
     try {
+      if (!(await deps.modelDownloaded())) return null;
       const model = await deps.loadPhoneModel();
-      const { text, comparison } = judge([card.tl, ...(card.accept ?? [])], await model.recognise(samples));
-      return passes(comparison) ? text : null;
+      const { text, comparison } = judge(targets(card), await model.recognise(samples));
+      return isRight(comparison) && everyWordSaid(text, comparison) ? text : null;
     } catch {
       // Left to OpenAI, as it would be without the model.
       return null;

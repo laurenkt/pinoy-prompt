@@ -324,8 +324,9 @@ const TRANSCRIBE_TIMEOUT_MS = 20000;
 /** What the learner was asked to say, to help the transcription: never the answer itself. */
 const TRANSCRIBE_PROMPTS: Record<AnswerLanguage, string> = {
   en: 'Someone saying in English what a Tagalog word or phrase means.',
-  // Literally, in Tagalog spelling: left to itself it writes a Spanish or English look-alike ("como esta" for kumusta).
-  tl: 'Someone saying a Tagalog word or phrase. Write down exactly what they say, in Tagalog spelling, even where it sounds like Spanish or English.',
+  // Read as text before the audio, not as an order: naming Spanish or English could pull towards the look-alikes it
+  // writes on its own ("como esta" for kumusta), so it only says how it's written.
+  tl: 'Someone saying a Tagalog word or phrase, written down exactly as said, in Tagalog spelling.',
 };
 
 /** What the learner said, as text in `language` (English or Tagalog). Sends only the recording. */
