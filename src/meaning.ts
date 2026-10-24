@@ -242,15 +242,21 @@ function tagalogOf(card: Card): Set<string> {
 
 /**
  * Whether the answer is the card's Tagalog said back ("salamat", "Salamat po",
- * an accepted spelling), not its meaning in English. It means the same, but
- * the question asks for the English, so it's never right. An answer needs a
- * word that's only Tagalog to count: "okay" for "Okay lang ako" is English,
- * and may still be right in other words.
+ * an accepted spelling, give or take a typo), not its meaning in English, with
+ * at most other Tagalog words of the deck around it ("paliulit ito" for
+ * "Pakiulit po."). It means the same, or near enough to pass for it, but the
+ * question asks for the English, so it's never right. An answer needs a word
+ * that's only Tagalog to count: "okay" for "Okay lang ako" is English, and may
+ * still be right in other words.
  */
 export function repeatsTagalog(answer: string, card: Card): boolean {
   const tagalog = tagalogOf(card);
+  const own = ownTagalog(card);
   const list = words(answer).filter((w) => !RESPECT.includes(w));
-  return list.length > 0 && list.every((w) => tagalog.has(w)) && list.some((w) => !knownWords().has(w));
+  const english = (w: string) => knownWords().has(w);
+  const said = (w: string) => tagalog.has(w) || (!english(w) && [...tagalog].some((t) => sameTagalogWord(w, t, own)));
+  const otherTagalog = (w: string) => !english(w) && deckTagalogWords().has(w);
+  return list.length > 0 && list.every((w) => said(w) || otherTagalog(w)) && list.some((w) => said(w) && !english(w));
 }
 
 /** A wording's words as written, in Tagalog or English: lower case, without accents or punctuation. */
@@ -288,6 +294,20 @@ function sameTagalogWord(typed: string, word: string, own: Set<string>): boolean
   const shorter = Math.min(typed.length, word.length);
   const allowed = shorter >= 9 ? 2 : shorter >= 5 ? 1 : 0;
   return isTypo(typed, word, allowed, knownTagalog(), own);
+}
+
+/**
+ * Whether the answer has every word of the card's Tagalog, give or take a typo,
+ * but not the "po" the card always has ("paliulit ito" for "Pakiulit po."):
+ * it's what makes it polite, so it's wrong without asking OpenAI, which can
+ * miss it.
+ */
+export function leavesOutPo(answer: string, card: Card): boolean {
+  const given = plainWords(answer);
+  const wordings = cardWords(card);
+  if (polite(given) || !wordings.every(polite)) return false;
+  const own = ownTagalog(card);
+  return wordings.some((want) => bare(want).every((w) => given.some((g) => sameTagalogWord(g, w, own))));
 }
 
 /**
@@ -435,8 +455,8 @@ export function exactAnswer(answer: string, card: Card, language: AnswerLanguage
  * asking. The English said back for its Tagalog is left to `ask`, which is
  * told it's wrong: on the device it can't be told from a word Tagalog
  * borrows ("traffic" for "trapik") or a number dictated as digits. The card's
- * Tagalog with a look-alike word from elsewhere in the deck swapped in is wrong
- * without asking too. Without an answer from `ask` (no key, offline, an error), the device's
+ * Tagalog with a look-alike word from elsewhere in the deck swapped in, or
+ * without the "po" it always has, is wrong without asking too. Without an answer from `ask` (no key, offline, an error), the device's
  * answer stands; a failed ask is noted, so the learner knows why.
  */
 export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge | null, language: AnswerLanguage = 'en'): Promise<Verdict> {
@@ -444,8 +464,8 @@ export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge
   if (matchesAnswer(answer, card, language)) return { right: true };
   // Not asked: OpenAI would see that it means the same.
   if (language === 'en' && repeatsTagalog(answer, card)) return { right: false };
-  // Not asked either: two words that look alike can pass for a typo.
-  if (language === 'tl' && swapsTagalog(answer, card)) return { right: false };
+  // Not asked either: two words that look alike can pass for a typo, and a missing "po" can go unseen.
+  if (language === 'tl' && (swapsTagalog(answer, card) || leavesOutPo(answer, card))) return { right: false };
   if (!ask) return { right: false };
   try {
     return { right: (await ask(answer, card, language)) ?? false };
