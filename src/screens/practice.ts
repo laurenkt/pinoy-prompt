@@ -337,9 +337,12 @@ export function practiceScreen(
     });
   }
 
-  /** The box's microphone button: record the meaning said out loud, turn it into text, and check that. A second tap stops early. */
+  /**
+   * The box's microphone button: record the meaning said out loud, turn it into text, and check that. A second tap
+   * stops early, or before the microphone gives sound (when nothing could have been heard) throws the take away.
+   */
   function sayMeaning(q: Question): void {
-    if (listening) return listening.stop();
+    if (listening) return micLive ? listening.stop() : cancelSaying(q);
     const hearer = hearMeaning();
     if (!hearer || picked !== null || checking || hearing) return;
     // The word playing would be recorded too.
@@ -353,7 +356,10 @@ export function practiceScreen(
       onListening: () => {
         if (listening !== recording) return;
         micLive = true;
-        draw();
+        // In place, as the level is, rather than redrawing the round mid-recording.
+        root.querySelector('.meaning-wave')?.classList.add('live');
+        const status = root.querySelector('.meaning-status');
+        if (status) status.textContent = listeningText(q);
       },
       onLevel: (level) => {
         if (listening !== recording) return;
@@ -404,6 +410,9 @@ export function practiceScreen(
       },
     );
   }
+
+  /** What the box says once the microphone gives sound. */
+  const listeningText = (q: Question) => (answerLanguage(q) === 'tl' ? 'Listening… say it in Tagalog.' : 'Listening… say what it means.');
 
   /** Stop recording a spoken meaning and drop it: the question is going. */
   function stopListening(): void {
@@ -786,11 +795,9 @@ export function practiceScreen(
       hearMeaning() !== null &&
       micButton(q);
     const status = listening
-      ? !micLive
-        ? 'Getting the mic ready…'
-        : tagalog
-        ? 'Listening… say it in Tagalog.'
-        : 'Listening… say what it means.'
+      ? micLive
+        ? listeningText(q)
+        : 'Getting the mic ready…'
       : hearing
         ? 'Hearing what you said…'
         : checking && q.wave

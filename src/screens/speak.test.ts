@@ -206,6 +206,17 @@ describe('an attempt', () => {
     expect(text('.listen-status')).toBe('Hearing you…');
     expect(panel.el.classList).toContain('live');
     expect(panel.el.classList).toContain('phase-sound');
+    mic.events.onListening?.();
+    expect(text('.listen-status')).toBe('Hearing you…');
+    expect(panel.el.classList).toContain('phase-sound');
+  });
+
+  it('leaves focus where the learner put it while the mic got ready', async () => {
+    await open('salamat');
+    button('Tap and speak').click();
+    button('Cancel').focus();
+    mic.events.onListening?.();
+    expect(document.activeElement?.textContent).toBe('Cancel');
   });
 
   it('praises a clean attempt and counts it', async () => {

@@ -93,7 +93,7 @@ describe('Speak mode', () => {
       await flush();
       button('Tap and speak').click();
       recorder.onListening?.();
-    button("I'm done").click();
+      button("I'm done").click();
       await flush();
       await flush();
       expect(chimes.count).toBe(heard);

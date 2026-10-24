@@ -223,8 +223,13 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     const current = deps.record({
       onLevel: (level) => recording === current && showLevel(level),
       onListening: () => {
-        if (recording !== current || state.name !== 'recording') return;
+        if (recording !== current || state.name !== 'recording' || state.live) return;
+        // "Wait…" couldn't hold focus, so it went nowhere: give it to "I'm done", unless the learner moved it to Cancel,
+        // where it stays (the redraw makes a new Cancel).
+        const cancelling = document.activeElement === el.querySelector('.speak-cancel button');
+        takeFocus = !cancelling;
         set({ name: 'recording', live: true, speech: false });
+        if (cancelling) el.querySelector<HTMLElement>('.speak-cancel button')?.focus({ preventScroll: true });
       },
       onSpeech: () => {
         if (recording !== current || state.name !== 'recording') return;
