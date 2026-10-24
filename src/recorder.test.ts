@@ -167,6 +167,23 @@ describe('a microphone that gives no sound', () => {
     await recording.audio;
   });
 
+  it("reports each block's level, whether it's speech, and the finer levels of its parts", async () => {
+    const onLevel = vi.fn();
+    const recording = record({ onLevel });
+    await started();
+    // Quiet then loud halves: speech as a block, though its first parts are only the room.
+    const block = Float32Array.from({ length: 4096 }, (_, i) => (i < 2048 ? 0.001 : 0.1) * (i % 2 ? 1 : -1));
+    FakeRecorderContext.last.processor.onaudioprocess?.({ inputBuffer: { getChannelData: () => block } });
+    const [level, speech, parts] = onLevel.mock.calls[0];
+    expect(level).toBeCloseTo(Math.sqrt((0.001 ** 2 + 0.1 ** 2) / 2) * 8);
+    expect(speech).toBe(true);
+    expect(parts.map((p: number) => +p.toFixed(3))).toEqual([0.008, 0.008, 0.8, 0.8]);
+    FakeRecorderContext.last.feed(0.001);
+    expect(onLevel.mock.calls[1][1]).toBe(false);
+    recording.stop();
+    await recording.audio;
+  });
+
   it('says it is listening only once the reopened microphone gives sound', async () => {
     const onListening = vi.fn();
     const recording = record({ onListening });

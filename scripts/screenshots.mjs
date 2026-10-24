@@ -453,7 +453,7 @@ async function typedOnly(page, mode, live = true) {
   await page.waitForSelector('.home');
   await page.evaluate(async (live) => {
     const { defaultDeps } = await import('/src/screens/speak.ts');
-    // A voice that rises and falls, a dozen levels a second, until it's stopped.
+    // A voice that rises and falls, a dozen blocks a second as the recorder gives them, until it's stopped.
     defaultDeps.recordingSupported = () => true;
     defaultDeps.microphoneAllowed = () => true;
     defaultDeps.record = ({ onLevel, onListening } = {}) => {
@@ -464,9 +464,14 @@ async function typedOnly(page, mode, live = true) {
       const timer = setInterval(() => {
         n++;
         if (n === 2) onListening?.();
-        const level = n < 6 ? 0.02 : Math.abs(Math.sin(n / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(n / 7)));
-        // The recorder's speech level (0.02 RMS) as onLevel reports it, so the room and the pauses draw nothing.
-        onLevel?.(level, level > 0.16);
+        // Four parts to each block, as the recorder gives them; the block counts as speech at its speech level (0.02
+        // RMS, as onLevel reports it), so the room and the pauses draw nothing.
+        const parts = [0, 1, 2, 3].map((p) => {
+          const t = n + p / 4;
+          return n < 6 ? 0.02 : Math.abs(Math.sin(t / 2.3)) * (0.35 + 0.6 * Math.abs(Math.sin(t / 7))) * (0.8 + 0.2 * Math.sin(t * 7));
+        });
+        const level = Math.sqrt(parts.reduce((a, v) => a + v * v, 0) / 4);
+        onLevel?.(level, level > 0.16, parts);
       }, 85);
       const end = () => {
         clearInterval(timer);
