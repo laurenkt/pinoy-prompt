@@ -207,7 +207,8 @@ export async function recognise(session: ort.InferenceSession, samples: Float32A
     for (let t = Math.round(start / stepSeconds); t < Math.round(end / stepSeconds); t++) {
       for (let v = 1; v < vocab; v++) {
         const token = soundToken(TOKENS[v]);
-        if (token && token !== sound && values[t * vocab + v] >= floor) nearly.add(token);
+        // Not the parts of the sound itself (the p of a pʰ, the o of an oʊ), which would hide what made it different.
+        if (token && !sound.includes(token) && values[t * vocab + v] >= floor) nearly.add(token);
       }
     }
     return [...nearly];

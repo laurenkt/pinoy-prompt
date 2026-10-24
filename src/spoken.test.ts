@@ -7,7 +7,7 @@ import clipSounds from './clip-sounds.json';
 import { VOCAB, type Card } from './deck';
 import { GUIDES } from './guides';
 import { drillSentence } from './session';
-import { englishReadings, judge, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
+import { englishReadings, judge, PASS, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
 import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
 
@@ -100,5 +100,23 @@ describe('recorded clips, heard by Speak', () => {
     // allowed, as long as they stay rare: about one in 20,000 pairs. More than that means scoring got too lenient.
     expect(passing.length, passing.join('\n')).toBeLessThan(pairs / 20_000);
     // Judging every clip as every card takes a few seconds.
+  }, 30_000);
+
+  it('rarely passes a clip as a card a sound or two away', () => {
+    // Near: one said perfectly scores at least ROUGHLY the other, short of passing outright (kanan and kanin,
+    // Salamat and Salamat po). How likely the recording is decides these, and some the recogniser itself can't
+    // tell apart pass: about 8% today. More than 10% means the likelihood check got too lenient.
+    const perfectly = (text: string) => toPhones(text).filter((p) => !p.optional).map((p) => p.ipa);
+    const closeness = (a: Card, b: Card) => Math.max(...texts(a).map((t) => judge(texts(b), { sounds: perfectly(t) }).comparison.score));
+    let pairs = 0;
+    const passing = VOCAB.flatMap((card) => {
+      const near = VOCAB.filter((other) => other !== card && closeness(card, other) >= ROUGHLY && closeness(card, other) < PASS);
+      return (CLIPS[spokenText(card)] ?? []).flatMap((file) => {
+        const heard = said(file);
+        pairs += near.length;
+        return near.filter((other) => passes(judge(texts(other), heard).comparison)).map((other) => `${file} passes as "${other.tl}"`);
+      });
+    });
+    expect(passing.length, passing.join('\n')).toBeLessThan(pairs / 10);
   }, 30_000);
 });

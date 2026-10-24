@@ -81,15 +81,15 @@ function assimilated(lower: string, at: number): string[] | undefined {
 /** s, d, t and n run into a y after them in everyday speech: "siya" said "sha", "diyan" "jan", "tiyak" "chak", "niyo" "nyo". */
 const BLENDS: Record<string, string> = { s: 'ʃ', d: 'dʒ', t: 'tʃ', n: 'ɲ' };
 
-/** Let s, d, t or n and the y after it (with an iy's vowel left out) be said as the one sound they blend into. */
-function blendGlides(phones: Phone[]): void {
+/** Let s, d, t or n and the y after it in the same word (with an iy's vowel left out) be said as the one sound they blend into. */
+function blendGlides(phones: Phone[], text: string): void {
   phones.forEach((p, k) => {
     const blend = BLENDS[p.ipa];
     if (!blend || p.also) return;
     let y = k + 1;
     if (phones[y]?.optional && phones[y].ipa === 'i') y++;
     const glide = phones[y];
-    if (glide?.ipa !== 'j' || glide.also) return;
+    if (glide?.ipa !== 'j' || glide.also || /[^a-zñ]/.test(text.slice(p.to, glide.from))) return;
     p.also = [blend];
     glide.also = [''];
     glide.dropsAfterAlso = true;
@@ -198,7 +198,7 @@ export function toPhones(text: string): Phone[] {
     if (ch === 'g' && 'ptks'.includes(lower[i + 1] ?? '-')) phones[phones.length - 1].also = ['k'];
     i++;
   }
-  blendGlides(phones);
+  blendGlides(phones, lower);
   return phones;
 }
 
@@ -602,7 +602,9 @@ interface Slot {
 function slotsFor(phones: Phone[]): Slot[] {
   return phones.flatMap((p) => {
     const ways = [p.ipa, ...(p.also ?? [])].filter(Boolean);
-    const optional = !!p.optional || p.also?.includes('') === true;
+    // A y that may go only when the sound before it blends with it ("jan" for diyan) stays: the alignment can't
+    // tell which way that sound was said, and "dan" isn't diyan. The blended way is still judged by compare.
+    const optional = !!p.optional || (p.also?.includes('') === true && !p.dropsAfterAlso);
     const halves = ways.map((w) => (w === 'tʃ' || w === 'dʒ' ? [...w] : [w]));
     if (halves.length === 1 && halves[0].length === 2) return halves[0].map((half) => ({ ways: [half], optional }));
     return [{ ways: [...new Set(halves.flat())], optional }];

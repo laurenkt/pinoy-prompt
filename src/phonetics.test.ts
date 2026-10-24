@@ -208,6 +208,13 @@ describe('compare', () => {
     expect(compare(toPhones('tiyo'), ['tʃ', 'o']).score).toBe(1);
     // Said "d", the y has to be there: "dan" isn't "diyan".
     expect(compare(toPhones('diyan'), ['d', 'a', 'n']).score).toBeLessThan(1);
+    // However sure the recogniser was of it.
+    expect(passes(judge(['diyan'], { sounds: ['d', 'a', 'n'], odds: unpackOdds('|d900||a900||n900|') }).comparison)).toBe(false);
+  });
+
+  it("doesn't blend a sound with a y that starts the next word", () => {
+    expect(toPhones('bukas yung').find((p) => p.ipa === 's')?.also).toBeUndefined();
+    expect(compare(toPhones('bukas yung'), ['b', 'u', 'k', 'a', 'ʃ', 'u', 'ŋ']).score).toBeLessThan(1);
   });
 
   it('counts a sound the recogniser nearly wrote instead as heard', () => {

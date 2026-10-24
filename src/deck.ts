@@ -309,7 +309,7 @@ export const UNITS: Unit[] = [
       { id: 'sa-tabi-lang', tl: 'Sa tabi lang po.', en: 'Just pull over here, please.', kind: 'phrase', hint: 'sah tah-BEE lahng poh', hook: '"Tabi" means side, so it is "just at the side". "Tabi!" on its own means "move aside!"' },
       { id: 'sumakay', tl: 'sumakay', en: 'to get on / ride', kind: 'word', hint: 'soo-mah-KAI', hook: '"Sakay" is ride. "-um-" slots inside to make a verb: s-um-akay. A driver calling "Sakay na!" means "get on!"' },
       { id: 'bumaba', tl: 'bumaba', en: 'to get off / go down', kind: 'word', hint: 'boo-mah-BAH', hook: '"Baba" means down, low. The same "-um-" trick: b-um-aba. "Bababa po ako" is "I\'m getting off".' },
-      { id: 'dyip', tl: 'dyip', accept: ['jip'], en: 'jeepney', kind: 'word', hint: 'jeep', hook: 'From the US Army jeeps left after World War Two, stretched and painted into the "king of the road".' },
+      { id: 'dyip', tl: 'dyip', say: 'jip', accept: ['jip'], en: 'jeepney', kind: 'word', hint: 'jeep', hook: 'From the US Army jeeps left after World War Two, stretched and painted into the "king of the road".' },
     ],
   },
   {
