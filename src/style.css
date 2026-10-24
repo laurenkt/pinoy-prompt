@@ -2470,6 +2470,12 @@ p {
   background: var(--teal);
 }
 
+/* On a drill's prompt, the card's strength sits after the eyebrow, outlined so it shows on the prompt's own colour. */
+.prompt .eyebrow .badge {
+  margin-left: 8px;
+  border: 2px solid var(--ink);
+}
+
 /* Talk */
 
 .talk-label {

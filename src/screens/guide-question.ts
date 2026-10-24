@@ -77,10 +77,18 @@ export function gapLine(d: Drill, filled: boolean, say: (slow: boolean) => void)
 }
 
 /** The question, as asked: an English sentence to complete in Tagalog, or a plain question. */
-export function drillPrompt(c: Card, d: Drill, filled: boolean, eyebrow: string, say: (slow: boolean) => void, showTl = true): HTMLElement {
+export function drillPrompt(
+  c: Card,
+  d: Drill,
+  filled: boolean,
+  eyebrow: string,
+  say: (slow: boolean) => void,
+  showTl = true,
+  badge: HTMLElement | null = null,
+): HTMLElement {
   return d.tl
-    ? h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, eyebrow), h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
-    : h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, c.en), h('p', { class: 'drill-q' }, d.q));
+    ? h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, eyebrow, badge), h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
+    : h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, c.en, badge), h('p', { class: 'drill-q' }, d.q));
 }
 
 /** A guide's explanation: its rule in plain words, and examples to hear. */
@@ -131,6 +139,8 @@ export interface GuideViewOptions {
   feedback: (right: boolean) => HTMLElement;
   /** Anything else to show once it's answered: a hook, the way on. */
   after: (HTMLElement | null | false)[];
+  /** Shown beside the question's eyebrow: Drills puts the card's memory strength there. */
+  badge?: HTMLElement | null;
 }
 
 /** The panel asking a guide's question, with `picked` as the pick so far (null before it's answered). */
@@ -142,7 +152,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
     return h(
       'div',
       { class: 'panel' },
-      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say),
+      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say, true, opts.badge),
       choiceList(q.choices, { key: (o) => o, label: (o) => o, answer: d.answer, picked, lang: d.tl ? 'fil' : undefined, onPick: opts.onPick }),
       answered && opts.feedback(right),
       ...(answered ? opts.after : []),
@@ -161,7 +171,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
   return h(
     'div',
     { class: 'panel' },
-    h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, 'Put it in order'), h('p', { class: 'drill-q' }, d.q)),
+    h('div', { class: `prompt kind-${c.kind}` }, h('p', { class: 'eyebrow' }, 'Put it in order', opts.badge), h('p', { class: 'drill-q' }, d.q)),
     h(
       'div',
       { class: `build-line ${answered ? (right ? 'right' : 'wrong') : ''}`, lang: 'fil', 'aria-label': 'Your sentence' },

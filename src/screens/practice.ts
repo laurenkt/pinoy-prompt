@@ -1,5 +1,6 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
+import { STRENGTHS, strengthOf } from '../memory';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
@@ -20,6 +21,8 @@ type Mode = 'listen' | 'read' | 'recall' | 'speak';
  * sentence from the English is recalling it. Guides aren't heard or said.
  */
 const GUIDE_MODES: Record<GuideFormat, Mode> = { gap: 'read', build: 'recall' };
+
+const STRENGTH_LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
 
 const MODES: { id: Mode; title: string }[] = [
   { id: 'listen', title: 'Listen' },
@@ -680,6 +683,17 @@ export function practiceScreen(
     ];
   }
 
+  /**
+   * How well the card is held right now, in the Library's strength pills, so the learner knows what they're being
+   * asked. A drill never changes the schedule, so it reads the same before and after the answer.
+   */
+  function strengthBadge(card: Card): HTMLElement | null {
+    const state = app.progress.cards[card.id];
+    if (!state) return null;
+    const strength = strengthOf(state);
+    return h('span', { class: `badge s-${strength}` }, h('span', { class: 'sr-only' }, 'Memory: '), STRENGTH_LABEL.get(strength));
+  }
+
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
@@ -705,16 +719,18 @@ export function practiceScreen(
           onChange: draw,
           feedback: (right) => guideFeedback(q.card, d, right, { praise: 'Tama!', miss: 'Mali.' }),
           after: [onward()],
+          badge: strengthBadge(q.card),
         }),
       );
     }
 
+    const eyebrow = (text: string) => h('p', { class: 'eyebrow' }, text, strengthBadge(q.card));
     let prompt: HTMLElement;
     if (q.mode === 'speak') {
       prompt = h(
         'div',
         { class: 'prompt' },
-        h('p', { class: 'eyebrow' }, 'Say this out loud'),
+        eyebrow('Say this out loud'),
         // No audio until the learner has had a go: the word is played on the result.
         h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
         h('p', { class: 'prompt-meaning' }, q.card.en),
@@ -723,7 +739,7 @@ export function practiceScreen(
       prompt = h(
         'div',
         { class: 'prompt center' },
-        h('p', { class: 'eyebrow' }, q.typed ? 'What does it mean?' : 'What did you hear?'),
+        eyebrow(q.typed ? 'What does it mean?' : 'What did you hear?'),
         audioPair(say, true),
         answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
       );
@@ -731,11 +747,11 @@ export function practiceScreen(
       prompt = h(
         'div',
         { class: 'prompt' },
-        h('p', { class: 'eyebrow' }, 'What does this mean?'),
+        eyebrow('What does this mean?'),
         h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
       );
     } else {
-      prompt = h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
+      prompt = h('div', { class: 'prompt' }, eyebrow('How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
     }
 
     return h(
