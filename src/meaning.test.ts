@@ -182,6 +182,10 @@ describe('checking typed Tagalog', () => {
     ['salamat-po', 'Salamat po'],
     ['taga-saan', 'tagasaan ka'],
     ['dahan-dahan', 'dahandahn lang po'],
+    // A slip in a short word still counts, taken with the rest of the wording.
+    ['magandang-umaga', 'Magandang umga'],
+    ['mabuti', 'Mabuti nman'],
+    ['wala-yon', "Wla 'yon"],
     ['po', 'po'],
     // Reworded the way people say it, with the textbook wording still right.
     ['ano-pangalan', 'Anong pangalan mo?'],
@@ -238,7 +242,6 @@ describe('telling a mixed-up Tagalog word from a typo', () => {
     ['magandang-umaga', 'Maraming umaga po'],
     ['maraming-salamat', 'magandang salamat'],
     ['kumanan-ka', 'Kumaliwa ka.'],
-    ['opo', 'oo'],
   ])('%s: "%s" swaps in another word', (id, answer) => {
     expect(swapsTagalog(answer, card(id))).toBe(true);
   });
@@ -250,6 +253,10 @@ describe('telling a mixed-up Tagalog word from a typo', () => {
     ['magandang-umaga', 'maraming hapon'],
     // Both say yes; the "po" may be added.
     ['oo', 'opo'],
+    // Short words are often shortened ("san" for "saan"), and one letter makes another word.
+    ['saan-ka-nakatira', 'San ka nakatira?'],
+    ['ilang-taon-ka-na', 'Ilan taon ka na?'],
+    ['kain-tayo', 'Kain tao!'],
   ])('%s: "%s" does not', (id, answer) => {
     expect(swapsTagalog(answer, card(id))).toBe(false);
   });

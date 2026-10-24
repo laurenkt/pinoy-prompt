@@ -109,6 +109,15 @@ export function meanings(card: Card): string[][] {
   return wordings(card).map((alt) => alt.words);
 }
 
+/** Each card's English words, worked out once. */
+const cardEnglish = new WeakMap<Card, Set<string>>();
+
+function ownWords(card: Card): Set<string> {
+  let found = cardEnglish.get(card);
+  if (!found) cardEnglish.set(card, (found = new Set(words(card.en))));
+  return found;
+}
+
 /** Each card's wordings, worked out once: the deck doesn't change. */
 const cardWordings = new WeakMap<Card, Wording[]>();
 
@@ -181,11 +190,16 @@ function sameWord(typed: string, word: string, own: Set<string>): boolean {
 function isTypo(typed: string, word: string, allowed: number, known: Set<string>, own: Set<string>): boolean {
   if (allowed === 0) return false;
   const edits = distance(typed, word);
-  if (edits > allowed) return false;
+  return edits <= allowed && !nearerElsewhere(typed, edits, known, own);
+}
+
+/** Whether a word in `known`, and not one of the card's `own`, is nearer `typed` than `edits` (it is, when it's `typed` itself). */
+function nearerElsewhere(typed: string, edits: number, known: Set<string>, own: Set<string>): boolean {
+  if (edits === 0) return false;
   for (const other of known) {
-    if (!own.has(other) && other[0] === typed[0] && Math.abs(other.length - typed.length) < edits && distance(typed, other) < edits) return false;
+    if (!own.has(other) && other[0] === typed[0] && Math.abs(other.length - typed.length) < edits && distance(typed, other) < edits) return true;
   }
-  return true;
+  return false;
 }
 
 /**
@@ -198,7 +212,7 @@ export function matchesMeaning(answer: string, card: Card): boolean {
   const parts = answer.replace(/\([^)]*\)/g, ' ').split(/\/|\bor\b/i).map(wording).filter((part) => part.words.length > 0);
   if (parts.length === 0) return false;
   const alts = wordings(card);
-  const own = new Set(words(card.en));
+  const own = ownWords(card);
   return parts.every((given) =>
     alts.some(
       (alt) =>
@@ -280,13 +294,14 @@ function sameTagalogWord(typed: string, word: string, own: Set<string>): boolean
 export function swapsTagalog(answer: string, card: Card): boolean {
   const given = bare(tagalogWords(answer));
   const own = ownTagalog(card);
-  // "Opo" for "Oo" isn't a mix-up: both say yes.
+  // "Opo" for "Oo" isn't a mix-up: a word from a card that means the same isn't.
   const swapped = (typed: string, word: string) =>
-    !own.has(typed) && looksAlike(typed, word) && (cardsUsing().get(typed) ?? []).some((other) => !matchesMeaning(other.en, card));
+    !own.has(typed) && looksAlike(typed, word) && cardsUsing().get(typed)?.every((other) => !matchesMeaning(other.en, card)) === true;
   return cardWords(card).some((want) => {
     const w = bare(want);
-    if (given.length !== w.length || !given.some((typed, i) => swapped(typed, w[i]))) return false;
-    return given.every((typed, i) => swapped(typed, w[i]) || sameTagalogWord(typed, w[i], own));
+    if (given.length !== w.length) return false;
+    const swaps = given.map((typed, i) => swapped(typed, w[i]));
+    return swaps.some(Boolean) && given.every((typed, i) => swaps[i] || sameTagalogWord(typed, w[i], own));
   });
 }
 
@@ -297,15 +312,23 @@ function cardsUsing(): Map<string, Card[]> {
   if (!tagalogCards) {
     tagalogCards = new Map();
     for (const card of VOCAB) {
-      for (const word of new Set(cardWords(card).flat())) tagalogCards.set(word, [...(tagalogCards.get(word) ?? []), card]);
+      for (const word of new Set(cardWords(card).flat())) {
+        const cards = tagalogCards.get(word);
+        if (cards) cards.push(card);
+        else tagalogCards.set(word, [card]);
+      }
     }
   }
   return tagalogCards;
 }
 
-/** Two different words that look alike: the same first letter, and no more than half the letters changed. */
+/**
+ * Two different words that look alike: five letters or more, the same first
+ * letter, and no more than half the letters changed. Shorter words are left
+ * alone, as typos are: "san" is how "saan" is often written.
+ */
 function looksAlike(a: string, b: string): boolean {
-  return a !== b && a[0] === b[0] && distance(a, b) <= Math.ceil(Math.max(a.length, b.length) / 2);
+  return a !== b && a.length >= 5 && b.length >= 5 && a[0] === b[0] && distance(a, b) <= Math.ceil(Math.max(a.length, b.length) / 2);
 }
 
 /**
@@ -324,9 +347,12 @@ export function matchesTagalog(answer: string, card: Card): boolean {
   return cardWords(card).some((want) => {
     if (want.length === 0 || (polite(want) && !polite(given))) return false;
     const w = bare(want);
-    // Word by word where it can be, so each slip is weighed against the deck's words.
-    if (g.length === w.length) return g.every((typed, i) => sameTagalogWord(typed, w[i], own));
-    // Joined up, a typo still counts: "dahandahn lang" for "dahan-dahan lang".
+    if (g.length === w.length && g.every((typed, i) => sameTagalogWord(typed, w[i], own))) return true;
+    // A word of five letters or more nearer another of the deck's than the card's isn't a typo, even inside a longer
+    // typo: "maganghang" is "maanghang". Shorter ones are often shortened ("san" for "saan", "na ko").
+    const nearer = (typed: string, word: string) => typed.length >= 5 && word.length >= 5 && nearerElsewhere(typed, distance(typed, word), knownTagalog(), own);
+    if (g.length === w.length && g.some((typed, i) => nearer(typed, w[i]))) return false;
+    // Joined up, a typo still counts: "dahandahn lang" for "dahan-dahan lang", "Magandang umga".
     return sameTagalogWord(g.join(''), w.join(''), own);
   });
 }
@@ -345,8 +371,12 @@ function cardWords(card: Card): string[][] {
 }
 
 /** The card's own Tagalog words, and each wording joined up, as `knownTagalog` has them. */
+const cardOwnTagalog = new WeakMap<Card, Set<string>>();
+
 function ownTagalog(card: Card): Set<string> {
-  return new Set(cardWords(card).flatMap((list) => [...list, bare(list).join('')]));
+  let found = cardOwnTagalog.get(card);
+  if (!found) cardOwnTagalog.set(card, (found = new Set(cardWords(card).flatMap((list) => [...list, bare(list).join('')]))));
+  return found;
 }
 
 /** Whether the answer plainly says the card in `language`, checked on the device. */
