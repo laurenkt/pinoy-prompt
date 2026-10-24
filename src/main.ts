@@ -156,7 +156,7 @@ function saved(ok: boolean): void {
 
 // The number on the app's icon, set again as the learner opens or leaves the app.
 keepBadgeCurrent(() => app.progress);
-// Home's Study button says what's due, or how long until more is, as of when it was drawn: draw it again on coming back.
+// Home's Study button keeps itself current only while the app is on show (home.ts): draw Home again on coming back.
 // Only Home: other screens hold a session or a half-typed answer.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || shown?.name !== 'home') return;

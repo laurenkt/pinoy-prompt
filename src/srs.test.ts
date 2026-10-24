@@ -59,5 +59,14 @@ describe('formatInterval', () => {
     expect(formatInterval(3)).toBe('3d');
     expect(formatInterval(60)).toBe('2mo');
     expect(formatInterval(730)).toBe('2y');
+    expect(formatInterval(364)).toBe('12mo');
+  });
+
+  it('rounds up when asked, never past a unit into "13mo"', () => {
+    expect(formatInterval(40)).toBe('1mo');
+    expect(formatInterval(40, { up: true })).toBe('2mo');
+    expect(formatInterval(2.2, { up: true })).toBe('3d');
+    expect(formatInterval(361, { up: true })).toBe('1y');
+    expect(formatInterval(380, { up: true })).toBe('1.1y');
   });
 });
