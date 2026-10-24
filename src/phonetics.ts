@@ -710,6 +710,17 @@ export function passes(comparison: Judged): boolean {
   return comparison.score >= PASS || (comparison.score >= ROUGHLY && (comparison.likely ?? -Infinity) >= LIKELY);
 }
 
+/**
+ * Whether some sound of every word in `text` was heard: an attempt can pass on its sounds with a short word left out
+ * altogether ("Salamat" for "Salamat po"), which says the card as Speak hears it but isn't the answer to recall.
+ */
+export function everyWordSaid(text: string, comparison: Comparison): boolean {
+  return [...text.matchAll(/[\p{L}'’]+/gu)].every(({ index, 0: word }) => {
+    const sounds = comparison.sounds.filter((s) => !s.phone.optional && s.phone.from >= index && s.phone.from < index + word.length);
+    return sounds.length === 0 || sounds.some((s) => s.verdict !== 'missing');
+  });
+}
+
 // --- Checking recorded clips ------------------------------------------------
 
 /**

@@ -495,12 +495,13 @@ describe('hearing a spoken answer', () => {
     expect(form.get('file')).toBeInstanceOf(Blob);
   });
 
-  it('hears Tagalog as Tagalog, without being told the answer', async () => {
+  it('hears Tagalog as Tagalog, written as said, without being told the answer', async () => {
     const fetchFn = vi.fn(async () => json(200, { text: 'Salamat po.' }));
     expect(await transcribe(KEY, new Blob(['x']), 'tl', fetchFn as unknown as typeof fetch)).toBe('Salamat po.');
     const form = (fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData;
     expect(form.get('language')).toBe('tl');
-    expect(form.get('prompt')).toBe('Someone saying a Tagalog word or phrase.');
+    expect(form.get('prompt')).toBe('Someone saying a Tagalog word or phrase, written down exactly as said, in Tagalog spelling.');
+    expect(form.get('prompt')).not.toContain('Salamat');
   });
 
   it('counts what it cost, audio and text at their own rates', async () => {

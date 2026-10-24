@@ -227,6 +227,14 @@
     "paano-002287c0",
     "paano-6010b144"
   ],
+  "Nasaan?": [
+    "nasaan-171795a1",
+    "nasaan-8af60c01"
+  ],
+  "Gaano?": [
+    "gaano-fcfdf974",
+    "gaano-376fb46d"
+  ],
   "Ano ito?": [
     "ano-ito-38b42ded",
     "ano-ito-93fc2de5"
@@ -274,6 +282,10 @@
   "Anong ibig sabihin nito?": [
     "anong-ibig-sabihin-nito-8387ec44",
     "anong-ibig-sabihin-nito-755a5f70"
+  ],
+  "sabihin": [
+    "sabihin-c121b946",
+    "sabihin-8724dc7f"
   ],
   "Paano sabihin ito sa Tagalog?": [
     "paano-sabihin-ito-sa-tagalog-c9a925d5",
@@ -347,6 +359,10 @@
     "sila-0626b57f",
     "sila-0aa40414"
   ],
+  "may": [
+    "may-dac0d868",
+    "may-71284a5c"
+  ],
   "May kape ba?": [
     "may-kape-ba-8457ff4f",
     "may-kape-ba-9e1d69d7"
@@ -359,9 +375,17 @@
     "wala-3af0a0d5",
     "wala-ab3e8d94"
   ],
+  "kailangan": [
+    "kailangan-d2daf2ec",
+    "kailangan-b637105a"
+  ],
   "Kailangan ko ito.": [
     "kailangan-ko-ito-f9aadf88",
     "kailangan-ko-ito-d29962e7"
+  ],
+  "puwede": [
+    "puwede-bdd92457",
+    "puwede-c11387dd"
   ],
   "Puwede ba?": [
     "puwede-ba-b1f84550",
@@ -394,6 +418,10 @@
   "pa": [
     "pa-1ed6ec24",
     "pa-2760c89d"
+  ],
+  "oras": [
+    "oras-8a83954a",
+    "oras-8802926c"
   ],
   "Anong oras na?": [
     "anong-oras-na-b0e33a29",
@@ -1098,6 +1126,10 @@
   "Nasaan ang banyo?": [
     "nasaan-ang-banyo-69344a85",
     "nasaan-ang-banyo-371f4172"
+  ],
+  "gusto": [
+    "gusto-6e043f58",
+    "gusto-4c411330"
   ],
   "Gusto ko ito.": [
     "gusto-ko-ito-bd9b50e4",

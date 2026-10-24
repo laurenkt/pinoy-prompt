@@ -2,6 +2,7 @@ import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
+import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
@@ -9,7 +10,7 @@ import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
 import { quietToggle } from './quiet';
-import { askForMicrophone, defaultDeps, micWaiting, needsMicrophone, PROBLEMS, speakPanel, type SpeakDeps, type SpeakPanel } from './speak';
+import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
 type Mode = 'listen' | 'read' | 'recall' | 'speak';
 
@@ -350,8 +351,12 @@ export function practiceScreen(
     // The word playing would be recorded too.
     stop();
     q.unheard = undefined;
-    // Starts flat and fills from the right as the level comes in.
-    const wave = (q.wave = new Array<number>(WAVE_BARS).fill(0));
+    // Starts empty and grows from the left, a bar for each moment of speech, so silence draws nothing. Each bar is the
+    // loudest of `span` moments; once the box is full, neighbouring bars merge in pairs and span doubles, so the whole
+    // of what was said stays in the box, and a bar, once whole, stays as it is until the next squeeze.
+    const wave: number[] = (q.wave = []);
+    let span = 1;
+    let inLast = 0;
     q.thinkingSince = undefined;
     micLive = false;
     const recording = deps.record({
@@ -363,13 +368,23 @@ export function practiceScreen(
         const status = root.querySelector('.meaning-status');
         if (status) status.textContent = listeningText(q);
       },
-      onLevel: (level) => {
-        if (listening !== recording) return;
-        wave.push(level);
-        wave.shift();
-        const bars = root.querySelectorAll<HTMLElement>('.meaning-wave span');
-        // Move each bar's height one along rather than redraw the box, a dozen times a second.
-        bars.forEach((bar, i) => bar.style.setProperty('--level', String(wave[i])));
+      onLevel: (_level, speech, parts) => {
+        if (listening !== recording || !speech) return;
+        for (const part of parts) {
+          if (inLast > 0 && inLast < span) {
+            wave[wave.length - 1] = Math.max(wave[wave.length - 1], part);
+            inLast++;
+            continue;
+          }
+          if (wave.length === WAVE_BARS) {
+            wave.splice(0, WAVE_BARS, ...Array.from({ length: WAVE_BARS / 2 }, (_, i) => Math.max(wave[2 * i], wave[2 * i + 1])));
+            span *= 2;
+          }
+          wave.push(part);
+          inLast = 1;
+        }
+        // Redraw the bars in place rather than the round, a dozen times a second.
+        root.querySelector('.meaning-wave')?.replaceChildren(...waveBars(wave));
       },
     });
     listening = recording;
@@ -390,6 +405,18 @@ export function practiceScreen(
         hearing = recording;
         q.thinkingSince = Date.now();
         draw();
+        // Tagalog is heard by its sounds first, on the device, as Speak hears it: speech-to-text writes the words it
+        // expects, and turned "kumusta" into "como esta". Only an answer that doesn't pass goes to OpenAI to be written out.
+        if (answerLanguage(q) === 'tl') {
+          const said = await saidOnDevice(q.card, take.samples);
+          if (hearing !== recording) return;
+          if (said) {
+            hearing = null;
+            if (current !== q || !q.typed || !root.isConnected || picked !== null) return;
+            q.draft = q.answer = said;
+            return answer(q, q.card.id);
+          }
+        }
         let text: string;
         try {
           text = await hearer(toWav(take.samples), answerLanguage(q));
@@ -411,6 +438,24 @@ export function practiceScreen(
         unheard(e instanceof RecordError ? PROBLEMS[e.problem] : PROBLEMS['no-mic']);
       },
     );
+  }
+
+  /**
+   * The card's Tagalog (or an accepted spelling) the recording passes as, judged as Speak judges it, with every word
+   * said, or null when it doesn't pass or can't be heard on the device: the model is never downloaded for this, and
+   * checked for again in case the phone has cleared it since.
+   */
+  async function saidOnDevice(card: Card, samples: Float32Array): Promise<string | null> {
+    if (!speakReady && !modelFound) return null;
+    try {
+      if (!(await deps.modelDownloaded())) return null;
+      const model = await deps.loadPhoneModel();
+      const { text, comparison } = judge(targets(card), await model.recognise(samples));
+      return isRight(comparison) && everyWordSaid(text, comparison) ? text : null;
+    } catch {
+      // Left to OpenAI, as it would be without the model.
+      return null;
+    }
   }
 
   /** What the box says once the microphone gives sound. */
@@ -742,8 +787,9 @@ export function practiceScreen(
   }
 
   /**
-   * What the microphone heard, as bars, in place of the box while the meaning is said: faint until the microphone
-   * gives sound, then on saffron. They run across while what was said is heard and checked.
+   * What the microphone heard, as bars, in place of the box while the meaning is said: empty and cream until the
+   * microphone gives sound, then saffron, with a bar added from the left only while there's speech. A beat runs
+   * along them while what was said is heard and checked.
    */
   function waveBox(levels: number[], thinkingSince: number | undefined): HTMLElement {
     const thinking = thinkingSince !== undefined;
@@ -753,11 +799,13 @@ export function practiceScreen(
       {
         class: `meaning-wave${thinking ? ' thinking' : ''}${live ? ' live' : ''}`,
         'aria-hidden': 'true',
-        style: thinking ? `--since: ${Date.now() - thinkingSince}ms` : undefined,
+        style: `--bars: ${WAVE_BARS}${thinking ? `; --since: ${Date.now() - thinkingSince}ms` : ''}`,
       },
-      levels.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` })),
+      waveBars(levels),
     );
   }
+
+  const waveBars = (levels: number[]) => levels.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` }));
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
@@ -865,8 +913,8 @@ export function practiceScreen(
   return root;
 }
 
-/** Bars in the box while a meaning is said, sharing its width: four seconds at about twelve levels a second. */
-const WAVE_BARS = 48;
+/** Bars the box holds while a meaning is said, each a slot of its width: under two seconds of speech at about fifty levels a second, before they merge in pairs. Even, so they can. */
+const WAVE_BARS = 80;
 
 /** How long typing has to pause before a meaning the device can tell is right is taken without Check. */
 const TYPING_PAUSE_MS = 700;
