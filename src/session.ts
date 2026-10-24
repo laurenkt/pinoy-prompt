@@ -219,22 +219,26 @@ const FRESH_MS = 7 * DAY_MS;
 const SETTLING_MS = 3 * DAY_MS;
 /**
  * The share of a drill round kept for cards still settling in, so they come up as often in a big deck as in a
- * small one. Weights alone get spread thinner with every card met.
+ * small one (weights alone get spread thinner with every card met): FOCUS_PER_CARD for each, up to FOCUS_SHARE,
+ * so one or two new words don't come round every few questions. Never less than their weights would give them.
  */
-export const FOCUS_SHARE = 0.5;
+const FOCUS_SHARE = 0.5;
+const FOCUS_PER_CARD = 0.1;
 
 /**
  * How much a card needs drilling. Every card starts at 1, so the strong ones
  * still turn up now and then; on top of that come how likely it is to have
- * been forgotten, being still learned or recently met, how hard it has been
- * (forgotten before, or answered Again or Hard, which lowers its ease), and
- * misses this round (`missed`), which count most.
+ * been forgotten, being still learned or recently met, how often it has been
+ * forgotten before, a hard start (answered Again or Hard while it hasn't yet
+ * held a week, which lowers its ease), and misses this round (`missed`), which
+ * count most.
  */
 export function drillWeight(state: CardState, now: number, missed = 0): number {
   const fading = 1 - recallChance(state, now);
   const learning = state.interval < 1 ? 3 : state.interval < 7 ? 1.5 : 0;
   const fresh = now - state.introduced < FRESH_MS ? 2 : 0;
-  const struggled = Math.min(3, 10 * Math.max(0, START_EASE - state.ease));
+  // Ease never comes back up on Good, so a hard start stops counting once the card has held a week.
+  const struggled = state.interval < 7 ? Math.min(3, 10 * Math.max(0, START_EASE - state.ease)) : 0;
   return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * missed;
 }
 
@@ -246,8 +250,8 @@ function settlingIn(state: CardState, now: number, missed = 0): boolean {
 /**
  * The next card for a drill round, which runs until the learner stops it: any
  * card met, words and guides alike, that `askable` allows, picked at random by
- * drillWeight. About FOCUS_SHARE of the picks are among cards settling in
- * (settlingIn) while there are any, the rest among every card. The last few
+ * drillWeight. A share of the picks (see FOCUS_SHARE) are among cards
+ * settling in (settlingIn) while there are any, the rest among the others. The last few
  * cards asked (`recent`, latest last) sit out while that leaves one to ask.
  * Null with nothing to ask.
  */
@@ -262,24 +266,31 @@ export function pickDrillCard(
   const pool = Object.entries(progress.cards)
     .map(([id, state]) => ({ card: getCard(id), state }))
     .filter((p): p is { card: Card; state: CardState } => !!p.card && askable(p.card))
-    .map(({ card, state }) => ({ card, w: drillWeight(state, now, missed.get(card.id)), focus: settlingIn(state, now, missed.get(card.id)) }));
+    .map(({ card, state }) => {
+      const misses = missed.get(card.id);
+      return { card, w: drillWeight(state, now, misses), focus: settlingIn(state, now, misses) };
+    });
   const keep = Math.min(DRILL_GAP, pool.length - 1);
   const skip = new Set(keep > 0 ? recent.slice(-keep) : []);
   const open = pool.filter((p) => !skip.has(p.card.id));
   if (open.length === 0) return null;
   const focus = open.filter((p) => p.focus);
+  const total = (ps: typeof open) => ps.reduce((sum, p) => sum + p.w, 0);
+  // Never less than the cards settling in would get by weight alone.
+  const share = Math.max(total(focus) / total(open), Math.min(FOCUS_SHARE, FOCUS_PER_CARD * focus.length));
   // One draw decides both which part of the round and which card in it.
   let r = random();
   let from = open;
   if (focus.length > 0 && focus.length < open.length) {
-    if (r < FOCUS_SHARE) {
+    if (r < share) {
       from = focus;
-      r /= FOCUS_SHARE;
+      r /= share;
     } else {
-      r = (r - FOCUS_SHARE) / (1 - FOCUS_SHARE);
+      from = open.filter((p) => !p.focus);
+      r = (r - share) / (1 - share);
     }
   }
-  r *= from.reduce((sum, p) => sum + p.w, 0);
+  r *= total(from);
   return (from.find((p) => (r -= p.w) <= 0) ?? from[from.length - 1]).card;
 }
 

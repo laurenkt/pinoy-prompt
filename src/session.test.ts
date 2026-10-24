@@ -424,9 +424,9 @@ describe('picking the next card to drill', () => {
     progress.cards.paalam = { ...progress.cards.paalam, introduced: LATER, reviewed: LATER, interval: 0 };
     const seen = counts(progress);
     for (const id of ['oo', 'hindi', 'paalam']) expect(seen.get(id)!).toBeGreaterThan(seen.get('kape')! * 2);
-    // The strong ones come up less than before, but still come up, even with two of six cards taking the focus half.
+    // The strong ones come up less than before, but still come up.
     expect(seen.get('kape')! / 4000).toBeLessThan(before);
-    expect(seen.get('kape')! / 4000).toBeGreaterThan(0.015);
+    expect(seen.get('kape')! / 4000).toBeGreaterThan(0.03);
   });
 
   it("gives cards met in the last few days half the round, however many cards are known", () => {
@@ -442,14 +442,30 @@ describe('picking the next card to drill', () => {
     const share = yesterday.reduce((sum, id) => sum + (seen.get(id) ?? 0), 0) / 4000;
     expect(share).toBeGreaterThan(0.45);
     // The rest of the round still goes round the others.
-    expect(share).toBeLessThan(0.6);
+    expect(share).toBeLessThan(0.55);
   });
 
-  it('asks a card answered Again or Hard in Study more than one that went smoothly', () => {
+  it("doesn't bring one new word round every few questions", () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 200), 30);
+    const [fresh] = VOCAB_ORDER.slice(200);
+    recordAnswer(progress, fresh, 'good', LATER - DAY_MS);
+    progress.cards[fresh] = { ...progress.cards[fresh], introduced: LATER - DAY_MS };
+    const share = counts(progress).get(fresh)! / 4000;
+    expect(share).toBeGreaterThan(0.08);
+    expect(share).toBeLessThan(0.15);
+  });
+
+  it('asks a card answered Again or Hard in Study more than one that went smoothly, until it has held a week', () => {
     const progress = settledProgress();
-    progress.cards.kape = { ...progress.cards.kape, ease: 2.1 };
-    const seen = counts(progress);
-    expect(seen.get('kape')!).toBeGreaterThan(seen.get('oo')! * 2);
+    for (const id of ['kape', 'oo']) progress.cards[id] = { ...progress.cards[id], interval: 3, reviewed: LATER };
+    progress.cards.kape.ease = 2.1;
+    let seen = counts(progress);
+    expect(seen.get('kape')!).toBeGreaterThan(seen.get('oo')! * 1.5);
+    // Held for months since: its hard start no longer counts.
+    for (const id of ['kape', 'oo']) progress.cards[id] = { ...progress.cards[id], interval: 90 };
+    seen = counts(progress);
+    expect(seen.get('kape')).toBe(seen.get('oo'));
   });
 
   it('drills guides as well as words, as far as the round can ask them', () => {
