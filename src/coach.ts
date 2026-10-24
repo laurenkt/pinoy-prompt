@@ -2,6 +2,7 @@
 // letters to work on, and a tip for the most useful thing to fix first.
 
 import { baseSound, isGlidingVowel, type Comparison, type SoundResult } from './phonetics';
+import { leanAgainst, SURE, type Stress } from './stress';
 
 /** How each sound is described to a learner, by example. */
 const DESCRIBE: Record<string, string> = {
@@ -113,4 +114,15 @@ export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
     tips.push({ letters, at: anchor ? [anchor.from] : [], text: `There was an extra ${describeSound(added.ipa)} sound ${where} "${letters}". Leave it out.`, plain: true });
   }
   return tips;
+}
+
+/**
+ * A tip for a word said leaning on the other one of its last two syllables, in the hint's own spelling, or null when
+ * it wasn't, or it isn't sure. Kept apart from the sound tips: stress never changes the score.
+ */
+export function stressTip(stress: Stress | null): string | null {
+  if (!stress || leanAgainst(stress) <= SURE) return null;
+  const { syllables, expected } = stress;
+  const said = expected === syllables.length - 1 ? expected - 1 : expected + 1;
+  return `Lean on ${syllables[expected]}, not ${syllables[said].toUpperCase()}: higher and longer.`;
 }
