@@ -13,6 +13,7 @@ import { button, drillScope, fakeApp, flush, noMic } from '../test/screen';
 import { practiceScreen, type MeaningHearer } from './practice';
 import type { SpeakDeps } from './speak';
 import { play } from '../speech';
+import { fakeRecognition } from '../test/fake-speech';
 
 vi.mock('../speech', async (actual) => {
   const speech = await actual<typeof import('../speech')>();
@@ -53,6 +54,7 @@ afterEach(() => {
   if (last) drillScope(last, ['listen', 'read', 'recall', 'speak']);
   last = undefined;
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   vi.mocked(play).mockClear();
   document.body.replaceChildren();
 });
@@ -136,6 +138,71 @@ describe('recalling words that have settled', () => {
     await flush();
     await flush();
     expect(hearer).toHaveBeenCalledWith(expect.any(Blob), 'tl');
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+});
+
+describe('a Tagalog answer said into the box, with the pronunciation model on the device', () => {
+  /** A microphone that records at once, and a model that hears these sounds. */
+  function onDevice(sounds: string[]) {
+    const record = vi.fn((events: RecorderEvents = {}) => {
+      setTimeout(() => events.onListening?.(), 0);
+      return { audio: new Promise<Take>((r) => setTimeout(() => r({ samples: new Float32Array(160), speech: true }), 0)), stop: () => {}, cancel: () => {} };
+    });
+    const recognise = vi.fn(async () => fakeRecognition(sounds));
+    const deps = {
+      recordingSupported: () => true,
+      modelDownloaded: async () => true,
+      modelKnownDownloaded: () => true,
+      loadPhoneModel: async () => ({ recognise }),
+      record,
+    } as unknown as SpeakDeps;
+    return { deps, recognise };
+  }
+
+  async function say(root: HTMLElement): Promise<void> {
+    root.querySelector<HTMLButtonElement>('.meaning-mic')!.click();
+    for (let i = 0; i < 5; i++) await flush();
+  }
+
+  it('is judged by its sounds, so speech-to-text writing a look-alike can\'t mark it wrong', async () => {
+    const { deps, recognise } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
+    // What speech-to-text might make of it.
+    const hearer = vi.fn<MeaningHearer>(async () => 'Solomon');
+    const judge = vi.fn<MeaningJudge>(async () => false);
+    const root = (last = recall(learner(true), judge, deps, hearer));
+    await say(root);
+    expect(recognise).toHaveBeenCalled();
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    expect(box(root)!.value).toBe('Salamat');
+    expect(box(root)!.classList.contains('correct')).toBe(true);
+    // It passed on the device, so the recording never went to OpenAI.
+    expect(hearer).not.toHaveBeenCalled();
+    expect(judge).not.toHaveBeenCalled();
+  });
+
+  it('goes to speech-to-text when its sounds are another word, which may still be right in other words', async () => {
+    const { deps } = onDevice(['b', 'u', 'k', 'a', 's']);
+    const hearer = vi.fn<MeaningHearer>(async () => 'Bukas');
+    const judge = vi.fn<MeaningJudge>(async () => false);
+    const root = (last = recall(learner(true), judge, deps, hearer));
+    await say(root);
+    expect(hearer).toHaveBeenCalledWith(expect.any(Blob), 'tl');
+    expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
+    expect(box(root)!.value).toBe('Bukas');
+  });
+
+  it("leaves English meanings to speech-to-text", async () => {
+    const { deps, recognise } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
+    const hearer = vi.fn<MeaningHearer>(async () => 'Thank you');
+    // A voice, so listening is on offer.
+    vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {} });
+    drillScope(practiceScreen(fakeApp(KNOWN), noMic), ['listen']);
+    const root = (last = practiceScreen(learner(true), deps, null, () => hearer));
+    document.body.replaceChildren(root);
+    await say(root);
+    expect(recognise).not.toHaveBeenCalled();
+    expect(hearer).toHaveBeenCalledWith(expect.any(Blob), 'en');
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
   });
 });
