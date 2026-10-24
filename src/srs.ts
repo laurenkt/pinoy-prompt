@@ -29,7 +29,16 @@ export interface CardState {
    * was tracked; their past is worked out from the schedule instead.
    */
   log?: [number, number][];
+  /**
+   * Drills only, never the schedule: how many times its answer was picked from the choices after "Show choices"
+   * (MAX_HINTED at most), less the times it has been typed right since. Brings it up more in drill rounds until
+   * it's answered without them (see drillWeight). Missing means none.
+   */
+  hinted?: number;
 }
+
+/** Most "Show choices" answers a card's `hinted` holds, so a few answers typed right are enough to clear it. */
+export const MAX_HINTED = 3;
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const MIN_EASE = 1.3;

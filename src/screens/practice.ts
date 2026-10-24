@@ -3,7 +3,7 @@ import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
 import { canTypeMeaning, judgeMeaning, matchesAnswer, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, pickDrillCard, settled, shuffle } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, noteDrillAnswer, pickDrillCard, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -41,6 +41,8 @@ interface Question {
    * typed (or dictated), not picked.
    */
   typed: boolean;
+  /** "Show choices" was tapped on a typed question, so an answer to it was picked rather than recalled. */
+  hinted?: boolean;
   /** What's typed so far, kept while the screen is redrawn. */
   draft?: string;
   /** What was typed, once it's sent. */
@@ -439,6 +441,9 @@ export function practiceScreen(
     if (right) void chime();
     if (q.guide || q.mode === 'recall' || q.mode === 'listen') sayCard(q);
     settle(right);
+    // Got from the choices, it comes up more in later rounds too, until it's typed right without them.
+    if (q.hinted) noteHint(q.card.id, true);
+    else if (q.typed && right) noteHint(q.card.id, false);
     if (right)
       auto = countdown(root, () => {
         autoMoved = true;
@@ -457,7 +462,12 @@ export function practiceScreen(
     if (misses > 1) missed.set(q.card.id, misses - 1);
     else missed.delete(q.card.id);
     tally(q.card.id, true);
+    noteHint(q.card.id, false);
     draw();
+  }
+
+  function noteHint(id: string, hinted: boolean): void {
+    if (noteDrillAnswer(app.progress, id, hinted)) app.commit();
   }
 
   /** Not sure enough to type it, or tired of waiting for the check: pick from choices instead. */
@@ -465,6 +475,7 @@ export function practiceScreen(
     const q = current;
     if (!q || picked !== null) return;
     q.typed = false;
+    q.hinted = true;
     checking = false;
     stopListening();
     draw();

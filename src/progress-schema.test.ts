@@ -92,6 +92,19 @@ describe('reviews scheduled by the old midnight rule', () => {
   });
 });
 
+describe("a card's count of answers from the choices", () => {
+  const card = newCardState(NOW);
+
+  it('is kept, up to the most it counts', () => {
+    expect(sanitizeCard({ ...card, hinted: 2 }, NOW)!.hinted).toBe(2);
+    expect(sanitizeCard({ ...card, hinted: 9 }, NOW)!.hinted).toBe(3);
+  });
+
+  it('is dropped when there are none or it is broken', () => {
+    for (const hinted of [0, -1, 1.5, '2', null]) expect(sanitizeCard({ ...card, hinted }, NOW)).toEqual(card);
+  });
+});
+
 describe('a copy from a newer version of the app', () => {
   it('keeps its schema number and every field this version does not know', () => {
     const future = {

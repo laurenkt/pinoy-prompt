@@ -3,7 +3,7 @@
 
 import { LEARN_ORDER, VOCAB, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
 import { recallChance } from './memory';
-import { DAY_MS, START_EASE, isDue, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, MAX_HINTED, START_EASE, isDue, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
 
 export type StepKind = 'new' | 'review';
@@ -230,7 +230,8 @@ const FOCUS_PER_CARD = 0.1;
  * still turn up now and then; on top of that come how likely it is to have
  * been forgotten, being still learned or recently met, how often it has been
  * forgotten before, a hard start (answered Again or Hard while it hasn't yet
- * held a week, which lowers its ease), and misses this round (`missed`), which
+ * held a week, which lowers its ease), and misses this round (`missed`) and
+ * answers only got from the choices (`hinted`, kept across rounds), which
  * count most.
  */
 export function drillWeight(state: CardState, now: number, missed = 0): number {
@@ -239,12 +240,15 @@ export function drillWeight(state: CardState, now: number, missed = 0): number {
   const fresh = now - state.introduced < FRESH_MS ? 2 : 0;
   // Ease never comes back up on Good, so a hard start stops counting once the card has held a week. A lapse counts on its own.
   const struggled = state.interval < 7 && state.lapses === 0 ? Math.min(3, 10 * Math.max(0, START_EASE - state.ease)) : 0;
-  return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * missed;
+  return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * (missed + (state.hinted ?? 0));
 }
 
-/** Whether a card is in the focus part of a drill round: still being learned, met in the last few days, or missed this round. */
+/**
+ * Whether a card is in the focus part of a drill round: still being learned, met in the last few days, missed this
+ * round, or last answered from the choices.
+ */
 function settlingIn(state: CardState, now: number, missed = 0): boolean {
-  return state.interval < 1 || now - state.introduced < SETTLING_MS || missed > 0;
+  return state.interval < 1 || now - state.introduced < SETTLING_MS || missed > 0 || !!state.hinted;
 }
 
 /**
@@ -294,6 +298,21 @@ export function pickDrillCard(
   }
   r *= total(from);
   return (from.find((p) => (r -= p.w) <= 0) ?? from[from.length - 1]).card;
+}
+
+/**
+ * Note how a drill question on a card was answered, for drillWeight: from the choices after "Show choices" (`hinted`),
+ * or typed right without them. Only `hinted` changes, never the schedule. Whether progress changed, to be saved.
+ */
+export function noteDrillAnswer(progress: Progress, cardId: string, hinted: boolean): boolean {
+  const state = progress.cards[cardId];
+  if (!state) return false;
+  const before = state.hinted ?? 0;
+  const after = hinted ? Math.min(before + 1, MAX_HINTED) : Math.max(before - 1, 0);
+  if (after === before) return false;
+  if (after) state.hinted = after;
+  else delete state.hinted;
+  return true;
 }
 
 /** A few more new cards beyond the daily rate, for when the learner wants them. */

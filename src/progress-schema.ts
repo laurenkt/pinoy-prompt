@@ -14,7 +14,7 @@
 // progress object into the new shape, and add a fixture for the new version
 // under src/test/fixtures/. The tests fail until both exist.
 
-import { DAY_MS, MIN_EASE, START_EASE, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, MAX_HINTED, MIN_EASE, START_EASE, startOfDayAfter, type CardState } from './srs';
 
 export interface Settings {
   /** New cards introduced per day. */
@@ -257,6 +257,8 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
     : [];
   if (log.length) card.log = log;
   else delete card.log;
+  if (isCount(value.hinted) && value.hinted > 0) card.hinted = Math.min(value.hinted, MAX_HINTED);
+  else delete card.hinted;
   return card;
 }
 

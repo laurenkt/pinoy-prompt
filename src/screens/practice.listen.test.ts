@@ -161,6 +161,23 @@ describe('listening to words that have settled', () => {
     expect(root.querySelectorAll('.choice')).toHaveLength(4);
   });
 
+  it('brings a word got only from the choices up more in later rounds, until its meaning is typed right', async () => {
+    const app = learner(true);
+    const commit = vi.spyOn(app, 'commit');
+    const root = listen(app);
+    button(root, 'Show choices').click();
+    [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((c) => c.textContent?.endsWith('Thank you'))!.click();
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    expect(app.progress.cards.salamat.hinted).toBe(1);
+    expect(commit).toHaveBeenCalled();
+    // Typed right next time, it's back to how often it came up before.
+    const again = listen(app);
+    type(again, 'thanks');
+    await flush();
+    expect(again.querySelector('.feedback')?.textContent).toContain('Tama!');
+    expect(app.progress.cards.salamat.hinted).toBeUndefined();
+  });
+
   it("drops a check that comes back after the round has ended", async () => {
     let answer: (right: boolean) => void = () => {};
     const app = learner(true);

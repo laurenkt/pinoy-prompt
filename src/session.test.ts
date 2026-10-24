@@ -18,6 +18,7 @@ import {
   nextStudyStep,
   DRILL_GAP,
   drillWeight,
+  noteDrillAnswer,
   pickDrillCard,
   pickFormat,
   requeue,
@@ -456,6 +457,42 @@ describe('picking the next card to drill', () => {
     }
     expect(asked / 4000).toBeGreaterThan(0.42);
     expect(asked / 4000).toBeLessThan(0.55);
+  });
+
+  it('brings a card only answered from the choices back much more often, in later rounds too, until it is typed right', () => {
+    const progress = settledProgress();
+    const plain = counts(progress).get('kape')!;
+    expect(noteDrillAnswer(progress, 'kape', true)).toBe(true);
+    const hinted = counts(progress).get('kape')!;
+    expect(hinted).toBeGreaterThan(plain * 2);
+    // Each answer typed right without the choices takes one off; the schedule is left alone.
+    const { hinted: _hinted, ...schedule } = progress.cards.kape;
+    noteDrillAnswer(progress, 'kape', true);
+    expect(progress.cards.kape.hinted).toBe(2);
+    noteDrillAnswer(progress, 'kape', false);
+    expect(noteDrillAnswer(progress, 'kape', false)).toBe(true);
+    expect(progress.cards.kape).toEqual(schedule);
+    expect(noteDrillAnswer(progress, 'kape', false)).toBe(false);
+    expect(counts(progress).get('kape')).toBe(plain);
+  });
+
+  it('counts only a few answers from the choices, so a few typed right clear it', () => {
+    const progress = settledProgress();
+    for (let i = 0; i < 6; i++) noteDrillAnswer(progress, 'kape', true);
+    expect(progress.cards.kape.hinted).toBe(3);
+    expect(noteDrillAnswer(progress, 'unmet', true)).toBe(false);
+    expect(progress.cards.unmet).toBeUndefined();
+  });
+
+  it('gives a card only answered from the choices its own share of the round in a big deck', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 200), 30);
+    const [word] = VOCAB_ORDER;
+    const plain = counts(progress).get(word)! / 4000;
+    noteDrillAnswer(progress, word, true);
+    const share = counts(progress).get(word)! / 4000;
+    expect(share).toBeGreaterThan(0.08);
+    expect(share).toBeGreaterThan(plain * 10);
   });
 
   it("doesn't bring one new word round every few questions", () => {
