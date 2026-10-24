@@ -45,8 +45,8 @@ describe('guides in a drill round', () => {
     const before = structuredClone(a.progress.cards);
     untilGuide(root, 'Fill the gap');
     root.querySelector<HTMLElement>('.prompt .drill-q')!.click();
-    expect([...root.querySelectorAll('.way-tile .way-name')].map((n) => n.textContent)).toEqual(['Gap', 'Build']);
-    expect(root.querySelector('.way-tile.asked')?.className).toContain('s-new');
+    expect([...root.querySelectorAll('.tag-name')].map((n) => n.textContent)).toEqual(['Gap', 'Build']);
+    expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Gap: Just met, asked now.');
     root.querySelector<HTMLElement>('.prompt')!.click();
     const drill = drillOf(root);
     [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((c) => c.textContent!.replace(/^\d/, '') !== drill.answer)!.click();
