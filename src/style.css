@@ -2471,8 +2471,60 @@ p {
   background: var(--teal);
 }
 
-/* On a drill's prompt, the card's strength sits after the eyebrow, outlined so it shows on the prompt's own colour. */
-.prompt .eyebrow .badge {
+/* Drills: how well the card is known, out of sight until the small button after the prompt's eyebrow is tapped. The
+   button is drawn smaller than a tap target and reaches out to 44px around it, so the eyebrow line stays short. */
+.memory-toggle {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  margin: -6px 0;
+  display: inline-grid;
+  place-items: center;
+  vertical-align: middle;
+  background: var(--cream);
+  color: var(--on-accent);
+  border: 2px solid var(--ink);
+  border-radius: 99px;
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: 0.9rem;
+}
+
+.memory-toggle::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
+
+.memory-toggle[aria-expanded='true'] {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+.card-memory {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 2px solid var(--ink);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.card-memory[hidden] {
+  display: none;
+}
+
+.card-memory dt {
+  font-weight: 800;
+}
+
+.card-memory dd {
+  margin: 0;
+}
+
+/* Outlined, so a strength's colour shows on the prompt's own. */
+.card-memory .badge {
   border: 2px solid var(--ink);
 }
 

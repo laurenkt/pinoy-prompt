@@ -26,6 +26,11 @@ export interface CardState {
   /** When the card was last reviewed. Missing on cards saved before it was tracked. */
   reviewed?: number;
   /**
+   * How many times Study has asked the card this way. Missing on cards saved before it was counted; the first answer
+   * since starts it from what the schedule shows for certain (see answersOf in memory.ts).
+   */
+  reviews?: number;
+  /**
    * Each time the card moved to a different strength (see memory.ts), as
    * [time, new interval] pairs, oldest first. Missing on cards saved before it
    * was tracked; their past is worked out from the schedule instead.
@@ -80,7 +85,7 @@ export function nextInterval(card: CardState, rating: Rating): number {
 export function review(card: CardState, rating: Rating, now: number): CardState {
   const interval = nextInterval(card, rating);
   const { split: _split, ...answered } = card;
-  const next: CardState = { ...answered, interval, reviewed: now };
+  const next: CardState = { ...answered, interval, reviewed: now, reviews: answersOf(card).count + 1 };
 
   switch (rating) {
     case 'again':
@@ -103,6 +108,18 @@ export function review(card: CardState, rating: Rating, now: number): CardState 
   return next;
 }
 
+/**
+ * How many times Study has asked the card this way. A card saved before answers were counted shows at least its
+ * current run of right answers and the times it was forgotten (`atLeast`); one only copied from reading's schedule
+ * when the ways were split (`split`) hasn't been asked this way at all.
+ */
+export function answersOf(card: CardState): { count: number; atLeast: boolean } {
+  if (card.reviews !== undefined) return { count: card.reviews, atLeast: false };
+  if (card.split) return { count: 0, atLeast: false };
+  const count = card.reps + card.lapses;
+  return { count, atLeast: count > 0 };
+}
+
 export function isDue(card: CardState, now: number): boolean {
   return card.due <= now;
 }
@@ -121,6 +138,17 @@ export function formatInterval(days: number, { up = false } = {}): string {
   // Rounded up, the last days of a year would say "13mo".
   if (days < 365 && months <= 12) return `${months}mo`;
   return `${up ? Math.ceil(days / 36.5) / 10 : round1(days / 365)}y`;
+}
+
+const MINUTE_MS = 60_000;
+
+/** A short wait, e.g. "25m", "3h", "2d", "2mo": rounded up, so the learner never comes back to find nothing yet. */
+export function formatWait(ms: number): string {
+  const minutes = Math.max(1, Math.ceil(ms / MINUTE_MS));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return formatInterval(Math.ceil(hours / 24), { up: true });
 }
 
 /** Local midnight a whole number of days after (or before) the day of `now`. */

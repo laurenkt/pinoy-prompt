@@ -64,6 +64,15 @@ describe('saved progress from every schema version', () => {
   });
 });
 
+describe("a card's count of answers", () => {
+  it('is kept only when it is one', () => {
+    const card = newCardState(0);
+    expect(sanitizeCard({ ...card, reviews: 4 }, NOW)!.reviews).toBe(4);
+    expect(sanitizeCard({ ...card, reviews: -1 }, NOW)).not.toHaveProperty('reviews');
+    expect(sanitizeCard({ ...card, reviews: 'x' }, NOW)).not.toHaveProperty('reviews');
+  });
+});
+
 describe('reviews scheduled by the old midnight rule', () => {
   const evening = new Date(2026, 9, 18, 21).getTime();
   const midnightCard = (interval: number) => ({

@@ -169,6 +169,15 @@ const SCREENS = {
     await page.click('.drills-btn');
     await page.click('.choice');
   },
+  // How well the card is known, opened from the button on the prompt.
+  'drills-memory': async (page) => {
+    await page.click('.drills-btn');
+    await page.click('.memory-toggle');
+  },
+  'drills-gap-memory': async (page) => {
+    await drillGuide(page, 'read');
+    await page.click('.memory-toggle');
+  },
   // A pattern in a drill round, asked as Study asks it: a gap to fill under Read, a sentence to build under Recall.
   'drills-gap': (page) => drillGuide(page, 'read'),
   'drills-build': (page) => drillGuide(page, 'recall'),
@@ -388,7 +397,7 @@ async function drillGuide(page, mode) {
       if (await page.locator('.meaning-input').count()) await page.click('text=Show choices');
       await page.locator('.choice').first().click();
     }
-    await page.click('text=Next');
+    await page.click('button:has-text("Next")');
   }
 }
 

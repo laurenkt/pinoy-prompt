@@ -12,7 +12,7 @@ import {
 } from '../memory';
 import { MAX_LEARNING, abilities, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards, upcomingWays } from '../session';
 import { canPlay } from '../speech';
-import { DAY_MS, formatInterval } from '../srs';
+import { DAY_MS, formatWait } from '../srs';
 import { rollDay } from '../store';
 import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
@@ -99,15 +99,6 @@ function plural(n: number, one: string, many = `${one}s`): string {
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
-/** A short wait, e.g. "25m", "3h", "2d", "2mo": rounded up, so the learner never comes back to find nothing yet. */
-function waitLabel(ms: number): string {
-  const minutes = Math.max(1, Math.ceil(ms / MINUTE));
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.ceil(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  return formatInterval(Math.ceil(hours / 24), { up: true });
-}
-
 /** The one Home's Study button waits on, so a Home drawn again doesn't leave an older one running. */
 let studyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -165,7 +156,7 @@ function studyButton(app: App, isFirstRun: boolean): { el: HTMLElement; changesI
   else if (reviews > 0) mode = { kind: 'review', icon: 'cards', kicker: `${plural(reviews, 'card')} due`, title: 'Review' };
   else if (fresh > 0) mode = { kind: 'learn', icon: 'plus', kicker: plural(fresh, 'new card'), title: 'Learn' };
   else {
-    mode = { kind: 'caught-up', icon: 'cards', kicker: next === null ? 'All caught up' : `Next in ${waitLabel(next - now)}`, title: 'Study' };
+    mode = { kind: 'caught-up', icon: 'cards', kicker: next === null ? 'All caught up' : `Next in ${formatWait(next - now)}`, title: 'Study' };
     if (next !== null) {
       const wait = next - now;
       const unit = wait <= HOUR ? MINUTE : wait <= DAY_MS ? HOUR : DAY_MS;

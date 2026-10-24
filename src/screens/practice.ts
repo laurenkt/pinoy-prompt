@@ -1,14 +1,16 @@
 import type { App } from '../app';
-import { VOCAB, cardKey, getCard, isVocab, type Card, type Drill, type Way } from '../deck';
+import { VOCAB, cardKey, getCard, isVocab, studyWays, type Card, type Drill, type Way } from '../deck';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle, wayState } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
+import { answersOf, formatWait } from '../srs';
+import { STRENGTHS, strengthOf } from '../memory';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, strengthBadge } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
-import { eyebrowLine, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
+import { promptBlock, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion, type PromptMemory } from './guide-question';
 import { quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
@@ -17,6 +19,11 @@ import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PR
  * sentence from the English is recalling it. Guides aren't heard or said.
  */
 const GUIDE_MODES: Record<GuideFormat, Way> = { gap: 'read', build: 'recall' };
+
+const STRENGTH_DESC = new Map(STRENGTHS.map((s) => [s.id, s.desc]));
+
+const times = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${n} times`);
+const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 const MODES: { id: Way; title: string }[] = [
   { id: 'listen', title: 'Listen' },
@@ -143,6 +150,8 @@ export function practiceScreen(
   /** What was picked on the question before; null when there's nothing to look back at (a spoken question has no pick). */
   let previousPick: string | null = null;
   let lookingBack = false;
+  /** The question whose memory is open: none to begin with, so a card's rating stays out of sight until asked for. */
+  let memoryFor: Question | null = null;
   /** Set as a question moves on by itself, so the next one doesn't take focus: an Enter meant for Next would answer it. */
   let autoMoved = false;
   /** The kinds of question are tucked away until asked for. */
@@ -694,12 +703,56 @@ export function practiceScreen(
     ];
   }
 
+  /**
+   * How well the card is known, kept behind a button on the prompt so it doesn't colour the answer: Study's schedule
+   * for the way it's asked (none for Speak, which Study doesn't ask), and how often the drills have had to help that
+   * way lately. A drill never changes the schedule, so it reads the same once answered. Open only on the question it
+   * was opened on.
+   */
+  function memoryControl(q: Question): PromptMemory {
+    const state = wayState(app.progress, q.card, q.mode);
+    const help = drillHelp(app.progress.cards[q.card.id], q.mode);
+    const row = (label: string, ...value: (Node | string | null)[]) => [h('dt', null, label), h('dd', null, ...value)];
+    const answers = state && answersOf(state);
+    const now = app.now();
+    const details = h(
+      'dl',
+      { class: 'card-memory', id: 'card-memory', hidden: memoryFor !== q },
+      state
+        ? [
+            row('Memory', strengthBadge(state), ' ', STRENGTH_DESC.get(strengthOf(state)) ?? ''),
+            row('Next in Study', state.due <= now ? 'Due now' : `In ${formatWait(state.due - now)}`),
+            row(
+              'Answered in Study',
+              answers!.count ? capital(`${answers!.atLeast ? 'at least ' : ''}${times(answers!.count)}`) : 'Not yet',
+              state.lapses ? `, forgotten ${times(state.lapses)}` : '',
+            ),
+          ]
+        : row('Memory', studyWays(q.card).includes(q.mode) ? 'Study hasn’t asked it this way yet' : 'Study doesn’t ask it this way'),
+      row('Help in Drills', help ? `Needed ${times(help)} lately` : 'Not needed lately'),
+    );
+    const toggle = h(
+      'button',
+      {
+        class: 'memory-toggle',
+        'aria-label': 'How well you know it',
+        'aria-expanded': String(memoryFor === q),
+        'aria-controls': 'card-memory',
+        onclick: () => {
+          memoryFor = memoryFor === q ? null : q;
+          details.hidden = memoryFor !== q;
+          toggle.setAttribute('aria-expanded', String(memoryFor === q));
+        },
+      },
+      icon('stats'),
+    );
+    return { toggle, details };
+  }
+
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
-    // How well the card is held, beside the question. A drill never changes the schedule, so it stays put once answered.
-    // The card asked this way, as Study keeps it; none for a way Study doesn't ask (Speak).
-    const badge = strengthBadge(wayState(app.progress, q.card, q.mode));
+    const memory = memoryControl(q);
     const answered = picked !== null;
     const right = picked === answerOf(q);
     const field = answerLanguage(q);
@@ -722,39 +775,38 @@ export function practiceScreen(
           onChange: draw,
           feedback: (right) => guideFeedback(q.card, d, right, { praise: 'Tama!', miss: 'Mali.' }),
           after: [onward()],
-          badge,
+          memory,
         }),
       );
     }
 
-    const eyebrow = (text: string) => eyebrowLine(text, badge);
     let prompt: HTMLElement;
     if (q.mode === 'speak') {
-      prompt = h(
-        'div',
-        { class: 'prompt' },
-        eyebrow('Say this out loud'),
+      prompt = promptBlock(
+        'prompt',
+        'Say this out loud',
+        memory,
         // No audio until the learner has had a go: the word is played on the result.
         h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
         h('p', { class: 'prompt-meaning' }, q.card.en),
       );
     } else if (q.mode === 'listen') {
-      prompt = h(
-        'div',
-        { class: 'prompt center' },
-        eyebrow(q.typed ? 'What does it mean?' : 'What did you hear?'),
+      prompt = promptBlock(
+        'prompt center',
+        q.typed ? 'What does it mean?' : 'What did you hear?',
+        memory,
         audioPair(say, true),
         answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
       );
     } else if (q.mode === 'read') {
-      prompt = h(
-        'div',
-        { class: 'prompt' },
-        eyebrow('What does this mean?'),
+      prompt = promptBlock(
+        'prompt',
+        'What does this mean?',
+        memory,
         h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
       );
     } else {
-      prompt = h('div', { class: 'prompt' }, eyebrow('How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
+      prompt = promptBlock('prompt', 'How do you say…', memory, h('p', { class: 'prompt-en' }, q.card.en));
     }
 
     return h(
