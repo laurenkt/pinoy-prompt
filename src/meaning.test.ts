@@ -326,6 +326,11 @@ describe('telling a mixed-up Tagalog word from a typo', () => {
     expect(leavesOutPo('pakiulit ho', card('pakiulit'))).toBe(false);
     // Another wording is OpenAI's to judge.
     expect(leavesOutPo('ulitin mo nga', card('pakiulit'))).toBe(false);
+    // Polite another way.
+    expect(leavesOutPo('Salamat sa inyo', card('salamat-po'))).toBe(false);
+    expect(leavesOutPo('Pakiulit ninyo', card('pakiulit'))).toBe(false);
+    // Joined up, as the card's own wording is matched.
+    expect(leavesOutPo('dahandahan lang', card('dahan-dahan'))).toBe(true);
     // A card without a "po" has none to leave out.
     expect(leavesOutPo('salamat', card('salamat'))).toBe(false);
   });

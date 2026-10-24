@@ -254,9 +254,9 @@ export function repeatsTagalog(answer: string, card: Card): boolean {
   const own = ownTagalog(card);
   const list = words(answer).filter((w) => !RESPECT.includes(w));
   const english = (w: string) => knownWords().has(w);
-  const said = (w: string) => tagalog.has(w) || (!english(w) && [...tagalog].some((t) => sameTagalogWord(w, t, own)));
+  const said = list.map((w) => tagalog.has(w) || (!english(w) && [...tagalog].some((t) => sameTagalogWord(w, t, own))));
   const otherTagalog = (w: string) => !english(w) && deckTagalogWords().has(w);
-  return list.length > 0 && list.every((w) => said(w) || otherTagalog(w)) && list.some((w) => said(w) && !english(w));
+  return list.length > 0 && list.every((w, i) => said[i] || otherTagalog(w)) && list.some((w, i) => said[i] && !english(w));
 }
 
 /** A wording's words as written, in Tagalog or English: lower case, without accents or punctuation. */
@@ -296,16 +296,20 @@ function sameTagalogWord(typed: string, word: string, own: Set<string>): boolean
   return isTypo(typed, word, allowed, knownTagalog(), own);
 }
 
+/** Saying "you" politely, which makes an answer polite without a "po": "Salamat sa inyo". */
+const POLITE_YOU = ['kayo', 'inyo', 'ninyo', 'niyo', 'nyo'];
+
 /**
  * Whether the answer has every word of the card's Tagalog, give or take a typo,
- * but not the "po" the card always has ("paliulit ito" for "Pakiulit po."):
- * it's what makes it polite, so it's wrong without asking OpenAI, which can
- * miss it.
+ * but not the "po" the card always has, nor a polite "you" instead ("paliulit
+ * ito" for "Pakiulit po.", "dahandahan lang" for "Dahan-dahan lang po."): it's
+ * what makes it polite, so it's wrong without asking OpenAI, which can miss it.
  */
 export function leavesOutPo(answer: string, card: Card): boolean {
   const given = plainWords(answer);
   const wordings = cardWords(card);
-  if (polite(given) || !wordings.every(polite)) return false;
+  if (given.length === 0 || polite(given) || given.some((w) => POLITE_YOU.includes(w)) || !wordings.every(polite)) return false;
+  if (matchesTagalog(`${answer} po`, card)) return true;
   const own = ownTagalog(card);
   return wordings.some((want) => bare(want).every((w) => given.some((g) => sameTagalogWord(g, w, own))));
 }
