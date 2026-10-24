@@ -84,7 +84,8 @@ describe('matching a typed meaning on the device', () => {
         for (const answer of other.en.split('/')) expect(matchesMeaning(answer, target), `${answer} for ${target.en}`).toBe(false);
       }
     }
-  });
+    // Every card against every other: a few seconds, and CI's runners can take twice that.
+  }, 20_000);
 
   it('spells out contractions typed with or without the apostrophe', () => {
     expect(words("doesnt didn't wont can't Im")).toEqual(['does', 'not', 'did', 'not', 'will', 'not', 'can', 'not', 'i', 'am']);

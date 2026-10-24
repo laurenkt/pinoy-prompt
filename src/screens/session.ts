@@ -13,6 +13,7 @@ import {
   requeue,
   shuffle,
   unmetCount,
+  upcomingNewCards,
   type Format,
   type Step,
 } from '../session';
@@ -379,6 +380,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   function caughtUpView(): HTMLElement {
     const unmet = unmetCount(app.progress) > 0;
+    // Cards still to meet may all be waiting for the ones they build on to settle.
+    const more = upcomingNewCards(app.progress, 1).length > 0;
     // Drills wait for a few words; until then, learning more is the way on.
     const drills = canDrill(app.progress);
     return h(
@@ -389,7 +392,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       h(
         'p',
         null,
-        unmet ? "No reviews are due, and today's new cards are in." : "No reviews are due, and you've met every card.",
+        !unmet
+          ? "No reviews are due, and you've met every card."
+          : more
+            ? "No reviews are due, and today's new cards are in."
+            : 'No reviews are due. The next new cards build on ones you met recently, so they come once those have had a day.',
         drills
           ? ' You can keep practising in Drills, which leans on your weakest cards. It won\'t change when they come back.'
           : ` Drills open once you know ${DRILL_MIN_WORDS} words.`,
@@ -399,7 +406,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
         { class: 'stack' },
         drills &&
           h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: () => app.navigate({ name: 'practice' }) }, 'Keep practising in Drills'),
-        unmet &&
+        more &&
           h(
             'button',
             {

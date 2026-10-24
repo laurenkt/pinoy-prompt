@@ -1,7 +1,7 @@
 // Builds a study session and tracks it as the learner works through it.
 // Kept free of DOM code so it can be unit tested.
 
-import { LEARN_ORDER, VOCAB, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
+import { LEARN_ORDER, VOCAB, buildsOn, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
 import { recallChance } from './memory';
 import { DAY_MS, MAX_HINTED, START_EASE, isDue, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
@@ -59,10 +59,13 @@ export function unmetCount(progress: Progress): number {
 }
 
 /**
- * The next cards to introduce, most useful first (see LEARN_ORDER). A guide
- * waits until the cards it builds on have settled, the learner has met enough
- * cards, and enough new cards have come since the last guide; then it comes in
- * at the first chance.
+ * The next cards to introduce, most useful first (see LEARN_ORDER). A card waits
+ * until the cards it builds on (`buildsOn`) have settled: a phrase until the
+ * words it is made of have been remembered a day after they were met, so each
+ * phrase is one new thing on top of words already known; meanwhile the next
+ * card in the order comes first. A guide also waits until the learner has met
+ * enough cards and enough new cards have come since the last guide; then it
+ * comes in at the first chance.
  */
 export function upcomingNewCards(progress: Progress, limit: number): string[] {
   const met = Object.entries(progress.cards)
@@ -75,13 +78,17 @@ export function upcomingNewCards(progress: Progress, limit: number): string[] {
   });
   let sinceGuide = lastGuide === -1 ? Infinity : met.length - 1 - lastGuide;
 
-  // Once every word is met, there is nothing left to space guides out with.
+  const grounded = (card: Card) => buildsOn(card).every((id) => settled(progress, id));
+  const unmetCards = LEARN_ORDER.map(getCard).filter((c): c is Card => !!c && !isIntroduced(progress, c.id));
+  // Cards this brings in won't have settled yet either, so a phrase that isn't grounded now stays out.
+  const unmet = unmetCards.filter((c) => !isVocab(c) || grounded(c));
+  // Words still to come, waiting or not, space guides out; once every word is met there is nothing to space them with.
+  const wordsWaiting = unmetCards.some((c) => isVocab(c) && !grounded(c));
   const ready = (card: Card) =>
     count >= (card.kind === 'pattern' ? PATTERN_START : GUIDE_START) &&
-    (sinceGuide >= guideEvery(count) - 1 || i >= unmet.length) &&
-    (card.needs ?? []).every((id) => settled(progress, id));
+    (sinceGuide >= guideEvery(count) - 1 || (i >= unmet.length && !wordsWaiting)) &&
+    grounded(card);
 
-  const unmet = LEARN_ORDER.map(getCard).filter((c): c is Card => !!c && !isIntroduced(progress, c.id));
   /** Guides reached in the order but not ready yet, still in order. */
   const waiting: Card[] = [];
   const result: string[] = [];
