@@ -11,7 +11,7 @@ import {
   type Strength,
 } from '../memory';
 import { MAX_LEARNING, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards } from '../session';
-import { formatInterval } from '../srs';
+import { rollDay } from '../store';
 import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
 import { quietToggle } from './quiet';
@@ -52,7 +52,7 @@ export function homeScreen(app: App): HTMLElement {
     h(
       'nav',
       { class: 'hub', 'aria-label': 'Main' },
-      studyButton(app, isFirstRun),
+      liveStudyButton(app, isFirstRun),
       h(
         'button',
         { class: 'hub-btn big chat-btn', 'data-tap': 'before', onclick: () => app.navigate({ name: 'talk', start: true }) },
@@ -86,13 +86,38 @@ function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
 
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
 /** A short wait, e.g. "25m", "3h", "2d", "2mo": rounded up, so the learner never comes back to find nothing yet. */
 function waitLabel(ms: number): string {
-  const minutes = Math.max(1, Math.ceil(ms / 60_000));
+  const minutes = Math.max(1, Math.ceil(ms / MINUTE));
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.ceil(minutes / 60);
   if (hours < 24) return `${hours}h`;
-  return formatInterval(Math.ceil(hours / 24));
+  const days = Math.ceil(hours / 24);
+  if (days < 30) return `${days}d`;
+  // Not formatInterval, which rounds to the nearest month: 40 days would say "1mo".
+  if (days < 360) return `${Math.ceil(days / 30)}mo`;
+  return `${Math.ceil(days / 36.5) / 10}y`;
+}
+
+/**
+ * The Study button, drawn again in place whenever what it says changes (a card falls due, the wait ticks down, a new
+ * day brings new cards) for as long as Home is on show, so it never says "Next in 25m" half an hour later.
+ */
+function liveStudyButton(app: App, isFirstRun: boolean): HTMLElement {
+  const { el, changesIn } = studyButton(app, isFirstRun);
+  const check = () => {
+    if (!el.isConnected) return;
+    const next = studyButton(app, isFirstRun);
+    if (next.el.className === el.className && next.el.textContent === el.textContent) {
+      if (next.changesIn !== null) setTimeout(check, next.changesIn);
+    } else el.replaceWith(liveStudyButton(app, isFirstRun));
+  };
+  if (changesIn !== null) setTimeout(check, changesIn);
+  return el;
 }
 
 /**
@@ -100,28 +125,38 @@ function waitLabel(ms: number): string {
  * or learn new cards. Once caught up it says how long until there's more
  * (Study then points to Drills).
  * Each looks different, so it's clear at a glance.
+ * Also how long until it may say something else (at most an hour, to look again), or null if it never will.
  */
-function studyButton(app: App, isFirstRun: boolean): HTMLElement {
-  const { progress } = app;
+function studyButton(app: App, isFirstRun: boolean): { el: HTMLElement; changesIn: number | null } {
   const now = app.now();
+  // As Study will see it: a new day brings new cards even if Home was drawn the day before.
+  const progress = rollDay(app.progress, now);
   // The same checks Study makes for its next step, so the button never promises something else.
   const reviews = studyQueue(progress, now).length;
   const fresh = learningCount(progress) < MAX_LEARNING ? Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length) : 0;
+  const next = isFirstRun ? null : nextStudyAt(progress, now);
   let mode: { kind: string; icon: 'cards' | 'plus'; kicker: string; title: string };
+  // A count changes once the next card falls due; a wait, each time the unit it's counted in runs out.
+  let changesIn = next === null ? null : next - now;
   if (isFirstRun) mode = { kind: 'learn', icon: 'plus', kicker: 'Start here', title: 'Learn' };
   else if (reviews > 0) mode = { kind: 'review', icon: 'cards', kicker: `${plural(reviews, 'card')} due`, title: 'Review' };
   else if (fresh > 0) mode = { kind: 'learn', icon: 'plus', kicker: plural(fresh, 'new card'), title: 'Learn' };
   else {
-    const next = nextStudyAt(progress, now);
     mode = { kind: 'caught-up', icon: 'cards', kicker: next === null ? 'All caught up' : `Next in ${waitLabel(next - now)}`, title: 'Study' };
+    if (next !== null) {
+      const wait = next - now;
+      const unit = wait <= HOUR ? MINUTE : wait <= DAY ? HOUR : DAY;
+      changesIn = wait % unit || unit;
+    }
   }
-  return h(
+  const el = h(
     'button',
     { class: `hub-btn big study-btn study-${mode.kind}`, onclick: () => app.navigate({ name: 'study' }) },
     icon(mode.icon),
     h('span', { class: 'hub-kicker' }, mode.kicker),
     h('span', { class: 'hub-title' }, mode.title),
   );
+  return { el, changesIn: changesIn === null ? null : Math.min(Math.max(changesIn, 0), HOUR) };
 }
 
 /** The chart carries the story; the text around it is just the numbers it can't show. */

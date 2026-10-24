@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ALL_CARDS } from '../deck';
 import { fakeApp } from '../test/screen';
 import { homeScreen } from './home';
@@ -26,6 +26,9 @@ describe('Study button', () => {
     [3 * HOUR, 'Next in 3h'],
     [50 * HOUR, 'Next in 3d'],
     [90 * 24 * HOUR, 'Next in 3mo'],
+    // Rounded up, not to the nearest month or year.
+    [40 * 24 * HOUR, 'Next in 2mo'],
+    [380 * 24 * HOUR, 'Next in 1.1y'],
   ])('says how long until the next review once caught up (%i ms)', (wait, label) => {
     const root = homeScreen(caughtUp(wait));
     expect(root.querySelector('.study-btn')?.classList.contains('study-caught-up')).toBe(true);
@@ -35,4 +38,66 @@ describe('Study button', () => {
   it('still says how many cards are due when some are', () => {
     expect(kicker(homeScreen(caughtUp(-1)))).toBe('1 card due');
   });
+
+  describe('while Home stays open', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      document.body.replaceChildren();
+    });
+
+    /** Home on show, with time moved on by `advance`. */
+    function open(wait: number) {
+      vi.useFakeTimers();
+      const app = caughtUp(wait);
+      let now = app.now();
+      app.now = () => now;
+      const root = homeScreen(app);
+      document.body.append(root);
+      const advance = (ms: number) => {
+        now += ms;
+        vi.advanceTimersByTime(ms);
+      };
+      return { root, advance };
+    }
+
+    it('counts the wait down', () => {
+      const { root, advance } = open(25 * 60 * 1000);
+      advance(60 * 1000);
+      expect(kicker(root)).toBe('Next in 24m');
+      advance(10 * 60 * 1000);
+      expect(kicker(root)).toBe('Next in 14m');
+    });
+
+    it('says the card is due once it is', () => {
+      const { root, advance } = open(90 * 1000);
+      advance(90 * 1000);
+      expect(kicker(root)).toBe('1 card due');
+      expect(root.querySelector('.study-btn')?.classList.contains('study-review')).toBe(true);
+    });
+
+    it("offers the new day's cards after midnight", () => {
+      vi.useFakeTimers();
+      const app = caughtUp(400 * 24 * HOUR);
+      app.progress.settings.dailyNew = 8;
+      app.progress.today.newCount = 8;
+      let now = app.now();
+      app.now = () => now;
+      const root = homeScreen(app);
+      document.body.append(root);
+      expect(root.querySelector('.study-btn')?.classList.contains('study-caught-up')).toBe(true);
+      now += 25 * HOUR;
+      vi.advanceTimersByTime(25 * HOUR);
+      expect(root.querySelector('.study-btn')?.classList.contains('study-learn')).toBe(true);
+    });
+
+    it('stops once Home is left', () => {
+      const { root, advance } = open(25 * 60 * 1000);
+      const button = root.querySelector('.study-btn');
+      document.body.replaceChildren();
+      advance(60 * 1000);
+      expect(root.querySelector('.study-btn')).toBe(button);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
 });
+
