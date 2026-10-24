@@ -95,6 +95,25 @@ describe('Study button', () => {
       expect(document.activeElement).toBe(button);
     });
 
+    it('redraws the memory card when what is due changes, not as the wait counts down', () => {
+      const { root, advance } = open(2 * 60 * 1000);
+      const card = root.querySelector('.strength-card');
+      advance(60 * 1000);
+      expect(root.querySelector('.strength-card')).toBe(card);
+      advance(60 * 1000);
+      expect(kicker(root)).toBe('1 card due');
+      expect(root.querySelector('.strength-card')).not.toBe(card);
+    });
+
+    it('stops while the app is hidden', () => {
+      const { root, advance } = open(25 * 60 * 1000);
+      const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+      advance(60 * 1000);
+      hidden.mockRestore();
+      expect(kicker(root)).toBe('Next in 25m');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
     it('stops once Home is left', () => {
       const { root, advance } = open(25 * 60 * 1000);
       document.body.replaceChildren();

@@ -1,5 +1,4 @@
 import type { App } from '../app';
-import { showDueBadge } from '../badge';
 import {
   MIN_MEASURED_REVIEWS,
   STRENGTHS,
@@ -12,7 +11,7 @@ import {
   type Strength,
 } from '../memory';
 import { MAX_LEARNING, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards } from '../session';
-import { formatInterval } from '../srs';
+import { DAY_MS, formatInterval } from '../srs';
 import { rollDay } from '../store';
 import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
@@ -32,6 +31,12 @@ export function homeScreen(app: App): HTMLElement {
   const hello = greeting(new Date(now).getHours());
   const memory = memorySummary(progress, now);
   const isFirstRun = memory.total === 0;
+
+  let memoryEl = isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now), forecast(progress, now));
+  const redrawMemory = () => {
+    const at = app.now();
+    memoryEl?.replaceWith((memoryEl = memoryCard(memorySummary(app.progress, at), memoryHistory(app.progress, at), forecast(app.progress, at))));
+  };
 
   // The last word of the greeting gets the accent color.
   const split = hello.tl.lastIndexOf(' ');
@@ -54,7 +59,8 @@ export function homeScreen(app: App): HTMLElement {
     h(
       'nav',
       { class: 'hub', 'aria-label': 'Main' },
-      liveStudyButton(app, isFirstRun),
+      // When what's due changes, so do the memory card's numbers, which would otherwise count a card twice.
+      liveStudyButton(app, isFirstRun, redrawMemory),
       h(
         'button',
         { class: 'hub-btn big chat-btn', 'data-tap': 'before', onclick: () => app.navigate({ name: 'talk', start: true }) },
@@ -65,7 +71,7 @@ export function homeScreen(app: App): HTMLElement {
       h('button', { class: 'hub-btn drills-btn', 'data-tap': 'before', onclick: () => app.navigate({ name: 'practice' }) }, h('span', { class: 'hub-title' }, 'Drills')),
       h('button', { class: 'hub-btn library-btn', onclick: () => app.navigate({ name: 'words' }) }, h('span', { class: 'hub-title' }, 'Library')),
     ),
-    isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now), forecast(progress, now)),
+    memoryEl,
   );
 }
 
@@ -90,7 +96,6 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
 
 /** A short wait, e.g. "25m", "3h", "2d", "2mo": rounded up, so the learner never comes back to find nothing yet. */
 function waitLabel(ms: number): string {
@@ -101,28 +106,30 @@ function waitLabel(ms: number): string {
   return formatInterval(Math.ceil(hours / 24), { up: true });
 }
 
-/** The one Home's Study button waits on, so a Home drawn again (or left) doesn't leave an older one running. */
+/** The one Home's Study button waits on, so a Home drawn again doesn't leave an older one running. */
 let studyTimer: ReturnType<typeof setTimeout> | undefined;
 
 /**
  * The Study button, brought up to date in place whenever what it says changes (a card falls due, the wait ticks
  * down, a new day brings new cards) for as long as Home is on show, so it never says "Next in 25m" half an hour later.
- * In place, so a finger or focus on it stays there.
+ * In place, so a finger or focus on it stays there; `changed` is told when it says something new. While the app is
+ * hidden it stops: main.ts draws Home again on coming back.
  */
-function liveStudyButton(app: App, isFirstRun: boolean): HTMLElement {
+function liveStudyButton(app: App, isFirstRun: boolean, changed: () => void): HTMLElement {
   clearTimeout(studyTimer);
   const { el, changesIn } = studyButton(app, isFirstRun);
   const wait = (ms: number | null) => {
     if (ms !== null) studyTimer = setTimeout(check, ms);
   };
   const check = () => {
-    if (!el.isConnected) return;
+    if (!el.isConnected || document.hidden) return;
     const next = studyButton(app, isFirstRun);
     if (next.el.className !== el.className || next.el.textContent !== el.textContent) {
+      // Only a wait counting down says nothing new about what's due.
+      const counted = next.el.className !== el.className || !el.classList.contains('study-caught-up');
       el.className = next.el.className;
       el.replaceChildren(...next.el.childNodes);
-      // The icon's number is Home's due count, which just changed.
-      showDueBadge(app.progress, app.now());
+      if (counted) changed();
     }
     wait(next.changesIn);
   };
@@ -155,7 +162,7 @@ function studyButton(app: App, isFirstRun: boolean): { el: HTMLElement; changesI
     mode = { kind: 'caught-up', icon: 'cards', kicker: next === null ? 'All caught up' : `Next in ${waitLabel(next - now)}`, title: 'Study' };
     if (next !== null) {
       const wait = next - now;
-      const unit = wait <= HOUR ? MINUTE : wait <= DAY ? HOUR : DAY;
+      const unit = wait <= HOUR ? MINUTE : wait <= DAY_MS ? HOUR : DAY_MS;
       changesIn = wait % unit || unit;
     }
   }
