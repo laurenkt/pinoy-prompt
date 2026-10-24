@@ -362,6 +362,68 @@ describe('an attempt', () => {
   });
 });
 
+describe('warming the microphone up', () => {
+  /** A stand-in warm-up that counts how many are running. */
+  function warmth() {
+    const w = { running: 0, started: 0 };
+    const warmRecorder = () => {
+      w.running++;
+      w.started++;
+      let cooled = false;
+      return () => {
+        if (!cooled) w.running--;
+        cooled = true;
+      };
+    };
+    return { w, warmRecorder };
+  }
+
+  it('starts as the question comes up, when the model is on the device, so the tap that brought it is the gesture', async () => {
+    const { w, warmRecorder } = warmth();
+    panel = speakPanel(getCard('salamat')!, { say, silence: () => {}, onAttempt, onNext, deps: deps({ warmRecorder, modelKnownDownloaded: () => true }) });
+    expect(w.running).toBe(1);
+    await flush();
+    expect(w.started).toBe(1);
+  });
+
+  it('waits for the model otherwise, and stops for the result, coming back after Cancel', async () => {
+    heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
+    const { w, warmRecorder } = warmth();
+    await open('salamat', { warmRecorder });
+    expect(w.running).toBe(1);
+    button('Tap and speak').click();
+    // The take adopted it.
+    expect(w.running).toBe(0);
+    button('Cancel').click();
+    expect(w.running).toBe(1);
+    button('Tap and speak').click();
+    mic.events.onListening?.();
+    button("I'm done").click();
+    await flush();
+    expect(text('.feedback strong')).toBe('Tama!');
+    expect(w.running).toBe(0);
+  });
+
+  it('stops when it may not warm (the mic going off), and when the question goes', async () => {
+    const { w, warmRecorder } = warmth();
+    await open('salamat', { warmRecorder });
+    panel.setWarm(false);
+    expect(w.running).toBe(0);
+    panel.setWarm(true);
+    expect(w.running).toBe(1);
+    panel.dispose();
+    expect(w.running).toBe(0);
+  });
+
+  it("doesn't warm while offering the download", async () => {
+    downloaded = false;
+    const { w, warmRecorder } = warmth();
+    await open('salamat', { warmRecorder });
+    expect(text('strong')).toBe('Pronunciation coaching');
+    expect(w.started).toBe(0);
+  });
+});
+
 describe('what counts as right', () => {
   /** The sounds of `tl` said cleanly, then with the sounds at `drop` left out. */
   function saidWithout(tl: string, drop: number[]) {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeMicrophone } from './microphone';
-import { record, RecordError, resample, SIGNAL_WAIT_MS, toWav } from './recorder';
+import { closeMicrophone, getMicrophone, releaseMicrophone } from './microphone';
+import { cancelRecording, record, RecordError, resample, SIGNAL_WAIT_MS, toWav, warmRecorder } from './recorder';
 
 const sine = (hz: number, rate: number, seconds = 0.5) =>
   Float32Array.from({ length: rate * seconds }, (_, i) => Math.sin((2 * Math.PI * hz * i) / rate));
@@ -52,15 +52,25 @@ function fakeStream() {
 /** The recorder's context: the test feeds the processor blocks, as the microphone would. */
 class FakeRecorderContext {
   static last: FakeRecorderContext;
+  /** How many have been made. */
+  static count = 0;
   state = 'running';
   sampleRate = 16000;
   destination = {};
   processor = { onaudioprocess: null as ((e: unknown) => void) | null, connect() {}, disconnect() {} };
   constructor() {
+    FakeRecorderContext.count++;
     FakeRecorderContext.last = this;
   }
-  resume = async () => {};
-  close = async () => {};
+  resume = async () => {
+    this.state = 'running';
+  };
+  suspend = async () => {
+    this.state = 'suspended';
+  };
+  close = async () => {
+    this.state = 'closed';
+  };
   createMediaStreamSource = () => ({ connect() {}, disconnect() {} });
   createScriptProcessor = () => this.processor;
   /** One block of 4096 samples at the given level (0 is exact silence, as a dead microphone gives). */
@@ -222,5 +232,90 @@ describe('a microphone that gives no sound', () => {
     await recording.audio;
     await vi.advanceTimersByTimeAsync(SIGNAL_WAIT_MS * 2);
     expect(opened).toHaveLength(1);
+  });
+});
+
+describe('warming the microphone up ahead of a take', () => {
+  let opened: ReturnType<typeof fakeStream>[];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    opened = [];
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: vi.fn(async () => {
+          const s = fakeStream();
+          opened.push(s);
+          return s.stream;
+        }),
+      },
+    });
+    vi.stubGlobal('AudioContext', FakeRecorderContext);
+  });
+
+  afterEach(() => {
+    cancelRecording();
+    closeMicrophone();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** The microphone opened and switched off again, as a drill round holds it. */
+  async function held() {
+    releaseMicrophone(await getMicrophone());
+    return opened[0].track;
+  }
+
+  it("never opens the microphone itself, so it can't ask for it", async () => {
+    const before = FakeRecorderContext.count;
+    warmRecorder();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(opened).toHaveLength(0);
+    expect(FakeRecorderContext.count).toBe(before);
+  });
+
+  it('switches the held microphone on ahead of a take, and off again when cooled', async () => {
+    const track = await held();
+    expect(track.enabled).toBe(false);
+    const cool = warmRecorder();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(track.enabled).toBe(true);
+    const context = FakeRecorderContext.last;
+    cool();
+    expect(track.enabled).toBe(false);
+    expect(context.state).toBe('suspended');
+  });
+
+  it('hands the warm microphone and context to the take, so it starts with sound and nothing switches off', async () => {
+    const track = await held();
+    const cool = warmRecorder();
+    await vi.advanceTimersByTimeAsync(0);
+    const context = FakeRecorderContext.last;
+    const made = FakeRecorderContext.count;
+    const onListening = vi.fn();
+    const recording = record({ onListening });
+    // Cooling after the take adopted it does nothing.
+    cool();
+    expect(track.enabled).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(FakeRecorderContext.count).toBe(made);
+    context.feed(0.2);
+    expect(onListening).toHaveBeenCalledOnce();
+    recording.stop();
+    expect((await recording.audio).speech).toBe(true);
+    // The take's done: the microphone is off and the context rests for the next one.
+    expect(track.enabled).toBe(false);
+    expect(context.state).toBe('suspended');
+    expect(opened).toHaveLength(1);
+  });
+
+  it('lets the microphone and context go when the screen is left', async () => {
+    const track = await held();
+    warmRecorder();
+    await vi.advanceTimersByTimeAsync(0);
+    const context = FakeRecorderContext.last;
+    cancelRecording();
+    expect(track.enabled).toBe(false);
+    expect(context.state).toBe('closed');
   });
 });
