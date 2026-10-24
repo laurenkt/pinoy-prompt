@@ -109,6 +109,15 @@ export function meanings(card: Card): string[][] {
   return wordings(card).map((alt) => alt.words);
 }
 
+/** Each card's English words, worked out once. */
+const cardEnglish = new WeakMap<Card, Set<string>>();
+
+function ownWords(card: Card): Set<string> {
+  let found = cardEnglish.get(card);
+  if (!found) cardEnglish.set(card, (found = new Set(words(card.en))));
+  return found;
+}
+
 /** Each card's wordings, worked out once: the deck doesn't change. */
 const cardWordings = new WeakMap<Card, Wording[]>();
 
@@ -161,15 +170,36 @@ function knownWords(): Set<string> {
  * letter wrong, missing, extra or swapped, two in a long word). A typo rarely
  * hits the first letter, so that has to match, and a word the deck uses
  * elsewhere is never a typo: "three" isn't "there", nor "grandmother" "grandfather".
+ * Nor is a slip nearer to one of those than to the card's word.
  */
-function sameWord(typed: string, word: string): boolean {
+function sameWord(typed: string, word: string, own: Set<string>): boolean {
   if (typed === word) return true;
   const stem = (w: string) => (w.length > 3 ? w.replace(/s$/, '') : w);
   if (stem(typed) === stem(word)) return true;
   if (typed[0] !== word[0] || knownWords().has(typed) || isNumber(typed) || isNumber(word)) return false;
   const shorter = Math.min(typed.length, word.length);
   const allowed = shorter >= 8 ? 2 : shorter >= 4 ? 1 : 0;
-  return allowed > 0 && distance(typed, word) <= allowed;
+  return isTypo(typed, word, allowed, knownWords(), own);
+}
+
+/**
+ * Whether `typed` is a typo for `word`: within `allowed` edits of it, and not
+ * nearer to another word in `known`, which would more likely be the one
+ * meant. The card's `own` words don't count against it: any of them is right.
+ */
+function isTypo(typed: string, word: string, allowed: number, known: Set<string>, own: Set<string>): boolean {
+  if (allowed === 0) return false;
+  const edits = distance(typed, word);
+  return edits <= allowed && !nearerElsewhere(typed, edits, known, own);
+}
+
+/** Whether a word in `known`, and not one of the card's `own`, is nearer `typed` than `edits` (it is, when it's `typed` itself). */
+function nearerElsewhere(typed: string, edits: number, known: Set<string>, own: Set<string>): boolean {
+  if (edits === 0) return false;
+  for (const other of known) {
+    if (!own.has(other) && other[0] === typed[0] && Math.abs(other.length - typed.length) < edits && distance(typed, other) < edits) return true;
+  }
+  return false;
 }
 
 /**
@@ -182,12 +212,13 @@ export function matchesMeaning(answer: string, card: Card): boolean {
   const parts = answer.replace(/\([^)]*\)/g, ' ').split(/\/|\bor\b/i).map(wording).filter((part) => part.words.length > 0);
   if (parts.length === 0) return false;
   const alts = wordings(card);
+  const own = ownWords(card);
   return parts.every((given) =>
     alts.some(
       (alt) =>
         !(given.helper && alt.helper && given.helper !== alt.helper) &&
-        alt.words.every((w) => given.words.some((g) => sameWord(g, w))) &&
-        given.words.every((g) => alt.words.some((w) => sameWord(g, w))),
+        alt.words.every((w) => given.words.some((g) => sameWord(g, w, own))) &&
+        given.words.every((g) => alt.words.some((w) => sameWord(g, w, own))),
     ),
   );
 }
@@ -243,14 +274,79 @@ function knownTagalog(): Set<string> {
  * Whether a typed Tagalog word is the card's: the same, or a typo (one letter
  * wrong, missing, extra or swapped in a word of five letters or more, two from
  * nine). Short words are left alone, since one letter makes another word ("ito",
- * "iyo"), and so is any word the deck uses elsewhere ("kain" isn't "kanin").
+ * "iyo"), and so is any word the deck uses elsewhere ("kain" isn't "kanin"), or
+ * a slip nearer to one of those than to the card's.
  */
-function sameTagalogWord(typed: string, word: string): boolean {
+function sameTagalogWord(typed: string, word: string, own: Set<string>): boolean {
   if (typed === word) return true;
   if (typed[0] !== word[0] || knownTagalog().has(typed)) return false;
   const shorter = Math.min(typed.length, word.length);
   const allowed = shorter >= 9 ? 2 : shorter >= 5 ? 1 : 0;
-  return allowed > 0 && distance(typed, word) <= allowed;
+  return isTypo(typed, word, allowed, knownTagalog(), own);
+}
+
+/**
+ * Whether the answer is the card's Tagalog with a word swapped for one the
+ * deck uses elsewhere that looks like it: "maraming umaga" for "Magandang
+ * umaga". That's mixing up two words, not another way of saying it, so it's
+ * wrong without asking OpenAI, which might take it for a typo.
+ */
+export function swapsTagalog(answer: string, card: Card): boolean {
+  const given = bare(tagalogWords(answer));
+  const own = ownTagalog(card);
+  const swapped = (typed: string, word: string) => !own.has(typed) && knownTagalog().has(typed) && looksAlike(typed, word);
+  return cardWords(card).some((want) => {
+    const w = bare(want);
+    if (given.length !== w.length) return false;
+    const swaps = given.map((typed, i) => swapped(typed, w[i]));
+    return swaps.some(Boolean) && given.every((typed, i) => swaps[i] || sameTagalogWord(typed, w[i], own));
+  });
+}
+
+/**
+ * Whether a typed word is plainly not a slip for the card's, so the answer can't pass as a typo joined up either:
+ * another word the deck uses ("marumi" for "mabuti", "saan" for "naman"), unless it's the card's word cut short
+ * (`cutShort`); or a slip of five letters or more nearer another of
+ * the deck's words than the card's ("maganghang" is "maanghang"). Two words written as one are left to the joined-up
+ * check ("walana anuman").
+ */
+function notATypo(typed: string, word: string, own: Set<string>): boolean {
+  if (typed === word || own.has(typed)) return false;
+  if (deckTagalogWords().has(typed)) return !cutShort(typed, word);
+  if (typed.length < 5 || word.length < 5 || knownTagalog().has(typed)) return false;
+  return nearerElsewhere(typed, distance(typed, word), knownTagalog(), own);
+}
+
+/**
+ * Whether `typed` is `word` cut short the way people write it: without the "-ng" that links it to the next word
+ * ("marami" for "maraming"), or one letter left out before its end ("san" for "saan", "ko" for "ako"). Not a letter
+ * off the end, which makes another word as often as not: "kanin" (rice) isn't "kanino" (whose).
+ */
+function cutShort(typed: string, word: string): boolean {
+  if (word === `${typed}ng` || word === `${typed}g`) return true;
+  if (word.length !== typed.length + 1 || word.at(-1) !== typed.at(-1)) return false;
+  return [...word].some((_, i) => word.slice(0, i) + word.slice(i + 1) === typed);
+}
+
+let tagalogWordSet: Set<string> | undefined;
+
+/** Every word the deck's Tagalog uses, without the joined-up wordings `knownTagalog` adds. */
+function deckTagalogWords(): Set<string> {
+  tagalogWordSet ??= new Set(VOCAB.flatMap((card) => cardWords(card).flat()));
+  return tagalogWordSet;
+}
+
+/**
+ * Two different words that look alike: five letters or more, the same first
+ * letter, and three letters changed or more, but no more than half. Shorter
+ * words are left alone, as typos are: "san" is how "saan" is often written.
+ * So are words a letter or two apart, which are more often two forms of one
+ * word than two words: "marami" and "maraming", "papunta" and "pupunta".
+ */
+function looksAlike(a: string, b: string): boolean {
+  if (a.length < 5 || b.length < 5 || a[0] !== b[0]) return false;
+  const edits = distance(a, b);
+  return edits >= 3 && edits <= Math.ceil(Math.max(a.length, b.length) / 2);
 }
 
 /**
@@ -265,12 +361,16 @@ export function matchesTagalog(answer: string, card: Card): boolean {
   const given = tagalogWords(answer);
   if (given.length === 0) return false;
   const g = bare(given);
+  const own = ownTagalog(card);
   return cardWords(card).some((want) => {
     if (want.length === 0 || (polite(want) && !polite(given))) return false;
     const w = bare(want);
-    // Joined up, a typo still counts: "dahandahn lang" for "dahan-dahan lang".
-    if (sameTagalogWord(g.join(''), w.join(''))) return true;
-    return g.length === w.length && g.every((typed, i) => sameTagalogWord(typed, w[i]));
+    if (g.length === w.length && g.every((typed, i) => sameTagalogWord(typed, w[i], own))) return true;
+    if (g.length === w.length && g.some((typed, i) => notATypo(typed, w[i], own))) return false;
+    // Split up differently, the deck's other words still aren't typos: "anong pangalan ko" isn't "Ano ang pangalan mo?".
+    if (g.some((typed) => !own.has(typed) && deckTagalogWords().has(typed) && !w.some((word) => cutShort(typed, word)))) return false;
+    // Joined up, a typo still counts: "dahandahn lang" for "dahan-dahan lang", "Magandang umga".
+    return sameTagalogWord(g.join(''), w.join(''), own);
   });
 }
 
@@ -287,6 +387,15 @@ function cardWords(card: Card): string[][] {
   return found;
 }
 
+/** The card's own Tagalog words, and each wording joined up, as `knownTagalog` has them. */
+const cardOwnTagalog = new WeakMap<Card, Set<string>>();
+
+function ownTagalog(card: Card): Set<string> {
+  let found = cardOwnTagalog.get(card);
+  if (!found) cardOwnTagalog.set(card, (found = new Set(cardWords(card).flatMap((list) => [...list, bare(list).join('')]))));
+  return found;
+}
+
 /** Whether the answer plainly says the card in `language`, checked on the device. */
 export function matchesAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
   return language === 'tl' ? matchesTagalog(answer, card) : matchesMeaning(answer, card);
@@ -297,7 +406,9 @@ export function matchesAnswer(answer: string, card: Card, language: AnswerLangua
  * that can't match it. The Tagalog said back for its meaning is wrong without
  * asking. The English said back for its Tagalog is left to `ask`, which is
  * told it's wrong: on the device it can't be told from a word Tagalog
- * borrows ("traffic" for "trapik") or a number dictated as digits. Without an answer from `ask` (no key, offline, an error), the device's
+ * borrows ("traffic" for "trapik") or a number dictated as digits. The card's
+ * Tagalog with a look-alike word from elsewhere in the deck swapped in is wrong
+ * without asking too. Without an answer from `ask` (no key, offline, an error), the device's
  * answer stands; a failed ask is noted, so the learner knows why.
  */
 export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge | null, language: AnswerLanguage = 'en'): Promise<Verdict> {
@@ -305,6 +416,8 @@ export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge
   if (matchesAnswer(answer, card, language)) return { right: true };
   // Not asked: OpenAI would see that it means the same.
   if (language === 'en' && repeatsTagalog(answer, card)) return { right: false };
+  // Not asked either: two words that look alike can pass for a typo.
+  if (language === 'tl' && swapsTagalog(answer, card)) return { right: false };
   if (!ask) return { right: false };
   try {
     return { right: (await ask(answer, card, language)) ?? false };
