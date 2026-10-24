@@ -858,21 +858,23 @@ for (const c of VOCAB) if (!wordCards.has(c.id)) wordCards.set(c.id, c.id);
 /**
  * The card that teaches a word of a phrase, if one does: the word's own card, or
  * the one it joins the next word with by adding "-ng" ("walang", "anong", "pong",
- * "ilang"); "nito" is "of this", "ito".
+ * "ilang"); "nito" is "of this", "ito", and "nang" is "ng".
  */
 export function cardForWord(word: string): string | undefined {
   if (word === 'nito') return 'ito';
+  // "Nang" before a doing word is the joining "ng" said as it sounds, not "na" (already) joined on.
+  if (word === 'nang') return 'ng';
   return wordCards.get(word) ?? (word.endsWith('ng') ? wordCards.get(word.slice(0, -2)) ?? wordCards.get(word.slice(0, -1)) : undefined);
 }
 
-const foundations = new Map<string, string[]>();
+const foundations = new Map<string, readonly string[]>();
 
 /**
  * The cards a card builds on, which have to settle before it's introduced (see
  * upcomingNewCards in session.ts): a guide's `needs`, and for a phrase, the cards
  * of the words it is made of, so it never asks for words the learner hasn't met.
  */
-export function buildsOn(card: Card): string[] {
+export function buildsOn(card: Card): readonly string[] {
   if (!isVocab(card)) return card.needs ?? [];
   let ids = foundations.get(card.id);
   if (!ids) {

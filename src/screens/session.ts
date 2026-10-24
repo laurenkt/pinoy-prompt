@@ -392,7 +392,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       h(
         'p',
         null,
-        unmet ? "No reviews are due, and today's new cards are in." : "No reviews are due, and you've met every card.",
+        !unmet
+          ? "No reviews are due, and you've met every card."
+          : more
+            ? "No reviews are due, and today's new cards are in."
+            : 'No reviews are due. The next new cards build on ones you met recently, so they come once those have had a day.',
         drills
           ? ' You can keep practising in Drills, which leans on your weakest cards. It won\'t change when they come back.'
           : ` Drills open once you know ${DRILL_MIN_WORDS} words.`,

@@ -69,18 +69,21 @@ describe('deck', () => {
     for (const id of CORE_WORDS) expect(getCard(id)?.tl.toLowerCase(), id).toBe(id);
   });
 
-  it('introduces the words a phrase is built from before the phrase', () => {
-    for (const card of VOCAB) {
-      for (const id of buildsOn(card)) {
+  it('introduces the words a card is built from before the card', () => {
+    for (const card of ALL_CARDS) {
+      // A guide's frame ("Gusto ko ng ___.") uses the little words too, as well as what it needs. Others in it, like
+      // the "kumain" whose forms "Did, doing, will do" teaches, are what it is about.
+      const words = isVocab(card) ? [] : tagalogWords(card.tl).map(cardForWord).filter((id): id is string => !!id && CORE_WORDS.includes(id));
+      for (const id of new Set([...buildsOn(card), ...words])) {
         expect(LEARN_ORDER.indexOf(id), `${card.id} uses ${id}`).toBeLessThan(LEARN_ORDER.indexOf(card.id));
       }
     }
   });
 
   it('finds the words a phrase is built from, joined with "-ng" or not', () => {
-    expect(buildsOn(getCard('paano-sabihin')!).sort()).toEqual(['ito', 'paano', 'sa', 'sabihin']);
+    expect([...buildsOn(getCard('paano-sabihin')!)].sort()).toEqual(['ito', 'paano', 'sa', 'sabihin']);
     expect(buildsOn(getCard('walang-anuman')!)).toEqual(['wala']);
-    expect(buildsOn(getCard('ilang-taon-ka-na')!).sort()).toEqual(['ilan', 'ka', 'na', 'taon']);
+    expect([...buildsOn(getCard('ilang-taon-ka-na')!)].sort()).toEqual(['ilan', 'ka', 'na', 'taon']);
     expect(buildsOn(getCard('magkano-lahat')!)).toEqual(['magkano']);
     expect(buildsOn(getCard('mabuti')!)).toEqual([]);
   });

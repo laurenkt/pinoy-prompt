@@ -213,6 +213,14 @@ describe('new cards', () => {
     for (const id of today) for (const word of buildsOn(getCard(id)!)) expect(today, `${id} uses ${word}`).not.toContain(word);
   });
 
+  it('keep spacing guides out while words are still waiting for the ones they build on', () => {
+    const progress = emptyProgress(NOW);
+    // Every word met and settled but "kumain", just met, so the phrases built on it wait.
+    learn(progress, VOCAB_ORDER.filter((id) => id !== 'kumain-ka-na-ba' && id !== 'kumain-na-ako'));
+    progress.cards['kumain'] = { ...progress.cards['kumain'], reps: 1, interval: 0 };
+    expect(upcomingNewCards(progress, Infinity).length).toBe(1);
+  });
+
   it('bring in the words of a phrase met before they were in the deck', () => {
     const progress = emptyProgress(NOW);
     // Met "Paano sabihin ito sa Tagalog?" before "paano" and "sabihin" came ahead of it.

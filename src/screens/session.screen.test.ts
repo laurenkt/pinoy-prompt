@@ -97,6 +97,7 @@ describe('open-ended study', () => {
     const root = sessionScreen(app, null);
     expect(root.textContent).toContain("You're caught up");
     expect(root.textContent).not.toContain('Learn something new');
+    expect(root.textContent).toContain('The next new cards build on ones you met recently');
   });
 
   it('offers new words instead of Drills while there are too few words to drill', () => {

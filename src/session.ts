@@ -79,14 +79,16 @@ export function upcomingNewCards(progress: Progress, limit: number): string[] {
   let sinceGuide = lastGuide === -1 ? Infinity : met.length - 1 - lastGuide;
 
   const grounded = (card: Card) => buildsOn(card).every((id) => settled(progress, id));
-  // Once no word is left to bring in, there is nothing to space guides out with.
+  const unmetCards = LEARN_ORDER.map(getCard).filter((c): c is Card => !!c && !isIntroduced(progress, c.id));
+  // Cards this brings in won't have settled yet either, so a phrase that isn't grounded now stays out.
+  const unmet = unmetCards.filter((c) => !isVocab(c) || grounded(c));
+  // Words still to come, waiting or not, space guides out; once every word is met there is nothing to space them with.
+  const wordsWaiting = unmetCards.some((c) => isVocab(c) && !grounded(c));
   const ready = (card: Card) =>
     count >= (card.kind === 'pattern' ? PATTERN_START : GUIDE_START) &&
-    (sinceGuide >= guideEvery(count) - 1 || i >= unmet.length) &&
+    (sinceGuide >= guideEvery(count) - 1 || (i >= unmet.length && !wordsWaiting)) &&
     grounded(card);
 
-  // Cards this brings in won't have settled yet either, so a phrase that isn't grounded now stays out.
-  const unmet = LEARN_ORDER.map(getCard).filter((c): c is Card => !!c && !isIntroduced(progress, c.id) && (!isVocab(c) || grounded(c)));
   /** Guides reached in the order but not ready yet, still in order. */
   const waiting: Card[] = [];
   const result: string[] = [];
