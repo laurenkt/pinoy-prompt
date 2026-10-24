@@ -78,7 +78,8 @@ type State =
   /** progress is null until a download reports any: loading a model kept on the device reports none. */
   | { name: 'loading'; progress: number | null }
   | { name: 'ready' }
-  | { name: 'recording'; speech: boolean }
+  /** live once the microphone gives sound (onListening): before that, anything said would be lost. */
+  | { name: 'recording'; live: boolean; speech: boolean }
   | { name: 'analysing' }
   | { name: 'result'; text: string; comparison: Comparison; tips: Tip[]; heard: string[]; recognition?: Recognition; samples?: Float32Array }
   /** detail is what went wrong in the browser's words, shown small so a failure seen only on one phone can be told apart. */
@@ -218,18 +219,29 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     options.silence();
     const mine = ++attempt;
     const stale = () => disposed || attempt !== mine;
-    set({ name: 'recording', speech: false });
+    set({ name: 'recording', live: false, speech: false });
     const current = deps.record({
       onLevel: (level) => recording === current && showLevel(level),
+      onListening: () => {
+        if (recording !== current || state.name !== 'recording' || state.live) return;
+        // "Wait…" couldn't hold focus, so it went nowhere: give it to "I'm done", unless the learner moved it to Cancel,
+        // where it stays (the redraw makes a new Cancel).
+        const cancelling = document.activeElement === el.querySelector('.speak-cancel button');
+        takeFocus = !cancelling;
+        set({ name: 'recording', live: true, speech: false });
+        if (cancelling) el.querySelector<HTMLElement>('.speak-cancel button')?.focus({ preventScroll: true });
+      },
       onSpeech: () => {
         if (recording !== current || state.name !== 'recording') return;
-        state = { name: 'recording', speech: true };
+        // Speech is sound too, should it come first.
+        if (!state.live) return set({ name: 'recording', live: true, speech: true });
+        state = { name: 'recording', live: true, speech: true };
         el.querySelector('.listen-status')!.textContent = 'Hearing you…';
         el.classList.replace('phase-mic-on', 'phase-sound');
       },
       onRestart: () => {
-        if (recording !== current || state.name !== 'recording' || state.speech) return;
-        el.querySelector('.listen-status')!.textContent = 'Mic restarted. Say it again.';
+        if (recording !== current || state.name !== 'recording' || state.live) return;
+        el.querySelector('.listen-status')!.textContent = 'Still getting the mic ready…';
       },
     });
     recording = current;
@@ -349,9 +361,12 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       // (see .speak.listening in style.css). The meter and status keep their room while ready, so nothing moves.
       case 'ready':
         return listening('', micButton('Tap and speak', 'btn mic huge'));
+      // Until the microphone gives sound, the big button waits (it would only stop an empty take) and the status
+      // says so; once it does, the prompt card turns magenta and the button saffron, so it's plain the take has begun.
       case 'recording':
+        if (!state.live) return listening('Getting the mic ready…', h('button', { class: 'btn mic huge done', disabled: true }, 'Wait…'));
         return listening(
-          state.speech ? 'Hearing you…' : 'Mic on. Say it now.',
+          state.speech ? 'Hearing you…' : 'Listening. Say it now!',
           h('button', { class: 'btn mic huge done', 'data-autofocus': true, 'data-no-tap': true, onclick: () => recording?.stop() }, "I'm done"),
         );
       case 'analysing':
@@ -464,11 +479,12 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   function draw(): void {
     breakdown?.dispose();
     breakdown = null;
-    const phase = state.name === 'recording' ? (state.speech ? 'phase-sound' : 'phase-mic-on') : '';
+    const phase = state.name === 'recording' ? (state.speech ? 'phase-sound' : state.live ? 'phase-mic-on' : 'phase-starting') : '';
     const children = view();
     // With a breakdown on screen, the card above gives way to it (see .result-card).
     const listens = state.name === 'ready' || state.name === 'recording' || state.name === 'analysing';
-    el.className = `speak ${state.name} ${phase}${listens ? ' listening' : ''}${breakdown ? ' has-breakdown' : ''}`.trim();
+    const live = state.name === 'recording' && state.live;
+    el.className = `speak ${state.name} ${phase}${listens ? ' listening' : ''}${live ? ' live' : ''}${breakdown ? ' has-breakdown' : ''}`.trim();
     el.replaceChildren(...children);
     if (takeFocus) el.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
   }

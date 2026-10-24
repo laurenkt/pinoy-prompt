@@ -173,11 +173,23 @@ describe('first use', () => {
 });
 
 describe('an attempt', () => {
-  it('shows the mic state and stops when the learner taps done', async () => {
+  it('says to wait until the microphone gives sound, then plainly that it is listening, and stops when the learner taps done', async () => {
     await open('salamat');
     button('Tap and speak').click();
-    expect(text('.listen-status')).toBe('Mic on. Say it now.');
+    // Getting ready: nothing said yet would be recorded, so it doesn't ask for it, and there's nothing to stop.
+    expect(text('.listen-status')).toBe('Getting the mic ready…');
+    expect(panel.el.classList).toContain('phase-starting');
+    expect(panel.el.classList).not.toContain('live');
+    expect(button('Wait…').disabled).toBe(true);
+    expect(button('Cancel').disabled).toBe(false);
     expect(panel.mayPlay()).toBe(false);
+    mic.events.onRestart?.();
+    expect(text('.listen-status')).toBe('Still getting the mic ready…');
+    mic.events.onListening?.();
+    expect(text('.listen-status')).toBe('Listening. Say it now!');
+    expect(panel.el.classList).toContain('live');
+    expect(panel.el.classList).toContain('phase-mic-on');
+    expect(document.activeElement).toBe(button("I'm done"));
     mic.events.onSpeech?.();
     expect(text('.listen-status')).toBe('Hearing you…');
     expect(panel.el.classList).toContain('phase-sound');
@@ -187,10 +199,31 @@ describe('an attempt', () => {
     expect(mic.stopped).toBe(true);
   });
 
+  it('counts speech as the microphone giving sound, should it come first', async () => {
+    await open('salamat');
+    button('Tap and speak').click();
+    mic.events.onSpeech?.();
+    expect(text('.listen-status')).toBe('Hearing you…');
+    expect(panel.el.classList).toContain('live');
+    expect(panel.el.classList).toContain('phase-sound');
+    mic.events.onListening?.();
+    expect(text('.listen-status')).toBe('Hearing you…');
+    expect(panel.el.classList).toContain('phase-sound');
+  });
+
+  it('leaves focus where the learner put it while the mic got ready', async () => {
+    await open('salamat');
+    button('Tap and speak').click();
+    button('Cancel').focus();
+    mic.events.onListening?.();
+    expect(document.activeElement?.textContent).toBe('Cancel');
+  });
+
   it('praises a clean attempt and counts it', async () => {
     heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
     await open('salamat');
     button('Tap and speak').click();
+    mic.events.onListening?.();
     button("I'm done").click();
     await flush();
     expect(text('.feedback strong')).toBe('Tama!');
@@ -207,6 +240,7 @@ describe('an attempt', () => {
     await open('ingat');
     heard = ['i', 'n', 'a', 't']; // "ng" said as "n"
     button('Tap and speak').click();
+    mic.events.onListening?.();
     button("I'm done").click();
     await flush();
     expect(onAttempt).toHaveBeenCalledWith(false);
@@ -241,6 +275,7 @@ describe('an attempt', () => {
     heard = ['k', 'a', 'm', 'u', 's', 't', 'a'];
     await open('kumusta');
     button('Tap and speak').click();
+    mic.events.onListening?.();
     button("I'm done").click();
     await flush();
     expect(text('.feedback strong')).toBe('Tama!');
@@ -272,7 +307,7 @@ describe('an attempt', () => {
     expect(text('.feedback')).toContain("didn't pick up any sound");
     expect(text('.feedback strong')).not.toBe("Didn't catch that.");
     button('Try again').click();
-    expect(panel.el.textContent).toContain("I'm done");
+    expect(panel.el.classList).toContain('recording');
   });
 
   it("lets the card's audio play only once an attempt has been judged", async () => {
@@ -288,6 +323,7 @@ describe('an attempt', () => {
     expect(panel.mayPlay()).toBe(false);
     expect(panel.el.textContent).not.toContain('Hear it slowly');
     button('Try again').click();
+    mic.events.onListening?.();
     button("I'm done").click();
     await flush();
     expect(panel.mayPlay()).toBe(true);
@@ -310,7 +346,8 @@ describe('an attempt', () => {
     expect(onAttempt).not.toHaveBeenCalled();
     expect(panel.el.classList).toContain('ready');
     button('Tap and speak').click();
-    expect(text('.listen-status')).toBe('Mic on. Say it now.');
+    expect(text('.listen-status')).toBe('Getting the mic ready…');
+    mic.events.onListening?.();
     button("I'm done").click();
     await flush();
     expect(onAttempt).toHaveBeenCalledOnce();

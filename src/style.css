@@ -1381,6 +1381,18 @@ p {
   background: var(--magenta);
 }
 
+/*
+ * Saying a meaning: the box stays cream with faint bars while the microphone gets ready, and turns saffron once it
+ * gives sound (.live), as Speak's big button does, so it's plain when to start.
+ */
+.meaning-wave:not(.live, .thinking) span {
+  opacity: 0.35;
+}
+
+.meaning-wave.live {
+  background: var(--saffron);
+}
+
 .meaning-status {
   margin: 0;
 }
@@ -1494,12 +1506,29 @@ p {
   opacity: 0.6;
 }
 
+/*
+ * Recording, once the microphone gives sound (.speak.live): the prompt card turns magenta and the big button
+ * saffron, so it can't be missed that what's said now is heard. While the microphone is still getting ready, both
+ * stay as they were and the status is muted, so the two never look alike.
+ */
+.prompt:has(+ .speak.live) {
+  background: var(--magenta);
+}
+
+.speak.live .btn.mic.done {
+  background: var(--saffron);
+}
+
+.speak.phase-starting .listen-status {
+  color: var(--muted);
+}
+
 /* Only there while listening; ready and checking keep its room (see .speak.listening). */
 .speak:not(.recording) .speak-cancel {
   visibility: hidden;
 }
 
-/* Listening: bars show the microphone state, from flat (waiting) to dancing (hearing sound). */
+/* Listening: bars show the microphone state, from grey dots (getting ready) to teal (listening) to dancing (hearing sound). */
 .meter {
   display: flex;
   justify-content: center;

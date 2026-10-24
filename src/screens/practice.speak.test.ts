@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
 import { speaking, stop } from '../speech';
 import { toPhones } from '../phonetics';
-import type { Take } from '../recorder';
+import type { RecorderEvents, Take } from '../recorder';
 import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen } from './practice';
 import type { SpeakDeps } from './speak';
@@ -15,14 +15,18 @@ import { drillScope, fakeApp, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'tatlo', 'paalam', 'oo', 'kape'];
 
+/** What the last recording was told to report, so a test can say when the microphone gives sound. */
+let recorder: RecorderEvents = {};
+
 /** A model that hears whatever the card should sound like, so every attempt is right. */
 function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
   let card = '';
   return {
     recordingSupported: () => true,
     modelDownloaded: async () => true,
-    record: (() => {
+    record: ((events: RecorderEvents = {}) => {
       card = document.querySelector('.prompt .tl')?.textContent ?? '';
+      recorder = events;
       let finish: (t: Take) => void = () => {};
       const audio = new Promise<Take>((r) => (finish = r));
       return { audio, stop: () => finish({ samples: new Float32Array(1), speech: true }), cancel: () => {} };
@@ -54,6 +58,7 @@ describe('Speak mode', () => {
     drillScope(root, ['speak']);
     await flush();
     button('Tap and speak').click();
+    recorder.onListening?.();
     button("I'm done").click();
     await flush();
     expect(document.querySelector('.feedback strong')?.textContent).toBe('Tama!');
@@ -87,6 +92,7 @@ describe('Speak mode', () => {
       drillScope(root, ['speak']);
       await flush();
       button('Tap and speak').click();
+      recorder.onListening?.();
       button("I'm done").click();
       await flush();
       await flush();
@@ -103,6 +109,7 @@ describe('Speak mode', () => {
     drillScope(root, ['speak']);
     await flush();
     button('Tap and speak').click();
+    recorder.onListening?.();
     button("I'm done").click();
     await flush();
     app.progress.settings.mic = false;
@@ -138,6 +145,7 @@ describe('the word before an attempt', () => {
     expect(root.querySelector('.prompt .audio-btn')).toBeNull();
     expect(speaking()).toBe(false);
     button('Tap and speak').click();
+    recorder.onListening?.();
     button("I'm done").click();
     await flush();
     button('▶ Target').click();
@@ -153,6 +161,7 @@ describe('moving on after a right attempt', () => {
   /** Say the word on screen, right or (by saying nothing like it) wrong. */
   async function attempt(): Promise<void> {
     button('Tap and speak').click();
+    recorder.onListening?.();
     button("I'm done").click();
     await vi.advanceTimersByTimeAsync(0);
   }

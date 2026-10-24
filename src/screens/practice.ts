@@ -117,6 +117,8 @@ export function practiceScreen(
   let checking = false;
   /** Recording a spoken meaning, from a tap on the box's microphone button. */
   let listening: Recording | null = null;
+  /** Whether that recording's microphone gives sound yet (onListening); until then, anything said is lost. */
+  let micLive = false;
   /** The recording whose spoken meaning is being turned into text; a reply for any other is dropped. */
   let hearing: Recording | null = null;
   /** Waiting for a pause in typing before taking a right meaning without Check. */
@@ -335,9 +337,12 @@ export function practiceScreen(
     });
   }
 
-  /** The box's microphone button: record the meaning said out loud, turn it into text, and check that. A second tap stops early. */
+  /**
+   * The box's microphone button: record the meaning said out loud, turn it into text, and check that. A second tap
+   * stops early, or before the microphone gives sound (when nothing could have been heard) throws the take away.
+   */
   function sayMeaning(q: Question): void {
-    if (listening) return listening.stop();
+    if (listening) return micLive ? listening.stop() : cancelSaying(q);
     const hearer = hearMeaning();
     if (!hearer || picked !== null || checking || hearing) return;
     // The word playing would be recorded too.
@@ -346,7 +351,16 @@ export function practiceScreen(
     // Starts flat and fills from the right as the level comes in.
     const wave = (q.wave = new Array<number>(WAVE_BARS).fill(0));
     q.thinkingSince = undefined;
+    micLive = false;
     const recording = deps.record({
+      onListening: () => {
+        if (listening !== recording) return;
+        micLive = true;
+        // In place, as the level is, rather than redrawing the round mid-recording.
+        root.querySelector('.meaning-wave')?.classList.add('live');
+        const status = root.querySelector('.meaning-status');
+        if (status) status.textContent = listeningText(q);
+      },
       onLevel: (level) => {
         if (listening !== recording) return;
         wave.push(level);
@@ -396,6 +410,9 @@ export function practiceScreen(
       },
     );
   }
+
+  /** What the box says once the microphone gives sound. */
+  const listeningText = (q: Question) => (answerLanguage(q) === 'tl' ? 'Listening… say it in Tagalog.' : 'Listening… say what it means.');
 
   /** Stop recording a spoken meaning and drop it: the question is going. */
   function stopListening(): void {
@@ -713,15 +730,16 @@ export function practiceScreen(
   }
 
   /**
-   * What the microphone heard, as bars, in place of the box while the meaning is said; they run across while what
-   * was said is heard and checked.
+   * What the microphone heard, as bars, in place of the box while the meaning is said: faint until the microphone
+   * gives sound, then on saffron. They run across while what was said is heard and checked.
    */
   function waveBox(levels: number[], thinkingSince: number | undefined): HTMLElement {
     const thinking = thinkingSince !== undefined;
+    const live = listening !== null && micLive;
     return h(
       'div',
       {
-        class: `meaning-wave${thinking ? ' thinking' : ''}`,
+        class: `meaning-wave${thinking ? ' thinking' : ''}${live ? ' live' : ''}`,
         'aria-hidden': 'true',
         style: thinking ? `--since: ${Date.now() - thinkingSince}ms` : undefined,
       },
@@ -777,9 +795,9 @@ export function practiceScreen(
       hearMeaning() !== null &&
       micButton(q);
     const status = listening
-      ? tagalog
-        ? 'Listening… say it in Tagalog.'
-        : 'Listening… say what it means.'
+      ? micLive
+        ? listeningText(q)
+        : 'Getting the mic ready…'
       : hearing
         ? 'Hearing what you said…'
         : checking && q.wave

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
 import type { Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
-import type { Take } from '../recorder';
+import type { RecorderEvents, Take } from '../recorder';
 import { recordAnswer } from '../store';
 import { button, drillScope, fakeApp, flush, noMic } from '../test/screen';
 import { practiceScreen, type MeaningHearer } from './practice';
@@ -120,7 +120,9 @@ describe('recalling words that have settled', () => {
 
   it('hears a Tagalog answer said into the box as Tagalog', async () => {
     let finish: (t: Take) => void = () => {};
-    const record = vi.fn(() => {
+    let listening: (() => void) | undefined;
+    const record = vi.fn((events: RecorderEvents = {}) => {
+      listening = events.onListening;
       const audio = new Promise<Take>((r) => (finish = r));
       setTimeout(() => finish({ samples: new Float32Array(160), speech: true }), 0);
       return { audio, stop: () => {}, cancel: () => {} };
@@ -129,6 +131,7 @@ describe('recalling words that have settled', () => {
     const hearer = vi.fn<MeaningHearer>(async () => 'Salamat.');
     const root = (last = recall(learner(true), null, deps, hearer));
     root.querySelector<HTMLButtonElement>('.meaning-mic')!.click();
+    listening?.();
     expect(root.querySelector('.meaning-status')?.textContent).toBe('Listening… say it in Tagalog.');
     await flush();
     await flush();
