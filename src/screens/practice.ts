@@ -49,6 +49,8 @@ interface Question {
   answer?: string;
   /** Why OpenAI couldn't be asked about the answer, so it was only checked on the device. */
   failure?: unknown;
+  /** Typed Tagalog that was the card's own wording, misspelt. */
+  misspelt?: boolean;
   /** The box has been offered, and taken focus, once: later redraws leave the keyboard alone. */
   offered?: boolean;
   /** Why a spoken answer didn't come through, to say under the box. */
@@ -72,9 +74,9 @@ const hearWithOpenAi = (): MeaningHearer | null => {
 const MISSED = '';
 
 /** Asks OpenAI, when the learner has given a key for Chat. */
-const askOpenAi: MeaningJudge = async (answer, card, language) => {
+const askOpenAi: MeaningJudge = async (answer, card, language, typed) => {
   const key = getApiKey();
-  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language }) : null;
+  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language, typed }) : null;
 };
 
 /** What a typed answer to the question is given in: the meaning when listening, the Tagalog when recalling. */
@@ -341,11 +343,13 @@ export function practiceScreen(
     if (!spoken) q.wave = undefined;
     checking = true;
     draw();
-    void judgeMeaning(q.answer, q.card, askMeaning, answerLanguage(q)).then(({ right, failure }) => {
+    // Typed Tagalog has to be spelled right; said, it's written down by speech-to-text, not the learner.
+    void judgeMeaning(q.answer, q.card, askMeaning, answerLanguage(q), !spoken).then(({ right, failure, misspelt }) => {
       // Left the question (or the drill), or went to the choices, while it was being checked.
       if (current !== q || !q.typed || !root.isConnected) return;
       checking = false;
       q.failure = failure;
+      q.misspelt = misspelt;
       answer(q, right ? q.card.id : MISSED);
     });
   }
@@ -785,10 +789,12 @@ export function practiceScreen(
             ' ',
             `${q.card.tl} = ${q.card.en}`,
             !right && q.failure !== undefined && h('p', { class: 'feedback-note' }, checkProblem(q.failure)),
+            !right && q.misspelt && h('p', { class: 'feedback-note' }, 'Nearly: check the spelling.'),
           ),
         q.mode !== 'speak' && answered && (!right || reviewing) &&
           hookView(q.card),
-        picked === MISSED && !reviewing && h('button', { class: 'btn secondary claim', onclick: claim }, 'I had it right'),
+        // Not for a misspelling: the spelling is what was wrong.
+        picked === MISSED && !reviewing && !q.misspelt && h('button', { class: 'btn secondary claim', onclick: claim }, 'I had it right'),
         q.mode !== 'speak' && answered && onward(),
       ),
     );

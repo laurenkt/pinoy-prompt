@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { VOCAB, getCard, type Card } from './deck';
-import { canTypeMeaning, exactAnswer, judgeMeaning, matchesMeaning, matchesTagalog, meanings, leavesOutPo, repeatsTagalog, swapsTagalog, words } from './meaning';
+import { canTypeMeaning, exactAnswer, judgeMeaning, matchesMeaning, matchesTagalog, meanings, leavesOutPo, repeatsTagalog, spellsTagalog, swapsTagalog, words } from './meaning';
 
 const card = (id: string) => getCard(id)!;
 
@@ -113,7 +113,7 @@ describe('judging a typed meaning', () => {
   it('asks OpenAI about other wording', async () => {
     const ask = vi.fn(async () => true);
     expect(await judgeMeaning('thanks a lot', card('maraming-salamat'), ask)).toEqual({ right: true });
-    expect(ask).toHaveBeenCalledWith('thanks a lot', card('maraming-salamat'), 'en');
+    expect(ask).toHaveBeenCalledWith('thanks a lot', card('maraming-salamat'), 'en', false);
   });
 
   it("goes by the device's check without OpenAI, or when it fails, and says when it failed", async () => {
@@ -170,7 +170,7 @@ describe('telling the Tagalog said back from an answer', () => {
     // Not matched on the device, but English, so OpenAI is asked.
     const ask = vi.fn(async () => true);
     expect(await judgeMeaning('okay', card('okay-lang-ako'), ask)).toEqual({ right: true });
-    expect(ask).toHaveBeenCalledWith('okay', card('okay-lang-ako'), 'en');
+    expect(ask).toHaveBeenCalledWith('okay', card('okay-lang-ako'), 'en', false);
     expect(repeatsTagalog('Okay lang ako', card('okay-lang-ako'))).toBe(true);
   });
 });
@@ -278,9 +278,9 @@ describe('checking typed Tagalog', () => {
     expect(await judgeMeaning('thank you', card('salamat'), null, 'tl')).toEqual({ right: false });
     // Could be a word Tagalog borrows, or a number dictated as digits, so the device can't turn it down.
     await judgeMeaning('traffic', card('trapik'), ask, 'tl');
-    expect(ask).toHaveBeenCalledWith('traffic', card('trapik'), 'tl');
+    expect(ask).toHaveBeenCalledWith('traffic', card('trapik'), 'tl', false);
     expect(await judgeMeaning('salamat nang marami', card('maraming-salamat'), ask, 'tl')).toEqual({ right: true });
-    expect(ask).toHaveBeenCalledWith('salamat nang marami', card('maraming-salamat'), 'tl');
+    expect(ask).toHaveBeenCalledWith('salamat nang marami', card('maraming-salamat'), 'tl', false);
   });
 });
 
@@ -345,7 +345,44 @@ describe('telling a mixed-up Tagalog word from a typo', () => {
     expect(ask).not.toHaveBeenCalled();
     // Nearer another word than the card's, it's left to OpenAI.
     await judgeMeaning('maganghang umaga', card('magandang-umaga'), ask, 'tl');
-    expect(ask).toHaveBeenCalledWith('maganghang umaga', card('magandang-umaga'), 'tl');
+    expect(ask).toHaveBeenCalledWith('maganghang umaga', card('magandang-umaga'), 'tl', false);
+  });
+});
+
+describe('typed Tagalog, spelled right', () => {
+  it.each([
+    ['salamat', 'salamat'],
+    ['salamat', 'Salamat po!'],
+    ['salamat-po', 'salamat ho'],
+    ['kumusta', 'kamusta'],
+    ['dahan-dahan', 'dahandahan lang po'],
+  ])('%s: "%s" is spelled right', (id, answer) => {
+    expect(spellsTagalog(answer, card(id))).toBe(true);
+  });
+
+  it.each([
+    ['salamat', 'salamt'],
+    ['maraming-salamat', 'Maraming slamat'],
+    ['salamat-po', 'salamat'],
+    ['salamat', ''],
+  ])('%s: "%s" is not', (id, answer) => {
+    expect(spellsTagalog(answer, card(id))).toBe(false);
+  });
+
+  it('turns a misspelling of the card down as misspelt, without asking OpenAI, but takes it said', async () => {
+    const ask = vi.fn(async () => true);
+    expect(await judgeMeaning('Maraming slamat', card('maraming-salamat'), ask, 'tl', true)).toEqual({ right: false, misspelt: true });
+    expect(ask).not.toHaveBeenCalled();
+    // Said, speech-to-text did the spelling.
+    expect(await judgeMeaning('Maraming slamat', card('maraming-salamat'), ask, 'tl', false)).toEqual({ right: true });
+    // Typed English is still judged on meaning, not spelling.
+    expect(await judgeMeaning('I do not undrestand', card('hindi-maintindihan'), ask, 'en', true)).toEqual({ right: true });
+  });
+
+  it('tells OpenAI the Tagalog was typed, so it judges spelling too', async () => {
+    const ask = vi.fn(async () => true);
+    await judgeMeaning('salamat nang marami', card('maraming-salamat'), ask, 'tl', true);
+    expect(ask).toHaveBeenCalledWith('salamat nang marami', card('maraming-salamat'), 'tl', true);
   });
 });
 
