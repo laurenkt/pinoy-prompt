@@ -335,6 +335,36 @@ describe('clips', () => {
     const { playBuffer } = await import('./audio-engine');
     playBuffer({ duration: 0.05 } as AudioBuffer, { fades: false, incidental: true });
     expect(sources.at(-1)!.started).toBeCloseTo(10.005, 5);
+    // A word in the same press still waits.
+    playBuffer({ duration: 1 } as AudioBuffer).stop();
+    expect(sources.at(-1)!.started).toBeCloseTo(10 + WAKE_SECONDS, 5);
+  });
+
+  it('waits after a wake for a sound made as it plays, as for a clip', async () => {
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    ctx.state = 'suspended';
+    ctx.resume = () => ((ctx.state = 'running'), Promise.resolve());
+    ctx.currentTime = 20;
+    const sound = playLive((c) => ({ out: c.createGain() as unknown as AudioNode, end() {} }));
+    expect(sound.startsAt).toBeCloseTo(20 + WAKE_SECONDS, 5);
+    sound.stop();
+  });
+
+  it("doesn't hold a word back long after a wake that played nothing", async () => {
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    ctx.state = 'suspended';
+    ctx.resume = () => ((ctx.state = 'running'), Promise.resolve());
+    ctx.currentTime = 30;
+    // Woken by something that plays nothing (the start of a scrub), then the output has been going a while.
+    const { audioContext, playBuffer } = await import('./audio-engine');
+    audioContext();
+    ctx.currentTime = 50;
+    playBuffer({ duration: 1 } as AudioBuffer).stop();
+    expect(sources.at(-1)!.started).toBeCloseTo(50.005, 5);
   });
 
   it('makes a new context when iOS left the old one interrupted, rather than going quiet', async () => {

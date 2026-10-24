@@ -3,6 +3,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { TAP_MS, webAudioPlayer } = await import('./player');
+const { WAKE_SECONDS } = await import('./audio-engine');
+/** How long after a new or woken context a sound starts, in ms (the phone's output starting, and a few ms to schedule). */
+const WAKE_MS = WAKE_SECONDS * 1000 + 5;
 const { setMuted } = await import('./speech');
 
 /** An AudioParam that takes any automation, remembering where it was last sent. */
@@ -127,7 +130,10 @@ describe('holding a sound', () => {
     const stops = ctx.stopped.length;
     held.release();
     expect(ctx.stopped.length).toBe(stops);
-    vi.advanceTimersByTime(TAP_MS);
+    // A tap's length from when it's heard, which on a new context is a moment after it was asked for.
+    vi.advanceTimersByTime(TAP_MS + WAKE_MS - 50);
+    expect(ctx.stopped.length).toBe(stops);
+    vi.advanceTimersByTime(100);
     await held.done;
     expect(ctx.stopped.length).toBeGreaterThan(stops);
   });
@@ -156,7 +162,7 @@ describe('holding a sound', () => {
     expect(resumed).toBe(1);
     // Still the same context, not a new one.
     expect(contexts.at(-1)).toBe(ctx);
-    vi.advanceTimersByTime(TAP_MS - 50);
+    vi.advanceTimersByTime(TAP_MS + WAKE_MS - 50);
     expect(ctx.stopped.length).toBe(stops);
     vi.advanceTimersByTime(100);
     await held.done;
