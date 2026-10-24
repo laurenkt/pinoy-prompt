@@ -488,11 +488,11 @@ export const UNITS: Unit[] = [
       { id: 'babae', tl: 'babae', en: 'woman / female', kind: 'word', hint: 'bah-BAH-eh', hook: 'The other toilet door. Three syllables, "ba-BA-eh", with the a and e said apart.' },
       { id: 'kapatid', tl: 'kapatid', en: 'brother / sister', kind: 'word', hint: 'kah-pah-TID', note: 'Older ones are usually called Ate and Kuya instead.', hook: 'One word for brother or sister, like "asawa" for husband or wife. Add "na lalaki" or "na babae" only if it matters.' },
       { id: 'pinsan', tl: 'pinsan', en: 'cousin', kind: 'word', hint: 'PEEN-sahn', note: 'Cousins are often as close as brothers and sisters. Between them it\'s shortened to "insan".', hook: 'Drop the p and you have "insan", what cousins call each other.' },
-      { id: 'magulang', tl: 'magulang', en: 'parent', kind: 'word', hint: 'mah-GOO-lahng', note: 'Your parents are "mga magulang ko".', hook: 'The root is "gulang" (age), as in "Ilang taon ka na?". Ma- + gulang: the ones with the years.' },
-      { id: 'apo', tl: 'apo', en: 'grandchild', kind: 'word', hint: 'AH-poh', hook: 'What lola and lolo call you. "Apo ko!", my grandchild!' },
-      { id: 'pamangkin', tl: 'pamangkin', en: 'niece / nephew', kind: 'word', hint: 'pah-MAHNG-kin', hook: 'One word for niece or nephew, like "kapatid" for brother or sister. Your tita\'s pamangkin is you.' },
-      { id: 'panganay', tl: 'panganay', en: 'eldest child', kind: 'word', hint: 'pah-NGAH-nai', note: 'The eldest is expected to look after the younger ones, and is their Ate or Kuya.', hook: 'The "ng" starts a syllable here, "pa-NGA-nay", as it does in "ngayon". The first child, and the first word of the pair: panganay, then bunso.' },
-      { id: 'bunso', tl: 'bunso', en: 'youngest child', kind: 'word', hint: 'BOON-soh', note: 'Also a pet name: the family keeps calling the youngest "Bunso" long after they\'ve grown up.', hook: 'The baby of the family. "Bun" for the little one, like a small bun.' },
+      { id: 'magulang', tl: 'magulang', en: 'parent', kind: 'word', hint: 'mah-GOO-lahng', note: 'Your parents are "mga magulang ko".', hook: 'The root is "gulang" (age). Ma- + gulang: the ones with the years.' },
+      { id: 'apo', tl: 'apo', en: 'grandchild', kind: 'word', hint: 'ah-POH', hook: 'What lola and lolo call you. "Apo ko!", my grandchild!' },
+      { id: 'pamangkin', tl: 'pamangkin', en: 'niece / nephew', kind: 'word', hint: 'pah-mahng-KIN', hook: 'One word for niece or nephew, like "kapatid" for brother or sister. Your tita\'s pamangkin is you.' },
+      { id: 'panganay', tl: 'panganay', en: 'eldest child', kind: 'word', hint: 'pah-ngah-NAI', note: 'The eldest is expected to look after the younger ones, and is their Ate or Kuya.', hook: 'The "ng" starts a syllable here, "pa-nga-NAY", as it does in "ngayon". The first child, and the first of a pair: panganay, then bunso.' },
+      { id: 'bunso', tl: 'bunso', en: 'youngest child', kind: 'word', hint: 'boon-SOH', note: 'Also a pet name: the family keeps calling the youngest "Bunso" long after they\'ve grown up.', hook: 'The last child, and the other half of "panganay", the first.' },
       { id: 'ninang', tl: 'Ninang', en: 'godmother', kind: 'word', hint: 'NEE-nahng', note: 'Children often have several, and visit them for gifts at Christmas. The sponsors at a wedding are ninang and ninong too.', hook: 'Ends in -ang for her and -ong for him: Ninang, Ninong. Together they are your "mga ninong at ninang".' },
       { id: 'ninong', tl: 'Ninong', en: 'godfather', kind: 'word', hint: 'NEE-nohng', note: 'Expect to be asked "Ninong, pamasko ko po?" (my Christmas gift, please?) if you are one.', hook: 'Ninang\'s pair: -ang for her, -ong for him.' },
       { id: 'bata', tl: 'bata', en: 'kid / young', kind: 'word', hint: 'BAH-tah', hook: 'Any child is a "bata"; your own child is your "anak". "Bata pa ako" is "I\'m still young".' },
@@ -700,12 +700,14 @@ export const CORE_WORDS: readonly string[] = [
 /**
  * Cards close enough in meaning that one is never offered as a wrong answer
  * for another: "ko" can mean "I", "mo" and "kayo" can mean "you", "na" can mean
- * "now", a "bata" may be someone's "anak", "luma" and "matanda" are both "old",
- * Ate and Kuya are each a "kapatid", "No problem" and "No worries" are ways to say "You're welcome",
+ * "now", a "bata" may be someone's "anak", "panganay" or "bunso", "luma" and
+ * "matanda" are both "old", a "magulang" is a "nanay" or "tatay", Ate and Kuya
+ * are each a "kapatid", "No problem" and "No worries" are ways to say "You're welcome",
  * and a hello, a goodbye or a "what's up?" can each be said several ways.
  */
 export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
-  ['ako', 'ko'], ['ikaw', 'ka', 'mo', 'kayo'], ['na', 'ngayon'], ['anak', 'bata'], ['luma', 'matanda'],
+  ['ako', 'ko'], ['ikaw', 'ka', 'mo', 'kayo'], ['na', 'ngayon'], ['anak', 'bata', 'panganay', 'bunso'], ['luma', 'matanda'],
+  ['magulang', 'nanay', 'tatay'],
   ['kapatid', 'ate', 'kuya'], ['walang-problema', 'walang-anuman', 'wala-yon', 'ayos-lang'],
   ['mauna-na-ako', 'aalis-na-ako'], ['uy', 'kumusta', 'ikaw-pala'], ['anong-meron', 'anong-balita'], ['maghintay', 'teka'], ['tumulong', 'tulong'],
 ];

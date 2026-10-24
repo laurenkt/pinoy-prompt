@@ -42,6 +42,8 @@ const SHIPPED_IDS = [
   'biyernes', 'sabado', 'hatinggabi', 'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',
   // Shipped later: everyday greetings.
   'uy', 'wala-yon', 'ikaw-pala', 'saan-ka-galing', 'diyan-lang', 'mauna-na-ako', 'anong-meron', 'tao-po', 'k-taglish',
+  // Shipped later: more family.
+  'tita', 'tito', 'pinsan', 'magulang', 'apo', 'pamangkin', 'panganay', 'bunso', 'ninang', 'ninong',
 ];
 
 describe('deck', () => {
