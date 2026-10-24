@@ -3047,307 +3047,273 @@ p {
   display: none;
 }
 
-/* The headline: a big figure in cream, then what it means and when Study asks again. */
+.back-note {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* The headline: a dial in the strength's colour beside the big figure, what it means, and when Study asks again. */
 .back-hero {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--line);
+  gap: 14px;
 }
 
-.hero-n {
-  font-size: 3rem;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
+.dial {
+  flex: 0 0 112px;
+  width: 112px;
+  overflow: visible;
+}
+
+.dial path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.dial-rim {
+  stroke: var(--ink);
+  stroke-width: 22;
+}
+
+.dial-track {
+  stroke: var(--surface);
+  stroke-width: 16;
+}
+
+.dial-fill {
+  stroke-width: 16;
+}
+
+.dial-needle {
+  stroke: var(--cream);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.dial-hub {
+  fill: var(--cream);
+  stroke: var(--ink);
+  stroke-width: 3;
 }
 
 .hero-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  min-width: 0;
   margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.25;
+  font-size: 0.8rem;
+  line-height: 1.3;
   color: var(--muted);
 }
 
-.hero-text strong {
-  font-size: 1rem;
+.hero-way {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+
+.hero-n {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
   color: var(--cream);
 }
 
-.back-note {
-  font-size: 0.8rem;
-  color: var(--faint);
-  margin: 8px 0 0;
+.hero-text strong {
+  font-size: 0.9rem;
+  color: var(--cream);
 }
 
-/* Each part of the back: what it shows, how to read it, then the chart. */
+/* Each picture: its title, how to read it, then the picture framed like Home's chart. */
 .back-fig {
-  margin: 14px 0 0;
+  margin: 20px 0 0;
 }
 
 .back-fig figcaption {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .back-label {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 800;
+  color: var(--cream);
 }
 
 .back-how {
-  font-size: 0.78rem;
-  line-height: 1.3;
+  font-size: 0.8rem;
+  line-height: 1.35;
   color: var(--muted);
 }
 
-/* The chart beside a gutter holding its scale. */
-.back-plot {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-}
-
-.back-ticks {
-  position: relative;
-}
-
-.back-ticks span {
-  position: absolute;
-  right: 6px;
-  transform: translateY(50%);
-  font-size: 0.65rem;
-  line-height: 1;
-  color: var(--faint);
-  font-variant-numeric: tabular-nums;
+.back-frame {
+  padding: 10px 10px 0;
+  border: var(--outline);
+  border-radius: 14px;
+  background: var(--surface-dim);
+  box-shadow: var(--shadow);
 }
 
 .back-chart {
   display: block;
   width: 100%;
-  height: 64px;
+  height: auto;
   overflow: visible;
 }
 
-.back-chart .step,
-.back-chart .area {
-  stroke: none;
-}
-
-.back-chart .area {
-  fill-opacity: 0.22;
-}
-
-.back-chart .line {
-  fill: none;
-  stroke-width: 3;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.back-chart .line.s-new {
-  stroke: var(--cream);
-}
-
-.back-chart .line.s-days {
-  stroke: var(--pink);
-}
-
-.back-chart .line.s-weeks {
-  stroke: var(--saffron);
-}
-
-.back-chart .line.s-long {
-  stroke: var(--teal);
+.back-chart text {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .back-chart .grid {
   stroke: var(--line);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
+  stroke-width: 1.5;
+}
+
+.back-chart .tick {
+  fill: var(--faint);
 }
 
 .back-chart .ground {
-  stroke: var(--cream);
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-/* Where Study asks it again: a saffron post. Now: a cream dot ringed in the card's night (round caps on a line of no
-   length). The key under the chart draws both the same way. */
-.back-chart .post {
-  stroke: var(--saffron);
+  stroke: var(--ink);
   stroke-width: 3;
-  vector-effect: non-scaling-stroke;
-}
-
-.back-chart .now-ring,
-.back-chart .now {
   stroke-linecap: round;
-  vector-effect: non-scaling-stroke;
 }
 
-.back-chart .now-ring {
-  stroke: var(--on-accent);
-  stroke-width: 16;
+/* Every picture's shapes: solid strength colours with ink outlines, as on Home. */
+.back-chart .hill,
+.back-chart .stair,
+.back-chart .building {
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linejoin: round;
 }
 
-.back-chart .now {
+.dial-fill.s-new {
   stroke: var(--cream);
-  stroke-width: 11;
+}
+
+.dial-fill.s-days {
+  stroke: var(--pink);
+}
+
+.dial-fill.s-weeks {
+  stroke: var(--saffron);
+}
+
+.dial-fill.s-long {
+  stroke: var(--teal);
+}
+
+/* The slope: a ball where it is now, a flag where Study asks. */
+.back-chart .pole {
+  stroke: var(--cream);
+  stroke-width: 2.5;
+}
+
+.back-chart .flag {
+  fill: var(--saffron);
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.back-chart .flag-label,
+.back-chart .over-hill {
+  fill: var(--cream);
+}
+
+.back-chart .on-hill {
+  fill: var(--on-accent);
+}
+
+.back-chart .ball {
+  fill: var(--cream);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+/* The stairs: a tag for each way, cream with its name, the way asked now dark. */
+.back-chart .tag {
+  fill: var(--cream);
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.back-chart .tag.asked {
+  fill: var(--on-accent);
+  stroke: var(--cream);
+}
+
+.back-chart .tag-name {
+  font-size: 11.5px;
+  font-weight: 800;
+  fill: var(--on-accent);
+}
+
+.back-chart .tag-name.asked {
+  fill: var(--cream);
+}
+
+/* The skyline's windows, cut in ink. */
+.back-chart .window {
+  fill: var(--ink);
+  opacity: 0.35;
 }
 
 .back-axis {
   display: flex;
-  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  margin: 6px 0 0 34px;
-  font-size: 0.72rem;
+  margin-top: 8px;
+  font-size: 0.75rem;
   color: var(--muted);
-}
-
-.back-axis > :first-child {
-  margin-right: auto;
-}
-
-.back-axis span {
-  white-space: nowrap;
-}
-
-.back-key {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.key-now {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--cream);
-}
-
-.key-post {
-  width: 3px;
-  height: 12px;
-  background: var(--saffron);
-}
-
-/* Each way a row along the ladder of strengths, the rungs named above, filled up to where it stands. */
-.ladder {
-  display: grid;
-  grid-template-columns: 56px repeat(4, minmax(0, 1fr));
-  gap: 6px 3px;
-  align-items: center;
-}
-
-.rung-name {
-  font-size: 0.62rem;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--faint);
-  text-align: center;
-}
-
-.way-tile {
-  display: contents;
-}
-
-.way-name {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-/* The way asked now, in cream with a saffron marker. */
-.way-tile.asked .way-name {
-  font-weight: 800;
-  color: var(--cream);
-}
-
-.way-tile.asked .way-name::before {
-  content: '';
-  display: inline-block;
-  width: 0;
-  height: 0;
-  margin-right: 5px;
-  border-block: 5px solid transparent;
-  border-left: 7px solid var(--saffron);
-}
-
-.rung {
-  height: 14px;
-  border-radius: 4px;
-  background: var(--surface);
-}
-
-.rung.on.s-new {
-  background: var(--cream);
-}
-
-.rung.on.s-days {
-  background: var(--pink);
-}
-
-.rung.on.s-weeks {
-  background: var(--saffron);
-}
-
-.rung.on.s-long {
-  background: var(--teal);
-}
-
-.rung-none {
-  grid-column: span 4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 16px;
-  border: 2px dashed var(--line);
-  border-radius: 4px;
-  font-size: 0.65rem;
-  line-height: 1;
-  color: var(--faint);
 }
 
 .back-help {
   margin: 10px 0 0;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
   color: var(--muted);
 }
 
 .counts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 .count {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: var(--surface);
+  padding: 10px;
+  border: var(--outline);
+  border-radius: 14px;
+  background: var(--surface-dim);
+  box-shadow: var(--shadow);
 }
 
 .count-n {
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
   line-height: 1;
+  color: var(--cream);
 }
 
 .count-label {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   line-height: 1.2;
   color: var(--muted);
 }
