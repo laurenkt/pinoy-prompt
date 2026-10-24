@@ -173,6 +173,8 @@ describe('englishReadings', () => {
   it('finds a g before e or i said the English way, as in "giant"', () => {
     expect(englishReadings('Gising ka na ba?', ['dʒ', 'i', 's', 'i', 'ŋ', 'k', 'a', 'n', 'a', 'b', 'a'])).toEqual([{ letters: 'Gi', heard: 'dʒ' }]);
     expect(englishReadings('saging', ['s', 'a', 'ʒ', 'i', 'ŋ'])).toEqual([{ letters: 'gi', heard: 'ʒ' }]);
+    // Lined up as a missing g, with the soft g beside it or in the vowel's place.
+    expect(englishReadings('gising', ['ʒ', 'dʒ', 'i'])).toEqual([{ letters: 'gi', heard: 'ʒ' }]);
   });
 
   it('passes a hard g, and leaves other slips to the transcript check', () => {

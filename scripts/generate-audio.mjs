@@ -82,21 +82,29 @@ async function recogniser() {
     console.log('Downloading the sound recogniser (71 MB, once)...');
     const response = await fetch(MODEL_URL);
     if (!response.ok) throw new Error(`Recogniser download: ${response.status}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    // A download cut short would fail every later run, so it's never kept.
+    if (bytes.length !== Number(response.headers.get('content-length'))) throw new Error('Recogniser download cut short');
     await mkdir(join(RECOGNISER, '..'), { recursive: true });
-    await writeFile(`${RECOGNISER}.part`, Buffer.from(await response.arrayBuffer()));
+    await writeFile(`${RECOGNISER}.part`, bytes);
     await rename(`${RECOGNISER}.part`, RECOGNISER);
   }
   const ort = await import('onnxruntime-web/wasm');
   ort.env.wasm.numThreads = 1;
   return ort.InferenceSession.create(await readFile(RECOGNISER));
 }
-const session = await recogniser();
+/** Loaded on first use, so a run with nothing to make doesn't need it. */
+let session;
+/** One recording at a time, as in the app: takes finish together, and the runtime isn't made to run in parallel. */
+let listening = Promise.resolve();
 
 /** Letters a clip says the English way, as the recogniser hears them. */
 async function misread(text, file) {
   const { stdout } = await run('ffmpeg', ['-v', 'error', '-i', file, '-ac', '1', '-ar', '16000', '-f', 'f32le', '-'], { encoding: 'buffer', maxBuffer: 1 << 26 });
   const samples = new Float32Array(stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.length));
-  return englishReadings(text, (await recognise(session, samples)).sounds);
+  const heard = listening.then(async () => recognise(await (session ??= recogniser()), samples));
+  listening = heard.catch(() => {});
+  return englishReadings(text, (await heard).sounds);
 }
 const describeMisread = (found) => found.map((f) => `"${f.letters}" said ${f.heard}`).join(', ');
 
@@ -226,10 +234,15 @@ async function makeClip(text, voice, work, unsure, keepOld) {
     }
     let right = saidRight && (!checked || heardRight(text, heard));
     if (right) {
-      const found = await misread(text, join(work, `${draft}.mp3`));
-      if (found.length) {
-        right = false;
-        heard = `${heard}, with ${describeMisread(found)}`;
+      try {
+        const found = await misread(text, join(work, `${draft}.mp3`));
+        if (found.length) {
+          right = false;
+          heard = `${heard}, with ${describeMisread(found)}`;
+        }
+      } catch (error) {
+        checked = false;
+        heard = `${heard} (couldn't check its sounds: ${error.message.split('\n')[0]})`;
       }
     }
     if (!right && attempt < ATTEMPTS) continue;
@@ -308,6 +321,6 @@ await rm(work, { recursive: true });
 await save(true);
 
 if (unsure.length) {
-  console.log(`\nThese didn't transcribe back to their text. Listen to them, and --redo any that sound wrong:`);
+  console.log(`\nThese didn't come out as written, or couldn't be checked. Listen to them, and --redo any that sound wrong:`);
   for (const u of unsure) console.log(`  "${u.text}" (${u.voice}) heard as "${u.heard}"${u.kept ? ', so the old clip was kept' : ''}`);
 }
