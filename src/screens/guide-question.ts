@@ -76,21 +76,50 @@ export function gapLine(d: Drill, filled: boolean, say: (slow: boolean) => void)
   );
 }
 
-/** How well the card is known, on its prompt (Drills): a button beside the eyebrow, and what it opens, at the prompt's foot. */
-export interface PromptMemory {
-  toggle: HTMLElement;
-  details: HTMLElement;
+/** The back of a card that turns over when tapped (Drills: how well it's known), drawn when first turned; whether it's turned now, and what to tell when it turns. */
+export interface CardBack {
+  back: () => HTMLElement;
+  turned: boolean;
+  onTurn: (turned: boolean) => void;
 }
 
-/** A prompt: its eyebrow, with the memory button after it if there is one, then the rest, then what that button opens. */
-export function promptBlock(cls: string, eyebrow: string, memory: PromptMemory | null | undefined, ...rest: (HTMLElement | null | false)[]): HTMLElement {
-  return h(
-    'div',
-    { class: cls },
-    h('p', { class: 'eyebrow' }, eyebrow, memory && [' ', memory.toggle]),
-    ...rest,
-    memory?.details,
-  );
+/** What a tap on the card presses instead of turning it: its own controls. */
+const PRESSABLE = 'button, a[href], input, textarea, select, [role="button"], [role="slider"]';
+
+/**
+ * A prompt: its eyebrow, then the rest. Given a back, a tap anywhere on the card that isn't on one of its controls
+ * (or picking out its text) turns it over, and again turns it back. A screen reader or keyboard has a hidden button
+ * for the same.
+ */
+export function promptBlock(cls: string, eyebrow: string, back: CardBack | null | undefined, ...rest: (HTMLElement | null | false)[]): HTMLElement {
+  const face = [h('p', { class: 'eyebrow' }, eyebrow), ...rest];
+  if (!back) return h('div', { class: cls }, ...face);
+  let turned = back.turned;
+  let drawn: HTMLElement | null = null;
+  const front = h('div', { class: 'card-front' }, ...face);
+  const button = h('button', { class: 'sr-only', type: 'button' }, 'How well you know it');
+  const card = h('div', { class: cls, 'data-turnable': '' }, front, button);
+  const show = () => {
+    if (turned && !drawn) card.insertBefore((drawn = back.back()), button);
+    card.classList.toggle('turned', turned);
+    front.hidden = turned;
+    if (drawn) drawn.hidden = !turned;
+    button.setAttribute('aria-expanded', String(turned));
+  };
+  card.addEventListener('click', (e) => {
+    const pressed = (e.target as Element).closest(PRESSABLE);
+    if (pressed && pressed !== button) return;
+    if (!pressed && String(window.getSelection?.() ?? '')) return;
+    turned = !turned;
+    show();
+    // Played again from the start on every turn.
+    card.classList.remove('turning');
+    void card.offsetWidth;
+    card.classList.add('turning');
+    back.onTurn(turned);
+  });
+  show();
+  return card;
 }
 
 /** The question, as asked: an English sentence to complete in Tagalog, or a plain question. */
@@ -100,11 +129,11 @@ export function drillPrompt(
   filled: boolean,
   eyebrow: string,
   say: (slow: boolean) => void,
-  { showTl = true, memory = null }: { showTl?: boolean; memory?: PromptMemory | null } = {},
+  { showTl = true, back = null }: { showTl?: boolean; back?: CardBack | null } = {},
 ): HTMLElement {
   return d.tl
-    ? promptBlock(`prompt kind-${c.kind}`, eyebrow, memory, h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
-    : promptBlock(`prompt kind-${c.kind}`, c.en, memory, h('p', { class: 'drill-q' }, d.q));
+    ? promptBlock(`prompt kind-${c.kind}`, eyebrow, back, h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
+    : promptBlock(`prompt kind-${c.kind}`, c.en, back, h('p', { class: 'drill-q' }, d.q));
 }
 
 /** A guide's explanation: its rule in plain words, and examples to hear. */
@@ -155,8 +184,8 @@ export interface GuideViewOptions {
   feedback: (right: boolean) => HTMLElement;
   /** Anything else to show once it's answered: a hook, the way on. */
   after: (HTMLElement | null | false)[];
-  /** How well the card is known, on the prompt (Drills). */
-  memory?: PromptMemory | null;
+  /** How well the card is known, on the card's back (Drills). */
+  back?: CardBack | null;
 }
 
 /** The panel asking a guide's question, with `picked` as the pick so far (null before it's answered). */
@@ -168,7 +197,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
     return h(
       'div',
       { class: 'panel' },
-      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say, { memory: opts.memory }),
+      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say, { back: opts.back }),
       choiceList(q.choices, { key: (o) => o, label: (o) => o, answer: d.answer, picked, lang: d.tl ? 'fil' : undefined, onPick: opts.onPick }),
       answered && opts.feedback(right),
       ...(answered ? opts.after : []),
@@ -187,7 +216,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
   return h(
     'div',
     { class: 'panel' },
-    promptBlock(`prompt kind-${c.kind}`, 'Put it in order', opts.memory, h('p', { class: 'drill-q' }, d.q)),
+    promptBlock(`prompt kind-${c.kind}`, 'Put it in order', opts.back, h('p', { class: 'drill-q' }, d.q)),
     h(
       'div',
       { class: `build-line ${answered ? (right ? 'right' : 'wrong') : ''}`, lang: 'fil', 'aria-label': 'Your sentence' },

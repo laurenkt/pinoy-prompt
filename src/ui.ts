@@ -65,7 +65,6 @@ const ICONS = {
   mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
   micOff: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 3l16 18"/>',
   soundOff: '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/>',
-  stats: '<path d="M5 20v-6M12 20V5M19 20v-10"/>',
 };
 
 export type IconName = keyof typeof ICONS;

@@ -39,7 +39,7 @@ export function strengthOf(card: CardState): Strength {
  * that day and midday is the best guess; otherwise due is exactly one interval
  * after the review.
  */
-function lastSeen(card: CardState, now: number): number {
+export function lastSeen(card: CardState, now: number): number {
   return Math.min(card.reviewed ?? guessedReview(card), now);
 }
 
@@ -124,23 +124,31 @@ export function recentReviews(progress: Progress, now: number, days = RECALL_WIN
 }
 
 /**
- * The card's strength over time, as [time, strength] steps, oldest first: it
- * is "new" from when it was introduced, then moves at each step. Cards saved
- * before moves were logged get a likely past worked back from the schedule.
+ * How long the card was expected to hold over time, as [time, interval in days] steps, oldest first: 0 from when it
+ * was introduced, then a step at each move to a new strength (see `log`). Cards saved before moves were logged get a
+ * likely past worked back from the schedule.
  */
-export function strengthSteps(card: CardState, now: number): [number, Strength][] {
+export function intervalSteps(card: CardState, now: number): [number, number][] {
   // Times are kept within [introduced, now], so a clock that ran ahead can't
   // leave a word out of today's count.
   const start = Math.min(card.introduced, now);
-  const steps: [number, Strength][] = [[start, 'new']];
+  const steps: [number, number][] = [[start, 0]];
   const seen = lastSeen(card, now);
-  const current = strengthOf(card);
   for (const [at, interval] of pastLog(card, now)) {
-    steps.push([Math.min(Math.max(at, start, steps[steps.length - 1][0]), now), strengthOf({ ...card, interval })]);
+    steps.push([Math.min(Math.max(at, start, steps[steps.length - 1][0]), now), interval]);
   }
   // An older build may have reviewed the card without logging the move.
-  if (steps[steps.length - 1][1] !== current) steps.push([Math.max(seen, steps[steps.length - 1][0]), current]);
+  const [lastAt, lastInterval] = steps[steps.length - 1];
+  if (strengthOf({ ...card, interval: lastInterval }) !== strengthOf(card)) steps.push([Math.max(seen, lastAt), card.interval]);
   return steps;
+}
+
+/**
+ * The card's strength over time, as [time, strength] steps, oldest first: it
+ * is "new" from when it was introduced, then moves at each step.
+ */
+export function strengthSteps(card: CardState, now: number): [number, Strength][] {
+  return intervalSteps(card, now).map(([at, interval]) => [at, strengthOf({ ...card, interval })]);
 }
 
 /** The card's log, or for a card saved without one, a likely one. */
