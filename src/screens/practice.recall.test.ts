@@ -242,6 +242,17 @@ describe('a Tagalog answer said into the box, with the pronunciation model on th
     expect(root.querySelector('.meaning-mic')).not.toBeNull();
   });
 
+  it("without a key, says it couldn't be checked once the phone has cleared the model, and drops the mic", async () => {
+    const { deps } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
+    const root = (last = recall(learner(true), null, deps, null));
+    (deps as { modelDownloaded: () => Promise<boolean> }).modelDownloaded = async () => false;
+    await say(root);
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(root.querySelector('.meaning-status')?.textContent).toBe("Couldn't check it on this phone. Type it instead.");
+    expect(root.querySelector('.meaning-mic')).toBeNull();
+    expect(box(root)).not.toBeNull();
+  });
+
   it("leaves English meanings to speech-to-text", async () => {
     const { deps, recognise } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
     const hearer = vi.fn<MeaningHearer>(async () => 'Thank you');
