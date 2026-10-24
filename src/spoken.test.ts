@@ -7,7 +7,7 @@ import clipSounds from './clip-sounds.json';
 import { VOCAB, type Card } from './deck';
 import { GUIDES } from './guides';
 import { drillSentence } from './session';
-import { englishReadings, judge, PASS, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
+import { englishReadings, judge, lostFirstSound, PASS, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
 import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
 
@@ -72,6 +72,16 @@ describe('recorded clips, heard by Speak', () => {
       }),
     );
     expect(failing).toEqual([]);
+  });
+
+  it('starts every clip with its first sound, so "Kailan" never plays as "ailan"', () => {
+    const lost = Object.keys(CLIPS).flatMap((text) =>
+      files(text).flatMap((file) => {
+        const found = lostFirstSound(text, said(file).sounds);
+        return found ? [`${file}: "${found.letters}" heard as ${found.heard}`] : [];
+      }),
+    );
+    expect(lost).toEqual([]);
   });
 
   it('never says a letter the English way', () => {

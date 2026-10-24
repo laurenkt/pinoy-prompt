@@ -31,8 +31,10 @@
 // recogniser (about 71 MB) is downloaded once into node_modules/.cache.
 //
 // The voice model sometimes starts or stops a take mid-sound (a word that
-// starts with a vowel often comes already sounding), and a take like that is
-// made again as well. Each clip keeps a little silence before and after its
+// starts with a vowel often comes already sounding), and often starts a take a
+// moment into its first word, so "Kailan" comes out "ailan" (lostFirstSound in
+// src/phonetics.ts, as the recogniser hears it); a take like either is made
+// again as well. Each clip keeps a little silence before and after its
 // sound (scripts/clip-edges.mjs), so soft starts and fading ends are heard
 // whole; `--check` also remakes clips made before that, which start right on their first sound.
 
@@ -84,7 +86,7 @@ const key = process.env.OPENAI_API_KEY;
 const vite = await createServer({ root: ROOT, server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
 const { allSpoken, spokenText } = await vite.ssrLoadModule('/src/spoken.ts');
 const { VOCAB } = await vite.ssrLoadModule('/src/deck.ts');
-const { englishReadings, judge, packOdds, passes, unpackOdds } = await vite.ssrLoadModule('/src/phonetics.ts');
+const { englishReadings, judge, lostFirstSound, packOdds, passes, unpackOdds } = await vite.ssrLoadModule('/src/phonetics.ts');
 const { recognise } = await vite.ssrLoadModule('/src/phone-model.ts');
 const { MODEL_URL } = await vite.ssrLoadModule('/src/model-cache.ts');
 await vite.close();
@@ -133,9 +135,10 @@ async function listen(file) {
 const speakAs = new Map();
 for (const card of VOCAB) speakAs.set(spokenText(card), [...(speakAs.get(spokenText(card)) ?? []), [card.tl, ...(card.accept ?? [])]]);
 
-/** What's wrong with a clip of the text, as Speak hears it: letters said the English way, or a card it wouldn't pass as. */
+/** What's wrong with a clip of the text, as Speak hears it: a first sound gone, letters said the English way, or a card it wouldn't pass as. */
 function soundProblems(text, heard) {
-  const found = englishReadings(text, heard.sounds).map((f) => `"${f.letters}" said ${f.heard}`);
+  const lost = lostFirstSound(text, heard.sounds);
+  const found = [...(lost ? [`first "${lost.letters}" heard as ${lost.heard}`] : []), ...englishReadings(text, heard.sounds).map((f) => `"${f.letters}" said ${f.heard}`)];
   if (!heard.odds) return found;
   for (const spellings of speakAs.get(text) ?? []) {
     const { comparison } = judge(spellings, { ...heard, odds: unpackOdds(heard.odds) });

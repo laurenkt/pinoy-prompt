@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coach } from './coach';
 import { ALL_CARDS } from './deck';
-import { compare, englishReadings, groupTokens, judge, likelihood, packOdds, passes, soundDistance, toPhones, unpackOdds, type Odds } from './phonetics';
+import { compare, englishReadings, groupTokens, lostFirstSound, judge, likelihood, packOdds, passes, soundDistance, toPhones, unpackOdds, type Odds } from './phonetics';
 
 /** The required sounds, joined, for compact assertions. */
 const sounds = (text: string) =>
@@ -231,6 +231,23 @@ describe('compare', () => {
 
   it("doesn't penalise leaving out an optional catch", () => {
     expect(compare(toPhones('Oo'), ['o', 'o']).score).toBe(1);
+  });
+});
+
+describe('lostFirstSound', () => {
+  it('finds a recording that starts a moment into its first word', () => {
+    expect(lostFirstSound('Kailan?', ['a', 'j', 'l', 'a', 'n'])).toEqual({ letters: 'K', heard: 'nothing' });
+    expect(lostFirstSound('Pabili po.', ['a', 'b', 'i', 'l', 'i', 'p', 'o'])).toEqual({ letters: 'P', heard: 'nothing' });
+  });
+
+  it('takes the first sound said, or heard as a near one', () => {
+    expect(lostFirstSound('Kailan?', ['k', 'a', 'j', 'l', 'a', 'n'])).toBeNull();
+    expect(lostFirstSound('kanan', ['ɡ', 'a', 'n', 'a', 'n'])).toBeNull();
+    expect(lostFirstSound('Psst! Kuya!', ['s', 't', 'k', 'u', 'j', 'a'])).toBeNull();
+  });
+
+  it('leaves a first vowel to the check for a take cut off', () => {
+    expect(lostFirstSound('Ako rin.', ['k', 'o', 'ɾ', 'i', 'n'])).toBeNull();
   });
 });
 
