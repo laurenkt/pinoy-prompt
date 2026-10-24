@@ -154,7 +154,7 @@ function studyButton(app: App, isFirstRun: boolean): { el: HTMLElement; changesI
   const can = abilities(progress, canPlay());
   const reviews = studyQueue(progress, now, can).length;
   const fresh =
-    learningCount(progress) < MAX_LEARNING
+    learningCount(progress, can) < MAX_LEARNING
       ? upcomingWays(progress, can).length + Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length)
       : 0;
   const next = isFirstRun ? null : nextStudyAt(progress, now, can);

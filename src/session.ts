@@ -185,8 +185,9 @@ export const MAX_LEARNING = 3;
 /** A card shown in the last few steps isn't shown again yet, so a miss gets a short gap. */
 const RECENT_GAP = 3;
 
-export function learningCount(progress: Progress): number {
-  return studied(progress).filter(({ state }) => state.interval < 1).length;
+/** Cards still being learned that Study can ask now: a listening card waiting for the sound doesn't hold new ones back. */
+export function learningCount(progress: Progress, can: Abilities = { listen: true }): number {
+  return studied(progress).filter(({ way, state }) => state.interval < 1 && canAsk(way, can)).length;
 }
 
 /**
@@ -254,12 +255,12 @@ export function nextStudyStep(progress: Progress, now: number, recent: string[],
   const review = queue.find((key) => !shownRecently.has(idOf(key))) ?? queue.find((key) => idOf(key) !== last);
   if (review) return reviewOf(review);
 
-  if (learningCount(progress) < MAX_LEARNING) {
+  if (learningCount(progress, can) < MAX_LEARNING) {
     const ways = upcomingWays(progress, can);
     const way = ways.find((s) => !shownRecently.has(s.cardId)) ?? ways.find((s) => s.cardId !== last);
     if (way) return way;
   }
-  if (newCardsLeftToday(progress) > 0 && learningCount(progress) < MAX_LEARNING) {
+  if (newCardsLeftToday(progress) > 0 && learningCount(progress, can) < MAX_LEARNING) {
     const [fresh] = upcomingNewCards(progress, 1);
     if (fresh) return { cardId: fresh, kind: 'new', format: isVocab(getCard(fresh)!) ? 'read' : 'gap' };
   }
@@ -435,7 +436,7 @@ export function buildExtraSession(progress: Progress, size = 5): Step[] {
 /** Put a missed card back a few steps later so it comes round again this session. */
 export function requeue(queue: Step[], step: Step): Step[] {
   const next = [...queue];
-  next.splice(Math.min(REQUEUE_GAP, next.length), 0, { cardId: step.cardId, kind: 'review' });
+  next.splice(Math.min(REQUEUE_GAP, next.length), 0, { cardId: step.cardId, way: step.way, kind: 'review' });
   return next;
 }
 

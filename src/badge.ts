@@ -8,6 +8,7 @@
 
 import { installed } from './app';
 import { abilities, studyQueue } from './session';
+import { canPlay } from './speech';
 import type { Progress } from './store';
 
 interface BadgeNavigator {
@@ -26,7 +27,7 @@ const shown = new WeakMap<BadgeNavigator, number>();
 /** Set the icon to the cards due now, or clear it when none are or the setting is off. */
 export function showDueBadge(progress: Progress, now: number, nav: BadgeNavigator = navigator as BadgeNavigator): void {
   if (!badgeSupported(nav)) return;
-  const due = progress.settings.iconBadge ? studyQueue(progress, now, abilities(progress)).length : 0;
+  const due = progress.settings.iconBadge ? studyQueue(progress, now, abilities(progress, canPlay())).length : 0;
   if (shown.get(nav) === due) return;
   shown.set(nav, due);
   // A refused badge (notifications turned off) just doesn't show, and is tried again next time.

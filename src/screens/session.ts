@@ -186,7 +186,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     app.commit();
     stats.answered++;
     if (rating !== 'again') stats.correct++;
-    if (wasNew) stats.learned++;
+    // Another way of asking a word already met isn't a new word (see Way).
+    if (wasNew && (step.way ?? 'read') === 'read') stats.learned++;
     else stats.reviewed++;
     if (open) return;
     // Open-ended study brings a missed card back by itself: it's still being learned.

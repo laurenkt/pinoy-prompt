@@ -142,6 +142,22 @@ describe('nextStudyStep', () => {
     expect(formats).toEqual(new Set(['remember']));
   });
 
+  it("doesn't let listening cards waiting for the sound hold back the other ways and new words", () => {
+    const progress = emptyProgress(NOW);
+    const ids = VOCAB_ORDER.slice(0, 4);
+    learn(progress, ids, 3);
+    // Three words whose listening was missed, so still being learned, then the sound goes off.
+    for (const id of ids.slice(0, 3)) {
+      recordAnswer(progress, cardKey(id, 'listen'), 'again', NOW);
+      progress.cards[cardKey(id, 'recall')] = { ...progress.cards[id] };
+    }
+    expect(learningCount(progress)).toBe(3);
+    expect(learningCount(progress, { listen: false })).toBe(0);
+    const step = nextStudyStep(progress, NOW + 60_000, [], { listen: false });
+    expect(step).not.toBeNull();
+    expect(step!.way).not.toBe('listen');
+  });
+
   it('asks the card just shown again when it is the only one left being learned, rather than being caught up', () => {
     const progress = emptyProgress(NOW);
     progress.settings.dailyNew = 0;
@@ -377,6 +393,10 @@ describe('requeue', () => {
     const next = requeue(queue, { cardId: 'x', kind: 'new' });
     expect(next.map((s) => s.cardId)).toEqual(['a', 'b', 'c', 'x', 'd']);
     expect(next[3].kind).toBe('review');
+  });
+
+  it('brings it back asked the same way', () => {
+    expect(requeue([], { cardId: 'x', way: 'recall', kind: 'review' })[0].way).toBe('recall');
   });
 
   it('appends when the queue is short', () => {
