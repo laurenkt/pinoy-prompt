@@ -294,9 +294,7 @@ function sameTagalogWord(typed: string, word: string, own: Set<string>): boolean
 export function swapsTagalog(answer: string, card: Card): boolean {
   const given = bare(tagalogWords(answer));
   const own = ownTagalog(card);
-  // "Opo" for "Oo" isn't a mix-up: a word from a card that means the same isn't.
-  const swapped = (typed: string, word: string) =>
-    !own.has(typed) && looksAlike(typed, word) && cardsUsing().get(typed)?.every((other) => !matchesMeaning(other.en, card)) === true;
+  const swapped = (typed: string, word: string) => !own.has(typed) && knownTagalog().has(typed) && looksAlike(typed, word);
   return cardWords(card).some((want) => {
     const w = bare(want);
     if (given.length !== w.length) return false;
@@ -305,30 +303,17 @@ export function swapsTagalog(answer: string, card: Card): boolean {
   });
 }
 
-let tagalogCards: Map<string, Card[]> | undefined;
-
-/** The cards whose Tagalog uses each word. */
-function cardsUsing(): Map<string, Card[]> {
-  if (!tagalogCards) {
-    tagalogCards = new Map();
-    for (const card of VOCAB) {
-      for (const word of new Set(cardWords(card).flat())) {
-        const cards = tagalogCards.get(word);
-        if (cards) cards.push(card);
-        else tagalogCards.set(word, [card]);
-      }
-    }
-  }
-  return tagalogCards;
-}
-
 /**
  * Two different words that look alike: five letters or more, the same first
- * letter, and no more than half the letters changed. Shorter words are left
- * alone, as typos are: "san" is how "saan" is often written.
+ * letter, and three letters changed or more, but no more than half. Shorter
+ * words are left alone, as typos are: "san" is how "saan" is often written.
+ * So are words a letter or two apart, which are more often two forms of one
+ * word than two words: "marami" and "maraming", "papunta" and "pupunta".
  */
 function looksAlike(a: string, b: string): boolean {
-  return a !== b && a.length >= 5 && b.length >= 5 && a[0] === b[0] && distance(a, b) <= Math.ceil(Math.max(a.length, b.length) / 2);
+  if (a.length < 5 || b.length < 5 || a[0] !== b[0]) return false;
+  const edits = distance(a, b);
+  return edits >= 3 && edits <= Math.ceil(Math.max(a.length, b.length) / 2);
 }
 
 /**
@@ -348,9 +333,11 @@ export function matchesTagalog(answer: string, card: Card): boolean {
     if (want.length === 0 || (polite(want) && !polite(given))) return false;
     const w = bare(want);
     if (g.length === w.length && g.every((typed, i) => sameTagalogWord(typed, w[i], own))) return true;
-    // A word of five letters or more nearer another of the deck's than the card's isn't a typo, even inside a longer
-    // typo: "maganghang" is "maanghang". Shorter ones are often shortened ("san" for "saan", "na ko").
-    const nearer = (typed: string, word: string) => typed.length >= 5 && word.length >= 5 && nearerElsewhere(typed, distance(typed, word), knownTagalog(), own);
+    // A slip of five letters or more nearer another of the deck's words than the card's isn't a typo, even inside a
+    // longer typo: "maganghang" is "maanghang". Shorter ones are often shortened ("san" for "saan", "na ko"), and
+    // a word the deck uses is left to the joined-up check and `swapsTagalog` ("marami salamat", "maraming umaga").
+    const nearer = (typed: string, word: string) =>
+      typed.length >= 5 && word.length >= 5 && !knownTagalog().has(typed) && nearerElsewhere(typed, distance(typed, word), knownTagalog(), own);
     if (g.length === w.length && g.some((typed, i) => nearer(typed, w[i]))) return false;
     // Joined up, a typo still counts: "dahandahn lang" for "dahan-dahan lang", "Magandang umga".
     return sameTagalogWord(g.join(''), w.join(''), own);

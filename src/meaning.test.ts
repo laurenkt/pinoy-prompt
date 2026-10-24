@@ -186,6 +186,8 @@ describe('checking typed Tagalog', () => {
     ['magandang-umaga', 'Magandang umga'],
     ['mabuti', 'Mabuti nman'],
     ['wala-yon', "Wla 'yon"],
+    ['maraming-salamat', 'Marami salamat po'],
+    ['walang-anuman', 'walana anuman'],
     ['po', 'po'],
     // Reworded the way people say it, with the textbook wording still right.
     ['ano-pangalan', 'Anong pangalan mo?'],
@@ -257,6 +259,11 @@ describe('telling a mixed-up Tagalog word from a typo', () => {
     ['saan-ka-nakatira', 'San ka nakatira?'],
     ['ilang-taon-ka-na', 'Ilan taon ka na?'],
     ['kain-tayo', 'Kain tao!'],
+    // A letter or two apart is more often another form of the word, left to OpenAI.
+    ['maraming-salamat', 'Marami salamat'],
+    ['magandang-umaga', 'Maganda umaga'],
+    ['saan-ka-pupunta', 'Saan ka papunta?'],
+    ['paano-pumunta', 'Paano pupunta sa palengke?'],
   ])('%s: "%s" does not', (id, answer) => {
     expect(swapsTagalog(answer, card(id))).toBe(false);
   });
