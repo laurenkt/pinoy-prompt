@@ -178,6 +178,13 @@ describe('recalling words that have settled', () => {
     expect(choices.some((c) => c.textContent?.includes('Salamat'))).toBe(true);
   });
 
+  it('has no microphone without a key or the pronunciation model', () => {
+    const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record: vi.fn() } as unknown as SpeakDeps;
+    const root = (last = recall(learner(true), null, deps, null));
+    expect(box(root)).not.toBeNull();
+    expect(root.querySelector('.meaning-mic')).toBeNull();
+  });
+
   it('hears a Tagalog answer said into the box as Tagalog', async () => {
     let finish: (t: Take) => void = () => {};
     let listening: (() => void) | undefined;
@@ -248,6 +255,34 @@ describe('a Tagalog answer said into the box, with the pronunciation model on th
     expect(hearer).toHaveBeenCalledWith(expect.any(Blob), 'tl');
     expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
     expect(box(root)!.value).toBe('Bukas');
+  });
+
+  it('needs no OpenAI key: a right answer passes on the device', async () => {
+    const { deps } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
+    const root = (last = recall(learner(true), null, deps, null));
+    await say(root);
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+
+  it("without a key, says to try again or type it when the device doesn't pass it, rather than marking it wrong", async () => {
+    const { deps } = onDevice(['b', 'u', 'k', 'a', 's']);
+    const root = (last = recall(learner(true), null, deps, null));
+    await say(root);
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(root.querySelector('.meaning-status')?.textContent).toBe("That didn't sound like it. Tap the microphone and try again, or type it.");
+    expect(box(root)).not.toBeNull();
+    expect(root.querySelector('.meaning-mic')).not.toBeNull();
+  });
+
+  it("without a key, says it couldn't be checked once the phone has cleared the model, and drops the mic", async () => {
+    const { deps } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
+    const root = (last = recall(learner(true), null, deps, null));
+    (deps as { modelDownloaded: () => Promise<boolean> }).modelDownloaded = async () => false;
+    await say(root);
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(root.querySelector('.meaning-status')?.textContent).toBe("Couldn't check it on this phone. Type it instead.");
+    expect(root.querySelector('.meaning-mic')).toBeNull();
+    expect(box(root)).not.toBeNull();
   });
 
   it("leaves English meanings to speech-to-text", async () => {
