@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coach } from './coach';
 import { ALL_CARDS } from './deck';
-import { compare, englishReadings, groupTokens, soundDistance, toPhones } from './phonetics';
+import { compare, englishReadings, groupTokens, judge, likelihood, packOdds, passes, soundDistance, toPhones, unpackOdds, type Odds } from './phonetics';
 
 /** The required sounds, joined, for compact assertions. */
 const sounds = (text: string) =>
@@ -57,9 +57,10 @@ describe('toPhones', () => {
     expect(sounds('bangka')).toBe('b a ŋ k a');
   });
 
-  it('says "sy" and "siy" before a vowel as "sh"', () => {
-    expect(sounds('Pasensya na')).toBe('p a s ɛ n ʃ a n a');
-    expect(sounds('siyam')).toBe('ʃ a m');
+  it('takes "sy" and "siy" before a vowel said "sh" or as spelled', () => {
+    for (const heard of [['ʃ', 'a', 'm'], ['s', 'j', 'a', 'm'], ['s', 'i', 'j', 'a', 'm']]) expect(compare(toPhones('siyam'), heard).score).toBe(1);
+    expect(compare(toPhones('Pasensya na'), ['p', 'a', 's', 'ɛ', 'n', 'ʃ', 'a', 'n', 'a']).score).toBe(1);
+    expect(compare(toPhones('siyam'), ['s', 'a', 'm']).score).toBeLessThan(1);
   });
 
   it('puts an optional catch before word-initial vowels and between vowels', () => {
@@ -92,6 +93,14 @@ describe('groupTokens', () => {
     expect(groupTokens(['g', 'a', 'ː'])).toEqual(['ɡ', 'aː']);
   });
 
+  it('drops a modifier the recording starts on, with no sound before it to join', () => {
+    expect(groupTokens(['\u032a', 'u', 'm', 'a'])).toEqual(['u', 'm', 'a']);
+  });
+
+  it('splits an r-coloured vowel into the vowel and an r', () => {
+    expect(groupTokens(['n', 'ə', 'm', 'b', 'ə', '˞'])).toEqual(['n', 'ə', 'm', 'b', 'ə', 'ɹ']);
+  });
+
   it("doesn't join a glide across a word break", () => {
     expect(groupTokens(['p', 'o', '▁', 'ʊ', 'n'])).toEqual(['p', 'o', 'ʊ', 'n']);
   });
@@ -108,10 +117,9 @@ describe('soundDistance', () => {
     expect(compare(toPhones('Salamat'), ['s', 'a', 'l', 'a', 'a', 'm', 'a', 't']).score).toBe(1);
   });
 
-  it('treats free variants as the same and o/u as a small slip', () => {
+  it('treats free variants as the same', () => {
     expect(soundDistance('ɾ', 'r')).toBe(0);
     expect(soundDistance('ɛ', 'e')).toBe(0);
-    expect(soundDistance('o', 'u')).toBeLessThan(0.4);
   });
 
   it('marks aspiration and gliding vowels as close, not right', () => {
@@ -137,9 +145,17 @@ describe('compare', () => {
   });
 
   it('finds the sound that was replaced', () => {
-    const c = compare(toPhones('ngayon'), ['n', 'a', 'j', 'o', 'n']);
-    expect(c.sounds[0]).toMatchObject({ verdict: 'off', heard: 'n' });
+    const c = compare(toPhones('pangit'), ['p', 'a', 'n', 'i', 't']);
+    expect(c.sounds[2]).toMatchObject({ verdict: 'off', heard: 'n' });
     expect(c.score).toBeLessThan(1);
+  });
+
+  it('takes "ng" heard as n at the start of a word as nearly right, as the recogniser often hears it so', () => {
+    const c = compare(toPhones('ngayon'), ['n', 'a', 'j', 'o', 'n']);
+    expect(c.sounds[0]).toMatchObject({ verdict: 'close', heard: 'n' });
+    expect(passes(c)).toBe(true);
+    // Only there: inside a word it has to be "ng".
+    expect(compare(toPhones('pangit'), ['p', 'a', 'n', 'i', 't']).sounds[2].verdict).toBe('off');
   });
 
   it('finds missing and extra sounds', () => {
@@ -162,6 +178,55 @@ describe('compare', () => {
     expect(compare(toPhones('po'), ['p', 'o', 'h']).score).toBe(1);
     expect(compare(toPhones('Kain tayo'), ['k', 'a', 'j', 'i', 'n', 't', 'a', 'j', 'o']).score).toBe(1);
     expect(compare(toPhones('Salamat po'), ['s', 'a', 'l', 'a', 'm', 'a', 't', 'ʔ', 'p', 'o']).score).toBe(1);
+  });
+
+  it('passes the ways native speakers say a sound, from region to region and in everyday speech', () => {
+    const right = (text: string, heard: string[]) => compare(toPhones(text), heard).score;
+    // o and u, e and i swap freely.
+    expect(right('Kumusta', ['k', 'o', 'm', 'o', 's', 't', 'a'])).toBe(1);
+    expect(right('babae', ['b', 'a', 'b', 'a', 'i'])).toBe(1);
+    expect(right('lalaki', ['l', 'a', 'l', 'a', 'k', 'ɛ'])).toBe(1);
+    // An unstressed a relaxes towards "uh".
+    expect(right('Salamat', ['s', 'ɐ', 'l', 'a', 'm', 'ə', 't'])).toBe(1);
+    // r and d swap between vowels.
+    expect(right('marami', ['m', 'a', 'd', 'a', 'm', 'i'])).toBe(1);
+    // f said p, v said b.
+    expect(right('pamilya', ['f', 'a', 'm', 'i', 'l', 'j', 'a'])).toBe(1);
+    // A g before p, t, k or s loses its voice.
+    expect(right('magkita', ['m', 'a', 'k', 'k', 'i', 't', 'a'])).toBe(1);
+    // l said as a tapped r is nearly right.
+    expect(compare(toPhones('salamat'), ['s', 'a', 'ɾ', 'a', 'm', 'a', 't']).sounds[2].verdict).toBe('close');
+    // So is an English r, as in "number" said the English way.
+    expect(compare(toPhones('namber'), ['n', 'a', 'm', 'b', 'ɛ', 'ɹ']).sounds[5].verdict).toBe('close');
+  });
+
+  it('passes "diyan" said "dyan" or "jan", and "puwede" said "pwede"', () => {
+    for (const heard of [['d', 'i', 'j', 'a', 'n'], ['d', 'j', 'a', 'n'], ['dʒ', 'a', 'n']]) expect(compare(toPhones('diyan'), heard).score).toBe(1);
+    expect(compare(toPhones('dyan'), ['dʒ', 'a', 'n']).score).toBe(1);
+    expect(compare(toPhones('Dyan lang.'), ['dʒ', 'a', 'n', 'l', 'a', 'ŋ']).score).toBe(1);
+    expect(compare(toPhones('puwede'), ['p', 'w', 'ɛ', 'd', 'ɛ']).score).toBe(1);
+    expect(compare(toPhones('tiyo'), ['tʃ', 'o']).score).toBe(1);
+    // Said "d", the y has to be there: "dan" isn't "diyan".
+    expect(compare(toPhones('diyan'), ['d', 'a', 'n']).score).toBeLessThan(1);
+    // However sure the recogniser was of it.
+    expect(passes(judge(['diyan'], { sounds: ['d', 'a', 'n'], odds: unpackOdds('|d900||a900||n900|') }).comparison)).toBe(false);
+  });
+
+  it("doesn't blend a sound with a y that starts the next word", () => {
+    expect(toPhones('bukas yung').find((p) => p.ipa === 's')?.also).toBeUndefined();
+    expect(compare(toPhones('bukas yung'), ['b', 'u', 'k', 'a', 'ʃ', 'u', 'ŋ']).score).toBeLessThan(1);
+  });
+
+  it('counts a sound the recogniser nearly wrote instead as heard', () => {
+    // Torn between n and l at the start of "lang".
+    expect(compare(toPhones('lang'), ['n', 'a', 'ŋ'], [['l'], [], []]).score).toBe(1);
+    expect(compare(toPhones('lang'), ['n', 'a', 'ŋ']).score).toBeLessThan(1);
+  });
+
+  it('still fails a different word, even one a sound away', () => {
+    expect(passes(judge(['ba'], { sounds: ['p', 'a'] }).comparison)).toBe(false);
+    expect(passes(judge(['dito'], { sounds: ['d', 'o', 'o', 'n'] }).comparison)).toBe(false);
+    expect(passes(judge(['Salamat'], { sounds: ['k', 'a', 'l', 'a', 'm', 'a', 'n', 's', 'i'] }).comparison)).toBe(false);
   });
 
   it("doesn't penalise leaving out an optional catch", () => {
@@ -222,20 +287,45 @@ describe('coach', () => {
 
   it('gives one tip per kind of mistake, at most two', () => {
     const text = 'Magandang umaga';
-    const heard = ['m', 'ə', 'ɡ', 'a', 'n', 'd', 'a', 'n', 'u', 'm', 'ə', 'ɡ', 'ə'];
+    const heard = ['m', 'ɛ', 'ɡ', 'a', 'n', 'd', 'a', 'n', 'u', 'm', 'ɛ', 'ɡ', 'ɛ'];
     const tips = coach(text, compare(toPhones(text), heard));
     expect(tips.map((t) => t.letters)).toEqual(['a', 'ng']);
     expect(tips[0].text).toContain('father');
   });
 
   it('puts sounds that were off before ones that were close', () => {
-    const text = 'po ngayon';
-    const tips = coach(text, compare(toPhones(text), ['pʰ', 'o', 'n', 'a', 'j', 'o', 'n']));
+    const text = 'po pangit';
+    const tips = coach(text, compare(toPhones(text), ['pʰ', 'o', 'p', 'a', 'n', 'i', 't']));
     expect(tips[0].letters).toBe('ng');
   });
 
   it('has nothing to say about a perfect attempt', () => {
     const text = 'Salamat';
     expect(coach(text, compare(toPhones(text), ['s', 'a', 'l', 'a', 'm', 'a', 't']))).toEqual([]);
+  });
+});
+
+describe('likelihood', () => {
+  // "pero" as the recogniser often hears it: torn on the p while the word starts, sure of the rest.
+  const pero: Odds = [[], [['p', 0.19], ['d', 0.05]], [['p', 0.1]], [['ɛ', 0.54], ['e', 0.32]], [], [['ɾ', 0.8]], [], [['o', 0.9]], []];
+
+  it('packs odds into a line of text and back', () => {
+    expect(packOdds(pero)).toBe('|p190 d50|p100|ɛ540 e320||ɾ800||o900|');
+    expect(unpackOdds(packOdds(pero))).toEqual(pero);
+  });
+
+  it('finds the word the recording most likely is, even with a sound only half heard', () => {
+    const own = likelihood(toPhones('pero'), pero);
+    expect(own).toBeGreaterThan(-1);
+    for (const other of ['pera', 'bero', 'kero', 'Oo']) expect(likelihood(toPhones(other), pero)).toBeLessThan(own);
+    expect(likelihood(toPhones('pera'), pero)).toBeLessThan(-1);
+  });
+
+  it('passes a word whose first sound the recogniser missed, when it was likely there', () => {
+    const heard = { sounds: ['ɛ', 'ɾ', 'o'], odds: pero };
+    expect(passes(judge(['pero'], { sounds: heard.sounds }).comparison)).toBe(false);
+    expect(passes(judge(['pero'], heard).comparison)).toBe(true);
+    // A different word, with the same odds, still fails.
+    expect(passes(judge(['pera'], heard).comparison)).toBe(false);
   });
 });

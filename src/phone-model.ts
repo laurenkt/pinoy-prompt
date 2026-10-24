@@ -12,7 +12,7 @@ import * as ort from 'onnxruntime-web/wasm';
 import mjsUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs?url';
 import wasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
 import { fbank, NUM_MEL_BINS } from './fbank';
-import { groupTimed, type TimedToken } from './phonetics';
+import { groupTimed, ODDS_KEPT, soundToken, type Odds, type TimedToken } from './phonetics';
 import TOKENS from './phone-tokens.json';
 
 import { CACHE, DownloadError, MODEL_URL } from './model-cache';
@@ -20,12 +20,21 @@ import { CACHE, DownloadError, MODEL_URL } from './model-cache';
 export { MODEL_URL, modelDownloaded } from './model-cache';
 
 const MODEL_BYTES = 70677672;
+/**
+ * How likely a sound the recogniser didn't write must have been, at some moment while it heard the one it
+ * did, to count as nearly written: an l it was torn on between n and l was likely said l.
+ */
+const RUNNER_UP_ODDS = 0.1;
 
 export interface Recognition {
   /** The sounds heard, in IPA. */
   sounds: string[];
   /** When each sound was heard, in seconds from the start of the recording. */
   timing: { start: number; end: number }[];
+  /** For each sound, others the recogniser nearly wrote in its place (see RUNNER_UP_ODDS). */
+  runnersUp: string[][];
+  /** The sounds it thought likely at each moment, for judging how likely the recording is a card (`likelihood`). */
+  odds: Odds;
   /** The log mel features the model heard: NUM_MEL_BINS values per 10 ms frame, for drawing. */
   features: { data: Float32Array; frames: number };
 }
@@ -171,7 +180,7 @@ export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise
 export async function recognise(session: ort.InferenceSession, samples: Float32Array): Promise<Recognition> {
   const features = fbank(samples);
   const { data, frames } = features;
-  if (frames === 0) return { sounds: [], timing: [], features };
+  if (frames === 0) return { sounds: [], timing: [], runnersUp: [], odds: [], features };
   const outputs = await session.run({
     x: new ort.Tensor('float32', data, [1, frames, NUM_MEL_BINS]),
     x_lens: new ort.Tensor('int64', BigInt64Array.from([BigInt(frames)]), [1]),
@@ -192,5 +201,27 @@ export async function recognise(session: ort.InferenceSession, samples: Float32A
     previous = best;
   }
   const sounds = groupTimed(tokens);
-  return { sounds: sounds.map((s) => s.sound), timing: sounds.map(({ start, end }) => ({ start, end })), features };
+  const floor = Math.log(RUNNER_UP_ODDS);
+  const runnersUp = sounds.map(({ sound, start, end }) => {
+    const nearly = new Set<string>();
+    for (let t = Math.round(start / stepSeconds); t < Math.round(end / stepSeconds); t++) {
+      for (let v = 1; v < vocab; v++) {
+        const token = soundToken(TOKENS[v]);
+        // Not the parts of the sound itself (the p of a pʰ, the o of an oʊ), which would hide what made it different.
+        if (token && !sound.includes(token) && values[t * vocab + v] >= floor) nearly.add(token);
+      }
+    }
+    return [...nearly];
+  });
+  const odds: Odds = [];
+  for (let t = 0; t < steps; t++) {
+    const moment: [string, number][] = [];
+    for (let v = 1; v < vocab; v++) {
+      const token = soundToken(TOKENS[v]);
+      const p = Math.exp(values[t * vocab + v]);
+      if (token && p >= ODDS_KEPT) moment.push([token, Math.round(p * 1000) / 1000]);
+    }
+    odds.push(moment);
+  }
+  return { sounds: sounds.map((s) => s.sound), timing: sounds.map(({ start, end }) => ({ start, end })), runnersUp, odds, features };
 }

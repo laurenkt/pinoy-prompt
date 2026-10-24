@@ -78,20 +78,11 @@ function adviceFor(r: SoundResult, letters: string): string | null {
   if (STOPS.includes(want) && heard.includes('ʰ')) {
     return `Say "${letters}" without a puff of air, like the "${want}" in "s${want}in" rather than "${want}in".`;
   }
-  if (want === 'o' && (isGlidingVowel(heard) || heard === 'u' || heard === 'ʊ')) {
+  if (want === 'o' && isGlidingVowel(heard)) {
     return 'Keep the "o" pure and steady, with rounded lips. Don\'t let it slide into "w" like English "go".';
   }
-  if ((want === 'ɛ' || want === 'e') && (isGlidingVowel(heard) || heard === 'i' || heard === 'ɪ')) {
+  if ((want === 'ɛ' || want === 'e') && isGlidingVowel(heard)) {
     return 'Keep the "e" short and open, like "bed". Don\'t let it slide into "ay" like English "day".';
-  }
-  if (want === 'a' && ['ə', 'ʌ', 'æ', 'ɐ'].includes(heard)) {
-    return 'Open your mouth wide for every "a", like "father", even in unstressed syllables. Don\'t soften it to "uh".';
-  }
-  if (want === 'i' && heard === 'ɪ') {
-    return 'Make the "i" a full "ee", as in "see", not the short "i" in "sit".';
-  }
-  if (want === 'u' && heard === 'ʊ') {
-    return 'Make the "u" a full "oo", as in "food".';
   }
   return null;
 }
