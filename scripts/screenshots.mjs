@@ -88,6 +88,8 @@ async function speakResult(page, mistakes) {
   await drillOnlySpeak(page);
   await page.click('.speak .btn.mic');
   await page.waitForSelector('.sound-results');
+  // Heard exactly right, the ring is full and holds a check.
+  if (!mistakes) await page.waitForSelector('.dial .icon', { timeout: 1000 });
 }
 
 /** How to reach each screen from Home. */
