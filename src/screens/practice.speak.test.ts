@@ -77,16 +77,27 @@ describe('Speak mode', () => {
       button("I'm done").click();
       await flush();
     };
-    // Missed, then moved on: one more answer needing help, asked to be said, and no other way.
-    let root = practiceScreen(app, mumble);
+    // Nothing recognised says nothing about the word.
+    let root = practiceScreen(app, deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition([]) }) }));
+    document.body.replaceChildren(root);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    await say();
+    expect(Object.values(app.progress.cards).some((c) => c.help)).toBe(false);
+    // Missed: one more answer needing help, asked to be said and no other way, kept as it happens and once a question.
+    root = practiceScreen(app, mumble);
     document.body.replaceChildren(root);
     await flush();
     drillScope(root, ['speak']);
     await flush();
     const word = asked();
     await say();
-    expect(app.progress.cards[word].help).toBeUndefined();
-    button('Next').click();
+    expect(app.progress.cards[word].help).toEqual({ speak: 1 });
+    button('Try again').click();
+    recorder.onListening?.();
+    button("I'm done").click();
+    await flush();
     expect(app.progress.cards[word].help).toEqual({ speak: 1 });
     // Said right first time: one off.
     for (const id of KNOWN) app.progress.cards[id].help = { speak: 1 };

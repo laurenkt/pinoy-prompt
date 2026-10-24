@@ -267,8 +267,8 @@ export function drillWeight(state: CardState, now: number): number {
 }
 
 /** How many answers asked this way needed help, less those got right unaided since (CardState.help). */
-export function drillHelp(state: CardState, way: DrillWay): number {
-  return state.help?.[way] ?? 0;
+export function drillHelp(state: CardState | undefined, way: DrillWay): number {
+  return state?.help?.[way] ?? 0;
 }
 
 /** Whether a card's schedule puts it in the focus part of a drill round: still being learned, or met in the last few days and not yet held. */
@@ -299,6 +299,7 @@ export function pickDrillCard(
   const pool = Object.entries(progress.cards).flatMap(([id, state]) => {
     const card = getCard(id);
     const asks = card ? ways(card) : [];
+    if (asks.length === 0) return [];
     const base = drillWeight(state, now) / asks.length;
     const settling = settlingIn(state, now);
     return asks.map((way) => {

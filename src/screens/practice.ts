@@ -13,16 +13,13 @@ import { guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionV
 import { quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
-type Mode = DrillWay;
-
-
 /**
  * The kind of question each way of asking a guide counts as: filling a sentence's gap is reading it, building a
  * sentence from the English is recalling it. Guides aren't heard or said.
  */
-const GUIDE_MODES: Record<GuideFormat, Mode> = { gap: 'read', build: 'recall' };
+const GUIDE_MODES: Record<GuideFormat, DrillWay> = { gap: 'read', build: 'recall' };
 
-const MODES: { id: Mode; title: string }[] = [
+const MODES: { id: DrillWay; title: string }[] = [
   { id: 'listen', title: 'Listen' },
   { id: 'read', title: 'Read' },
   { id: 'recall', title: 'Recall' },
@@ -30,11 +27,11 @@ const MODES: { id: Mode; title: string }[] = [
 ];
 
 /** The kinds of question a round may ask. Kept across visits, as the Library's filter is, and back to all of them when the app opens. */
-let scope = new Set<Mode>(MODES.map((m) => m.id));
+let scope = new Set<DrillWay>(MODES.map((m) => m.id));
 
 interface Question {
   card: Card;
-  mode: Mode;
+  mode: DrillWay;
   /** For a guide, its question as it's asked; `choices` is then empty. */
   guide?: GuideQuestion;
   choices: Card[];
@@ -82,11 +79,11 @@ const askOpenAi: MeaningJudge = async (answer, card, language) => {
 };
 
 /** What a typed answer to the question is given in: the meaning when listening, the Tagalog when recalling. */
-const languageOf = (mode: Mode): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
+const languageOf = (mode: DrillWay): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
 const answerLanguage = (q: Question): AnswerLanguage => languageOf(q.mode);
 
 /** The kinds of question a card can be asked as. */
-function modesFor(card: Card): Mode[] {
+function modesFor(card: Card): DrillWay[] {
   return isVocab(card) ? MODES.map((m) => m.id) : guideFormats(card).map((f) => GUIDE_MODES[f]);
 }
 
@@ -140,7 +137,7 @@ export function practiceScreen(
   const lastDrill = new Map<string, Drill>();
   let speak: SpeakPanel | null = null;
   let spokenRight = false;
-  /** An attempt at the current spoken question was judged wrong. */
+  /** An attempt at the current spoken question was heard and judged wrong. */
   let spokeWrong = false;
   /** Counting down to the next question after a right answer. */
   let auto: Countdown | null = null;
@@ -161,7 +158,7 @@ export function practiceScreen(
   holdOnTap(root, hold);
 
   /** Why a kind of question can't be asked right now, if it can't: the mic or sound may have gone off mid-round, here or in another tab. */
-  function unavailable(mode: Mode): string | null {
+  function unavailable(mode: DrillWay): string | null {
     if (mode === 'listen' && !canListen) return 'Listen needs a voice, and this device has none.';
     if (mode === 'listen' && !app.progress.settings.sound) return 'Listen is off while the sound is off.';
     if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
@@ -171,7 +168,7 @@ export function practiceScreen(
   }
 
   /** The kinds in scope that can be asked right now, before the speaking model is taken into account. */
-  function chosen(): Mode[] {
+  function chosen(): DrillWay[] {
     return MODES.map((m) => m.id).filter((m) => scope.has(m) && unavailable(m) === null);
   }
 
@@ -180,10 +177,10 @@ export function practiceScreen(
    * to be on the device, so a round never stops for a download, unless Speak is all that's chosen: then it asks for it.
    * When nothing in scope can be asked (only Listen, then the sound goes off), it falls back to everything that can.
    */
-  function modes(): Mode[] {
+  function modes(): DrillWay[] {
     const picks = chosen();
     if (picks.length === 1 && picks[0] === 'speak') return picks;
-    const ready = (m: Mode) => m !== 'speak' || speakReady || (modelFound && micHeld);
+    const ready = (m: DrillWay) => m !== 'speak' || speakReady || (modelFound && micHeld);
     const ways = picks.filter(ready);
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
@@ -282,12 +279,16 @@ export function practiceScreen(
       speak = speakPanel(q.card, {
         say: (slow) => sayCard(q, slow),
         silence: () => stop(),
-        onAttempt: (right) => {
-          if (!right) spokeWrong = true;
+        onAttempt: (right, heard) => {
+          // A miss heard as some other sounds comes up more to be said in later rounds, counted once a question, as it
+          // happens. Nothing recognised says nothing about the word. Said right first time, it takes one off.
+          if (!right && heard && !spokeWrong && !spokenRight) {
+            spokeWrong = true;
+            noteHelp(q, true);
+          }
           if (!right || spokenRight) return;
           spokenRight = true;
-          // Said right, but only after a miss, it still needed the practice.
-          noteHelp(q, spokeWrong);
+          if (!spokeWrong) noteHelp(q, false);
           void chime();
           // Pick what's next now, so its word loads while the coaching is up.
           settle(true);
@@ -543,9 +544,6 @@ export function practiceScreen(
   function advance(): void {
     hold();
     stopListening();
-    // Moved past without saying it right, after trying: it comes up more to be said in later rounds. Not tried (or not
-    // heard at all), nothing is known.
-    if (current?.mode === 'speak' && !spokenRight && spokeWrong) noteHelp(current, true);
     settle(spokenRight);
     done++;
     previous = current;
@@ -585,7 +583,7 @@ export function practiceScreen(
     draw();
   }
 
-  function toggleScope(mode: Mode): void {
+  function toggleScope(mode: DrillWay): void {
     // The last kind left in that can be asked stays on, so the round asks what was chosen.
     const picks = chosen();
     if (picks.length === 1 && picks[0] === mode) return;
