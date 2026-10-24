@@ -3,7 +3,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import { VOCAB, getCard, type Card } from './deck';
-import { canTypeMeaning, judgeMeaning, matchesMeaning, matchesTagalog, meanings, repeatsTagalog, words } from './meaning';
+import { canTypeMeaning, judgeMeaning, matchesMeaning, matchesTagalog, meanings, repeatsTagalog, swapsTagalog, words } from './meaning';
 
 const card = (id: string) => getCard(id)!;
 
@@ -58,6 +58,8 @@ describe('matching a typed meaning on the device', () => {
     ['salamat', ''],
     ['salamat', '?!'],
     ['lola', 'grandfather'],
+    // Two letters off "thursday", but one off "thirsty", which the deck also uses.
+    ['huwebes', 'thirstay'],
     ['meron', 'three'],
     ['walo', 'eighty'],
     ['siya', 'he or they'],
@@ -200,6 +202,9 @@ describe('checking typed Tagalog', () => {
     ['dahan-dahan', 'dahan-dahan lang'],
     ['maraming-salamat', 'salamat'],
     ['kumusta', 'salamat'],
+    ['magandang-umaga', 'maraming umaga'],
+    // Two letters off "magandang", but one off "maanghang" (spicy).
+    ['magandang-umaga', 'maganghang umaga'],
   ])('%s: "%s" is not, or not for sure', (id, answer) => {
     expect(matchesTagalog(answer, card(id))).toBe(false);
   });
@@ -224,6 +229,41 @@ describe('checking typed Tagalog', () => {
     expect(ask).toHaveBeenCalledWith('traffic', card('trapik'), 'tl');
     expect(await judgeMeaning('salamat nang marami', card('maraming-salamat'), ask, 'tl')).toEqual({ right: true });
     expect(ask).toHaveBeenCalledWith('salamat nang marami', card('maraming-salamat'), 'tl');
+  });
+});
+
+describe('telling a mixed-up Tagalog word from a typo', () => {
+  it.each([
+    ['magandang-umaga', 'maraming umaga'],
+    ['magandang-umaga', 'Maraming umaga po'],
+    ['maraming-salamat', 'magandang salamat'],
+    ['kumanan-ka', 'Kumaliwa ka.'],
+    ['opo', 'oo'],
+  ])('%s: "%s" swaps in another word', (id, answer) => {
+    expect(swapsTagalog(answer, card(id))).toBe(true);
+  });
+
+  it.each([
+    ['magandang-umaga', 'magandng umaga'],
+    ['magandang-umaga', 'Magandang umaga po'],
+    ['maraming-salamat', 'salamat nang marami'],
+    ['magandang-umaga', 'maraming hapon'],
+    // Both say yes; the "po" may be added.
+    ['oo', 'opo'],
+  ])('%s: "%s" does not', (id, answer) => {
+    expect(swapsTagalog(answer, card(id))).toBe(false);
+  });
+
+  it("turns a swapped word down without asking OpenAI, which can take it for a typo", async () => {
+    const ask = vi.fn(async () => true);
+    expect(await judgeMeaning('maraming umaga', card('magandang-umaga'), ask, 'tl')).toEqual({ right: false });
+    expect(ask).not.toHaveBeenCalled();
+    // A typo is still right, on the device.
+    expect(await judgeMeaning('magandng umaga', card('magandang-umaga'), ask, 'tl')).toEqual({ right: true });
+    expect(ask).not.toHaveBeenCalled();
+    // Nearer another word than the card's, it's left to OpenAI.
+    await judgeMeaning('maganghang umaga', card('magandang-umaga'), ask, 'tl');
+    expect(ask).toHaveBeenCalledWith('maganghang umaga', card('magandang-umaga'), 'tl');
   });
 });
 
