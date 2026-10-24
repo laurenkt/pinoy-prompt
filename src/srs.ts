@@ -100,12 +100,15 @@ export function isMature(card: CardState): boolean {
   return card.interval >= 21;
 }
 
-/** Short human label for an interval, e.g. "1m", "3d", "2mo". */
-export function formatInterval(days: number): string {
+/** Short human label for an interval, e.g. "1m", "3d", "2mo": to the nearest unit, or with `up`, rounded up. */
+export function formatInterval(days: number, { up = false } = {}): string {
+  const round = up ? Math.ceil : Math.round;
   if (days <= 0) return '1m';
-  if (days < 30) return `${Math.round(days)}d`;
-  if (days < 365) return `${Math.round(days / 30)}mo`;
-  return `${round1(days / 365)}y`;
+  if (days < 30) return `${round(days)}d`;
+  const months = round(days / 30);
+  // Rounded up, the last days of a year would say "13mo".
+  if (days < 365 && months <= 12) return `${months}mo`;
+  return `${up ? Math.ceil(days / 36.5) / 10 : round1(days / 365)}y`;
 }
 
 /** Local midnight a whole number of days after (or before) the day of `now`. */

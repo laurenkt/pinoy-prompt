@@ -170,6 +170,8 @@ async function start(): Promise<void> {
     replaceContents(app.progress, progress);
     applyAudioMode(app.progress.settings);
     showDueBadge(app.progress, Date.now());
+    // Home's Study button and chart say what's due as of when they were drawn (as on coming back, above).
+    if (shown?.name === 'home') render(shown);
   });
   try {
     replaceContents(app.progress, await loadDurable(Date.now()));

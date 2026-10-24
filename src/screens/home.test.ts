@@ -46,9 +46,10 @@ describe('Study button', () => {
     });
 
     /** Home on show, with time moved on by `advance`. */
-    function open(wait: number) {
+    function open(wait: number, setup: (app: ReturnType<typeof caughtUp>) => void = () => {}) {
       vi.useFakeTimers();
       const app = caughtUp(wait);
+      setup(app);
       let now = app.now();
       app.now = () => now;
       const root = homeScreen(app);
@@ -76,28 +77,36 @@ describe('Study button', () => {
     });
 
     it("offers the new day's cards after midnight", () => {
-      vi.useFakeTimers();
-      const app = caughtUp(400 * 24 * HOUR);
-      app.progress.settings.dailyNew = 8;
-      app.progress.today.newCount = 8;
-      let now = app.now();
-      app.now = () => now;
-      const root = homeScreen(app);
-      document.body.append(root);
+      const { root, advance } = open(400 * 24 * HOUR, (app) => {
+        app.progress.settings.dailyNew = 8;
+        app.progress.today.newCount = 8;
+      });
       expect(root.querySelector('.study-btn')?.classList.contains('study-caught-up')).toBe(true);
-      now += 25 * HOUR;
-      vi.advanceTimersByTime(25 * HOUR);
+      advance(25 * HOUR);
       expect(root.querySelector('.study-btn')?.classList.contains('study-learn')).toBe(true);
+    });
+
+    it('keeps the same button, so focus on it stays', () => {
+      const { root, advance } = open(25 * 60 * 1000);
+      const button = root.querySelector<HTMLButtonElement>('.study-btn')!;
+      button.focus();
+      advance(60 * 1000);
+      expect(root.querySelector('.study-btn')).toBe(button);
+      expect(document.activeElement).toBe(button);
     });
 
     it('stops once Home is left', () => {
       const { root, advance } = open(25 * 60 * 1000);
-      const button = root.querySelector('.study-btn');
       document.body.replaceChildren();
       advance(60 * 1000);
-      expect(root.querySelector('.study-btn')).toBe(button);
+      expect(kicker(root)).toBe('Next in 25m');
       expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('leaves only one timer when Home is drawn again', () => {
+      open(25 * 60 * 1000);
+      homeScreen(caughtUp(25 * 60 * 1000));
+      expect(vi.getTimerCount()).toBe(1);
     });
   });
 });
-

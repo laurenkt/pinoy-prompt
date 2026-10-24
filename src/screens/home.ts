@@ -1,4 +1,5 @@
 import type { App } from '../app';
+import { showDueBadge } from '../badge';
 import {
   MIN_MEASURED_REVIEWS,
   STRENGTHS,
@@ -11,6 +12,7 @@ import {
   type Strength,
 } from '../memory';
 import { MAX_LEARNING, learningCount, newCardsLeftToday, nextStudyAt, studyQueue, upcomingNewCards } from '../session';
+import { formatInterval } from '../srs';
 import { rollDay } from '../store';
 import { h, icon, settingsToggle } from '../ui';
 import { growthChart } from './growth-chart';
@@ -96,27 +98,35 @@ function waitLabel(ms: number): string {
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.ceil(minutes / 60);
   if (hours < 24) return `${hours}h`;
-  const days = Math.ceil(hours / 24);
-  if (days < 30) return `${days}d`;
-  // Not formatInterval, which rounds to the nearest month: 40 days would say "1mo".
-  if (days < 360) return `${Math.ceil(days / 30)}mo`;
-  return `${Math.ceil(days / 36.5) / 10}y`;
+  return formatInterval(Math.ceil(hours / 24), { up: true });
 }
 
+/** The one Home's Study button waits on, so a Home drawn again (or left) doesn't leave an older one running. */
+let studyTimer: ReturnType<typeof setTimeout> | undefined;
+
 /**
- * The Study button, drawn again in place whenever what it says changes (a card falls due, the wait ticks down, a new
- * day brings new cards) for as long as Home is on show, so it never says "Next in 25m" half an hour later.
+ * The Study button, brought up to date in place whenever what it says changes (a card falls due, the wait ticks
+ * down, a new day brings new cards) for as long as Home is on show, so it never says "Next in 25m" half an hour later.
+ * In place, so a finger or focus on it stays there.
  */
 function liveStudyButton(app: App, isFirstRun: boolean): HTMLElement {
+  clearTimeout(studyTimer);
   const { el, changesIn } = studyButton(app, isFirstRun);
+  const wait = (ms: number | null) => {
+    if (ms !== null) studyTimer = setTimeout(check, ms);
+  };
   const check = () => {
     if (!el.isConnected) return;
     const next = studyButton(app, isFirstRun);
-    if (next.el.className === el.className && next.el.textContent === el.textContent) {
-      if (next.changesIn !== null) setTimeout(check, next.changesIn);
-    } else el.replaceWith(liveStudyButton(app, isFirstRun));
+    if (next.el.className !== el.className || next.el.textContent !== el.textContent) {
+      el.className = next.el.className;
+      el.replaceChildren(...next.el.childNodes);
+      // The icon's number is Home's due count, which just changed.
+      showDueBadge(app.progress, app.now());
+    }
+    wait(next.changesIn);
   };
-  if (changesIn !== null) setTimeout(check, changesIn);
+  wait(changesIn);
   return el;
 }
 
