@@ -454,7 +454,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
     const r = 26;
     const c = 2 * Math.PI * r;
     const el = h('div', { class: 'dial', role: 'img', 'aria-label': label });
-    el.innerHTML = `<svg viewBox="0 0 64 64" aria-hidden="true"><circle class="dial-track" cx="32" cy="32" r="${r}"/><circle class="dial-fill" cx="32" cy="32" r="${r}" stroke-dasharray="${c * score} ${c}" transform="rotate(-90 32 32)"/></svg><span>${Math.round(score * 100)}<small>%</small></span>`;
+    el.innerHTML = `<svg viewBox="0 0 64 64" aria-hidden="true"><circle class="dial-track" cx="32" cy="32" r="${r}"/><circle class="dial-fill" cx="32" cy="32" r="${r}" stroke-dasharray="${c * score} ${c}" transform="rotate(-90 32 32)"/></svg>`;
+    const pct = Math.round(score * 100);
+    // "100%" is too wide for the middle of the ring, so a full ring holds a check.
+    el.append(pct === 100 ? h('span', null, icon('check')) : h('span', null, `${pct}`, h('small', null, '%')));
     return el;
   }
 

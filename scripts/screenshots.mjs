@@ -52,6 +52,44 @@ async function quiet(page) {
   await page.click('.split-toggle [aria-label="Sound off"]');
 }
 
+/** A spoken attempt's results (see 'speak-result'): heard with a vowel and a consonant off, or exactly right. */
+async function speakResult(page, mistakes) {
+  await page.evaluate(async (mistakes) => {
+    const { defaultDeps } = await import('/src/screens/speak.ts');
+    const { toPhones } = await import('/src/phonetics.ts');
+    const { NUM_MEL_BINS } = await import('/src/fbank.ts');
+    const swap = { a: 'ɛ', i: 'ɛ', u: 'o', o: 'u', ɛ: 'i', s: 'ʃ', ŋ: 'n', ɾ: 'd', k: 'g', t: 'd', p: 'b', l: 'ɾ', m: 'n', n: 'm', b: 'p', d: 't', g: 'k', h: 'k', w: 'b', j: 'dʒ' };
+    const vowels = new Set(['a', 'i', 'u', 'o', 'ɛ']);
+    const samples = new Float32Array(16000 * 2).map((_, i) => Math.sin(i / 7) * 0.2 * Math.sin((i / 32000) * Math.PI));
+    Object.assign(defaultDeps, {
+      recordingSupported: () => true,
+      modelDownloaded: async () => true,
+      modelKnownDownloaded: () => true,
+      microphoneAllowed: () => true,
+      holdMicrophone: async () => true,
+      record: () => ({ audio: Promise.resolve({ samples, speech: true }), stop() {}, cancel() {} }),
+      loadPhoneModel: async () => ({
+        async recognise() {
+          const sounds = toPhones(document.querySelector('.prompt .tl').textContent).filter((p) => !p.optional).map((p) => p.ipa);
+          const vowel = sounds.findIndex((s) => vowels.has(s));
+          const consonant = sounds.findLastIndex((s) => !vowels.has(s) && swap[s]);
+          if (mistakes && vowel >= 0) sounds[vowel] = swap[sounds[vowel]];
+          if (mistakes && consonant >= 0) sounds[consonant] = swap[sounds[consonant]];
+          const frames = 200;
+          return {
+            sounds,
+            timing: sounds.map((_, i) => ({ start: 0.3 + i * 0.12, end: 0.38 + i * 0.12 })),
+            features: { data: new Float32Array(frames * NUM_MEL_BINS).map((_, i) => Math.sin(i / 9) * 3 - 4), frames },
+          };
+        },
+      }),
+    });
+  }, mistakes);
+  await drillOnlySpeak(page);
+  await page.click('.speak .btn.mic');
+  await page.waitForSelector('.sound-results');
+}
+
 /** How to reach each screen from Home. */
 const SCREENS = {
   home: async () => {},
@@ -112,42 +150,9 @@ const SCREENS = {
   },
   // A spoken attempt's results, from a drill round asking only to speak, with stand-ins for the microphone and
   // the speech model that hear the word with a vowel and a consonant off.
-  'speak-result': async (page) => {
-    await page.evaluate(async () => {
-      const { defaultDeps } = await import('/src/screens/speak.ts');
-      const { toPhones } = await import('/src/phonetics.ts');
-      const { NUM_MEL_BINS } = await import('/src/fbank.ts');
-      const swap = { a: 'ɛ', i: 'ɛ', u: 'o', o: 'u', ɛ: 'i', s: 'ʃ', ŋ: 'n', ɾ: 'd', k: 'g', t: 'd', p: 'b', l: 'ɾ', m: 'n', n: 'm', b: 'p', d: 't', g: 'k', h: 'k', w: 'b', j: 'dʒ' };
-      const vowels = new Set(['a', 'i', 'u', 'o', 'ɛ']);
-      const samples = new Float32Array(16000 * 2).map((_, i) => Math.sin(i / 7) * 0.2 * Math.sin((i / 32000) * Math.PI));
-      Object.assign(defaultDeps, {
-        recordingSupported: () => true,
-        modelDownloaded: async () => true,
-        modelKnownDownloaded: () => true,
-        microphoneAllowed: () => true,
-        holdMicrophone: async () => true,
-        record: () => ({ audio: Promise.resolve({ samples, speech: true }), stop() {}, cancel() {} }),
-        loadPhoneModel: async () => ({
-          async recognise() {
-            const sounds = toPhones(document.querySelector('.prompt .tl').textContent).filter((p) => !p.optional).map((p) => p.ipa);
-            const vowel = sounds.findIndex((s) => vowels.has(s));
-            const consonant = sounds.findLastIndex((s) => !vowels.has(s) && swap[s]);
-            if (vowel >= 0) sounds[vowel] = swap[sounds[vowel]];
-            if (consonant >= 0) sounds[consonant] = swap[sounds[consonant]];
-            const frames = 200;
-            return {
-              sounds,
-              timing: sounds.map((_, i) => ({ start: 0.3 + i * 0.12, end: 0.38 + i * 0.12 })),
-              features: { data: new Float32Array(frames * NUM_MEL_BINS).map((_, i) => Math.sin(i / 9) * 3 - 4), frames },
-            };
-          },
-        }),
-      });
-    });
-    await drillOnlySpeak(page);
-    await page.click('.speak .btn.mic');
-    await page.waitForSelector('.sound-results');
-  },
+  'speak-result': (page) => speakResult(page, true),
+  // The same, heard exactly right: a full ring.
+  'speak-result-perfect': (page) => speakResult(page, false),
   // The same, with a finger held on the slider three quarters of the way from the middle to the right: the target, fairly loud.
   'speak-result-held': async (page) => {
     await SCREENS['speak-result'](page);
