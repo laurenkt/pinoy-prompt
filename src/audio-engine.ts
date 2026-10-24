@@ -19,6 +19,10 @@ let context: AudioContext | null = null;
 let madeWithMicrophone = false;
 /** When the context was last asked for, by performance.now(). */
 let lastUsed = -Infinity;
+/** Whether the context has just been made or woken, so the phone's output is still starting up. */
+let waking = false;
+/** Until when, in the context's time, the phone's output may still be starting up. */
+let wokenUntil = 0;
 
 function contextClass(): typeof AudioContext | undefined {
   const scope = globalThis as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
@@ -43,8 +47,12 @@ export function audioContext(incidental = false): AudioContext {
   if (!context) {
     context = new (contextClass()!)({ latencyHint: 'interactive' });
     madeWithMicrophone = mic;
+    waking = true;
   }
-  if (context.state !== 'running') void context.resume().catch(() => {});
+  if (context.state !== 'running') {
+    waking = true;
+    void context.resume().catch(() => {});
+  }
   return context;
 }
 
@@ -150,6 +158,23 @@ export function loadClip(url: string): Promise<AudioBuffer> {
 /** Fade in and out over a few milliseconds, so clips and slices don't click. */
 const FADE = 0.012;
 
+/**
+ * How long the phone's output takes to start once the context is made or woken (it's suspended after a while
+ * idle, and closed when the app is hidden). A sound started straight away loses its first moment on an iPhone,
+ * which took the k off "Kailan", so sounds wait this long after a wake. The tap sound doesn't: it's there to be heard
+ * at once, and losing a moment of a click doesn't change it.
+ */
+export const WAKE_SECONDS = 0.12;
+
+/** When a sound may start, in the context's time: a few ms ahead, so a fade-in is scheduled before its first sample, and after a wake. */
+function startTime(ctx: AudioContext, at: number, incidental: boolean): number {
+  if (waking) {
+    waking = false;
+    wokenUntil = ctx.currentTime + WAKE_SECONDS;
+  }
+  return Math.max(ctx.currentTime + 0.005, at, incidental ? 0 : wokenUntil);
+}
+
 export interface Sound {
   /** When it starts, in the context's time. */
   startsAt: number;
@@ -177,8 +202,7 @@ export function playBuffer(buffer: AudioBuffer, { rate = 1, at = 0, fades = true
   source.buffer = buffer;
   source.playbackRate.value = rate;
   source.connect(gain).connect(ctx.destination);
-  // A few ms ahead, so the fade-in is scheduled before the first sample.
-  const t0 = Math.max(ctx.currentTime + 0.005, at);
+  const t0 = startTime(ctx, at, incidental);
   const length = buffer.duration / rate;
   if (fades) {
     gain.gain.setValueAtTime(0, t0);
@@ -217,7 +241,7 @@ export function playBuffer(buffer: AudioBuffer, { rate = 1, at = 0, fades = true
  */
 export function playLive(make: (ctx: AudioContext, t0: number) => { out: AudioNode; end(at: number): void }): Sound {
   const ctx = audioContext();
-  const t0 = ctx.currentTime + 0.005;
+  const t0 = startTime(ctx, 0, false);
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(0, t0);
   gain.gain.linearRampToValueAtTime(1, t0 + FADE);
