@@ -113,7 +113,7 @@ export function stuckExample(plan: TalkPlan): string | null {
 export function mixLevel(known: number): string {
   if (known < 20) return 'at most one Tagalog word or phrase in a sentence';
   if (known < 60) return 'at most two or three Tagalog words or phrases in a sentence';
-  return 'at most a few Tagalog words or phrases in a sentence, keeping most of each sentence English';
+  return 'at most three or four Tagalog words or phrases in a sentence, keeping most of each sentence English';
 }
 
 /**
@@ -137,14 +137,14 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     'Say every Tagalog word as a native Manila speaker would, not with English sounds: pure vowels a, e, i, o, u, never softened to "uh"; ng as one sound, even at the start of a word; a light tapped r; and, where a word has a guide after it, the stress that guide shows in capitals. Never say the guides themselves aloud.',
     '',
     'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below (the one exception is when they ask how to say something): a Tagalog word or phrase stands in for its English meaning inside an English sentence.',
-    'Say what you would naturally say first, then use a listed word only where that sentence already needs its meaning. The list is the Tagalog you may use, not a list to get through: you do not need to use every word, or any particular word, and many sentences will have no Tagalog at all. Never steer the conversation, pick a topic or ask a question just to make room for a word.',
+    'Say what you would naturally say first, then use a listed word only where that sentence already needs its meaning. The list is the Tagalog you may use, not a list to get through: you do not need to use every word, or any particular word, and many sentences will have no Tagalog at all. Never steer the conversation, change the subject or ask a question just to make room for a word. But when a sentence does need the meaning of a listed word, say it in Tagalog rather than English.',
     `Use ${mixLevel(plan.known.length)}; that is a limit, not a target.`,
     'A listed phrase counts as one swap. Apart from short listed greetings and replies, never say a whole sentence in Tagalog. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
     `For example, with ${example(plan)} on the list, say it in place of its English meaning when you are talking about that anyway.`,
     'Only use a Tagalog word where it means exactly what that spot in the sentence needs. Never tack one onto the end of a sentence or question just to fit it in; a plain English sentence is better than a misplaced word.',
     '',
   ];
-  if (firm.length) lines.push(`Tagalog they know well: ${list(firm)}.`);
+  if (firm.length) lines.push(`Tagalog they know well, use it whenever it fits: ${list(firm)}.`);
   if (settling.length) lines.push(`Tagalog they know but are still settling: ${list(settling)}.`);
   if (fresh.length) lines.push(`Tagalog they met in the last day or so; say the English meaning straight after it the first time: ${list(fresh)}.`);
   if (plan.newWord) {
