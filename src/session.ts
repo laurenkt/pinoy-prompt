@@ -3,7 +3,7 @@
 
 import { LEARN_ORDER, VOCAB, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
 import { recallChance } from './memory';
-import { DAY_MS, isDue, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, START_EASE, isDue, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
 
 export type StepKind = 'new' | 'review';
@@ -215,25 +215,41 @@ export function canDrill(progress: Progress): boolean {
 }
 /** Cards met within this long count as new in a drill round, and come up more. */
 const FRESH_MS = 7 * DAY_MS;
+/** Cards met within this long are still settling in, and share the focus part of a round (see pickDrillCard). */
+const SETTLING_MS = 3 * DAY_MS;
+/**
+ * The share of a drill round kept for cards still settling in, so they come up as often in a big deck as in a
+ * small one. Weights alone get spread thinner with every card met.
+ */
+export const FOCUS_SHARE = 0.5;
 
 /**
  * How much a card needs drilling. Every card starts at 1, so the strong ones
  * still turn up now and then; on top of that come how likely it is to have
- * been forgotten, being still learned or recently met, how often it has been
- * forgotten before, and misses this round (`missed`), which count most.
+ * been forgotten, being still learned or recently met, how hard it has been
+ * (forgotten before, or answered Again or Hard, which lowers its ease), and
+ * misses this round (`missed`), which count most.
  */
 export function drillWeight(state: CardState, now: number, missed = 0): number {
   const fading = 1 - recallChance(state, now);
   const learning = state.interval < 1 ? 3 : state.interval < 7 ? 1.5 : 0;
   const fresh = now - state.introduced < FRESH_MS ? 2 : 0;
-  return 1 + 8 * fading + learning + fresh + 2 * Math.min(state.lapses, 3) + 4 * missed;
+  const struggled = Math.min(3, 10 * Math.max(0, START_EASE - state.ease));
+  return 1 + 8 * fading + learning + fresh + struggled + 2 * Math.min(state.lapses, 3) + 4 * missed;
+}
+
+/** Whether a card is in the focus part of a drill round: still being learned, met in the last few days, or missed this round. */
+function settlingIn(state: CardState, now: number, missed = 0): boolean {
+  return state.interval < 1 || now - state.introduced < SETTLING_MS || missed > 0;
 }
 
 /**
  * The next card for a drill round, which runs until the learner stops it: any
  * card met, words and guides alike, that `askable` allows, picked at random by
- * drillWeight. The last few cards asked (`recent`, latest last) sit out while
- * that leaves one to ask. Null with nothing to ask.
+ * drillWeight. About FOCUS_SHARE of the picks are among cards settling in
+ * (settlingIn) while there are any, the rest among every card. The last few
+ * cards asked (`recent`, latest last) sit out while that leaves one to ask.
+ * Null with nothing to ask.
  */
 export function pickDrillCard(
   progress: Progress,
@@ -246,13 +262,25 @@ export function pickDrillCard(
   const pool = Object.entries(progress.cards)
     .map(([id, state]) => ({ card: getCard(id), state }))
     .filter((p): p is { card: Card; state: CardState } => !!p.card && askable(p.card))
-    .map(({ card, state }) => ({ card, w: drillWeight(state, now, missed.get(card.id)) }));
+    .map(({ card, state }) => ({ card, w: drillWeight(state, now, missed.get(card.id)), focus: settlingIn(state, now, missed.get(card.id)) }));
   const keep = Math.min(DRILL_GAP, pool.length - 1);
   const skip = new Set(keep > 0 ? recent.slice(-keep) : []);
   const open = pool.filter((p) => !skip.has(p.card.id));
   if (open.length === 0) return null;
-  let r = random() * open.reduce((sum, p) => sum + p.w, 0);
-  return (open.find((p) => (r -= p.w) <= 0) ?? open[open.length - 1]).card;
+  const focus = open.filter((p) => p.focus);
+  // One draw decides both which part of the round and which card in it.
+  let r = random();
+  let from = open;
+  if (focus.length > 0 && focus.length < open.length) {
+    if (r < FOCUS_SHARE) {
+      from = focus;
+      r /= FOCUS_SHARE;
+    } else {
+      r = (r - FOCUS_SHARE) / (1 - FOCUS_SHARE);
+    }
+  }
+  r *= from.reduce((sum, p) => sum + p.w, 0);
+  return (from.find((p) => (r -= p.w) <= 0) ?? from[from.length - 1]).card;
 }
 
 /** A few more new cards beyond the daily rate, for when the learner wants them. */

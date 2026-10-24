@@ -424,9 +424,32 @@ describe('picking the next card to drill', () => {
     progress.cards.paalam = { ...progress.cards.paalam, introduced: LATER, reviewed: LATER, interval: 0 };
     const seen = counts(progress);
     for (const id of ['oo', 'hindi', 'paalam']) expect(seen.get(id)!).toBeGreaterThan(seen.get('kape')! * 2);
-    // The strong ones come up less than before, but still come up.
+    // The strong ones come up less than before, but still come up, even with two of six cards taking the focus half.
     expect(seen.get('kape')! / 4000).toBeLessThan(before);
-    expect(seen.get('kape')! / 4000).toBeGreaterThan(0.03);
+    expect(seen.get('kape')! / 4000).toBeGreaterThan(0.015);
+  });
+
+  it("gives cards met in the last few days half the round, however many cards are known", () => {
+    // A big deck held for months, and a few words met yesterday that got a good first answer.
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 200), 30);
+    const yesterday = VOCAB_ORDER.slice(200, 205);
+    for (const id of yesterday) {
+      recordAnswer(progress, id, 'good', LATER - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], introduced: LATER - DAY_MS };
+    }
+    const seen = counts(progress);
+    const share = yesterday.reduce((sum, id) => sum + (seen.get(id) ?? 0), 0) / 4000;
+    expect(share).toBeGreaterThan(0.45);
+    // The rest of the round still goes round the others.
+    expect(share).toBeLessThan(0.6);
+  });
+
+  it('asks a card answered Again or Hard in Study more than one that went smoothly', () => {
+    const progress = settledProgress();
+    progress.cards.kape = { ...progress.cards.kape, ease: 2.1 };
+    const seen = counts(progress);
+    expect(seen.get('kape')!).toBeGreaterThan(seen.get('oo')! * 2);
   });
 
   it('drills guides as well as words, as far as the round can ask them', () => {
