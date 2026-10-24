@@ -236,6 +236,33 @@ describe('an attempt', () => {
     expect(dial.querySelector('span')!.textContent).toBe('');
   });
 
+  it('says which syllable to lean on, apart from the score, when the attempt clearly leaned on the other', async () => {
+    heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
+    // Every sound right, but the last "a" the longest, highest and loudest: "sa-la-MAT".
+    const vowel = (length: number, pitch: number, level: number) => ({ length, pitch, level });
+    const consonant = vowel(0.06, 0, -30);
+    const prosody = [consonant, vowel(0.08, 200, -14), consonant, vowel(0.08, 190, -16), consonant, vowel(0.17, 270, -11), consonant];
+    await open('salamat', { loadPhoneModel: async () => ({ recognise: async () => fakeRecognition(heard, prosody) }) });
+    button('Tap and speak').click();
+    mic.events.onListening?.();
+    button("I'm done").click();
+    await flush();
+    expect(text('.feedback strong')).toBe('Tama!');
+    expect(onAttempt).toHaveBeenCalledWith(true);
+    expect(panel.el.querySelector('.dial')!.getAttribute('aria-label')).toBe('100% of the way there');
+    expect(text('.result-card .stress-tip')).toBe('Lean on LAH, not MAHT: higher and longer.');
+  });
+
+  it("doesn't mention stress when it can't tell", async () => {
+    heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
+    await open('salamat');
+    button('Tap and speak').click();
+    mic.events.onListening?.();
+    button("I'm done").click();
+    await flush();
+    expect(panel.el.querySelector('.stress-tip')).toBeNull();
+  });
+
   it('marks the letters that were off and coaches on them', async () => {
     await open('ingat');
     heard = ['i', 'n', 'a', 't']; // "ng" said as "n"

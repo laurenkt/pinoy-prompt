@@ -121,14 +121,16 @@ async function samplesOf(file, rate) {
 
 /**
  * What Speak's recogniser hears in a clip file, as src/clip-sounds.json keeps it: its sounds, the ones it nearly
- * wrote instead (if any), and its odds at each moment (packed into a line of text).
+ * wrote instead (if any), its odds at each moment (packed into a line of text), and how long (ms), high (Hz) and
+ * loud (dB) each sound was, for judging stress (src/stress.ts).
  */
 async function listen(file) {
   const samples = await samplesOf(file, 16000);
   const heard = listening.then(async () => recognise(await (session ??= recogniser()), samples));
   listening = heard.catch(() => {});
-  const { sounds, runnersUp, odds } = await heard;
-  return { sounds, ...(runnersUp.some((r) => r.length) && { runnersUp }), odds: packOdds(odds) };
+  const { sounds, runnersUp, odds, prosody } = await heard;
+  const measured = prosody.map((p) => [Math.round(p.length * 1000), Math.round(p.pitch), Math.round(p.level)]);
+  return { sounds, ...(runnersUp.some((r) => r.length) && { runnersUp }), odds: packOdds(odds), prosody: measured };
 }
 
 /** The spellings Speak takes for each text, from every card that says it (Speak asks words and phrases, not guides). */
@@ -152,8 +154,11 @@ async function listenToClip(text, dir, name) {
   const heard = {};
   for (const suffix of ['', '-slow']) {
     heard[`${name}${suffix}`] = await listen(join(dir, `${name}${suffix}.mp3`));
-    // Only what Speak asks needs its odds.
-    if (!speakAs.has(text)) delete heard[`${name}${suffix}`].odds;
+    // Only what Speak asks needs its odds and measures.
+    if (!speakAs.has(text)) {
+      delete heard[`${name}${suffix}`].odds;
+      delete heard[`${name}${suffix}`].prosody;
+    }
   }
   return { heard, problems: [...new Set(Object.values(heard).flatMap((h) => soundProblems(text, h)))] };
 }
@@ -394,8 +399,11 @@ await Promise.all(
 );
 await rm(work, { recursive: true });
 
-// Clips made before what they sound like was kept, or kept by hand: listened to here, with no key needed.
-const unheard = Object.entries(manifest).flatMap(([text, names]) => (texts.includes(text) && Array.isArray(names) ? names.filter((name) => name && !clipSounds[name]).map((name) => ({ text, name })) : []));
+// Clips made before what they sound like was kept (or, for what Speak asks, how each sound was stressed), or kept by
+// hand: listened to here, with no key needed.
+const unheard = Object.entries(manifest).flatMap(([text, names]) =>
+  texts.includes(text) && Array.isArray(names) ? names.filter((name) => name && (!clipSounds[name] || (speakAs.has(text) && !clipSounds[name].prosody))).map((name) => ({ text, name })) : [],
+);
 if (unheard.length) console.log(`Listening to ${unheard.length} clips not heard yet...`);
 for (const { text, name } of unheard) {
   const { heard, problems } = await listenToClip(text, AUDIO_DIR, name);

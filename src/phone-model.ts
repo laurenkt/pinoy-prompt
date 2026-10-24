@@ -13,6 +13,7 @@ import mjsUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.
 import wasmUrl from '../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm?url';
 import { fbank, NUM_MEL_BINS } from './fbank';
 import { groupTimed, ODDS_KEPT, soundToken, type Odds, type TimedToken } from './phonetics';
+import { contour, soundProsody, type SoundProsody } from './prosody';
 import TOKENS from './phone-tokens.json';
 
 import { CACHE, DownloadError, MODEL_URL } from './model-cache';
@@ -35,6 +36,8 @@ export interface Recognition {
   runnersUp: string[][];
   /** The sounds it thought likely at each moment, for judging how likely the recording is a card (`likelihood`). */
   odds: Odds;
+  /** How long, high and loud each sound was, for judging stress (src/stress.ts). */
+  prosody: SoundProsody[];
   /** The log mel features the model heard: NUM_MEL_BINS values per 10 ms frame, for drawing. */
   features: { data: Float32Array; frames: number };
 }
@@ -180,7 +183,7 @@ export function loadPhoneModel(onProgress?: (fraction: number) => void): Promise
 export async function recognise(session: ort.InferenceSession, samples: Float32Array): Promise<Recognition> {
   const features = fbank(samples);
   const { data, frames } = features;
-  if (frames === 0) return { sounds: [], timing: [], runnersUp: [], odds: [], features };
+  if (frames === 0) return { sounds: [], timing: [], runnersUp: [], odds: [], prosody: [], features };
   const outputs = await session.run({
     x: new ort.Tensor('float32', data, [1, frames, NUM_MEL_BINS]),
     x_lens: new ort.Tensor('int64', BigInt64Array.from([BigInt(frames)]), [1]),
@@ -223,5 +226,6 @@ export async function recognise(session: ort.InferenceSession, samples: Float32A
     }
     odds.push(moment);
   }
-  return { sounds: sounds.map((s) => s.sound), timing: sounds.map(({ start, end }) => ({ start, end })), runnersUp, odds, features };
+  const timing = sounds.map(({ start, end }) => ({ start, end }));
+  return { sounds: sounds.map((s) => s.sound), timing, runnersUp, odds, prosody: soundProsody(contour(samples), timing), features };
 }

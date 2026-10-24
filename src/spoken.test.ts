@@ -7,13 +7,15 @@ import clipSounds from './clip-sounds.json';
 import { VOCAB, type Card } from './deck';
 import { GUIDES } from './guides';
 import { drillSentence } from './session';
-import { englishReadings, judge, lostFirstSound, PASS, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
+import { compare, englishReadings, judge, lostFirstSound, PASS, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
 import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
+import { stressTip } from './coach';
+import { cardStress, leanAgainst, measureStress, UNJUDGED } from './stress';
 
 const CLIPS: Record<string, string[]> = clips;
 /** What Speak's recogniser hears in each clip file, as scripts/generate-audio.mjs listened to it. */
-const HEARD: Record<string, { sounds: string[]; runnersUp?: string[][]; odds?: string }> = clipSounds;
+const HEARD: Record<string, { sounds: string[]; runnersUp?: string[][]; odds?: string; prosody?: number[][] }> = clipSounds;
 /** The clip files in public/audio, by name. */
 const onDisk = new Set(Object.keys(import.meta.glob('../public/audio/*')).map((path) => path.split('/').pop()));
 
@@ -129,4 +131,34 @@ describe('recorded clips, heard by Speak', () => {
     });
     expect(passing.length, passing.join('\n')).toBeLessThan(pairs / 10);
   }, 30_000);
+});
+
+describe('recorded clips, measured for stress', () => {
+  const files = (text: string) => (CLIPS[text] ?? []).flatMap((name) => [name, `${name}-slow`]);
+  /** How long (ms), high (Hz) and loud (dB) each sound in a clip was, as scripts/generate-audio.mjs measured it. */
+  const prosodyOf = (file: string) => (HEARD[file]?.prosody ?? []).map(([ms, pitch, level]) => ({ length: ms / 1000, pitch, level }));
+  const measured = (card: Card) =>
+    files(spokenText(card)).map((file) => ({ file, comparison: compare(toPhones(card.tl), HEARD[file]?.sounds ?? [], HEARD[file]?.runnersUp) }));
+
+  it('has measured every clip Speak asks (run `npm run audio` to measure new ones)', () => {
+    expect(VOCAB.flatMap((card) => files(spokenText(card)).filter((f) => !HEARD[f]?.prosody))).toEqual([]);
+  });
+
+  it("never tells a learner who says a card like its clips to lean on another syllable", () => {
+    const told = VOCAB.flatMap((card) =>
+      measured(card).flatMap(({ file, comparison }) => {
+        const tip = stressTip(cardStress(card, card.tl, comparison, prosodyOf(file)));
+        return tip ? [`${file}: ${tip}`] : [];
+      }),
+    );
+    expect(told).toEqual([]);
+  });
+
+  it("judges stress on exactly the words whose clips all measure as their hint says (else add them to UNJUDGED)", () => {
+    const unsure = VOCAB.filter((card) => {
+      const stresses = measured(card).flatMap(({ file, comparison }) => measureStress(card.tl, card.hint ?? '', comparison, prosodyOf(file)) ?? []);
+      return stresses.length > 0 && stresses.some((s) => leanAgainst(s) > 0);
+    }).map((card) => card.id);
+    expect([...UNJUDGED].sort()).toEqual(unsure.sort());
+  });
 });

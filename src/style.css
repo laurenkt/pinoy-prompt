@@ -1745,6 +1745,14 @@ p {
   opacity: 0.8;
 }
 
+/* Which syllable to lean on, under the word, when an attempt clearly leaned on the other. */
+.result-card .stress-tip {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
 .result-card .dial {
   width: 56px;
   height: 56px;

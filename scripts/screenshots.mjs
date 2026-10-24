@@ -52,9 +52,12 @@ async function quiet(page) {
   await page.click('.split-toggle [aria-label="Sound off"]');
 }
 
-/** A spoken attempt's results (see 'speak-result'): heard with a vowel and a consonant off, or exactly right. */
-async function speakResult(page, mistakes) {
-  await page.evaluate(async (mistakes) => {
+/**
+ * A spoken attempt's results (see 'speak-result'): heard with a vowel and a consonant off, or exactly right. With
+ * `stress`, heard right but leaning on one of the last two vowels (the last, then the one before, by turns).
+ */
+async function speakResult(page, mistakes, stress = false) {
+  await page.evaluate(async ([mistakes, stress]) => {
     const { defaultDeps } = await import('/src/screens/speak.ts');
     const { toPhones } = await import('/src/phonetics.ts');
     const { NUM_MEL_BINS } = await import('/src/fbank.ts');
@@ -76,18 +79,30 @@ async function speakResult(page, mistakes) {
           if (mistakes && vowel >= 0) sounds[vowel] = swap[sounds[vowel]];
           if (mistakes && consonant >= 0) sounds[consonant] = swap[sounds[consonant]];
           const frames = 200;
+          const lastVowels = sounds.flatMap((s, i) => (vowels.has(s) ? [i] : [])).slice(-2);
+          const leanOn = lastVowels[(window.leans = (window.leans ?? 0) + 1) % 2];
+          const plain = { length: 0.1, pitch: 200, level: -16 };
           return {
             sounds,
             timing: sounds.map((_, i) => ({ start: 0.3 + i * 0.12, end: 0.38 + i * 0.12 })),
+            // Measured only for the stress tip: without it, stress isn't judged.
+            prosody: stress ? sounds.map((_, i) => (i === leanOn ? { length: 0.2, pitch: 280, level: -10 } : plain)) : [],
             features: { data: new Float32Array(frames * NUM_MEL_BINS).map((_, i) => Math.sin(i / 9) * 3 - 4), frames },
           };
         },
       }),
     });
-  }, mistakes);
+  }, [mistakes, stress]);
   await drillOnlySpeak(page);
   await page.click('.speak .btn.mic');
   await page.waitForSelector('.sound-results');
+  // Only single words with a judged stress get the tip: move on until one does.
+  for (let tries = 0; stress && !(await page.$('.stress-tip')) && tries < 40; tries++) {
+    await page.click('.result-actions .btn');
+    await page.waitForSelector('.speak .btn.mic');
+    await page.click('.speak .btn.mic');
+    await page.waitForSelector('.sound-results');
+  }
   // Heard exactly right, the ring is full and holds a check.
   if (!mistakes) await page.waitForSelector('.dial .icon', { timeout: 1000 });
 }
@@ -164,6 +179,8 @@ const SCREENS = {
   'speak-result': (page) => speakResult(page, true),
   // The same, heard exactly right: a full ring.
   'speak-result-perfect': (page) => speakResult(page, false),
+  // The same, heard right but leaning on the other syllable than the card's hint: the stress tip under the word.
+  'speak-result-stress': (page) => speakResult(page, false, true),
   // The same, with a finger held on the slider three quarters of the way from the middle to the right: the target, fairly loud.
   'speak-result-held': async (page) => {
     await SCREENS['speak-result'](page);

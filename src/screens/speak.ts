@@ -1,12 +1,13 @@
 // The Speak question: record the learner saying a card, recognise the sounds
 // on the device, and coach them sound by sound.
 
-import { coach, type Tip } from '../coach';
+import { coach, stressTip, type Tip } from '../coach';
 import { holdMicrophone, microphoneAllowed } from '../microphone';
 import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, judge, passes, toPhones, type Comparison } from '../phonetics';
+import { cardStress } from '../stress';
 import { record, RecordError, recordingSupported, warmRecorder, type RecordProblem, type Recording, type Warmth } from '../recorder';
 import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
@@ -76,7 +77,17 @@ type State =
   /** live once the microphone gives sound (onListening): before that, anything said would be lost. */
   | { name: 'recording'; live: boolean; speech: boolean }
   | { name: 'analysing' }
-  | { name: 'result'; text: string; comparison: Comparison; tips: Tip[]; heard: string[]; recognition?: Recognition; samples?: Float32Array }
+  | {
+      name: 'result';
+      text: string;
+      comparison: Comparison;
+      tips: Tip[];
+      /** Which syllable to lean on, when the attempt clearly leaned on the other. */
+      stress?: string | null;
+      heard: string[];
+      recognition?: Recognition;
+      samples?: Float32Array;
+    }
   /** detail is what went wrong in the browser's words, shown small so a failure seen only on one phone can be told apart. */
   | { name: 'problem'; problem: Problem; detail?: string };
 
@@ -271,7 +282,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
       options.onAttempt(isRight(comparison));
-      set({ name: 'result', text, comparison, tips: coach(text, comparison), heard: sounds, recognition, samples: take.samples });
+      const stress = stressTip(cardStress(card, text, comparison, recognition.prosody));
+      set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples });
     } catch (err) {
       if (stale()) return;
       recording = null;
@@ -412,7 +424,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let breakdown: ResultView | null = null;
 
   function resultView(result: Extract<State, { name: 'result' }>): HTMLElement[] {
-    const { text, comparison, tips, heard, recognition, samples } = result;
+    const { text, comparison, tips, stress, heard, recognition, samples } = result;
     const right = isRight(comparison);
     const pct = Math.round(comparison.score * 100);
     const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
@@ -438,6 +450,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           'div',
           { class: `feedback result-card ${right ? 'good' : 'bad'}`, role: 'status' },
           h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title), ' ', h('span', { class: 'result-meaning' }, card.en)), breakdown.word), dial(comparison.score, `${pct}% of the way there`)),
+          stress && h('p', { class: 'stress-tip' }, stress),
         ),
         breakdown.el,
         h(
@@ -458,7 +471,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
         { class: `feedback ${right ? 'good' : 'bad'}`, role: 'status' },
         h('div', { class: 'feedback-head' }, h('div', null, h('strong', null, title), ' ', detail), heard.length > 0 && dial(comparison.score, `${pct}% of the way there`)),
         lettersEl,
-        tips.length > 0 && h('ul', { class: 'tips' }, tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text))),
+        (tips.length > 0 || stress) &&
+          h('ul', { class: 'tips' }, [...tips.map((t) => h('li', null, h('strong', { lang: 'fil' }, t.letters), ': ', t.text)), stress && h('li', { class: 'stress-tip' }, stress)]),
       ),
       judged && h('div', { class: 'row hear-slowly' }, h('button', { class: 'btn secondary', onclick: () => options.say(true) }, 'Hear it slowly')),
       actions(right),
