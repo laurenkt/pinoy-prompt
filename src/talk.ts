@@ -1,6 +1,9 @@
 // Talk: a spoken conversation in English with the learner's Tagalog mixed in.
-// What gets mixed in comes from their memory: every word they have met is used
-// in Tagalog, and at most one new word from the deck joins each conversation.
+// What gets mixed in comes from their memory: any word they have met may be
+// said in Tagalog where it fits what is being said, and at most one new word
+// from the deck joins each conversation. The words are a limit on which Tagalog
+// to use, never a list to get through: a conversation that bends to fit a word
+// sounds wrong and teaches the word badly.
 // The app spots those words in the transcript of what the AI says, so the
 // learner can tap one to hear it and see its meaning.
 
@@ -106,11 +109,11 @@ export function stuckExample(plan: TalkPlan): string | null {
   return `${tl}, ${meaning}`;
 }
 
-/** How much Tagalog to mix in: more as the learner knows more. */
+/** The most Tagalog to mix in: more as the learner knows more. A ceiling, never a target. */
 export function mixLevel(known: number): string {
-  if (known < 20) return 'at most one Tagalog word or phrase in a sentence, where one fits; plain English sentences are fine';
-  if (known < 60) return 'up to two or three Tagalog words or phrases in a sentence';
-  return 'the listed Tagalog wherever it fits, but keep most of each sentence English';
+  if (known < 20) return 'at most one Tagalog word or phrase in a sentence';
+  if (known < 60) return 'at most two or three Tagalog words or phrases in a sentence';
+  return 'at most a few Tagalog words or phrases in a sentence, keeping most of each sentence English';
 }
 
 /**
@@ -133,19 +136,20 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     'Accent: keep a natural Filipino accent the whole call, in English as well as Tagalog, the way someone from Manila speaks Taglish. Never switch to an American accent.',
     'Say every Tagalog word as a native Manila speaker would, not with English sounds: pure vowels a, e, i, o, u, never softened to "uh"; ng as one sound, even at the start of a word; a light tapped r; and, where a word has a guide after it, the stress that guide shows in capitals. Never say the guides themselves aloud.',
     '',
-    'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below (the one exception is when they ask how to say something): every sentence is an English sentence with some of those words or phrases in place of the English.',
-    `Use ${mixLevel(plan.known.length)}.`,
+    'Language: speak English. Mix in Tagalog the way Taglish speakers do, but only the Tagalog listed below (the one exception is when they ask how to say something): a Tagalog word or phrase stands in for its English meaning inside an English sentence.',
+    'Say what you would naturally say first, then use a listed word only where that sentence already needs its meaning. The list is the Tagalog you may use, not a list to get through: you do not need to use every word, or any particular word, and many sentences will have no Tagalog at all. Never steer the conversation, pick a topic or ask a question just to make room for a word.',
+    `Use ${mixLevel(plan.known.length)}; that is a limit, not a target.`,
     'A listed phrase counts as one swap. Apart from short listed greetings and replies, never say a whole sentence in Tagalog. Keep speaking English even if the learner uses Tagalog, unless they ask you to switch.',
-    `For example, with ${example(plan)} on the list, say an English sentence with it in place of its English meaning.`,
+    `For example, with ${example(plan)} on the list, say it in place of its English meaning when you are talking about that anyway.`,
     'Only use a Tagalog word where it means exactly what that spot in the sentence needs. Never tack one onto the end of a sentence or question just to fit it in; a plain English sentence is better than a misplaced word.',
     '',
   ];
-  if (firm.length) lines.push(`Tagalog they know well, use it freely: ${list(firm)}.`);
+  if (firm.length) lines.push(`Tagalog they know well: ${list(firm)}.`);
   if (settling.length) lines.push(`Tagalog they know but are still settling: ${list(settling)}.`);
   if (fresh.length) lines.push(`Tagalog they met in the last day or so; say the English meaning straight after it the first time: ${list(fresh)}.`);
   if (plan.newWord) {
     lines.push(
-      `One new word to bring in during the call: ${say(plan.newWord)}. Use it in a sentence where its meaning is clear, say the English meaning straight after it, and use it again later if it fits.`,
+      `One new word they could pick up during the call: ${say(plan.newWord)}. Bring it in only if the conversation reaches a moment that needs its meaning; if none comes, leave it out. When you use it, make its meaning clear from the sentence, say the English meaning straight after it, and use it again later only if it fits.`,
     );
   }
   lines.push(
@@ -154,7 +158,7 @@ export function talkInstructions(plan: TalkPlan, now: Date, timeZone?: string): 
     plan.topic
       ? `Talk about everyday situations around this topic: ${plan.topic.title}.`
       : 'Talk about everyday things, like how their day is going, food, family or plans.',
-    'Keep each turn to one to three short sentences, and end with a question or something easy to answer, so they can reply using their Tagalog.',
+    'Keep each turn to one to three short sentences, and end with a question or something easy to answer, so the conversation keeps going.',
     'They may answer in English, Tagalog or a mix; English answers are fine. If their Tagalog has a mistake, do not point it out; use the right form in your reply if it is on the list, otherwise reply in English.',
     '',
     'When they are stuck, help before moving on. They are stuck if they stop partway through and do not finish, or put "um", "something" or similar where a word should go and leave it there. Give them a moment to think first. Then, in one short sentence, offer the listed Tagalog for what they meant, with its meaning' +
