@@ -5,7 +5,7 @@
 
 /** Levels are measured 10 ms at a time. */
 export const FRAME = 0.01;
-/** Quieter than this, in dB below the take's loudest moment, is silence: the voice's own hiss sits about 50 dB down. */
+/** Quieter than this, in dB below the take's loudest moment, is silence: the voice's own hiss and breath sit 40 to 50 dB down. */
 export const QUIET_DB = 40;
 /** A take whose first or last 10 ms is louder than this below its peak starts or ends mid-sound. */
 export const CUT_DB = 35;
@@ -50,8 +50,11 @@ export function trimPlan({ start, end, duration }) {
   return { from, to, before: ms(LEAD - (start - from)), after: ms(TAIL - (to - end)) };
 }
 
-/** Whether a finished clip has less silence around its sound than the trim leaves (one made before it, cut close). */
+/**
+ * Whether a finished clip has less silence before its sound than the trim leaves (one made before it, cut close).
+ * Only the start is measured: evening out loudness lifts the breath after a word to about the level of QUIET_DB,
+ * so a clip's measured end can land in its tail, and a clip trimmed right would be remade on every run.
+ */
 export function trimmedClose(samples, rate) {
-  const { start, end, duration } = edges(samples, rate);
-  return start < LEAD / 2 || duration - end < TAIL / 2;
+  return edges(samples, rate).start < LEAD / 2;
 }

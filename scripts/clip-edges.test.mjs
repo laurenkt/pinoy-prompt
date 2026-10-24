@@ -50,4 +50,8 @@ describe('trimmedClose', () => {
     expect(trimmedClose(take(0.01, 0.5, 0.05), RATE)).toBe(true);
     expect(trimmedClose(take(LEAD, 0.5, TAIL), RATE)).toBe(false);
   });
+
+  it("doesn't flag a clip for breath that runs into its tail", () => {
+    expect(trimmedClose(take(LEAD, 0.5, 0.01), RATE)).toBe(false);
+  });
 });

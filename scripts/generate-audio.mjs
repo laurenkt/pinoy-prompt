@@ -30,7 +30,7 @@
 // starts with a vowel often comes already sounding), and a take like that is
 // made again as well. Each clip keeps a little silence before and after its
 // sound (scripts/clip-edges.mjs), so soft starts and fading ends are heard
-// whole; `--check` also remakes clips trimmed closer than that.
+// whole; `--check` also remakes clips made before that, which start right on their first sound.
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -186,7 +186,7 @@ async function encode(wav, name, work) {
   // Measured against the take's own peak: takes come at different levels, so a fixed threshold cut into some words.
   const sound = edges(await samplesOf(input, 24000), 24000);
   const { from, to, before, after } = trimPlan(sound);
-  // A take cut mid-sound gets a 5 ms fade at that end, so it doesn't click.
+  // A 5 ms fade at each end, so a take cut mid-sound doesn't click; on any other take it falls on silence.
   const trim = `atrim=${from}:${to},asetpts=PTS-STARTPTS,afade=t=in:d=0.005,afade=t=out:st=${Math.max(0, to - from - 0.005).toFixed(3)}:d=0.005`;
   const pad = `adelay=${Math.round(before * 1000)}:all=1,apad=pad_dur=${after}`;
   const clean = `${trim},loudnorm=I=-16:TP=-1.5:LRA=11,${pad}`;
