@@ -63,16 +63,18 @@ describe('the Library', () => {
     // Named by its title before its count.
     expect(summary.firstElementChild!.className).toBe('unit-body');
     expect([...fill.children].map((s) => s.className)).toEqual(['s-long', 's-days']);
-    expect(parseFloat((fill.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / unit.cards.length);
-    expect(fill.getAttribute('aria-label')).toBe(`2 of ${unit.cards.length} met: Long-term 1, Days 1`);
+    // In cards, as Home's chart counts them: each word read, heard and recalled. These two have only been read.
+    const total = unit.cards.length * 3;
+    expect(parseFloat((fill.children[0] as HTMLElement).style.width)).toBeCloseTo(100 / total);
+    expect(fill.getAttribute('aria-label')).toBe(`2 of ${total} met: Long-term 1, Days 1`);
     // The ink copy of the title is for the eye only, and covers just the fill.
     const ink = summary.querySelector<HTMLElement>('.memory-ink')!;
     expect(ink.getAttribute('aria-hidden')).toBe('true');
     expect(ink.textContent).toBe(summary.querySelector(':scope > .unit-body')!.textContent);
-    expect(parseFloat(ink.style.clipPath.match(/inset\(0(?:px)? ([\d.]+)%/)![1])).toBeCloseTo(100 - (200 / unit.cards.length));
+    expect(parseFloat(ink.style.clipPath.match(/inset\(0(?:px)? ([\d.]+)%/)![1])).toBeCloseTo(100 - 200 / total);
 
     const none = wordsScreen(fakeApp()).querySelector('.unit-list summary')!;
-    expect(none.querySelector('.memory-fill')!.getAttribute('aria-label')).toBe(`None of ${unit.cards.length} met yet`);
+    expect(none.querySelector('.memory-fill')!.getAttribute('aria-label')).toBe(`None of ${total} met yet`);
     expect(none.querySelector('.memory-ink')).toBeNull();
   });
 });

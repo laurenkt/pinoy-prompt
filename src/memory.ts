@@ -2,7 +2,7 @@
 // Nothing here is stored: it is all derived from saved progress, so it is
 // right for progress saved by any earlier version of the app too.
 
-import { ALL_CARDS, getCard, isVocab, type Card } from './deck';
+import { ALL_CARDS, isVocab, keyed, studyWays, type Card } from './deck';
 import { DAY_MS, startOfDayAfter, type CardState } from './srs';
 import { dayKey, type Progress } from './progress-schema';
 
@@ -87,7 +87,7 @@ export interface MemorySummary {
 export function memorySummary(progress: Progress, now: number): MemorySummary {
   // Only cards still in the deck count; saved progress may outlive removed cards.
   const cards = Object.entries(progress.cards)
-    .filter(([id]) => getCard(id))
+    .filter(([key]) => keyed(key))
     .map(([, card]) => card);
   const due = { tomorrow: 0, week: 0 };
   const endOfTomorrow = startOfDayAfter(now, 2);
@@ -199,7 +199,7 @@ const EARLIEST = new Date(2025, 0, 1).getTime();
 export function memoryHistory(progress: Progress, now: number, samples = 64): MemoryHistory {
   samples = Math.max(2, Math.round(samples));
   const steps = Object.entries(progress.cards)
-    .filter(([id]) => getCard(id))
+    .filter(([key]) => keyed(key))
     .map(([, card]) => strengthSteps(card, now));
   const since = Math.min(now, Math.max(EARLIEST, Math.min(...steps.map((s) => s[0][0]))));
   const first = Math.min(now - MIN_HISTORY_DAYS * DAY_MS, since);
@@ -237,14 +237,16 @@ export const MILESTONES: { words: number; label: string }[] = [
 
 /**
  * Cards the deck spends on each Tagalog word it teaches, so the milestones can
- * be counted in cards like the rest of the chart. A phrase teaches several
+ * be counted in cards like the rest of the chart: each way a card is studied
+ * (studyWays) is a card of its own. A phrase teaches several
  * words but repeats many met before, and guides (patterns, sounds) teach none.
  * Each spelling counts as a word, so "maganda" and "magandang" are two: rough,
  * like the milestones themselves.
  */
 export function cardsPerWord(cards: readonly Card[] = ALL_CARDS): number {
   const words = new Set(cards.filter(isVocab).flatMap((c) => c.tl.toLowerCase().match(/\p{L}[\p{L}'-]*/gu) ?? []));
-  return words.size ? cards.length / words.size : 1;
+  const studied = cards.reduce((sum, c) => sum + studyWays(c).length, 0);
+  return words.size ? studied / words.size : 1;
 }
 
 /** Worked out once: the deck only changes with the app. */
@@ -339,7 +341,7 @@ export function fitPower(points: [number, number][]): number | null {
  */
 export function forecast(progress: Progress, now: number, milestones = MILESTONES, perWord = CARDS_PER_WORD): Forecast {
   const steps = Object.entries(progress.cards)
-    .filter(([id]) => getCard(id))
+    .filter(([key]) => keyed(key))
     .map(([, card]) => strengthSteps(card, now));
   const since = Math.max(EARLIEST, Math.min(now, ...steps.map((s) => s[0][0])));
   const days = Math.min(PACE_DAYS, (now - since) / DAY_MS);

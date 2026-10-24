@@ -14,7 +14,8 @@
 // progress object into the new shape, and add a fixture for the new version
 // under src/test/fixtures/. The tests fail until both exist.
 
-import { DAY_MS, DRILL_WAYS, MAX_HELP, MIN_EASE, START_EASE, startOfDayAfter, type CardState, type DrillWay } from './srs';
+import { WAYS, cardKey, getCard, studyWays, type Way } from './deck';
+import { DAY_MS, MAX_HELP, MIN_EASE, START_EASE, startOfDayAfter, type CardState } from './srs';
 
 export interface Settings {
   /** New cards introduced per day. */
@@ -61,7 +62,7 @@ export interface Envelope {
 }
 
 /** The schema this build writes. */
-export const SCHEMA = 3;
+export const SCHEMA = 4;
 
 type Data = Record<string, unknown>;
 
@@ -72,7 +73,32 @@ export const MIGRATIONS: Record<number, (data: Data) => Data> = {
   1: ({ streak: _streak, ...rest }) => rest,
   // 2 → 3: review results are tallied by day. Nothing earlier was recorded, so it starts empty.
   2: (data) => ({ history: {}, ...data }),
+  // 3 → 4: each way Study asks a word or phrase is a card of its own (see Way in deck.ts). The card kept so far stays
+  // as it was, as reading's. Its other ways start from its schedule, as Study had been asking them in turn, once it
+  // has settled; a word met since joins those ways as it settles, as a new learner's do. Only added, so a build from
+  // before them, still open elsewhere, keeps working on reading's card and carries the rest through untouched.
+  3: (data) => (isObject(data.cards) ? { ...data, cards: { ...data.cards, ...splitWays(data.cards) } } : data),
 };
+
+/** The fields of a card that make up its schedule, which another way of studying it starts from (MIGRATIONS[3]). */
+const SCHEDULE = ['ease', 'interval', 'reps', 'lapses', 'due', 'introduced', 'reviewed', 'log'];
+
+/** For each word or phrase that has settled (as settled() in session.ts has it), its other ways, as copies of its schedule. */
+function splitWays(cards: Data): Data {
+  const added: Data = {};
+  for (const [id, value] of Object.entries(cards)) {
+    const card = getCard(id);
+    if (!card || !isObject(value)) continue;
+    const { interval, reps, lapses } = value;
+    if (!isNumber(interval) || interval < 1 || !((isNumber(reps) && reps >= 2) || (isNumber(lapses) && lapses > 0))) continue;
+    for (const way of studyWays(card)) {
+      const key = cardKey(id, way);
+      if (key in cards) continue;
+      added[key] = { ...Object.fromEntries(SCHEDULE.filter((f) => f in value).map((f) => [f, structuredClone(value[f])])), split: true };
+    }
+  }
+  return added;
+}
 
 export const DEFAULT_SETTINGS: Settings = { dailyNew: 8, autoplay: true, mic: true, sound: true, tapSounds: true, iconBadge: false };
 
@@ -257,9 +283,10 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
     : [];
   if (log.length) card.log = log;
   else delete card.log;
+  if (value.split !== true) delete card.split;
   // Ways a newer build added are kept as they are; the ways this build asks are checked.
-  const help: Partial<Record<DrillWay, number>> = isObject(value.help) ? { ...value.help } : {};
-  for (const way of DRILL_WAYS) {
+  const help: Partial<Record<Way, number>> = isObject(value.help) ? { ...value.help } : {};
+  for (const way of WAYS) {
     const count = help[way];
     if (isCount(count) && count > 0) help[way] = Math.min(count, MAX_HELP);
     else delete help[way];
@@ -289,6 +316,15 @@ function helpOf(card: CardState): Pick<CardState, 'help' | 'helpAt'> {
   return { help: card.help, helpAt: card.helpAt };
 }
 
+/**
+ * Whether `theirs` should replace `mine`'s schedule: the later review, but a card answered this way always over one only
+ * started from reading's when the ways were split (`split`), which never replaces one that was.
+ */
+function newerSchedule(theirs: CardState, mine: CardState): boolean {
+  if (!!theirs.split !== !!mine.split) return !theirs.split;
+  return changedAt(theirs) > changedAt(mine);
+}
+
 /** When a card's schedule last changed; later wins when two copies disagree. */
 function changedAt(card: CardState): number {
   return card.reviewed ?? card.introduced;
@@ -310,7 +346,7 @@ export function mergeInto(target: Progress, other: Progress, { since = -Infinity
     // A card's schedule and its drill help change separately (a drill never touches the schedule), so each keeps the later copy.
     const theirHelp =
       (card.helpAt ?? -Infinity) > Math.max(since, mine?.helpAt ?? -Infinity) && (!mine || mine.introduced === card.introduced);
-    if (changedAt(card) > since && (!mine || changedAt(card) > changedAt(mine))) {
+    if (changedAt(card) > since && (!mine || newerSchedule(card, mine))) {
       target.cards[id] = theirHelp || !mine ? card : { ...card, ...helpOf(mine) };
       changed++;
     } else if (mine && theirHelp) {

@@ -206,7 +206,7 @@ describe('forecast', () => {
   it('measures the pace of words that stuck over the last four weeks', () => {
     // 14 words stuck in the last 28 days, 6 before: half a word a day.
     const p = learner(20, [...Array(6).fill(35), ...Array(14).fill(10)]);
-    const f = forecast(p, NOW);
+    const f = forecast(p, NOW, undefined, 1);
     expect(f.known).toBe(20);
     expect(f.perDay).toBeCloseTo(0.5);
     expect(f.milestones[0].at).toBeGreaterThan(NOW);
@@ -298,15 +298,15 @@ describe('forecast', () => {
 
 describe('cardsPerWord', () => {
   const vocab = (tl: string, kind: 'word' | 'phrase' = 'phrase') => ({ id: tl, tl, en: '', kind, hook: '' });
-  it('divides the cards by the different words their Tagalog uses', () => {
-    // "Salamat po" repeats both words; the guide teaches none.
+  it('divides the cards, each way they are studied, by the different words their Tagalog uses', () => {
+    // "Salamat po" repeats both words; the guide teaches none. Each word or phrase is read, heard and recalled: three cards.
     const cards = [vocab('Salamat', 'word'), vocab('po', 'word'), vocab('Salamat po.'), vocab('Taga-saan ka?'), { ...vocab('___ ka'), kind: 'pattern' as const }];
-    expect(cardsPerWord(cards)).toBeCloseTo(5 / 4);
+    expect(cardsPerWord(cards)).toBeCloseTo((4 * 3 + 1) / 4);
   });
 
-  it('comes to about one card a word for the deck', () => {
-    expect(cardsPerWord()).toBeGreaterThan(0.8);
-    expect(cardsPerWord()).toBeLessThan(1.5);
+  it('comes to about three cards a word for the deck', () => {
+    expect(cardsPerWord()).toBeGreaterThan(2.5);
+    expect(cardsPerWord()).toBeLessThan(4);
   });
 });
 

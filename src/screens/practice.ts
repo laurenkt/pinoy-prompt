@@ -1,11 +1,10 @@
 import type { App } from '../app';
-import { VOCAB, getCard, isVocab, type Card, type Drill } from '../deck';
+import { VOCAB, cardKey, getCard, isVocab, type Card, type Drill, type Way } from '../deck';
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
-import type { DrillWay } from '../srs';
+import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle, wayState } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, strengthBadge } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -17,9 +16,9 @@ import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PR
  * The kind of question each way of asking a guide counts as: filling a sentence's gap is reading it, building a
  * sentence from the English is recalling it. Guides aren't heard or said.
  */
-const GUIDE_MODES: Record<GuideFormat, DrillWay> = { gap: 'read', build: 'recall' };
+const GUIDE_MODES: Record<GuideFormat, Way> = { gap: 'read', build: 'recall' };
 
-const MODES: { id: DrillWay; title: string }[] = [
+const MODES: { id: Way; title: string }[] = [
   { id: 'listen', title: 'Listen' },
   { id: 'read', title: 'Read' },
   { id: 'recall', title: 'Recall' },
@@ -27,11 +26,11 @@ const MODES: { id: DrillWay; title: string }[] = [
 ];
 
 /** The kinds of question a round may ask. Kept across visits, as the Library's filter is, and back to all of them when the app opens. */
-let scope = new Set<DrillWay>(MODES.map((m) => m.id));
+let scope = new Set<Way>(MODES.map((m) => m.id));
 
 interface Question {
   card: Card;
-  mode: DrillWay;
+  mode: Way;
   /** For a guide, its question as it's asked; `choices` is then empty. */
   guide?: GuideQuestion;
   choices: Card[];
@@ -79,11 +78,11 @@ const askOpenAi: MeaningJudge = async (answer, card, language) => {
 };
 
 /** What a typed answer to the question is given in: the meaning when listening, the Tagalog when recalling. */
-const languageOf = (mode: DrillWay): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
+const languageOf = (mode: Way): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
 const answerLanguage = (q: Question): AnswerLanguage => languageOf(q.mode);
 
 /** The kinds of question a card can be asked as. */
-function modesFor(card: Card): DrillWay[] {
+function modesFor(card: Card): Way[] {
   return isVocab(card) ? MODES.map((m) => m.id) : guideFormats(card).map((f) => GUIDE_MODES[f]);
 }
 
@@ -158,7 +157,7 @@ export function practiceScreen(
   holdOnTap(root, hold);
 
   /** Why a kind of question can't be asked right now, if it can't: the mic or sound may have gone off mid-round, here or in another tab. */
-  function unavailable(mode: DrillWay): string | null {
+  function unavailable(mode: Way): string | null {
     if (mode === 'listen' && !canListen) return 'Listen needs a voice, and this device has none.';
     if (mode === 'listen' && !app.progress.settings.sound) return 'Listen is off while the sound is off.';
     if (mode === 'speak' && !canSpeak) return "Speak needs the microphone, and this browser can't record.";
@@ -168,7 +167,7 @@ export function practiceScreen(
   }
 
   /** The kinds in scope that can be asked right now, before the speaking model is taken into account. */
-  function chosen(): DrillWay[] {
+  function chosen(): Way[] {
     return MODES.map((m) => m.id).filter((m) => scope.has(m) && unavailable(m) === null);
   }
 
@@ -177,10 +176,10 @@ export function practiceScreen(
    * to be on the device, so a round never stops for a download, unless Speak is all that's chosen: then it asks for it.
    * When nothing in scope can be asked (only Listen, then the sound goes off), it falls back to everything that can.
    */
-  function modes(): DrillWay[] {
+  function modes(): Way[] {
     const picks = chosen();
     if (picks.length === 1 && picks[0] === 'speak') return picks;
-    const ready = (m: DrillWay) => m !== 'speak' || speakReady || (modelFound && micHeld);
+    const ready = (m: Way) => m !== 'speak' || speakReady || (modelFound && micHeld);
     const ways = picks.filter(ready);
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
@@ -202,7 +201,8 @@ export function practiceScreen(
     }
     const field = languageOf(mode);
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
-    const typed = settled(app.progress, card.id) && (mode === 'recall' || (mode === 'listen' && canTypeMeaning(card)));
+    // Typed once that way of studying it has settled in Study.
+    const typed = settled(app.progress, cardKey(card.id, mode)) && (mode === 'recall' || (mode === 'listen' && canTypeMeaning(card)));
     return { card, mode, choices, typed };
   }
 
@@ -583,7 +583,7 @@ export function practiceScreen(
     draw();
   }
 
-  function toggleScope(mode: DrillWay): void {
+  function toggleScope(mode: Way): void {
     // The last kind left in that can be asked stays on, so the round asks what was chosen.
     const picks = chosen();
     if (picks.length === 1 && picks[0] === mode) return;
@@ -698,7 +698,8 @@ export function practiceScreen(
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
     // How well the card is held, beside the question. A drill never changes the schedule, so it stays put once answered.
-    const badge = strengthBadge(app.progress.cards[q.card.id]);
+    // The card asked this way, as Study keeps it; none for a way Study doesn't ask (Speak).
+    const badge = strengthBadge(wayState(app.progress, q.card, q.mode));
     const answered = picked !== null;
     const right = picked === answerOf(q);
     const field = answerLanguage(q);

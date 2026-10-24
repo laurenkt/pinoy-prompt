@@ -37,13 +37,18 @@ describe('saved progress from every schema version', () => {
     it(`loads ${path.split('/').pop()} with every card and setting intact`, () => {
       const { schema, progress } = decodeOk(text);
       expect(schema).toBe(SCHEMA);
-      expect(progress.cards).toEqual(cardsIn(text));
-      const raw = JSON.parse(text);
+      // Every card as it was; from before schema 4, the other ways of a word that has settled join it (see splitWays).
+      const raw = cardsIn(text);
+      const added = schemaOf(path) < 4 ? ['kumusta:listen', 'kumusta:recall'] : [];
+      expect(Object.keys(progress.cards).sort()).toEqual([...Object.keys(raw), ...added].sort());
+      for (const [key, card] of Object.entries(raw)) expect(progress.cards[key]).toEqual(card);
+      for (const key of added) expect(progress.cards[key]).toEqual({ ...(raw.kumusta as object), split: true });
+      const envelope = JSON.parse(text);
       // Settings added since keep their defaults.
-      expect(progress.settings).toEqual({ ...DEFAULT_SETTINGS, ...(raw.progress ?? raw).settings });
-      expect(progress.today).toEqual((raw.progress ?? raw).today);
+      expect(progress.settings).toEqual({ ...DEFAULT_SETTINGS, ...(envelope.progress ?? envelope).settings });
+      expect(progress.today).toEqual((envelope.progress ?? envelope).today);
       // Review results were first kept in schema 3; earlier copies start with none.
-      expect(progress.history).toEqual((raw.progress ?? raw).history ?? {});
+      expect(progress.history).toEqual((envelope.progress ?? envelope).history ?? {});
       expect('streak' in progress).toBe(false);
     });
 
@@ -122,6 +127,53 @@ describe("a card's count of drill answers needing help", () => {
     // Once this build has counted for itself, the old count is left out, even after its counts are cleared.
     expect(sanitizeCard({ ...card, hinted: 2, help: { read: 1 }, helpAt: NOW }, NOW)!.help).toEqual({ read: 1 });
     expect(sanitizeCard({ ...card, hinted: 2, helpAt: NOW }, NOW)!.help).toBeUndefined();
+  });
+});
+
+describe('splitting each word into the ways Study asks it (schema 3 to 4)', () => {
+  const settledCard = { ease: 2.4, interval: 9, reps: 3, lapses: 1, due: NOW + 9 * DAY_MS, introduced: NOW - 30 * DAY_MS, reviewed: NOW, log: [[NOW - 30 * DAY_MS, 0], [NOW - 20 * DAY_MS, 1]] };
+  const v3 = (cards: Record<string, unknown>) => JSON.stringify({ schema: 3, rev: 9, savedAt: NOW, resetAt: 0, progress: { ...emptyProgress(NOW), cards } });
+
+  it("starts a settled word's other ways from its schedule, keeping the card itself exactly as it was", () => {
+    const kept = { ...settledCard, help: { recall: 2 }, helpAt: NOW };
+    const { cards } = decodeOk(v3({ kumusta: kept })).progress;
+    expect(cards.kumusta).toEqual(kept);
+    // The schedule, and its history for the chart; not the drills' counts, which stay on the word.
+    expect(cards['kumusta:listen']).toEqual({ ...settledCard, split: true });
+    expect(cards['kumusta:recall']).toEqual({ ...settledCard, split: true });
+    expect(Object.keys(cards).sort()).toEqual(['kumusta', 'kumusta:listen', 'kumusta:recall']);
+  });
+
+  it('leaves a word still settling in, a guide, and a card since removed from the deck to their own', () => {
+    const learning = { ...settledCard, interval: 1, reps: 1, lapses: 0 };
+    const { cards } = decodeOk(v3({ kumusta: learning, 'p-gusto': settledCard, 'a-card-since-removed': settledCard })).progress;
+    expect(Object.keys(cards).sort()).toEqual(['a-card-since-removed', 'kumusta', 'p-gusto']);
+  });
+
+  it('never overwrites a way already there, and keeps ways and cards this build does not know', () => {
+    const recall = { ...settledCard, interval: 2, reps: 1 };
+    const { cards } = decodeOk(v3({ kumusta: settledCard, 'kumusta:recall': recall, 'kumusta:speak': recall, 'gone:listen': recall })).progress;
+    expect(cards['kumusta:recall']).toEqual(recall);
+    expect(cards['kumusta:speak']).toEqual(recall);
+    expect(cards['gone:listen']).toEqual(recall);
+  });
+
+  it('keeps the later review of each way when an older copy (the mirror, a backup) is merged in', () => {
+    const now = decodeOk(v3({ kumusta: settledCard })).progress;
+    // Recalled since, on this copy.
+    now.cards['kumusta:recall'] = review(now.cards['kumusta:recall'], 'again', NOW + DAY_MS);
+    const older = decodeOk(v3({ kumusta: settledCard })).progress;
+    expect(mergeInto(now, older)).toBe(0);
+    expect(now.cards['kumusta:recall'].reviewed).toBe(NOW + DAY_MS);
+    expect(now.cards['kumusta:recall'].split).toBeUndefined();
+    // A copy from a build before the split (a backup from another phone), saved later with a newer review of the word
+    // itself, brings that in only: its other ways were only started from it, and this copy has answered recall itself.
+    const later = decodeOk(v3({ kumusta: { ...settledCard, reviewed: NOW + 2 * DAY_MS } })).progress;
+    mergeInto(now, later);
+    expect(now.cards.kumusta.reviewed).toBe(NOW + 2 * DAY_MS);
+    expect(now.cards['kumusta:recall'].reviewed).toBe(NOW + DAY_MS);
+    // Where neither copy has answered that way, the later start is as good as any.
+    expect(now.cards['kumusta:listen']).toEqual({ ...settledCard, reviewed: NOW + 2 * DAY_MS, split: true });
   });
 });
 

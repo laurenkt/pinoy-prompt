@@ -1,9 +1,9 @@
 // Builds a study session and tracks it as the learner works through it.
 // Kept free of DOM code so it can be unit tested.
 
-import { LEARN_ORDER, VOCAB, buildsOn, closeInMeaning, getCard, isVocab, type Card, type CardKind, type Drill } from './deck';
+import { LEARN_ORDER, VOCAB, buildsOn, cardKey, closeInMeaning, getCard, isVocab, keyed, studyWays, type Card, type CardKind, type Drill, type Way } from './deck';
 import { recallChance } from './memory';
-import { DAY_MS, MAX_HELP, START_EASE, isDue, startOfDayAfter, type CardState, type DrillWay } from './srs';
+import { DAY_MS, MAX_HELP, START_EASE, isDue, newCardState, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
 
 export type StepKind = 'new' | 'review';
@@ -11,9 +11,14 @@ export type StepKind = 'new' | 'review';
 export interface Step {
   cardId: string;
   kind: StepKind;
+  /** The way it's studied, its own card (see Way); read when it's left out. Only read is ever new: the rest follow it. */
+  way?: Way;
   /** How to ask it; the session picks one when it's left out. */
   format?: Format;
 }
+
+/** Where saved progress keeps a step's card (see cardKey). */
+export const stepKey = (step: Step): string => cardKey(step.cardId, step.way ?? 'read');
 
 /** How far back in the queue a missed card is re-inserted. */
 const REQUEUE_GAP = 3;
@@ -22,12 +27,28 @@ export function isIntroduced(progress: Progress, cardId: string): boolean {
   return cardId in progress.cards;
 }
 
+/**
+ * The cards Study schedules that the learner has met, each a card asked one way, by its key in saved progress. Skips
+ * progress for cards since removed from the deck, and ways Study doesn't ask.
+ */
+function studied(progress: Progress): { key: string; card: Card; way: Way; state: CardState }[] {
+  return Object.entries(progress.cards).flatMap(([key, state]) => {
+    const found = keyed(key);
+    return found && studyWays(found.card).includes(found.way) ? [{ key, ...found, state }] : [];
+  });
+}
+
+/** The schedule of a card asked one way, if Study keeps one for it: a guide's is its own whichever way it's asked. */
+export function wayState(progress: Progress, card: Card, way: Way): CardState | undefined {
+  return progress.cards[isVocab(card) ? cardKey(card.id, way) : card.id];
+}
+
+/** Due cards, by key (see cardKey), soonest due first. */
 export function dueCards(progress: Progress, now: number): string[] {
-  return Object.entries(progress.cards)
-    // Skip progress for cards since removed from the deck.
-    .filter(([id, state]) => isDue(state, now) && getCard(id))
-    .sort(([, a], [, b]) => a.due - b.due)
-    .map(([id]) => id);
+  return studied(progress)
+    .filter(({ state }) => isDue(state, now))
+    .sort((a, b) => a.state.due - b.state.due)
+    .map(({ key }) => key);
 }
 
 export function newCardsLeftToday(progress: Progress): number {
@@ -131,23 +152,32 @@ export type Format =
   /** A guide: think of the answer to one of its questions, then rate yourself. */
   | 'think';
 
-/** What this device can do, which decides the formats on offer. */
+/** What this device can do now, which decides the ways Study asks: listening needs a voice and the sound on. */
 export interface Abilities {
   listen: boolean;
 }
 
+/** What Study can ask now, from the settings and whether the device has a voice at all (canPlay in speech.ts). */
+export function abilities(progress: Progress, voice = true): Abilities {
+  return { listen: voice && progress.settings.sound };
+}
+
+/** Whether a way of studying a card can be asked now. One that can't waits, exactly as it is, until it can. */
+function canAsk(way: Way, can: Abilities): boolean {
+  return way !== 'listen' || can.listen;
+}
+
 /**
- * Words still being learned get a multiple-choice check. Learned words are
- * self-rated, because a lucky guess would push a word weeks out; they move from
- * reading and hearing to producing the Tagalog from the English as they hold.
+ * How Study asks a card, the way it's studied. Words still being learned get a multiple-choice check; learned words
+ * are self-rated, because a lucky guess would push a word weeks out.
  */
-export function pickFormat(state: CardState, can: Abilities, random: () => number = Math.random, kind: CardKind = 'word'): Format {
+export function pickFormat(state: CardState, way: Way = 'read', random: () => number = Math.random, kind: CardKind = 'word'): Format {
   if (kind === 'pattern') return state.interval < 1 ? 'gap' : random() < 0.5 ? 'build' : 'think';
   if (kind !== 'word' && kind !== 'phrase') return state.interval < 1 ? 'gap' : 'think';
-  if (state.interval < 1) return 'read';
-  const formats: Format[] = state.interval < 7 ? ['remember'] : ['remember', 'produce', 'produce'];
-  if (can.listen) formats.push('hear');
-  return formats[Math.floor(random() * formats.length)];
+  const learning = state.interval < 1;
+  if (way === 'listen') return learning ? 'listen' : 'hear';
+  if (way === 'recall') return learning ? 'recall' : 'produce';
+  return learning ? 'read' : 'remember';
 }
 
 /** New cards wait while this many cards are still being learned (just met, or just forgotten). */
@@ -155,20 +185,37 @@ export const MAX_LEARNING = 3;
 /** A card shown in the last few steps isn't shown again yet, so a miss gets a short gap. */
 const RECENT_GAP = 3;
 
-export function learningCount(progress: Progress): number {
-  return Object.entries(progress.cards).filter(([id, state]) => state.interval < 1 && getCard(id)).length;
+/** Cards still being learned that Study can ask now: a listening card waiting for the sound doesn't hold new ones back. */
+export function learningCount(progress: Progress, can: Abilities = { listen: true }): number {
+  return studied(progress).filter(({ way, state }) => state.interval < 1 && canAsk(way, can)).length;
 }
 
 /**
- * Words to study now: everything due, weakest first, then words still being
- * learned that aren't quite due (they're due again within a minute anyway).
+ * Cards to study now, by key (see cardKey): everything due that can be asked now, weakest first, then cards still
+ * being learned that aren't quite due (they're due again within a minute anyway).
  */
-export function studyQueue(progress: Progress, now: number): string[] {
-  return Object.entries(progress.cards)
-    .filter(([id, state]) => (isDue(state, now) || state.interval < 1) && getCard(id))
-    .map(([id, state]) => ({ id, early: !isDue(state, now), recall: recallChance(state, now) }))
+export function studyQueue(progress: Progress, now: number, can: Abilities = { listen: true }): string[] {
+  return studied(progress)
+    .filter(({ way, state }) => (isDue(state, now) || state.interval < 1) && canAsk(way, can))
+    .map(({ key, state }) => ({ key, early: !isDue(state, now), recall: recallChance(state, now) }))
     .sort((a, b) => Number(a.early) - Number(b.early) || a.recall - b.recall)
-    .map(({ id }) => id);
+    .map(({ key }) => key);
+}
+
+/**
+ * The ways of studying words met that are ready to start, as steps, in the order the words were met: each once the
+ * word's reading card has settled (see settled), so a word is learned one way before another, and only ways that can
+ * be asked now.
+ */
+export function upcomingWays(progress: Progress, can: Abilities = { listen: true }): Step[] {
+  return studied(progress)
+    .filter(({ key, way }) => way === 'read' && settled(progress, key))
+    .sort((a, b) => a.state.introduced - b.state.introduced)
+    .flatMap(({ card }) =>
+      studyWays(card)
+        .filter((way) => !(cardKey(card.id, way) in progress.cards) && canAsk(way, can))
+        .map((way): Step => ({ cardId: card.id, way, kind: 'review', format: pickFormat(newCardState(0), way) })),
+    );
 }
 
 /**
@@ -176,10 +223,10 @@ export function studyQueue(progress: Progress, now: number): string[] {
  * falling due, or tomorrow's new cards if today's rate is what holds them back.
  * Null when nothing ever comes back (no cards met, and none left to meet).
  */
-export function nextStudyAt(progress: Progress, now: number): number | null {
-  const dues = Object.entries(progress.cards)
-    .filter(([id, state]) => state.due > now && getCard(id))
-    .map(([, state]) => state.due);
+export function nextStudyAt(progress: Progress, now: number, can: Abilities = { listen: true }): number | null {
+  const dues = studied(progress)
+    .filter(({ way, state }) => state.due > now && canAsk(way, can))
+    .map(({ state }) => state.due);
   if (progress.settings.dailyNew > 0 && upcomingNewCards(progress, 1).length) dues.push(startOfDayAfter(now, 1));
   return dues.length ? Math.min(...dues) : null;
 }
@@ -187,28 +234,40 @@ export function nextStudyAt(progress: Progress, now: number): number | null {
 /**
  * The next step of open-ended study. In order:
  * 1. Due reviews, weakest first.
- * 2. A new word, but only once nothing is due, few words are still being
- *    learned, and the daily new-word rate allows it.
+ * 2. Once few cards are still being learned: another way of studying a word
+ *    already met (see upcomingWays), then a new word, if the daily new-word rate
+ *    allows it. Ways of words already met don't count towards that rate.
  * Null once caught up: practice beyond that is Drills' (see pickDrillCard).
- * `recent` is the cards shown this session, latest last.
+ * `recent` is the cards shown this session, by key (see stepKey), latest last.
+ * A card isn't asked again within a few steps, whichever way: one way of asking
+ * a word would give away another.
  */
 export function nextStudyStep(progress: Progress, now: number, recent: string[], can: Abilities, random: () => number = Math.random): Step | null {
-  const shownRecently = new Set(recent.slice(-RECENT_GAP));
-  const last = recent[recent.length - 1];
-  const reviewOf = (id: string): Step => ({ cardId: id, kind: 'review', format: pickFormat(progress.cards[id], can, random, getCard(id)!.kind) });
+  const idOf = (key: string) => keyed(key)?.card.id ?? key;
+  const shownRecently = new Set(recent.slice(-RECENT_GAP).map(idOf));
+  const last = recent.length ? idOf(recent[recent.length - 1]) : undefined;
+  const reviewOf = (key: string): Step => {
+    const { card, way } = keyed(key)!;
+    return { cardId: card.id, way, kind: 'review', format: pickFormat(progress.cards[key], way, random, card.kind) };
+  };
   // A full gap when there's enough to fill it; otherwise just not the same card twice running.
-  const queue = studyQueue(progress, now);
-  const review = queue.find((id) => !shownRecently.has(id)) ?? queue.find((id) => id !== last);
+  const queue = studyQueue(progress, now, can);
+  const review = queue.find((key) => !shownRecently.has(idOf(key))) ?? queue.find((key) => idOf(key) !== last);
   if (review) return reviewOf(review);
 
-  if (newCardsLeftToday(progress) > 0 && learningCount(progress) < MAX_LEARNING) {
+  if (learningCount(progress, can) < MAX_LEARNING) {
+    const ways = upcomingWays(progress, can);
+    const way = ways.find((s) => !shownRecently.has(s.cardId)) ?? ways.find((s) => s.cardId !== last);
+    if (way) return way;
+  }
+  if (newCardsLeftToday(progress) > 0 && learningCount(progress, can) < MAX_LEARNING) {
     const [fresh] = upcomingNewCards(progress, 1);
     if (fresh) return { cardId: fresh, kind: 'new', format: isVocab(getCard(fresh)!) ? 'read' : 'gap' };
   }
   // Nothing else to ask: the card just shown again, rather than calling Study caught up while it's still being learned.
   // Not a guide with nothing to ask, which Study skips: it would come straight back.
-  const again = queue[0] && getCard(queue[0])!;
-  return again && (isVocab(again) || again.drills?.length) ? reviewOf(again.id) : null;
+  const again = queue[0] && keyed(queue[0])!.card;
+  return again && (isVocab(again) || again.drills?.length) ? reviewOf(queue[0]) : null;
 }
 
 /** How many of the last cards drilled are kept out of the next pick, so nothing comes straight back. */
@@ -235,11 +294,11 @@ const FOCUS_PER_CARD = 0.1;
 /** A card and a way of asking it: what a drill round picks, and what it keeps count of. */
 export interface DrillPick {
   card: Card;
-  way: DrillWay;
+  way: Way;
 }
 
 /** The key for a card asked one way, as a round's `missed` holds it. */
-export const drillKey = (id: string, way: DrillWay): string => `${id} ${way}`;
+export const drillKey = (id: string, way: Way): string => `${id} ${way}`;
 
 /**
  * Whether a card has held in Study: remembered twice in a row, the second time a day or more after the first. A card
@@ -267,7 +326,7 @@ export function drillWeight(state: CardState, now: number): number {
 }
 
 /** How many answers asked this way needed help, less those got right unaided since (CardState.help). */
-export function drillHelp(state: CardState | undefined, way: DrillWay): number {
+export function drillHelp(state: CardState | undefined, way: Way): number {
   return state?.help?.[way] ?? 0;
 }
 
@@ -279,7 +338,8 @@ function settlingIn(state: CardState, now: number): boolean {
 /**
  * The next question for a drill round, which runs until the learner stops it: any card met, words and guides alike,
  * asked any way `ways` allows it, picked at random by weight. Each way of asking a card is weighed on its own: the
- * card's drillWeight shared between its ways (so a word asked four ways comes up no more than a guide asked one),
+ * drillWeight of that way's schedule in Study (reading's for a way Study doesn't keep), shared between its ways (so a
+ * word asked four ways comes up no more than a guide asked one),
  * plus, most of all, misses this round asked that way (`missed`, by drillKey) and answers asked that way the drills
  * had to help with (drillHelp): what was seen to go wrong outweighs what the calendar guesses. So a word read easily
  * but never recalled from the English is asked for its Tagalog, not read again.
@@ -293,19 +353,26 @@ export function pickDrillCard(
   now: number,
   recent: string[],
   missed: ReadonlyMap<string, number>,
-  ways: (card: Card) => readonly DrillWay[],
+  ways: (card: Card) => readonly Way[],
   random: () => number = Math.random,
 ): DrillPick | null {
-  const pool = Object.entries(progress.cards).flatMap(([id, state]) => {
-    const card = getCard(id);
+  const entries = Object.entries(progress.cards);
+  // The ways with a schedule of their own (see cardKey), found once rather than looked up for every word.
+  const ownKeys = new Set(entries.flatMap(([key]) => (key.includes(':') ? [key] : [])));
+  const pool = entries.flatMap(([id, state]) => {
+    // A way's own key is reached through its word's read key.
+    const card = id.includes(':') ? undefined : getCard(id);
     const asks = card ? ways(card) : [];
     if (asks.length === 0) return [];
-    const base = drillWeight(state, now) / asks.length;
-    const settling = settlingIn(state, now);
+    let read: { weight: number; settling: boolean } | undefined;
     return asks.map((way) => {
+      // Each way by its own schedule, where Study keeps one; otherwise (Speak, or a way not started yet) by reading's.
+      const own = way !== 'read' && ownKeys.size > 0 && ownKeys.has(cardKey(id, way)) ? progress.cards[cardKey(id, way)] : state;
+      const { weight, settling } =
+        own === state ? (read ??= { weight: drillWeight(state, now), settling: settlingIn(state, now) }) : { weight: drillWeight(own, now), settling: settlingIn(own, now) };
       const misses = missed.get(drillKey(id, way)) ?? 0;
       const help = drillHelp(state, way);
-      return { pick: { card: card!, way }, w: base + 4 * misses + 8 * help, focus: settling || misses > 0 || help > 0 };
+      return { pick: { card: card!, way }, w: weight / asks.length + 4 * misses + 8 * help, focus: settling || misses > 0 || help > 0 };
     });
   });
   const cards = (ps: typeof pool) => new Set(ps.map((p) => p.pick.card.id));
@@ -340,12 +407,12 @@ export function pickDrillCard(
  * after "Show choices") adds one, up to MAX_HELP; right unaided takes one off. Only `help` changes, never the
  * schedule. Whether progress changed, to be saved.
  */
-export function noteDrillAnswer(progress: Progress, cardId: string, way: DrillWay, helped: boolean, now: number): boolean {
+export function noteDrillAnswer(progress: Progress, cardId: string, way: Way, helped: boolean, now: number): boolean {
   return setDrillHelp(progress, cardId, way, (n) => (helped ? Math.min(n + 1, MAX_HELP) : Math.max(n - 1, 0)), now);
 }
 
 /** Set how many answers asked this way needed help, from what it was. Whether that changed it. */
-export function setDrillHelp(progress: Progress, cardId: string, way: DrillWay, to: (before: number) => number, now: number): boolean {
+export function setDrillHelp(progress: Progress, cardId: string, way: Way, to: (before: number) => number, now: number): boolean {
   const state = progress.cards[cardId];
   if (!state) return false;
   const before = drillHelp(state, way);
@@ -369,7 +436,7 @@ export function buildExtraSession(progress: Progress, size = 5): Step[] {
 /** Put a missed card back a few steps later so it comes round again this session. */
 export function requeue(queue: Step[], step: Step): Step[] {
   const next = [...queue];
-  next.splice(Math.min(REQUEUE_GAP, next.length), 0, { cardId: step.cardId, kind: 'review' });
+  next.splice(Math.min(REQUEUE_GAP, next.length), 0, { cardId: step.cardId, way: step.way, kind: 'review' });
   return next;
 }
 

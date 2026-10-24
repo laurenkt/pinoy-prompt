@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
-import type { Card } from '../deck';
+import { cardKey, type Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
 import type { RecorderEvents, Take } from '../recorder';
 import { recordAnswer } from '../store';
@@ -26,7 +26,8 @@ const KNOWN = ['salamat', 'maraming-salamat', 'magandang-umaga', 'bukas'];
 /** Words just met; settled ones have been remembered again since. */
 function learner(settled: boolean): App {
   const app = fakeApp(KNOWN);
-  if (settled) for (const id of KNOWN) recordAnswer(app.progress, id, 'good', app.now());
+  // Settled the way it's asked here: met, then remembered again since, as its own card (see Way).
+  if (settled) for (const id of KNOWN) for (const key of [id, cardKey(id, 'recall'), cardKey(id, 'recall')]) recordAnswer(app.progress, key, 'good', app.now());
   return app;
 }
 
@@ -71,18 +72,25 @@ describe('recalling words still being learned', () => {
 describe("the card's memory strength", () => {
   it('shows beside the question, and stays the same once answered', () => {
     const app = learner(false);
-    app.progress.cards.salamat.interval = 0;
+    // Recalling it is a card of its own (see Way), started here and still being learned; reading it is held for weeks.
+    app.progress.cards['salamat:recall'] = { ...app.progress.cards.salamat, interval: 0 };
+    app.progress.cards.salamat.interval = 30;
     const root = (last = recall(app));
     expect(root.querySelector('.prompt .eyebrow')?.textContent).toBe('How do you say… Memory: Just met');
     root.querySelector<HTMLButtonElement>('.choice')!.click();
     expect(root.querySelector('.prompt .eyebrow .badge.s-new')?.textContent).toBe('Memory: Just met');
   });
 
-  it('follows the schedule', () => {
+  it('follows the schedule of the way it is asked', () => {
     const app = learner(true);
-    app.progress.cards.salamat.interval = 30;
+    app.progress.cards['salamat:recall'].interval = 30;
     const root = (last = recall(app));
     expect(root.querySelector('.prompt .eyebrow .badge.s-long')?.textContent).toBe('Memory: Long-term');
+  });
+
+  it("isn't shown for a way not studied yet", () => {
+    const root = (last = recall(learner(false)));
+    expect(root.querySelector('.prompt .eyebrow .badge')).toBeNull();
   });
 });
 
@@ -216,7 +224,10 @@ describe('a Tagalog answer said into the box, with the pronunciation model on th
     // A voice, so listening is on offer.
     vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {} });
     drillScope(practiceScreen(fakeApp(KNOWN), noMic), ['listen']);
-    const root = (last = practiceScreen(learner(true), deps, null, () => hearer));
+    const app = learner(true);
+    // Heard and settled too, so a listening question asks for the meaning in the box.
+    for (const id of KNOWN) for (let i = 0; i < 2; i++) recordAnswer(app.progress, cardKey(id, 'listen'), 'good', app.now());
+    const root = (last = practiceScreen(app, deps, null, () => hearer));
     document.body.replaceChildren(root);
     await say(root);
     expect(recognise).not.toHaveBeenCalled();

@@ -6,6 +6,8 @@
 // one-day interval is due at 3pm tomorrow, and reviews trickle in through the
 // day instead of all landing at midnight.
 
+import type { Way } from './deck';
+
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
 
 export interface CardState {
@@ -30,19 +32,21 @@ export interface CardState {
    */
   log?: [number, number][];
   /**
-   * Drills only, never the schedule: for each way the card is asked (DrillWay), how many answers needed help (got
+   * Drills only, never the schedule, and kept on a card's read key (cardKey) for every way: for each way it's asked
+   * (Way), how many answers needed help (got
    * wrong, or picked from the choices after "Show choices"; MAX_HELP at most), less those got right unaided since.
    * Knowing a word one way says little about another (reading it, but not saying it or recalling it from the English),
    * so each way is counted, and drilled, on its own (see pickDrillCard). Missing ways, or a missing `help`, mean none.
    */
-  help?: Partial<Record<DrillWay, number>>;
+  help?: Partial<Record<Way, number>>;
   /** When `help` last changed, so a copy synced from elsewhere keeps the later count (see mergeInto). */
   helpAt?: number;
+  /**
+   * Started from reading's schedule when Study's ways were split (schema 4), and not answered this way since. Any
+   * copy answered this way wins over it in a merge, however long ago (see mergeInto). Missing means answered.
+   */
+  split?: true;
 }
-
-/** The ways a drill round asks a card: see the Tagalog, hear it, come up with it from the English, say it. */
-export type DrillWay = 'read' | 'listen' | 'recall' | 'speak';
-export const DRILL_WAYS: readonly DrillWay[] = ['read', 'listen', 'recall', 'speak'];
 
 /** Most answers needing help one way of asking a card holds, so a few right answers are enough to clear it. */
 export const MAX_HELP = 3;
@@ -75,7 +79,8 @@ export function nextInterval(card: CardState, rating: Rating): number {
 
 export function review(card: CardState, rating: Rating, now: number): CardState {
   const interval = nextInterval(card, rating);
-  const next: CardState = { ...card, interval, reviewed: now };
+  const { split: _split, ...answered } = card;
+  const next: CardState = { ...answered, interval, reviewed: now };
 
   switch (rating) {
     case 'again':

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, LEARN_ORDER, UNITS, buildsOn, getCard, isVocab, type Card } from './deck';
+import { ALL_CARDS, LEARN_ORDER, UNITS, WAYS, buildsOn, cardKey, getCard, isVocab, studyWays, type Card, type Way } from './deck';
 import {
   MAX_LEARNING,
   PATTERN_START,
@@ -28,7 +28,7 @@ import {
   studyQueue,
   upcomingNewCards,
 } from './session';
-import { DAY_MS, DRILL_WAYS, newCardState, startOfDayAfter, type DrillWay } from './srs';
+import { DAY_MS, newCardState, startOfDayAfter } from './srs';
 import { emptyProgress, recordAnswer } from './store';
 
 const NOW = Date.UTC(2026, 0, 1, 12);
@@ -40,11 +40,14 @@ const VOCAB_ORDER = LEARN_ORDER.filter(isVocabId);
 /** Whether a card builds on nothing, so it can come before anything has settled. */
 const standsAlone = (id: string) => buildsOn(getCard(id)!).length === 0;
 
-/** Introduce cards and give them each a schedule `days` long, last seen at NOW. */
-function learn(progress: ReturnType<typeof emptyProgress>, ids: string[], days = 3): void {
+/** Introduce cards and give them each a schedule `days` long, last seen at NOW: read only, or every way Study asks. */
+function learn(progress: ReturnType<typeof emptyProgress>, ids: string[], days = 3, everyWay = false): void {
   for (const id of ids) {
-    recordAnswer(progress, id, 'good', NOW);
-    progress.cards[id] = { ...progress.cards[id], interval: days, reps: 2, due: NOW + days * DAY_MS };
+    for (const way of everyWay ? studyWays(getCard(id)!) : ['read' as const]) {
+      const key = cardKey(id, way);
+      recordAnswer(progress, key, 'good', NOW);
+      progress.cards[key] = { ...progress.cards[key], interval: days, reps: 2, due: NOW + days * DAY_MS };
+    }
   }
 }
 
@@ -98,9 +101,61 @@ describe('nextStudyStep', () => {
 
   it('keeps to the daily new-word rate, then is caught up: practice beyond that is Drills\'', () => {
     const progress = emptyProgress(NOW);
-    learn(progress, ALL_CARDS.slice(0, 8).map((c) => c.id));
+    learn(progress, ALL_CARDS.slice(0, 8).map((c) => c.id), 3, true);
     expect(newCardsLeftToday(progress)).toBe(0);
     expect(nextStudyStep(progress, NOW, [], CAN)).toBeNull();
+  });
+
+  it("starts a word's other ways once it has settled, before new words and without using up the day's new words", () => {
+    const progress = emptyProgress(NOW);
+    const [a, b] = VOCAB_ORDER;
+    learn(progress, [a]);
+    // Met today and not yet remembered a day later: it's learned by reading first.
+    recordAnswer(progress, b, 'good', NOW);
+    const step = nextStudyStep(progress, NOW, [], CAN)!;
+    expect(step).toEqual({ cardId: a, way: 'listen', kind: 'review', format: 'listen' });
+    const before = progress.today.newCount;
+    recordAnswer(progress, cardKey(a, 'listen'), 'good', NOW);
+    expect(progress.today.newCount).toBe(before);
+    expect(nextStudyStep(progress, NOW, [cardKey(a, 'listen')], CAN)).toMatchObject({ kind: 'new' });
+    // A way not just shown, once there's nothing else.
+    expect(nextStudyStep(progress, NOW, [cardKey(b, 'read'), b, b], CAN)).toEqual({ cardId: a, way: 'recall', kind: 'review', format: 'recall' });
+  });
+
+  it('asks each way of a word by its own schedule, and leaves listening waiting while the sound is off', () => {
+    const progress = emptyProgress(NOW);
+    progress.settings.dailyNew = 0;
+    const [a] = VOCAB_ORDER;
+    learn(progress, [a], 3, true);
+    const later = NOW + 4 * DAY_MS;
+    expect(studyQueue(progress, later, CAN).sort()).toEqual([a, cardKey(a, 'listen'), cardKey(a, 'recall')].sort());
+    expect(studyQueue(progress, later, { listen: false })).not.toContain(cardKey(a, 'listen'));
+    progress.cards[cardKey(a, 'recall')].due = later + DAY_MS;
+    const formats = new Set<string>();
+    const recent: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const step = nextStudyStep(progress, later, recent, { listen: false })!;
+      expect(step.way).not.toBe('listen');
+      formats.add(step.format!);
+      recent.push(cardKey(step.cardId, step.way ?? 'read'));
+    }
+    expect(formats).toEqual(new Set(['remember']));
+  });
+
+  it("doesn't let listening cards waiting for the sound hold back the other ways and new words", () => {
+    const progress = emptyProgress(NOW);
+    const ids = VOCAB_ORDER.slice(0, 4);
+    learn(progress, ids, 3);
+    // Three words whose listening was missed, so still being learned, then the sound goes off.
+    for (const id of ids.slice(0, 3)) {
+      recordAnswer(progress, cardKey(id, 'listen'), 'again', NOW);
+      progress.cards[cardKey(id, 'recall')] = { ...progress.cards[id] };
+    }
+    expect(learningCount(progress)).toBe(3);
+    expect(learningCount(progress, { listen: false })).toBe(0);
+    const step = nextStudyStep(progress, NOW + 60_000, [], { listen: false });
+    expect(step).not.toBeNull();
+    expect(step!.way).not.toBe('listen');
   });
 
   it('asks the card just shown again when it is the only one left being learned, rather than being caught up', () => {
@@ -145,6 +200,16 @@ describe('nextStudyAt', () => {
     expect(nextStudyAt(progress, NOW)).toBe(NOW + 5 * DAY_MS);
   });
 
+  it("doesn't wait for a listening card while the sound is off, as Study won't ask it", () => {
+    const progress = emptyProgress(NOW);
+    const id = VOCAB_ORDER[0];
+    learn(progress, [id], 5, true);
+    progress.settings.dailyNew = 0;
+    progress.cards[cardKey(id, 'listen')].due = NOW + DAY_MS;
+    expect(nextStudyAt(progress, NOW)).toBe(NOW + DAY_MS);
+    expect(nextStudyAt(progress, NOW, { listen: false })).toBe(NOW + 5 * DAY_MS);
+  });
+
   it('is null with nothing met and nothing to meet', () => {
     const progress = emptyProgress(NOW);
     progress.settings.dailyNew = 0;
@@ -154,19 +219,19 @@ describe('nextStudyAt', () => {
 
 describe('pickFormat', () => {
   const state = (interval: number) => ({ ...newCardState(NOW), interval });
-  const all = (interval: number, can = CAN) => new Set([0, 0.3, 0.6, 0.99].map((r) => pickFormat(state(interval), can, () => r)));
 
-  it('asks words still being learned the easiest way', () => {
-    expect(all(0)).toEqual(new Set(['read']));
+  it('asks words still being learned each way by picking from four', () => {
+    expect(pickFormat(state(0), 'read')).toBe('read');
+    expect(pickFormat(state(0), 'listen')).toBe('listen');
+    expect(pickFormat(state(0), 'recall')).toBe('recall');
   });
 
-  it('self-rates learned words, in harder ways as they hold for longer', () => {
-    expect(all(3)).toEqual(new Set(['remember', 'hear']));
-    expect(all(14)).toEqual(new Set(['remember', 'produce', 'hear']));
-  });
-
-  it('leaves out listening without a voice', () => {
-    expect(all(14, { listen: false })).not.toContain('hear');
+  it('self-rates learned words, the same way round', () => {
+    for (const interval of [3, 30]) {
+      expect(pickFormat(state(interval), 'read')).toBe('remember');
+      expect(pickFormat(state(interval), 'listen')).toBe('hear');
+      expect(pickFormat(state(interval), 'recall')).toBe('produce');
+    }
   });
 });
 
@@ -330,6 +395,10 @@ describe('requeue', () => {
     expect(next[3].kind).toBe('review');
   });
 
+  it('brings it back asked the same way', () => {
+    expect(requeue([], { cardId: 'x', way: 'recall', kind: 'review' })[0].way).toBe('recall');
+  });
+
   it('appends when the queue is short', () => {
     expect(requeue([], { cardId: 'x', kind: 'review' })).toEqual([{ cardId: 'x', kind: 'review' }]);
   });
@@ -377,11 +446,11 @@ describe('guides', () => {
   it('are checked with a gap while being learned, then built or recalled', () => {
     const learning = newCardState(NOW);
     const learned = { ...learning, interval: 10, reps: 3 };
-    expect(pickFormat(learning, CAN, () => 0.1, 'pattern')).toBe('gap');
-    expect(pickFormat(learned, CAN, () => 0.1, 'pattern')).toBe('build');
-    expect(pickFormat(learned, CAN, () => 0.9, 'pattern')).toBe('think');
-    expect(pickFormat(learning, CAN, () => 0.1, 'sound')).toBe('gap');
-    expect(pickFormat(learned, CAN, () => 0.1, 'knowhow')).toBe('think');
+    expect(pickFormat(learning, 'read', () => 0.1, 'pattern')).toBe('gap');
+    expect(pickFormat(learned, 'read', () => 0.1, 'pattern')).toBe('build');
+    expect(pickFormat(learned, 'read', () => 0.9, 'pattern')).toBe('think');
+    expect(pickFormat(learning, 'read', () => 0.1, 'sound')).toBe('gap');
+    expect(pickFormat(learned, 'read', () => 0.1, 'knowhow')).toBe('think');
   });
 
   it('pick drills made of cards already met, and not the same one twice running', () => {
@@ -423,7 +492,7 @@ describe('picking the next card to drill', () => {
   }
 
   /** Words asked every way, guides as a gap to fill (read), as a round with everything in scope does. */
-  const everyWay = (card: Card): readonly DrillWay[] => (isVocab(card) ? DRILL_WAYS : ['read']);
+  const everyWay = (card: Card): readonly Way[] => (isVocab(card) ? WAYS : ['read']);
 
   /** The card picked next, asked any way. */
   function pick(progress: ReturnType<typeof emptyProgress>, now: number, recent: string[], missed = new Map<string, number>(), ways = everyWay, random?: () => number) {
@@ -445,7 +514,7 @@ describe('picking the next card to drill', () => {
   const counts = (...args: Parameters<typeof tallies>) => tallies(...args).seen;
 
   /** A drill answer asked `way` that needed help (or, with `helped` false, was got right unaided). */
-  const helpWith = (progress: ReturnType<typeof emptyProgress>, id: string, way: DrillWay = 'recall', helped = true) =>
+  const helpWith = (progress: ReturnType<typeof emptyProgress>, id: string, way: Way = 'recall', helped = true) =>
     noteDrillAnswer(progress, id, way, helped, LATER);
 
   it('keeps the last three cards out', () => {
@@ -597,7 +666,7 @@ describe('picking the next card to drill', () => {
   it('shares a card between the ways it can be asked, so a word asked four ways comes up no more than one asked one way', () => {
     const progress = settledProgress();
     const seen = new Map<string, number>();
-    const oneWay = (card: Card): readonly DrillWay[] => (card.id === 'kape' ? DRILL_WAYS : ['read']);
+    const oneWay = (card: Card): readonly Way[] => (card.id === 'kape' ? WAYS : ['read']);
     for (let i = 0; i < 4000; i++) {
       const { card } = pickDrillCard(progress, LATER, [], new Map(), oneWay, () => (i + 0.5) / 4000)!;
       seen.set(card.id, (seen.get(card.id) ?? 0) + 1);
@@ -633,7 +702,7 @@ describe('picking the next card to drill', () => {
     expect(seen.get('p-gusto')).toBeGreaterThan(0);
     expect(seen.get('s-ng')).toBeGreaterThan(0);
     for (let i = 0; i < 50; i++) {
-      const card = pick(progress, LATER, [], new Map(), (c) => (isVocab(c) ? DRILL_WAYS : []), () => i / 50)!;
+      const card = pick(progress, LATER, [], new Map(), (c) => (isVocab(c) ? WAYS : []), () => i / 50)!;
       expect(isVocab(card)).toBe(true);
     }
   });

@@ -24,6 +24,7 @@ import {
   type Envelope,
   type Progress,
 } from './progress-schema';
+import { keyed } from './deck';
 import { pastLog, strengthOf } from './memory';
 import { newCardState, review, type Rating } from './srs';
 
@@ -225,7 +226,8 @@ const RETRY_WINDOW_MS = 60 * 60 * 1000;
 /** Record a rating for a card, introducing it if it is new. Mutates and returns progress. */
 export function recordAnswer(progress: Progress, cardId: string, rating: Rating, now: number): Progress {
   const existing = progress.cards[cardId];
-  if (!existing) progress.today.newCount++;
+  // Another way of studying a word already met (see Way) isn't a new word, so it leaves the daily new-word rate alone.
+  if (!existing && (keyed(cardId)?.way ?? 'read') === 'read') progress.today.newCount++;
   else progress.today.reviewCount++;
   // A review after a gap tests memory; a retry minutes after a miss doesn't.
   if (existing && (existing.reviewed === undefined || now - existing.reviewed >= RETRY_WINDOW_MS)) {

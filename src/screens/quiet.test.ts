@@ -74,14 +74,18 @@ describe('sound off', () => {
     expect(app.progress.cards.salamat.reps).toBe(reps + 1);
   });
 
-  it('asks an unanswered listening step again by reading when the sound goes off', () => {
+  it('leaves an unanswered listening step as it is when the sound goes off, and moves on: reading it is another card', () => {
     const app = fakeApp(true);
-    const root = sessionScreen(app, [{ kind: 'review', cardId: 'salamat', format: 'hear' }]);
+    const root = sessionScreen(app, [
+      { kind: 'review', cardId: 'salamat', way: 'listen', format: 'hear' },
+      { kind: 'review', cardId: 'salamat', format: 'remember' },
+    ]);
     expect(hearing(root)).toBe(true);
     const before = structuredClone(app.progress.cards);
     soundSwitch(root).click();
     expect(hearing(root)).toBe(false);
     expect(root.textContent).toContain('Salamat');
+    expect(root.textContent).toContain('Show the');
     expect(app.progress.cards).toEqual(before);
   });
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ALL_CARDS } from '../deck';
+import { ALL_CARDS, cardKey, studyWays } from '../deck';
 import { fakeApp } from '../test/screen';
 import { homeScreen } from './home';
 
@@ -11,6 +11,10 @@ function caughtUp(wait: number) {
   const app = fakeApp(ALL_CARDS.slice(0, 8).map((c) => c.id));
   const now = app.now();
   for (const state of Object.values(app.progress.cards)) Object.assign(state, { interval: 30, reps: 3, due: now + 400 * 24 * HOUR });
+  // Studied every way, so no way of a word is waiting to start.
+  for (const card of ALL_CARDS.slice(0, 8)) {
+    for (const way of studyWays(card)) app.progress.cards[cardKey(card.id, way)] ??= { ...app.progress.cards[card.id] };
+  }
   app.progress.cards[ALL_CARDS[2].id].due = now + wait;
   app.progress.settings.dailyNew = 0;
   return app;
