@@ -745,9 +745,13 @@ export function englishReadings(text: string, heard: string[]): { letters: strin
  */
 export function lostFirstSound(text: string, heard: string[]): { letters: string; heard: string } | null {
   const spelled = text.toLowerCase().normalize('NFC');
-  const [first, second] = compare(toPhones(spelled), heard).sounds;
+  // The catch before a first vowel is optional, so a text starting with a vowel starts at the vowel.
+  const sounds = compare(toPhones(spelled), heard).sounds.filter((s) => !s.phone.optional);
+  const [first, second] = sounds;
   if (!first || isVowelSound(first.phone.ipa) || first.verdict === 'good' || first.verdict === 'close') return null;
-  // A stop before another consonant (the p of "Psst") is barely sounded at all.
-  if (second && !isVowelSound(second.phone.ipa)) return null;
+  // A p before an s that was heard is barely sounded at all; a t before r ("Trapik") is.
+  if (first.verdict === 'missing' && second?.phone.ipa === 's' && second.verdict !== 'missing') return null;
+  // A first word with no vowel ("Psst!") is a hiss, not speech: the voice barely sounds it, and the recogniser rarely hears it.
+  if (!/[aeiou]/.test(spelled.match(/[\p{L}]+/u)?.[0] ?? '')) return null;
   return { letters: text.normalize('NFC').slice(first.phone.from, first.phone.to), heard: first.heard ?? 'nothing' };
 }

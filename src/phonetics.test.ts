@@ -244,10 +244,17 @@ describe('lostFirstSound', () => {
     expect(lostFirstSound('Kailan?', ['k', 'a', 'j', 'l', 'a', 'n'])).toBeNull();
     expect(lostFirstSound('kanan', ['ɡ', 'a', 'n', 'a', 'n'])).toBeNull();
     expect(lostFirstSound('Psst! Kuya!', ['s', 't', 'k', 'u', 'j', 'a'])).toBeNull();
+    expect(lostFirstSound('Pabili po.', ['b', 'i', 'l', 'i', 'p', 'o'])).not.toBeNull();
+    expect(lostFirstSound('Trapik!', ['ɾ', 'a', 'p', 'i', 'k'])).not.toBeNull();
+  });
+
+  it('leaves out a hiss, which the voice barely sounds', () => {
+    expect(lostFirstSound('Psst! Kuya!', ['k', 'u', 'j', 'a'])).toBeNull();
   });
 
   it('leaves a first vowel to the check for a take cut off', () => {
     expect(lostFirstSound('Ako rin.', ['k', 'o', 'ɾ', 'i', 'n'])).toBeNull();
+    expect(lostFirstSound('Ako rin.', ['h', 'a', 'k', 'o', 'ɾ', 'i', 'n'])).toBeNull();
   });
 });
 
