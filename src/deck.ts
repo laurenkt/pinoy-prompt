@@ -478,6 +478,8 @@ export const UNITS: Unit[] = [
       { id: 'kuya', tl: 'Kuya', en: 'older brother', kind: 'word', hint: 'KOO-yah', note: 'Also used for drivers, guards and other men slightly older than you.', hook: 'From Hokkien Chinese "ko-á", older brother. Chinese traders brought family words that stuck.' },
       { id: 'lola', tl: 'lola', en: 'grandmother', kind: 'word', hint: 'LOH-lah', hook: 'Usually traced to Spanish "abuela". Ends in -a for the woman, like Spanish.' },
       { id: 'lolo', tl: 'lolo', en: 'grandfather', kind: 'word', hint: 'LOH-loh', hook: 'Lola ends in -a like "abuela" (grandma), lolo ends in -o like "abuelo" (grandpa). Same rule as Spanish.' },
+      { id: 'tita', tl: 'Tita', en: 'aunt', kind: 'word', hint: 'TEE-tah', note: 'Also what you call your parents\' friends and other women their age, by name: "Tita Rose". You may hear the older word "tiya" in the provinces.', hook: 'From Spanish "tita", the pet form of "tía" (aunt). Tita and tito, like lola and lolo: -a for her, -o for him.' },
+      { id: 'tito', tl: 'Tito', en: 'uncle', kind: 'word', hint: 'TEE-toh', note: 'Also what you call your parents\' friends and other men their age, by name: "Tito Boy". You may hear the older word "tiyo" in the provinces.', hook: 'From Spanish "tito", the pet form of "tío" (uncle). Ends in -o for him, like "lolo".' },
       { id: 'anak', tl: 'anak', en: 'child (son or daughter)', kind: 'word', hint: 'ah-NAHK', hook: '"Anak" is also the title of Freddie Aguilar\'s 1978 hit, a song about a parent and child that became famous around the world.' },
       { id: 'kaibigan', tl: 'kaibigan', en: 'friend', kind: 'word', hint: 'kah-ee-BEE-gahn', hook: 'The root is "ibig" (love, want). Ka- + ibig + -an: someone you share fondness with.' },
       { id: 'asawa', tl: 'asawa', en: 'husband / wife', kind: 'word', hint: 'ah-SAH-wah', hook: 'One word for husband and wife, as "siya" is one word for he and she.' },
@@ -485,6 +487,14 @@ export const UNITS: Unit[] = [
       { id: 'lalaki', tl: 'lalaki', en: 'man / male', kind: 'word', hint: 'lah-LAH-kee', hook: 'One letter from "malaki" (big). On toilet doors you will see "Lalaki" for men.' },
       { id: 'babae', tl: 'babae', en: 'woman / female', kind: 'word', hint: 'bah-BAH-eh', hook: 'The other toilet door. Three syllables, "ba-BA-eh", with the a and e said apart.' },
       { id: 'kapatid', tl: 'kapatid', en: 'brother / sister', kind: 'word', hint: 'kah-pah-TID', note: 'Older ones are usually called Ate and Kuya instead.', hook: 'One word for brother or sister, like "asawa" for husband or wife. Add "na lalaki" or "na babae" only if it matters.' },
+      { id: 'pinsan', tl: 'pinsan', en: 'cousin', kind: 'word', hint: 'PEEN-sahn', note: 'Cousins are often as close as brothers and sisters. Between them it\'s shortened to "insan".', hook: 'Drop the p and you have "insan", what cousins call each other.' },
+      { id: 'magulang', tl: 'magulang', en: 'parent', kind: 'word', hint: 'mah-GOO-lahng', note: 'Your parents are "mga magulang ko".', hook: 'The root is "gulang" (age), as in "Ilang taon ka na?". Ma- + gulang: the ones with the years.' },
+      { id: 'apo', tl: 'apo', en: 'grandchild', kind: 'word', hint: 'AH-poh', hook: 'What lola and lolo call you. "Apo ko!", my grandchild!' },
+      { id: 'pamangkin', tl: 'pamangkin', en: 'niece / nephew', kind: 'word', hint: 'pah-MAHNG-kin', hook: 'One word for niece or nephew, like "kapatid" for brother or sister. Your tita\'s pamangkin is you.' },
+      { id: 'panganay', tl: 'panganay', en: 'eldest child', kind: 'word', hint: 'pah-NGAH-nai', note: 'The eldest is expected to look after the younger ones, and is their Ate or Kuya.', hook: 'The "ng" starts a syllable here, "pa-NGA-nay", as it does in "ngayon". The first child, and the first word of the pair: panganay, then bunso.' },
+      { id: 'bunso', tl: 'bunso', en: 'youngest child', kind: 'word', hint: 'BOON-soh', note: 'Also a pet name: the family keeps calling the youngest "Bunso" long after they\'ve grown up.', hook: 'The baby of the family. "Bun" for the little one, like a small bun.' },
+      { id: 'ninang', tl: 'Ninang', en: 'godmother', kind: 'word', hint: 'NEE-nahng', note: 'Children often have several, and visit them for gifts at Christmas. The sponsors at a wedding are ninang and ninong too.', hook: 'Ends in -ang for her and -ong for him: Ninang, Ninong. Together they are your "mga ninong at ninang".' },
+      { id: 'ninong', tl: 'Ninong', en: 'godfather', kind: 'word', hint: 'NEE-nohng', note: 'Expect to be asked "Ninong, pamasko ko po?" (my Christmas gift, please?) if you are one.', hook: 'Ninang\'s pair: -ang for her, -ong for him.' },
       { id: 'bata', tl: 'bata', en: 'kid / young', kind: 'word', hint: 'BAH-tah', hook: 'Any child is a "bata"; your own child is your "anak". "Bata pa ako" is "I\'m still young".' },
     ],
   },
@@ -769,7 +779,7 @@ export const LEARN_ORDER: readonly string[] = [
   'p-when',
   // Less everyday feelings, plans and family.
   'nauuhaw-ako', 'inaantok-ako', 'malamig', 'masaya', 'malungkot', 'gusto-ko-umuwi', 'sasama-ako',
-  'tuloy-ba-tayo', 'mga', 'p-mga', 'para-saan', 'kanino', 'lola', 'lolo',
+  'tuloy-ba-tayo', 'mga', 'p-mga', 'para-saan', 'kanino', 'lola', 'lolo', 'tita', 'tito',
   // Rarer places, dates and emergencies.
   'simbahan', 'opisina', 'bangko', 'paliparan', 'buwan', 'taon', 'lunes', 'biyernes', 'sabado', 'hatinggabi',
   'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',
@@ -778,6 +788,7 @@ export const LEARN_ORDER: readonly string[] = [
   // Have you eaten? Small talk about home, work and family, and the replies that go with it.
   'pa', 'kumain-ka-na-ba', 'kumain-na-ako', 'hindi-pa', 'kayo', 'tao-po', 'tuloy-po-kayo', 'saan-ka-nakatira', 'ano-trabaho-mo',
   'ilang-taon-ka-na', 'asawa', 'may-asawa-ka-na-ba', 'pamilya', 'lalaki', 'babae', 'kapatid', 'bata',
+  'magulang', 'pinsan', 'apo', 'pamangkin', 'panganay', 'bunso', 'ninang', 'ninong',
   'walang-problema', 'ikaw-ang-bahala', 'sigurado-ka-ba', 'sana',
   // Doing words for an ordinary day.
   'kumain', 'uminom', 'matulog', 'matutulog-na-ako', 'gising-ka-na-ba', 'maligo', 'pumunta', 'dumating',
