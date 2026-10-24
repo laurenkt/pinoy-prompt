@@ -13,6 +13,7 @@ import {
   requeue,
   shuffle,
   unmetCount,
+  upcomingNewCards,
   type Format,
   type Step,
 } from '../session';
@@ -379,6 +380,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   function caughtUpView(): HTMLElement {
     const unmet = unmetCount(app.progress) > 0;
+    // Cards still to meet may all be waiting for the ones they build on to settle.
+    const more = upcomingNewCards(app.progress, 1).length > 0;
     // Drills wait for a few words; until then, learning more is the way on.
     const drills = canDrill(app.progress);
     return h(
@@ -399,7 +402,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
         { class: 'stack' },
         drills &&
           h('button', { class: 'btn primary big', 'data-autofocus': true, 'data-tap': 'before', onclick: () => app.navigate({ name: 'practice' }) }, 'Keep practising in Drills'),
-        unmet &&
+        more &&
           h(
             'button',
             {

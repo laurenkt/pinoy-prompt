@@ -3,7 +3,8 @@
 // review until the learner asks for one or misses the card.
 
 import { describe, expect, it, vi } from 'vitest';
-import { getCard } from '../deck';
+import { LEARN_ORDER, getCard } from '../deck';
+import { DAY_MS } from '../srs';
 import { sessionScreen } from './session';
 import { button, fakeApp } from '../test/screen';
 
@@ -85,6 +86,17 @@ describe('open-ended study', () => {
     expect(root.querySelector('.choice')).toBeNull();
     button(root, 'Keep practising in Drills').click();
     expect(navigate).toHaveBeenCalledWith({ name: 'practice' });
+  });
+
+  it("doesn't offer new cards when every one left is waiting for the words it is built from to settle", () => {
+    const app = fakeApp(LEARN_ORDER.filter((id) => id !== 'kumain-na-ako'));
+    const tomorrow = app.now() + DAY_MS;
+    for (const state of Object.values(app.progress.cards)) Object.assign(state, { interval: 3, reps: 2, due: tomorrow });
+    // "Kumain" was met yesterday and hasn't been seen again since.
+    Object.assign(app.progress.cards['kumain'], { interval: 1, reps: 1 });
+    const root = sessionScreen(app, null);
+    expect(root.textContent).toContain("You're caught up");
+    expect(root.textContent).not.toContain('Learn something new');
   });
 
   it('offers new words instead of Drills while there are too few words to drill', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, LEARN_ORDER, UNITS, VOCAB, getCard, isVocab } from './deck';
+import { ALL_CARDS, LEARN_ORDER, UNITS, buildsOn, getCard, isVocab } from './deck';
 import {
   MAX_LEARNING,
   PATTERN_START,
@@ -34,6 +34,8 @@ const CAN = { listen: true };
 
 const isVocabId = (id: string) => isVocab(getCard(id)!);
 const VOCAB_ORDER = LEARN_ORDER.filter(isVocabId);
+/** Whether a card builds on nothing, so it can come before anything has settled. */
+const standsAlone = (id: string) => buildsOn(getCard(id)!).length === 0;
 
 /** Introduce cards and give them each a schedule `days` long, last seen at NOW. */
 function learn(progress: ReturnType<typeof emptyProgress>, ids: string[], days = 3): void {
@@ -177,19 +179,45 @@ describe('dueCards', () => {
 describe('new cards', () => {
   it('come most useful first across topics, with no vocabulary locked', () => {
     const progress = emptyProgress(NOW);
-    expect(upcomingNewCards(progress, Infinity).filter(isVocabId)).toEqual(VOCAB_ORDER);
+    expect(upcomingNewCards(progress, Infinity).filter(isVocabId)).toEqual(VOCAB_ORDER.filter(standsAlone));
     for (const id of VOCAB_ORDER.slice(0, 3)) recordAnswer(progress, id, 'good', NOW);
     expect(upcomingNewCards(progress, 2)).toEqual(VOCAB_ORDER.slice(3, 5));
+    // Once everything met has settled, every word and phrase is open.
+    learn(progress, VOCAB_ORDER.slice(0, -1));
+    expect(upcomingNewCards(progress, Infinity).filter(isVocabId)).toEqual(VOCAB_ORDER.slice(-1));
   });
 
   it('skip cards met in an earlier order, however they were met', () => {
     const progress = emptyProgress(NOW);
     // Older builds introduced whole topics in turn.
     const met = UNITS[0].cards.map((c) => c.id);
-    for (const id of met) recordAnswer(progress, id, 'good', NOW);
-    const next = upcomingNewCards(progress, Infinity);
-    expect(next.filter(isVocabId)).toEqual(VOCAB_ORDER.filter((id) => !met.includes(id)));
-    expect(next.filter(isVocabId).length).toBe(VOCAB.length - met.length);
+    learn(progress, met);
+    const next = upcomingNewCards(progress, Infinity).filter(isVocabId);
+    expect(next).toEqual(VOCAB_ORDER.filter((id) => !met.includes(id) && buildsOn(getCard(id)!).every((w) => met.includes(w))));
+  });
+
+  it('hold a phrase back until the words it is built from have settled, bringing the next card in meanwhile', () => {
+    const progress = emptyProgress(NOW);
+    const before = VOCAB_ORDER.slice(0, VOCAB_ORDER.indexOf('salamat-po'));
+    learn(progress, before);
+    // "Po" was only just met: one good answer, not yet seen again.
+    progress.cards['po'] = { ...progress.cards['po'], reps: 1, interval: 0 };
+    expect(upcomingNewCards(progress, 1)).toEqual(['wala']);
+    progress.cards['po'] = { ...progress.cards['po'], reps: 2, interval: 1 };
+    expect(upcomingNewCards(progress, 1)).toEqual(['salamat-po']);
+  });
+
+  it('keep a phrase out of the cards met with its words, so it comes on a later day', () => {
+    const progress = emptyProgress(NOW);
+    const today = upcomingNewCards(progress, 30);
+    for (const id of today) for (const word of buildsOn(getCard(id)!)) expect(today, `${id} uses ${word}`).not.toContain(word);
+  });
+
+  it('bring in the words of a phrase met before they were in the deck', () => {
+    const progress = emptyProgress(NOW);
+    // Met "Paano sabihin ito sa Tagalog?" before "paano" and "sabihin" came ahead of it.
+    learn(progress, [...VOCAB_ORDER.slice(0, VOCAB_ORDER.indexOf('paano')), 'paano-sabihin']);
+    expect(upcomingNewCards(progress, 2)).toEqual(['paano', 'sabihin']);
   });
 
   it('hold guides back until enough cards are met and the ones they build on have settled', () => {
@@ -277,7 +305,8 @@ describe('new cards', () => {
     for (const id of LEARN_ORDER.slice(0, 8)) recordAnswer(progress, id, 'good', NOW);
     expect(newCardsLeftToday(progress)).toBe(0);
     const steps = buildExtraSession(progress, 5);
-    expect(steps.map((s) => s.cardId)).toEqual(LEARN_ORDER.slice(8, 13));
+    // Phrases built on today's words wait for another day.
+    expect(steps.map((s) => s.cardId)).toEqual(LEARN_ORDER.slice(8).filter(standsAlone).slice(0, 5));
     expect(steps.every((s) => s.kind === 'new')).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, CORE_WORDS, LEARN_ORDER, UNITS, getCard, isVocab } from './deck';
+import { ALL_CARDS, CORE_WORDS, LEARN_ORDER, UNITS, VOCAB, buildsOn, cardForWord, getCard, isVocab, tagalogWords } from './deck';
 import { GUIDES } from './guides';
 import { canBuild, upcomingNewCards } from './session';
 import { emptyProgress, recordAnswer } from './store';
@@ -69,15 +69,31 @@ describe('deck', () => {
     for (const id of CORE_WORDS) expect(getCard(id)?.tl.toLowerCase(), id).toBe(id);
   });
 
-  it('introduces the core words a card is built from before the card', () => {
-    // "Bang" is "ba" joined to the next word, "pong" is "po", and "nito" is "of this".
-    const core = (word: string) =>
-      [word, word.replace(/ng$/, ''), word === 'nito' ? 'ito' : ''].find((w) => CORE_WORDS.includes(w));
-    for (const card of ALL_CARDS) {
-      const words = card.tl.toLowerCase().split(/[^a-z-]+/).map(core);
-      for (const word of words.filter((w): w is string => !!w && w !== card.id)) {
-        expect(LEARN_ORDER.indexOf(word), `${card.id} uses ${word}`).toBeLessThan(LEARN_ORDER.indexOf(card.id));
+  it('introduces the words a phrase is built from before the phrase', () => {
+    for (const card of VOCAB) {
+      for (const id of buildsOn(card)) {
+        expect(LEARN_ORDER.indexOf(id), `${card.id} uses ${id}`).toBeLessThan(LEARN_ORDER.indexOf(card.id));
       }
+    }
+  });
+
+  it('finds the words a phrase is built from, joined with "-ng" or not', () => {
+    expect(buildsOn(getCard('paano-sabihin')!).sort()).toEqual(['ito', 'paano', 'sa', 'sabihin']);
+    expect(buildsOn(getCard('walang-anuman')!)).toEqual(['wala']);
+    expect(buildsOn(getCard('ilang-taon-ka-na')!).sort()).toEqual(['ilan', 'ka', 'na', 'taon']);
+    expect(buildsOn(getCard('magkano-lahat')!)).toEqual(['magkano']);
+    expect(buildsOn(getCard('mabuti')!)).toEqual([]);
+  });
+
+  it('brings at most one new word with each phrase', () => {
+    // Words a learner knows already: English ones Tagalog borrows, and a name.
+    const known = ['tagalog', 'mag-english', 'taga-amerika', 'okay', 'bill', 'bag', 'pulis', 'signal', 'number', 'i-text', 'adobo', 'ana'];
+    // Said as a whole: "Mabuti naman" is the reply to "Kumusta?", and the formal "nice to meet you" is there to recognise.
+    const whole = ['mabuti', 'ikinagagalak'];
+    for (const card of VOCAB.filter((c) => !whole.includes(c.id))) {
+      // A word is new here if no card teaches it, or this card does ("tumawad" in "Puwede bang tumawad?").
+      const fresh = tagalogWords(card.tl).filter((w) => !known.includes(w) && (cardForWord(w) ?? card.id) === card.id);
+      expect(fresh.length, `${card.id}: ${fresh.join(', ')}`).toBeLessThanOrEqual(1);
     }
   });
 
