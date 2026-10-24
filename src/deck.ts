@@ -700,13 +700,13 @@ export const CORE_WORDS: readonly string[] = [
 /**
  * Cards close enough in meaning that one is never offered as a wrong answer
  * for another: "ko" can mean "I", "mo" and "kayo" can mean "you", "na" can mean
- * "now", a "bata" may be someone's "anak", "panganay" or "bunso", "luma" and
- * "matanda" are both "old", a "magulang" is a "nanay" or "tatay", Ate and Kuya
- * are each a "kapatid", "No problem" and "No worries" are ways to say "You're welcome",
+ * "now", a "bata" may be someone's "anak", "panganay" or "bunso" (though those
+ * two are opposites, so each is offered for the other), "luma" and "matanda"
+ * are both "old", a "magulang" is a "nanay" or "tatay", Ate and Kuya are each a "kapatid", "No problem" and "No worries" are ways to say "You're welcome",
  * and a hello, a goodbye or a "what's up?" can each be said several ways.
  */
 export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
-  ['ako', 'ko'], ['ikaw', 'ka', 'mo', 'kayo'], ['na', 'ngayon'], ['anak', 'bata', 'panganay', 'bunso'], ['luma', 'matanda'],
+  ['ako', 'ko'], ['ikaw', 'ka', 'mo', 'kayo'], ['na', 'ngayon'], ['anak', 'bata', 'panganay'], ['anak', 'bata', 'bunso'], ['luma', 'matanda'],
   ['magulang', 'nanay', 'tatay'],
   ['kapatid', 'ate', 'kuya'], ['walang-problema', 'walang-anuman', 'wala-yon', 'ayos-lang'],
   ['mauna-na-ako', 'aalis-na-ako'], ['uy', 'kumusta', 'ikaw-pala'], ['anong-meron', 'anong-balita'], ['maghintay', 'teka'], ['tumulong', 'tulong'],
