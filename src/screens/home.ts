@@ -32,10 +32,11 @@ export function homeScreen(app: App): HTMLElement {
   const memory = memorySummary(progress, now);
   const isFirstRun = memory.total === 0;
 
-  let memoryEl = isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now), forecast(progress, now));
+  const memoryEl = isFirstRun ? null : memoryCard(memory, memoryHistory(progress, now), forecast(progress, now));
+  // Only its numbers, not the chart, which a finger may be scrubbing.
   const redrawMemory = () => {
-    const at = app.now();
-    memoryEl?.replaceWith((memoryEl = memoryCard(memorySummary(app.progress, at), memoryHistory(app.progress, at), forecast(app.progress, at))));
+    const facts = memoryEl?.querySelector('.coming');
+    if (facts) facts.textContent = memoryFacts(memorySummary(app.progress, app.now()));
   };
 
   // The last word of the greeting gets the accent color.
@@ -178,17 +179,12 @@ function studyButton(app: App, isFirstRun: boolean): { el: HTMLElement; changesI
 
 /** The chart carries the story; the text around it is just the numbers it can't show. */
 function memoryCard(memory: MemorySummary, history: MemoryHistory, ahead: Forecast): HTMLElement {
-  const { strengths, recent, due } = memory;
-  const measured = recent.reviews >= MIN_MEASURED_REVIEWS;
-  const recall = measured ? 1 - recent.missed / recent.reviews : (memory.estimatedRecall ?? 0);
-  const pct = `${Math.round(recall * 100)}%`;
+  const { strengths } = memory;
 
   const counts = Object.fromEntries(
     STRENGTHS.map((s) => [s.id, h('span', { class: 'legend-count' }, strengths[s.id])]),
   ) as Record<Strength, HTMLElement>;
 
-  const facts = [measured ? `${pct} recalled` : `≈${pct} recall`];
-  if (due.tomorrow > 0) facts.push(`${due.tomorrow} more due by tomorrow`);
 
   return h(
     'section',
@@ -209,6 +205,16 @@ function memoryCard(memory: MemorySummary, history: MemoryHistory, ahead: Foreca
         ),
       ),
     ),
-    h('p', { class: 'coming muted small' }, facts.join(' · ')),
+    h('p', { class: 'coming muted small' }, memoryFacts(memory)),
   );
+}
+
+/** The numbers under the chart that it can't show. */
+function memoryFacts({ recent, estimatedRecall, due }: MemorySummary): string {
+  const measured = recent.reviews >= MIN_MEASURED_REVIEWS;
+  const recall = measured ? 1 - recent.missed / recent.reviews : (estimatedRecall ?? 0);
+  const pct = `${Math.round(recall * 100)}%`;
+  const facts = [measured ? `${pct} recalled` : `≈${pct} recall`];
+  if (due.tomorrow > 0) facts.push(`${due.tomorrow} more due by tomorrow`);
+  return facts.join(' · ');
 }

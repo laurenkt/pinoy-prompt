@@ -95,14 +95,15 @@ describe('Study button', () => {
       expect(document.activeElement).toBe(button);
     });
 
-    it('redraws the memory card when what is due changes, not as the wait counts down', () => {
+    it("updates the memory card's numbers when what is due changes, leaving its chart be", () => {
       const { root, advance } = open(2 * 60 * 1000);
-      const card = root.querySelector('.strength-card');
-      advance(60 * 1000);
-      expect(root.querySelector('.strength-card')).toBe(card);
-      advance(60 * 1000);
+      const facts = () => root.querySelector('.strength-card .coming')?.textContent;
+      const chart = root.querySelector('.strength-card svg');
+      expect(facts()).toContain('1 more due by tomorrow');
+      advance(2 * 60 * 1000);
       expect(kicker(root)).toBe('1 card due');
-      expect(root.querySelector('.strength-card')).not.toBe(card);
+      expect(facts()).not.toContain('more due by tomorrow');
+      expect(root.querySelector('.strength-card svg')).toBe(chart);
     });
 
     it('stops while the app is hidden', () => {
