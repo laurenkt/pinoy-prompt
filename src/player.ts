@@ -89,11 +89,13 @@ export function webAudioPlayer(): Player {
       // A finger going down doesn't count as a tap on iOS, so a context that hasn't started yet may stay silent
       // until it's lifted; then it's resumed, and the sound plays from there for a tap's length.
       let heard = ctx.state === 'running';
-      let since = performance.now();
+      // When it's heard from, by performance.now(): once the context runs, and it starts (after a wake, a moment later).
+      const heardFrom = () => performance.now() + Math.max(0, (sound.startsAt - ctx.currentTime) * 1000);
+      let since = heardFrom();
       const timer = setInterval(() => {
         if (ctx.state === 'running' && !heard) {
           heard = true;
-          since = performance.now();
+          since = heardFrom();
         }
         live.scheduleUntil(ctx.currentTime + AHEAD);
       }, EVERY_MS);
@@ -110,7 +112,7 @@ export function webAudioPlayer(): Player {
           // may replace it, leaving this voice on a closed one.
           if (!heard) {
             void ctx.resume().catch(() => {});
-            since = performance.now();
+            since = heardFrom();
           }
           const left = TAP_MS - (performance.now() - since);
           if (left > 0) setTimeout(() => sound.stop(), left);

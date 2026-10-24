@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Decoded clips are kept between tests, so each test that counts fetches has its own word.
 vi.mock('./clips.json', () => ({ default: { Salamat: ['salamat-1a2b'], Opo: ['opo-a1-marin', 'opo-b2-cedar'], Sige: ['sige-c3-marin', 'sige-d4-cedar'], Oo: ['oo-3c4d'], Paalam: ['paalam-5e6f'], 'Kumusta?': ['kumusta-7a8b'] } }));
 
-const { audioBusy, IDLE_SUSPEND_MS, KEEP_DECODED, loadClip, playLive } = await import('./audio-engine');
+const { audioBusy, IDLE_SUSPEND_MS, KEEP_DECODED, loadClip, playLive, WAKE_SECONDS } = await import('./audio-engine');
 const { canPlay, chime, clickSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
@@ -307,6 +307,66 @@ describe('clips', () => {
     closeMicrophone();
   });
 
+  it("waits for the phone's output to start after a wake, so a word doesn't lose its first sound", async () => {
+    vi.useFakeTimers();
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    await Promise.resolve();
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS);
+    expect(ctx.state).toBe('suspended');
+    ctx.currentTime = 40;
+    ctx.resume = () => ((ctx.state = 'running'), Promise.resolve());
+    await play({ tl: 'Salamat' });
+    expect(sources.at(-1)!.started).toBeCloseTo(40 + WAKE_SECONDS, 5);
+    // Once it's going, the next word starts at once.
+    ctx.currentTime = 41;
+    await play({ tl: 'Salamat' });
+    expect(sources.at(-1)!.started).toBeCloseTo(41.005, 5);
+  });
+
+  it("doesn't hold the tap sound back after a wake", async () => {
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    ctx.state = 'suspended';
+    ctx.resume = () => ((ctx.state = 'running'), Promise.resolve());
+    ctx.currentTime = 10;
+    const { playBuffer } = await import('./audio-engine');
+    playBuffer({ duration: 0.05 } as AudioBuffer, { fades: false, incidental: true });
+    expect(sources.at(-1)!.started).toBeCloseTo(10.005, 5);
+    // A word in the same press still waits.
+    playBuffer({ duration: 1 } as AudioBuffer).stop();
+    expect(sources.at(-1)!.started).toBeCloseTo(10 + WAKE_SECONDS, 5);
+  });
+
+  it('waits after a wake for a sound made as it plays, as for a clip', async () => {
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    ctx.state = 'suspended';
+    ctx.resume = () => ((ctx.state = 'running'), Promise.resolve());
+    ctx.currentTime = 20;
+    const sound = playLive((c) => ({ out: c.createGain() as unknown as AudioNode, end() {} }));
+    expect(sound.startsAt).toBeCloseTo(20 + WAKE_SECONDS, 5);
+    sound.stop();
+  });
+
+  it("doesn't hold a word back long after a wake that played nothing", async () => {
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    stop();
+    ctx.state = 'suspended';
+    ctx.resume = () => ((ctx.state = 'running'), Promise.resolve());
+    ctx.currentTime = 30;
+    // Woken by something that plays nothing (the start of a scrub), then the output has been going a while.
+    const { audioContext, playBuffer } = await import('./audio-engine');
+    audioContext();
+    ctx.currentTime = 50;
+    playBuffer({ duration: 1 } as AudioBuffer).stop();
+    expect(sources.at(-1)!.started).toBeCloseTo(50.005, 5);
+  });
+
   it('makes a new context when iOS left the old one interrupted, rather than going quiet', async () => {
     const speech = stubSpeech();
     await play({ tl: 'Salamat' });
@@ -386,7 +446,8 @@ describe('the right-answer chime', () => {
     await chime();
     old.state = 'interrupted';
     await play({ tl: 'Salamat' });
-    expect(sources.at(-1)!.started).toBeLessThan(0.1);
+    // Only as long as a new context's output takes to start.
+    expect(sources.at(-1)!.started).toBeLessThanOrEqual(WAKE_SECONDS + 0.01);
   });
 
   it('is silent in silent mode, and stops when it comes on', async () => {
