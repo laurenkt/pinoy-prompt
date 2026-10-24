@@ -379,6 +379,8 @@ describe('typed Tagalog, spelled right', () => {
     expect(await judgeMeaning('hidi', card('hindi'), ask, 'tl', true)).toEqual({ right: false, misspelt: true });
     expect(await judgeMeaning('Sie', card('sige'), ask, 'tl', true)).toEqual({ right: false, misspelt: true });
     expect(ask).not.toHaveBeenCalled();
+    // Nor is a "po" left out.
+    expect(await judgeMeaning('Salamat', card('salamat-po'), ask, 'tl', true)).toEqual({ right: false });
     // A word the deck uses elsewhere is a different word, not a misspelling: OpenAI judges it.
     expect(await judgeMeaning('iyan', card('ito'), ask, 'tl', true)).toEqual({ right: true });
     expect(ask).toHaveBeenCalledTimes(1);

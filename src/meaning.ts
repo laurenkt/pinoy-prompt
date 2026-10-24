@@ -477,6 +477,8 @@ function nearlySpells(answer: string, card: Card): boolean {
   if (given.some((w) => !own.has(w) && !RESPECT.includes(w) && deckTagalogWords().has(w))) return false;
   const g = bare(given).join('');
   return cardWords(card).some((want) => {
+    // A "po" left out isn't spelling: leavesOutPo and OpenAI judge that.
+    if (polite(want) && !polite(given)) return false;
     const w = bare(want).join('');
     return w.length > 0 && distance(g, w) <= (Math.min(g.length, w.length) >= 9 ? 2 : 1);
   });
