@@ -147,6 +147,9 @@ export function micWaiting(dictation = false): HTMLElement {
 /** True when the attempt was good enough to count as right. */
 export const isRight = passes;
 
+/** What an attempt at the card is judged against: its spelling and any other accepted pronunciations (Kamusta for Kumusta). */
+export const targets = (card: Card): string[] => [card.tl, ...(card.accept ?? [])];
+
 export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   const deps = options.deps ?? defaultDeps;
   const el = h('div', { class: 'speak' });
@@ -160,8 +163,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let judged = false;
   /** Whether a redraw may move focus to its main button. */
   let takeFocus = options.autofocus ?? true;
-  // The card's spelling and any other accepted pronunciations (e.g. Kamusta for Kumusta).
-  const texts = [card.tl, ...(card.accept ?? [])];
+  const texts = targets(card);
 
   /**
    * The microphone warmed for this question. It's warmed from the tap that brought the question up (or, once

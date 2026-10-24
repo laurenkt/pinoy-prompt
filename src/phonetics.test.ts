@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coach } from './coach';
 import { ALL_CARDS } from './deck';
-import { compare, englishReadings, groupTokens, lostFirstSound, judge, likelihood, packOdds, passes, soundDistance, toPhones, unpackOdds, type Odds } from './phonetics';
+import { compare, englishReadings, everyWordSaid, groupTokens, lostFirstSound, judge, likelihood, packOdds, passes, soundDistance, toPhones, unpackOdds, type Odds } from './phonetics';
 
 /** The required sounds, joined, for compact assertions. */
 const sounds = (text: string) =>
@@ -231,6 +231,20 @@ describe('compare', () => {
 
   it("doesn't penalise leaving out an optional catch", () => {
     expect(compare(toPhones('Oo'), ['o', 'o']).score).toBe(1);
+  });
+});
+
+describe('everyWordSaid', () => {
+  const heard = (text: string, sounds: string[]) => everyWordSaid(text, compare(toPhones(text), sounds));
+
+  it('holds when each word has a sound heard, even one said off', () => {
+    expect(heard('Salamat po', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'p', 'o'])).toBe(true);
+    expect(heard('Salamat po', ['s', 'a', 'l', 'a', 'm', 'a', 't', 'b', 'o'])).toBe(true);
+    expect(heard('Salamat', ['s', 'a', 'l', 'a', 'm', 'a'])).toBe(true);
+  });
+
+  it('fails a word left out altogether', () => {
+    expect(heard('Salamat po', ['s', 'a', 'l', 'a', 'm', 'a', 't'])).toBe(false);
   });
 });
 
