@@ -16,6 +16,8 @@ import {
   newCardsLeftToday,
   nextStudyAt,
   nextStudyStep,
+  DRILL_GAP,
+  drillWeight,
   pickDrillCard,
   pickFormat,
   requeue,
@@ -427,6 +429,55 @@ describe('picking the next card to drill', () => {
     // The strong ones come up less than before, but still come up.
     expect(seen.get('kape')! / 4000).toBeLessThan(before);
     expect(seen.get('kape')! / 4000).toBeGreaterThan(0.03);
+  });
+
+  it("gives cards met in the last few days half the round, however many cards are known", () => {
+    // A big deck held for months, and a few words met yesterday that got a good first answer.
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 200), 30);
+    const yesterday = VOCAB_ORDER.slice(200, 205);
+    for (const id of yesterday) {
+      recordAnswer(progress, id, 'good', LATER - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], introduced: LATER - DAY_MS };
+    }
+    const seen = counts(progress);
+    const share = yesterday.reduce((sum, id) => sum + (seen.get(id) ?? 0), 0) / 4000;
+    expect(share).toBeGreaterThan(0.45);
+    // The rest of the round still goes round the others.
+    expect(share).toBeLessThan(0.55);
+    // So does a real round, where the last few asked sit out.
+    let recent: string[] = [];
+    let seed = 1;
+    let asked = 0;
+    for (let i = 0; i < 4000; i++) {
+      const id = pickDrillCard(progress, LATER, recent, new Map(), undefined, () => (seed = (seed * 16807) % 2147483647) / 2147483647)!.id;
+      recent = [...recent.slice(-DRILL_GAP), id];
+      if (yesterday.includes(id)) asked++;
+    }
+    expect(asked / 4000).toBeGreaterThan(0.42);
+    expect(asked / 4000).toBeLessThan(0.55);
+  });
+
+  it("doesn't bring one new word round every few questions", () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 200), 30);
+    const [fresh] = VOCAB_ORDER.slice(200);
+    recordAnswer(progress, fresh, 'good', LATER - DAY_MS);
+    progress.cards[fresh] = { ...progress.cards[fresh], introduced: LATER - DAY_MS };
+    const share = counts(progress).get(fresh)! / 4000;
+    expect(share).toBeGreaterThan(0.08);
+    expect(share).toBeLessThan(0.15);
+  });
+
+  it('asks a card answered Again or Hard in Study more than one that went smoothly, until it has held a week', () => {
+    const progress = settledProgress();
+    for (const id of ['kape', 'oo']) progress.cards[id] = { ...progress.cards[id], interval: 3, reviewed: LATER };
+    progress.cards.kape.ease = 2.1;
+    const seen = counts(progress);
+    expect(seen.get('kape')!).toBeGreaterThan(seen.get('oo')! * 1.5);
+    // Held for months since: its hard start no longer counts.
+    for (const id of ['kape', 'oo']) progress.cards[id] = { ...progress.cards[id], interval: 90 };
+    expect(drillWeight(progress.cards.kape, LATER)).toBe(drillWeight(progress.cards.oo, LATER));
   });
 
   it('drills guides as well as words, as far as the round can ask them', () => {
