@@ -290,6 +290,15 @@ const SETTLING_MS = 3 * DAY_MS;
  */
 const FOCUS_SHARE = 0.5;
 const FOCUS_PER_CARD = 0.1;
+/**
+ * The share of a drill round kept for ways the drills had to help with: HELP_PER_ANSWER for each answer still
+ * needing help (drillHelp, up to MAX_HELP a way), up to HELP_SHARE, so a way that needed help three times has 45% of
+ * the picks to itself and one helped with once 15%, however big the deck. Taken before the focus part.
+ */
+const HELP_SHARE = 0.6;
+const HELP_PER_ANSWER = 0.15;
+/** The share of a drill round always left for cards neither helped with nor settling in, so the ones known well still turn up. */
+const REST_SHARE = 0.2;
 
 /** A card and a way of asking it: what a drill round picks, and what it keeps count of. */
 export interface DrillPick {
@@ -337,30 +346,92 @@ function settlingIn(state: CardState, now: number): boolean {
 
 /**
  * The next question for a drill round, which runs until the learner stops it: any card met, words and guides alike,
- * asked any way `ways` allows it, picked at random by weight. Each way of asking a card is weighed on its own: the
+ * asked any way `ways` allows it. A way missed this round comes back on its own (`repeats`, see noteDrillRepeat): the
+ * first one due by `asked`, the number of questions asked this round before this one, is asked, whatever has just
+ * been asked. Otherwise it's picked at random by weight. Each way of asking a card is weighed on its own: the
  * drillWeight of that way's schedule in Study (reading's for a way Study doesn't keep), shared between its ways (so a
  * word asked four ways comes up no more than a guide asked one),
- * plus, most of all, misses this round asked that way (`missed`, by drillKey) and answers asked that way the drills
- * had to help with (drillHelp): what was seen to go wrong outweighs what the calendar guesses. So a word read easily
- * but never recalled from the English is asked for its Tagalog, not read again.
+ * plus, most of all, misses this round asked that way and answers asked that way the drills had to help with
+ * (drillHelp): what was seen to go wrong outweighs what the calendar guesses. So a word read easily but never recalled
+ * from the English is asked for its Tagalog, not read again.
  *
- * A share of the picks (see FOCUS_SHARE) are among cards settling in (settlingIn), or ways missed or helped with,
- * while there are any, the rest among the others. The last few cards asked (`recent`, latest last) sit out, every
- * way, while that leaves one to ask. Null with nothing to ask. Picked by the chances drillOdds gives.
+ * Ways the drills had to help with get a share of the picks of their own, more the more they needed help (see
+ * HELP_SHARE); a share of the rest (see FOCUS_SHARE) are among cards settling in (settlingIn), or ways missed this
+ * round, while there are any, the rest among the others. The last few cards asked (`recent`, latest last) sit out,
+ * every way, while that leaves one to ask. Null with nothing to ask. Picked by the chances drillOdds gives.
  */
 export function pickDrillCard(
   progress: Progress,
   now: number,
   recent: string[],
-  missed: ReadonlyMap<string, number>,
+  repeats: ReadonlyMap<string, DrillRepeat>,
+  asked: number,
   ways: (card: Card) => readonly Way[],
   random: () => number = Math.random,
 ): DrillPick | null {
-  const odds = drillOdds(progress, now, recent, missed, ways);
+  const due = dueRepeat(progress, repeats, asked, ways);
+  if (due) return due;
+  const odds = drillOdds(progress, now, recent, repeats, ways);
   if (odds.length === 0) return null;
-  // One draw decides both which part of the round and which question in it: the focus part comes first.
+  // One draw decides both which part of the round and which question in it: the parts come in order.
   let r = random();
   return (odds.find((o) => (r -= o.chance) <= 0) ?? odds[odds.length - 1]).pick;
+}
+
+/**
+ * The gaps, in other questions, before a way missed in a drill round comes back, one after each time it's asked again:
+ * the very next question, then after one other, then easing off. Got right at the end of them, it goes back to taking
+ * its chances with the rest. Missed again on the way, it starts over, and each miss this round past the first adds
+ * another one-question gap before it eases off (up to MAX_HELP), so a word that keeps slipping stays close.
+ */
+export const DRILL_REPEATS = [0, 1, 3, 6];
+
+/** A way missed in a drill round coming back on its own (see DRILL_REPEATS), by drillKey. */
+export interface DrillRepeat {
+  /** Times missed this round. */
+  misses: number;
+  /** Times got right since it was last missed. */
+  rights: number;
+  /** The question it's due as, counting from 0 at the round's first. */
+  due: number;
+}
+
+/** The gaps a way missed `misses` times this round comes back after (see DRILL_REPEATS). */
+function repeatGaps(misses: number): number[] {
+  const extra = Math.min(misses - 1, MAX_HELP);
+  return [DRILL_REPEATS[0], ...Array<number>(extra).fill(1), ...DRILL_REPEATS.slice(1)];
+}
+
+/**
+ * Note how question number `asked` (from 0) of a drill round went, asked one way (`key`, by drillKey), so a miss comes
+ * back on its own (see DRILL_REPEATS). Changes `repeats`.
+ */
+export function noteDrillRepeat(repeats: Map<string, DrillRepeat>, key: string, right: boolean, asked: number): void {
+  const before = repeats.get(key);
+  if (!right) {
+    const misses = (before?.misses ?? 0) + 1;
+    repeats.set(key, { misses, rights: 0, due: asked + 1 + repeatGaps(misses)[0] });
+    return;
+  }
+  if (!before) return;
+  const rights = before.rights + 1;
+  const gaps = repeatGaps(before.misses);
+  if (rights >= gaps.length) repeats.delete(key);
+  else repeats.set(key, { ...before, rights, due: asked + 1 + gaps[rights] });
+}
+
+/** The repeat due soonest by question `asked` that can be asked now, if any. */
+function dueRepeat(progress: Progress, repeats: ReadonlyMap<string, DrillRepeat>, asked: number, ways: (card: Card) => readonly Way[]): DrillPick | null {
+  let best: { pick: DrillPick; due: number } | null = null;
+  for (const [key, { due }] of repeats) {
+    if (due > asked || (best && best.due <= due)) continue;
+    const split = key.lastIndexOf(' ');
+    const id = key.slice(0, split);
+    const way = key.slice(split + 1) as Way;
+    const card = progress.cards[id] ? getCard(id) : undefined;
+    if (card && ways(card).includes(way)) best = { pick: { card, way }, due };
+  }
+  return best?.pick ?? null;
 }
 
 /** A question pickDrillCard could ask next, and the chance it does. */
@@ -370,14 +441,15 @@ export interface DrillOdds {
 }
 
 /**
- * The chance of each question pickDrillCard could ask next, adding up to 1: the focus part of the round first, then
- * the rest. Empty with nothing to ask. Also what a card's back shows of how often Drills picks it.
+ * The chance of each question pickDrillCard could ask next at random, adding up to 1: ways the drills had to help with
+ * first, then the rest of the focus part of the round, then the rest. Empty with nothing to ask. Also what a card's back
+ * shows of how often Drills picks it.
  */
 export function drillOdds(
   progress: Progress,
   now: number,
   recent: string[],
-  missed: ReadonlyMap<string, number>,
+  repeats: ReadonlyMap<string, DrillRepeat>,
   ways: (card: Card) => readonly Way[],
 ): DrillOdds[] {
   const entries = Object.entries(progress.cards);
@@ -394,27 +466,41 @@ export function drillOdds(
       const own = way !== 'read' && ownKeys.size > 0 && ownKeys.has(cardKey(id, way)) ? progress.cards[cardKey(id, way)] : state;
       const { weight, settling } =
         own === state ? (read ??= { weight: drillWeight(state, now), settling: settlingIn(state, now) }) : { weight: drillWeight(own, now), settling: settlingIn(own, now) };
-      const misses = missed.get(drillKey(id, way)) ?? 0;
+      const misses = repeats.get(drillKey(id, way))?.misses ?? 0;
       const help = drillHelp(state, way);
-      return { pick: { card: card!, way }, w: weight / asks.length + 4 * misses + 8 * help, focus: settling || misses > 0 || help > 0 };
+      return { pick: { card: card!, way }, w: weight / asks.length + 4 * misses + 8 * help, help, focus: settling || misses > 0 };
     });
   });
+  if (pool.length === 0) return [];
   const cards = (ps: typeof pool) => new Set(ps.map((p) => p.pick.card.id));
   const keep = Math.min(DRILL_GAP, cards(pool).size - 1);
   const skip = new Set(keep > 0 ? recent.slice(-keep) : []);
   const open = pool.filter((p) => !skip.has(p.pick.card.id));
-  const focus = open.filter((p) => p.focus);
   const total = (ps: typeof open) => ps.reduce((sum, p) => sum + p.w, 0);
-  // Never less than the cards settling in would get by weight alone.
+  const all = total(open);
+  // Each part's share is never less than its questions would get by weight alone, within its cap.
+  const helped = open.filter((p) => p.help > 0);
+  // Only the ways open now count towards it: helped ways sitting out would hand their share to the others.
+  // Never more than HELP_SHARE, even by weight, so a small deck with many helped still has room for the rest.
+  const helpShare = Math.min(HELP_SHARE, Math.max(total(helped) / all, HELP_PER_ANSWER * helped.reduce((sum, p) => sum + p.help, 0)));
+  const rest = open.filter((p) => p.help === 0);
+  const focus = rest.filter((p) => p.focus);
   // Counted before the sit-out, which so often holds cards settling in that it would shrink their share.
-  const settling = cards(pool.filter((p) => p.focus)).size;
-  const share = Math.max(total(focus) / total(open), Math.min(FOCUS_SHARE, FOCUS_PER_CARD * settling));
-  const odds = (ps: typeof open, part: number) => {
+  const settling = cards(pool.filter((p) => p.focus && p.help === 0)).size;
+  // What's left after the ways helped with, keeping REST_SHARE for the others.
+  const focusShare = Math.max(0, Math.min(1 - REST_SHARE - helpShare, Math.max(total(focus) / all, Math.min(FOCUS_SHARE, FOCUS_PER_CARD * settling))));
+  const parts: [typeof open, number][] = [
+    [helped, helpShare],
+    [focus, focusShare],
+    [rest.filter((p) => !p.focus), 1 - helpShare - focusShare],
+  ];
+  // A part with nothing to ask has its share spread over the others, in proportion.
+  const filled = parts.filter(([ps]) => ps.length > 0);
+  const given = filled.reduce((sum, [, share]) => sum + share, 0);
+  return filled.flatMap(([ps, share]) => {
     const sum = total(ps);
-    return ps.map((p) => ({ pick: p.pick, chance: (part * p.w) / sum }));
-  };
-  if (focus.length === 0 || focus.length === open.length) return odds(open, 1);
-  return [...odds(focus, share), ...odds(open.filter((p) => !p.focus), 1 - share)];
+    return ps.map((p) => ({ pick: p.pick, chance: (share / given) * (p.w / sum) }));
+  });
 }
 
 /**
