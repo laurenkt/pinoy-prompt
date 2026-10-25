@@ -1,19 +1,23 @@
 # Every pull request is meant to be merged by the thread that opened it once CI
-# is green. One that conflicts with main never gets CI and wakes nobody, so it
-# can sit open unnoticed. Each hour this lists any open PR that conflicts with
-# main or has been open over three hours in one issue, "Pull requests left
-# open", comments when a PR joins the list, and closes the issue once there are
-# none. Draft PRs are left out.
+# is green. One that conflicts with main never gets CI and wakes nobody, and a
+# thread can miss the event that says CI passed, so a PR can sit open unnoticed.
+# After every push to main (when a PR is most likely to start conflicting), and
+# hourly, this finds each open PR that conflicts with main or has been open two
+# hours or more. It comments on the PR, once per commit, which wakes the thread
+# watching it, and lists them all in one issue, "Pull requests left open",
+# which closes itself once there are none. Draft PRs are left out.
 name: Open PRs
 
 on:
+  push:
+    branches: [main]
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: open-prs
@@ -26,17 +30,35 @@ jobs:
       GH_REPO: ${{ github.repository }}
       TITLE: Pull requests left open
     steps:
-      - name: List stuck pull requests
+      - name: Flag stuck pull requests
         run: |
-          list() { gh pr list --state open --base main --limit 500 --json number,title,url,isDraft,mergeable,createdAt --jq 'map(select(.isDraft | not))'; }
-          prs=$(list)
-          # GitHub works out mergeability on request, so ask again once it has had a moment.
-          if echo "$prs" | jq -e 'any(.mergeable == "UNKNOWN")' > /dev/null; then sleep 20; prs=$(list); fi
+          list() { gh pr list --state open --base main --limit 500 --json number,title,url,isDraft,mergeable,createdAt,headRefOid --jq 'map(select(.isDraft | not))'; }
+          # GitHub works out mergeability on request, and a push to main resets it, so give it a moment.
+          for try in 1 2 3; do
+            prs=$(list)
+            echo "$prs" | jq -e 'any(.mergeable == "UNKNOWN")' > /dev/null || break
+            sleep 15
+          done
           stuck=$(echo "$prs" | jq -c '
             map(.hours = ((now - (.createdAt | fromdateiso8601)) / 3600 | floor)
-              | select(.mergeable == "CONFLICTING" or .hours >= 3))')
+              | .reason = (if .mergeable == "CONFLICTING" then "conflict" elif .hours >= 2 then "open" else null end)
+              | select(.reason))')
+
+          # Tell each PR's own thread, once per commit and reason.
+          echo "$stuck" | jq -c '.[]' | while read -r pr; do
+            number=$(echo "$pr" | jq .number)
+            marker="<!-- open-prs:$(echo "$pr" | jq -r '.headRefOid + ":" + .reason') -->"
+            if gh pr view "$number" --json comments --jq '.comments[].body' | grep -qF "$marker"; then continue; fi
+            if [ "$(echo "$pr" | jq -r .reason)" = conflict ]; then
+              message='This pull request conflicts with `main`, so CI has not run on it and it cannot be merged. Merge `main` into the branch, run the tests and build, push, wait for CI, then merge and check it shows as merged.'
+            else
+              message="This pull request has been open $(echo "$pr" | jq .hours) hours without being merged. If CI is green and its review is addressed, merge it and check it shows as merged. If it was superseded, close it."
+            fi
+            gh pr comment "$number" --body "$(printf '%s\n\n%s' "$message" "$marker")"
+          done
+
           lines=$(echo "$stuck" | jq -r 'map("- [#\(.number)](\(.url)) \(.title): "
-            + (if .mergeable == "CONFLICTING" then "conflicts with main, so CI hasn'"'"'t run"
+            + (if .reason == "conflict" then "conflicts with main, so CI hasn'"'"'t run"
                elif .mergeable == "UNKNOWN" then "open \(.hours) hours, and GitHub hasn'"'"'t said yet whether it conflicts"
                else "open \(.hours) hours" end)) | join("\n")')
           issue=$(gh issue list --state open --limit 500 --json number,title,body \
@@ -44,7 +66,7 @@ jobs:
           if [ -n "$lines" ]; then
             echo "$lines"
             body=$(printf '%s\n\n%s\n\n%s' \
-              'These pull requests have not been merged. Each one needs main merged in, tests run, CI green and a merge, or closing if it was superseded. This issue is updated every hour and closes itself once none are left.' \
+              'These pull requests have not been merged. Each one needs main merged in, tests run, CI green and a merge, or closing if it was superseded. This issue is updated after every push to main and closes itself once none are left.' \
               "$lines" \
               '_Checked by `.github/workflows/open-prs.yml`._')
             if [ -z "$issue" ]; then
