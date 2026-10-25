@@ -21,6 +21,7 @@ import {
   drillKey,
   drillWeight,
   noteDrillAnswer,
+  drillOdds,
   pickDrillCard,
   setDrillHelp,
   pickFormat,
@@ -520,6 +521,18 @@ describe('picking the next card to drill', () => {
   it('keeps the last three cards out', () => {
     const seen = counts(settledProgress(), ['kape', 'salamat', 'oo', 'hindi']);
     expect([...seen.keys()].sort()).toEqual(['kape', 'kumusta', 'paalam']);
+  });
+
+  it('gives the chances it picks by, adding up to one, with none for a card sitting out', () => {
+    const progress = settledProgress();
+    progress.cards.kape.lapses = 2;
+    helpWith(progress, 'kape');
+    const odds = drillOdds(progress, LATER, ['salamat'], new Map(), everyWay);
+    expect(odds.reduce((sum, o) => sum + o.chance, 0)).toBeCloseTo(1);
+    expect(odds.some((o) => o.pick.card.id === 'salamat')).toBe(false);
+    // Over many evenly spread draws, each question comes up about as often as its chance says.
+    const seen = tallies(progress, ['salamat']).byWay;
+    for (const { pick, chance } of odds) expect((seen.get(drillKey(pick.card.id, pick.way)) ?? 0) / 4000).toBeCloseTo(chance, 2);
   });
 
   it('only keeps out what leaves a card to ask, when few are known', () => {

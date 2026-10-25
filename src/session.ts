@@ -346,7 +346,7 @@ function settlingIn(state: CardState, now: number): boolean {
  *
  * A share of the picks (see FOCUS_SHARE) are among cards settling in (settlingIn), or ways missed or helped with,
  * while there are any, the rest among the others. The last few cards asked (`recent`, latest last) sit out, every
- * way, while that leaves one to ask. Null with nothing to ask.
+ * way, while that leaves one to ask. Null with nothing to ask. Picked by the chances drillOdds gives.
  */
 export function pickDrillCard(
   progress: Progress,
@@ -356,6 +356,30 @@ export function pickDrillCard(
   ways: (card: Card) => readonly Way[],
   random: () => number = Math.random,
 ): DrillPick | null {
+  const odds = drillOdds(progress, now, recent, missed, ways);
+  if (odds.length === 0) return null;
+  // One draw decides both which part of the round and which question in it: the focus part comes first.
+  let r = random();
+  return (odds.find((o) => (r -= o.chance) <= 0) ?? odds[odds.length - 1]).pick;
+}
+
+/** A question pickDrillCard could ask next, and the chance it does. */
+export interface DrillOdds {
+  pick: DrillPick;
+  chance: number;
+}
+
+/**
+ * The chance of each question pickDrillCard could ask next, adding up to 1: the focus part of the round first, then
+ * the rest. Empty with nothing to ask. Also what a card's back shows of how often Drills picks it.
+ */
+export function drillOdds(
+  progress: Progress,
+  now: number,
+  recent: string[],
+  missed: ReadonlyMap<string, number>,
+  ways: (card: Card) => readonly Way[],
+): DrillOdds[] {
   const entries = Object.entries(progress.cards);
   // The ways with a schedule of their own (see cardKey), found once rather than looked up for every word.
   const ownKeys = new Set(entries.flatMap(([key]) => (key.includes(':') ? [key] : [])));
@@ -379,27 +403,18 @@ export function pickDrillCard(
   const keep = Math.min(DRILL_GAP, cards(pool).size - 1);
   const skip = new Set(keep > 0 ? recent.slice(-keep) : []);
   const open = pool.filter((p) => !skip.has(p.pick.card.id));
-  if (open.length === 0) return null;
   const focus = open.filter((p) => p.focus);
   const total = (ps: typeof open) => ps.reduce((sum, p) => sum + p.w, 0);
   // Never less than the cards settling in would get by weight alone.
   // Counted before the sit-out, which so often holds cards settling in that it would shrink their share.
   const settling = cards(pool.filter((p) => p.focus)).size;
   const share = Math.max(total(focus) / total(open), Math.min(FOCUS_SHARE, FOCUS_PER_CARD * settling));
-  // One draw decides both which part of the round and which question in it.
-  let r = random();
-  let from = open;
-  if (focus.length > 0 && focus.length < open.length) {
-    if (r < share) {
-      from = focus;
-      r /= share;
-    } else {
-      from = open.filter((p) => !p.focus);
-      r = (r - share) / (1 - share);
-    }
-  }
-  r *= total(from);
-  return (from.find((p) => (r -= p.w) <= 0) ?? from[from.length - 1]).pick;
+  const odds = (ps: typeof open, part: number) => {
+    const sum = total(ps);
+    return ps.map((p) => ({ pick: p.pick, chance: (part * p.w) / sum }));
+  };
+  if (focus.length === 0 || focus.length === open.length) return odds(open, 1);
+  return [...odds(focus, share), ...odds(open.filter((p) => !p.focus), 1 - share)];
 }
 
 /**

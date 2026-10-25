@@ -3262,6 +3262,11 @@ p {
   stroke-width: 3;
 }
 
+/* How often Drills picks it, in magenta: a colour of its own, as it isn't a strength. */
+.back-chart .picks-area {
+  fill: var(--magenta);
+}
+
 /* The stairs: a tag for each way, cream with its name, the way asked now saffron and labelled. */
 .back-chart .tag {
   fill: var(--cream);
