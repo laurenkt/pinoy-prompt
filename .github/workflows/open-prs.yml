@@ -3,7 +3,7 @@
 # thread can miss the event that says CI passed, so a PR can sit open unnoticed.
 # After every push to main (when a PR is most likely to start conflicting), and
 # hourly, this finds each open PR that conflicts with main or has been open two
-# hours or more. It comments on the PR, once per commit and reason, which wakes the thread
+# hours or more (a missed CI signal, or CI left red). It comments on the PR, once per commit and reason, which wakes the thread
 # watching it, and lists them all in one issue, "Pull requests left open",
 # which closes itself once there are none. Draft PRs are left out.
 name: Open PRs
@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Flag stuck pull requests
         run: |
-          list() { gh pr list --state open --base main --limit 500 --json number,title,url,isDraft,mergeable,createdAt,headRefOid --jq 'map(select(.isDraft | not))'; }
+          list() { gh pr list --state open --base main --limit 500 --json number,title,url,isDraft,mergeable,createdAt,headRefOid,statusCheckRollup --jq 'map(select(.isDraft | not))'; }
           # GitHub works out mergeability on request, and a push to main resets it, so give it a moment.
           if [ "${{ github.event_name }}" = push ]; then sleep 20; fi
           for try in 1 2 3; do
@@ -42,7 +42,9 @@ jobs:
           done
           stuck=$(echo "$prs" | jq -c '
             map(.hours = ((now - (.createdAt | fromdateiso8601)) / 3600 | floor)
-              | .reason = (if .mergeable == "CONFLICTING" then "conflict" elif .hours >= 2 then "open" else null end)
+              | .failing = any(.statusCheckRollup[]?; .conclusion == "FAILURE" or .conclusion == "TIMED_OUT" or .state == "FAILURE" or .state == "ERROR")
+              | .reason = (if .mergeable == "CONFLICTING" then "conflict" elif .hours < 2 then null
+                           elif .failing then "failing" else "open" end)
               | select(.reason))')
 
           # Tell each PR's own thread, once per commit and reason.
@@ -51,8 +53,11 @@ jobs:
             marker="<!-- open-prs:$(echo "$pr" | jq -r '.headRefOid + ":" + .reason') -->"
             bodies=$(gh pr view "$number" --json comments --jq '.comments[].body') || continue
             if grep -qF "$marker" <<< "$bodies"; then continue; fi
-            if [ "$(echo "$pr" | jq -r .reason)" = conflict ]; then
+            reason=$(echo "$pr" | jq -r .reason)
+            if [ "$reason" = conflict ]; then
               message='This pull request conflicts with `main`, so CI has not run on it and it cannot be merged. Merge `main` into the branch, run the tests and build, push, wait for CI, then merge and check it shows as merged.'
+            elif [ "$reason" = failing ]; then
+              message="This pull request has been open $(echo "$pr" | jq .hours) hours and CI is failing on its latest commit. Find the cause and fix it (a flaky test included, rather than re-running until it passes), push, wait for CI, then merge and check it shows as merged."
             else
               message="This pull request has been open $(echo "$pr" | jq .hours) hours without being merged. If CI is green and its review is addressed, merge it and check it shows as merged. If it was superseded, close it."
             fi
@@ -62,6 +67,7 @@ jobs:
 
           lines=$(echo "$stuck" | jq -r 'map("- [#\(.number)](\(.url)) \(.title): "
             + (if .reason == "conflict" then "conflicts with main, so CI hasn'"'"'t run"
+               elif .reason == "failing" then "open \(.hours) hours, CI failing"
                elif .mergeable == "UNKNOWN" then "open \(.hours) hours, and GitHub hasn'"'"'t said yet whether it conflicts"
                else "open \(.hours) hours" end)) | join("\n")')
           issue=$(gh issue list --state open --limit 500 --json number,title,body \
