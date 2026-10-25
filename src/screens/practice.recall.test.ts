@@ -56,6 +56,7 @@ afterEach(() => {
   // The scope is kept across visits: back to the mix for the next test.
   if (last) drillScope(last, ['listen', 'read', 'recall', 'speak']);
   last = undefined;
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.mocked(play).mockClear();
@@ -216,15 +217,22 @@ describe('recalling words that have settled', () => {
   });
 
   it('asks a word picked from the choices again straight away, and keeps it needing help until it has come back a few times', async () => {
+    vi.useFakeTimers();
     const app = learner(true);
     const root = (last = recall(app));
     button(root, 'Show choices').click();
     [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((c) => c.textContent?.endsWith('Salamat'))!.click();
     expect(drillHelp(app.progress.cards.salamat, 'recall')).toBe(1);
+    // Right, but from the choices: the hook shows, as on a miss, and it waits for Next.
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    expect(root.querySelector('.hook')?.textContent).toContain(getCard('salamat')!.hook);
+    vi.advanceTimersByTime(60_000);
+    expect(root.querySelector('.hook')).not.toBeNull();
     button(root, 'Next').click();
     // The same word: its Tagalog is the right answer again.
     type(root, 'salamat');
-    await flush();
+    await vi.advanceTimersByTimeAsync(0);
+    vi.useRealTimers();
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
     // Got right so soon after, it still counts as needing help.
     expect(drillHelp(app.progress.cards.salamat, 'recall')).toBe(1);

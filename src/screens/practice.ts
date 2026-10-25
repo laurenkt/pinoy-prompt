@@ -530,7 +530,8 @@ export function practiceScreen(
     // Not when the check itself failed (offline, say): the answer may well have been right.
     q.helpBefore = drillHelp(app.progress.cards[q.card.id], q.mode);
     if (q.failure === undefined || right) noteHelp(q, q.hinted || !right);
-    if (right)
+    // From the choices it waits for Next, as a miss does, so the hook can be read.
+    if (right && !q.hinted)
       auto = countdown(root, () => {
         autoMoved = true;
         advance();
@@ -849,7 +850,8 @@ export function practiceScreen(
             !right && q.failure !== undefined && h('p', { class: 'feedback-note' }, checkProblem(q.failure)),
             !right && q.misspelt && h('p', { class: 'feedback-note' }, 'Nearly: check the spelling.'),
           ),
-        q.mode !== 'speak' && answered && (!right || reviewing) &&
+        // Picked from the choices after "Show choices" is half a miss: the hook shows then too.
+        q.mode !== 'speak' && answered && (!right || reviewing || q.hinted) &&
           hookView(q.card),
         // Not for a misspelling: the spelling is what was wrong.
         picked === MISSED && !reviewing && !q.misspelt && h('button', { class: 'btn secondary claim', onclick: claim }, 'I had it right'),
