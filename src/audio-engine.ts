@@ -15,11 +15,11 @@
 // replacement: a word said back by itself straight after a take still plays.
 
 import { setAudioSession } from './audio-session';
-import { microphoneOpen } from './microphone';
+import { microphoneChanges, microphoneOpen } from './microphone';
 
 let context: AudioContext | null = null;
-/** Whether the microphone was open when the context was made. */
-let madeWithMicrophone = false;
+/** The microphone's count of openings and closings when the context was made (microphoneChanges). */
+let madeAt = 0;
 /** When the context was last asked for, by performance.now(). */
 let lastUsed = -Infinity;
 /** Until when, in the context's time, the phone's output may still be starting up after the context was made or woken. */
@@ -42,12 +42,12 @@ export function audioContext(incidental = false): AudioContext {
   // iOS leaves a context "interrupted" after a call, Siri or another app's audio, and it may never
   // resume from there; a new one made in the tap starts at once.
   const stuck = context && context.state !== 'running' && context.state !== 'suspended';
-  if (context && ((madeWithMicrophone !== mic && (mic || inTap())) || stuck)) closeContext();
+  if (context && ((madeAt !== microphoneChanges() && (mic || inTap())) || stuck)) closeContext();
   // Counted again from every use, and it waits for anything still playing.
   suspendWhenIdle();
   if (!context) {
     context = new (contextClass()!)({ latencyHint: 'interactive' });
-    madeWithMicrophone = mic;
+    madeAt = microphoneChanges();
     wokenUntil = WAKE_SECONDS;
   }
   if (context.state !== 'running') {
@@ -58,9 +58,9 @@ export function audioContext(incidental = false): AudioContext {
   return context;
 }
 
-/** Whether the page is inside a tap's window to start audio; a browser that can't say is taken to be, as before it could. */
+/** Whether the page is inside a tap's window to start audio. A browser that can't say (Safari before 16.4) keeps the context it has. */
 function inTap(): boolean {
-  return (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive ?? true;
+  return (globalThis.navigator as { userActivation?: { isActive: boolean } } | undefined)?.userActivation?.isActive ?? false;
 }
 
 /**

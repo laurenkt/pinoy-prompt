@@ -288,7 +288,8 @@ describe('warming the microphone up ahead of a take', () => {
     // Long after any earlier test's stream closed.
     vi.setSystemTime(Date.now() + 60 * 60 * 1000);
     const before = FakeRecorderContext.count;
-    expect(warmRecorder(true)).toBeNull();
+    vi.stubGlobal('event', { isTrusted: true, type: 'click' });
+    expect(warmRecorder()).toBeNull();
     await vi.advanceTimersByTimeAsync(0);
     expect(opened).toHaveLength(0);
     expect(FakeRecorderContext.count).toBe(before);
@@ -316,7 +317,8 @@ describe('warming the microphone up ahead of a take', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(opened).toHaveLength(1);
     // A tap still opens it without asking.
-    expect(warmRecorder(true)).not.toBeNull();
+    vi.stubGlobal('event', { isTrusted: true, type: 'click' });
+    expect(warmRecorder()).not.toBeNull();
     await vi.advanceTimersByTimeAsync(0);
     expect(opened).toHaveLength(2);
   });
@@ -359,6 +361,21 @@ describe('warming the microphone up ahead of a take', () => {
     await vi.advanceTimersByTimeAsync(0);
     warmth.cool();
     const first = FakeRecorderContext.last;
+    warmRecorder();
+    expect(FakeRecorderContext.last).not.toBe(first);
+    expect(first.state).toBe('closed');
+  });
+
+  it("doesn't keep a warm-up's context for a later stream when the take adopted it before its stream came", async () => {
+    await allowed();
+    warmRecorder();
+    const first = FakeRecorderContext.last;
+    // Tapped before the warm-up's stream came.
+    const recording = record();
+    await vi.advanceTimersByTimeAsync(0);
+    first.feed(0.2);
+    recording.stop();
+    await recording.audio;
     warmRecorder();
     expect(FakeRecorderContext.last).not.toBe(first);
     expect(first.state).toBe('closed');

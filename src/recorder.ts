@@ -7,7 +7,7 @@
 // (warmRecorder): the audio runs, and is thrown away, until the take begins.
 
 import { SAMPLE_RATE } from './fbank';
-import { closeMicrophone, dropMicrophone, getMicrophone, liveMicrophone, microphoneInUse, microphoneOpensQuietly, releaseMicrophone } from './microphone';
+import { closeMicrophone, getMicrophone, liveMicrophone, microphoneInUse, microphoneOpen, microphoneOpensQuietly, releaseMicrophone } from './microphone';
 
 /** Level (RMS, 0–1) above which a block counts as speech. */
 const SPEECH_LEVEL = 0.02;
@@ -116,9 +116,12 @@ export function resample(input: Float32Array, fromRate: number): Float32Array {
 let kept: AudioContext | null = null;
 let keptFor: MediaStream | null = null;
 
-/** The kept context, if it still suits the microphone open now; otherwise it's let go. */
+/**
+ * The kept context, if it still suits the microphone open now; otherwise it's let go. One made by a warm-up before its
+ * stream came (keptFor null) suits only while that stream is still opening.
+ */
 function keptContext(): AudioContext | null {
-  if (kept && (kept.state === 'closed' || keptFor !== liveMicrophone())) {
+  if (kept && (kept.state === 'closed' || keptFor !== liveMicrophone() || (keptFor === null && !microphoneOpen()))) {
     void kept.close().catch(() => {});
     kept = null;
   }
@@ -153,13 +156,12 @@ export interface Warmth {
 
 /**
  * Get the microphone and the recorder's context going ahead of a take, so it starts with sound already flowing rather
- * than after they wake up. Call it from the tap that brings up a question that will ask for a take (`fromTap`), if there
- * is one. It opens the microphone only where that goes straight through, never asking the learner over a question
+ * than after they wake up. Call it from the tap that brings up a question that will ask for a take, if there is one. It opens the microphone only where that goes straight through, never asking the learner over a question
  * (microphoneOpensQuietly): outside a tap, only within a minute of the last take. Null if there was nothing to warm.
  * While it's warm the phone is in a call (microphone.ts), so it's cooled as soon as the question stops listening.
  */
-export function warmRecorder(fromTap = false): Warmth | null {
-  if (!recordingSupported() || globalThis.document?.visibilityState === 'hidden' || !microphoneOpensQuietly(fromTap)) return null;
+export function warmRecorder(): Warmth | null {
+  if (!recordingSupported() || globalThis.document?.visibilityState === 'hidden' || !microphoneOpensQuietly()) return null;
   // Asked for before an earlier warm-up lets go, so the stream it has stays open for this one.
   const opening = getMicrophone();
   coolRecorder();
@@ -173,9 +175,9 @@ export function warmRecorder(fromTap = false): Warmth | null {
   warm = mine;
   void opening.then(
     (stream) => {
-      if (mine.cooled || warm !== mine) return releaseMicrophone(stream);
-      // Made as this stream opened, so it's this stream's (keptContext).
+      // Made as this stream opened, so it's this stream's (keptContext), whether this warm-up or a take adopting it uses it.
       if (kept === context) keptFor = stream;
+      if (mine.cooled || warm !== mine) return releaseMicrophone(stream);
       // Outside a tap WebKit only lets a context start once the page is using the microphone.
       if (context.state !== 'running') void context.resume().catch(() => {});
       mine.stream = stream;
@@ -298,8 +300,8 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
         end();
         // Stopped over a stream giving exact silence: it's dead, not a learner who said nothing.
         const dead = !signal && !cancelled;
-        if (dead) dropMicrophone(stream);
-        else releaseMicrophone(stream);
+        // Closed once nothing else uses it, so a dead one isn't handed to the next take.
+        releaseMicrophone(stream);
         if (dead && Date.now() - listeningSince >= DEAD_AFTER_MS) return reject(new RecordError('silent'));
         const total = chunks.reduce((n, c) => n + c.length, 0);
         const all = new Float32Array(total);
@@ -316,12 +318,12 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
           if (done || signal) return;
           if (retried) {
             end();
-            // The stream is no good, so the next take opens a new one rather than the same dead one.
-            dropMicrophone(stream);
+            // The stream is no good; closing it means the next take opens a new one rather than the same dead one.
+            releaseMicrophone(stream);
             return reject(new RecordError('silent'));
           }
           source.disconnect();
-          dropMicrophone(stream);
+          releaseMicrophone(stream);
           try {
             stream = await getMicrophone();
           } catch (err) {

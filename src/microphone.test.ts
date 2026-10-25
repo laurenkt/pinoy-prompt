@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALLOW_KEPT_MS, askMicrophone, closeMicrophone, dropMicrophone, endMicrophoneAsk, getMicrophone, microphoneAllowed, microphoneOpen, microphoneOpensQuietly, releaseMicrophone, REOPEN_QUIETLY_MS } from './microphone';
+import { ALLOW_KEPT_MS, askMicrophone, closeMicrophone, endMicrophoneAsk, getMicrophone, microphoneAllowed, microphoneOpen, microphoneOpensQuietly, releaseMicrophone, REOPEN_QUIETLY_MS } from './microphone';
 
 function fakeStream() {
   const track = {
@@ -78,22 +78,6 @@ describe('shared microphone after an interruption', () => {
   });
 });
 
-describe('dropping a stream that gave no sound', () => {
-  it('closes it, so the next caller gets a fresh one', async () => {
-    const dead = await getMicrophone();
-    dropMicrophone(dead);
-    expect(opened[0].track.readyState).toBe('ended');
-    const fresh = await getMicrophone();
-    expect(fresh).not.toBe(dead);
-  });
-
-  it('leaves it open while something else is using it', async () => {
-    const [a] = await Promise.all([getMicrophone(), getMicrophone()]);
-    dropMicrophone(a);
-    expect(opened[0].track.readyState).toBe('live');
-  });
-});
-
 describe('asking for the microphone as a screen opens', () => {
   it('asks, then closes it straight away, leaving the Allow for later takes', async () => {
     expect(await askMicrophone()).toBe(true);
@@ -137,14 +121,20 @@ describe('whether the microphone opens without asking, from outside a tap', () =
   it('does for a minute after the last stream closed, then only from a tap, as WebKit asks', async () => {
     // Long after any earlier test's stream closed.
     vi.setSystemTime(Date.now() + 60 * 60 * 1000);
-    expect(microphoneOpensQuietly(true)).toBe(false);
+    const tap = () => vi.stubGlobal('event', { isTrusted: true, type: 'click' });
+    const noTap = () => vi.stubGlobal('event', undefined);
+    tap();
+    expect(microphoneOpensQuietly()).toBe(false);
     releaseMicrophone(await getMicrophone());
-    expect(microphoneOpensQuietly(false)).toBe(true);
+    noTap();
+    expect(microphoneOpensQuietly()).toBe(true);
     vi.advanceTimersByTime(REOPEN_QUIETLY_MS);
-    expect(microphoneOpensQuietly(false)).toBe(false);
-    expect(microphoneOpensQuietly(true)).toBe(true);
+    expect(microphoneOpensQuietly()).toBe(false);
+    tap();
+    expect(microphoneOpensQuietly()).toBe(true);
     // While one is open it always does.
+    noTap();
     await getMicrophone();
-    expect(microphoneOpensQuietly(false)).toBe(true);
+    expect(microphoneOpensQuietly()).toBe(true);
   });
 });

@@ -35,7 +35,7 @@ export interface SpeakDeps {
   /** Ask for the microphone now, so takes for the next few minutes don't; false if the screen was left meanwhile. */
   askMicrophone?(): Promise<boolean>;
   /** Get the microphone going ahead of a take, its sound thrown away until then; null if it couldn't without the browser asking. */
-  warmRecorder?(fromTap: boolean): Warmth | null;
+  warmRecorder?(): Warmth | null;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -194,10 +194,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
    */
   let warmth: Warmth | null = null;
   let mayWarm = true;
-  /** Again if the last one ended by itself (timed out, or the app went into the background). `fromTap`: inside a tap now. */
-  const warmUp = (fromTap = false) => {
+  /** Again if the last one ended by itself (timed out, or the app went into the background). */
+  const warmUp = () => {
     if (warmth?.warm || disposed || !mayWarm) return;
-    warmth = deps.warmRecorder?.(fromTap) ?? null;
+    warmth = deps.warmRecorder?.() ?? null;
   };
   const coolDown = () => {
     warmth?.cool();
@@ -529,7 +529,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   draw();
   // Inside the tap that brought the question up, if one did: a model already on the device means a take is coming.
-  if (deps.modelKnownDownloaded?.()) warmUp(options.autofocus ?? true);
+  if (deps.modelKnownDownloaded?.()) warmUp();
   void prepare();
 
   return {

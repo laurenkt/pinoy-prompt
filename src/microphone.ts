@@ -27,6 +27,8 @@ const CONSTRAINTS: MediaStreamConstraints = {
 let stream: MediaStream | null = null;
 let opening: Promise<MediaStream> | null = null;
 let users = 0;
+/** Counts each stream opening and closing, so the shared audio context can tell the hardware's rate may have changed since it was made. */
+let changes = 0;
 /** Bumped as each screen that asked is left, so an answer that comes after isn't taken as the screen's. */
 let asks = 0;
 /** When the last stream closed, by Date.now(); WebKit keeps the learner's Allow for 10 minutes after. */
@@ -35,6 +37,11 @@ let closedAt = -Infinity;
 export const ALLOW_KEPT_MS = 9 * 60 * 1000;
 /** The site setting says Allow (a Safari tab set so), as read when the app opened. */
 let allowedBySite = false;
+
+/** How many times a stream has opened or closed: the same number means the phone's audio hasn't been switched since. */
+export function microphoneChanges(): number {
+  return changes;
+}
 
 /** Whether a microphone stream is open, or being opened. */
 export function microphoneOpen(): boolean {
@@ -65,12 +72,20 @@ export function microphoneAllowed(): boolean {
 /** WebKit asks again from outside a tap once the last stream closed more than a minute ago; a little under it. */
 export const REOPEN_QUIETLY_MS = 50 * 1000;
 
+const TAP_EVENTS = new Set(['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchend', 'keydown', 'keyup']);
+
+/** Whether this is running inside the learner's tap or key press itself, which is what WebKit counts as one for the microphone. */
+function insideTap(): boolean {
+  const event = (globalThis as { event?: Event }).event;
+  return !!event?.isTrusted && TAP_EVENTS.has(event.type);
+}
+
 /**
- * Whether getMicrophone() now would go straight through without the browser asking, for a caller that may not be
- * inside a tap (`fromTap` false): outside one, WebKit only remembers the Allow for a minute after the last stream closed.
+ * Whether getMicrophone() now would go straight through without the browser asking. Inside a tap that's while WebKit
+ * remembers the Allow (microphoneAllowed); outside one, only for a minute after the last stream closed.
  */
-export function microphoneOpensQuietly(fromTap: boolean): boolean {
-  return microphoneOpen() || allowedBySite || Date.now() - closedAt < (fromTap ? ALLOW_KEPT_MS : REOPEN_QUIETLY_MS);
+export function microphoneOpensQuietly(): boolean {
+  return insideTap() ? microphoneAllowed() : microphoneOpen() || allowedBySite || Date.now() - closedAt < REOPEN_QUIETLY_MS;
 }
 
 // A track iOS muted (a phone call, Siri) can stay "live" but silent, so it doesn't count.
@@ -84,6 +99,7 @@ export async function getMicrophone(): Promise<MediaStream> {
     opening ??= navigator.mediaDevices.getUserMedia(CONSTRAINTS).finally(() => (opening = null));
     try {
       stream = await opening;
+      changes++;
     } catch (error) {
       // No microphone after all (refused, or none), so don't keep the session it needed.
       if (!microphoneOpen()) setAudioSession('auto');
@@ -103,15 +119,6 @@ export function releaseMicrophone(released: MediaStream): void {
   }
   users = Math.max(0, users - 1);
   if (users === 0) closeMicrophone();
-}
-
-/**
- * Done with a stream from getMicrophone() that gave no sound at all (iOS can leave a track live but silent):
- * in place of releaseMicrophone(). It's closed unless something else is using it, as any stream is, so the
- * next getMicrophone() opens a fresh one.
- */
-export function dropMicrophone(dead: MediaStream): void {
-  releaseMicrophone(dead);
 }
 
 /**
@@ -142,7 +149,10 @@ export function endMicrophoneAsk(): void {
 export function closeMicrophone(): void {
   // Only hand the session back if the microphone had it: this also runs on every trip to the background.
   const had = stream !== null;
-  if (had) closedAt = Date.now();
+  if (had) {
+    closedAt = Date.now();
+    changes++;
+  }
   stream?.getTracks().forEach((t) => t.stop());
   stream = null;
   users = 0;

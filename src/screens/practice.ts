@@ -588,6 +588,9 @@ export function practiceScreen(
     upcoming = null;
     picked = null;
     checking = false;
+    // Ten minutes without a take and WebKit has forgotten the Allow: the phone asks now, over the holding screen, rather
+    // than at the question's own tap.
+    if (current?.mode === 'speak') askForMicrophoneIfNeeded();
     ask();
   }
 
