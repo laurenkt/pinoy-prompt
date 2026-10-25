@@ -51,6 +51,11 @@ export interface Card {
    * card of its own (deck.test.ts checks), and a variant is only asked once the learner has met them all.
    */
   variants?: Variant[];
+  /**
+   * Phrases only: cards spelled like a word of the phrase that mean something else there, so it doesn't build on them
+   * (the "para" of "Para po!" is Spanish "parar", stop, not "para", for).
+   */
+  homonyms?: string[];
   /** Guides only: examples, each tappable to hear, built from cards met earlier where possible. */
   examples?: Example[];
   /** Guides only: cards that must be met, and have lasted a day, before this one is introduced. */
@@ -144,7 +149,7 @@ export const UNITS: Unit[] = [
       { id: 'makikiraan-po', tl: 'Makikiraan po', en: 'Excuse me (to pass by)', kind: 'phrase', hint: 'mah-kee-kee-rah-AHN poh', hook: 'Built on "daan" (road, path), with the d softened to r. Roughly "may I share your path?"' },
       { id: 'sige', tl: 'Sige', en: 'Okay / Go ahead', kind: 'word', hint: 'SEE-gheh', note: 'Very common. "Sige, salamat!" is a friendly way to end a chat.', hook: 'From Spanish "sigue", "go on, carry on". That is why it means both "okay" and "go ahead".' },
       { id: 'tuloy-po-kayo', tl: 'Tuloy po kayo.', en: 'Come in, please.', kind: 'phrase', hint: 'too-LOY poh kah-YOH', note: 'What a host says at the door, often to answer "Tao po!".', hook: '"Tuloy" means carry on, as in "Tuloy ba tayo?": carry on in, you (polite).' },
-      { id: 'tao-po', tl: 'Tao po!', en: 'Hello, anyone home?', kind: 'phrase', hint: 'tah-OH poh', note: 'Called out at someone\'s gate or door, as many homes have no doorbell.', hook: '"Tao" means person: "a person is here, po!". You\'re announcing yourself.' },
+      { id: 'tao-po', tl: 'Tao po!', en: 'Hello, anyone home?', kind: 'phrase', hint: 'TAH-oh poh', note: 'Called out at someone\'s gate or door, as many homes have no doorbell.', hook: '"Tao" means person: "a person is here, po!". You\'re announcing yourself.' },
       { id: 'pakiusap', tl: 'pakiusap', en: 'please (asking a favour)', kind: 'word', hint: 'pah-kee-OO-sahp', note: 'For a real favour, or to plead: "Pakiusap, tulungan mo ako". For small requests, "paki-" on the doing word is usual: "Pakiulit po".', hook: '"Paki-" (please) + "usap" (talk): please, let\'s talk about it.' },
     ],
   },
@@ -296,10 +301,10 @@ export const UNITS: Unit[] = [
     tlTitle: 'Pag-uugnay',
     intro: 'Words that tie one idea to the next: if, because, so, while, until, then. With these, short sentences become stories.',
     cards: [
-      { id: 'ay', tl: 'ay', en: 'is / are (after the topic)', kind: 'word', hint: 'ai', note: 'In books and speeches the topic goes first, then "ay": "Ako ay guro", I am a teacher. Everyday talk turns it round: "Guro ako". Also an "oh!" of surprise: "Ay, sorry!"', hook: 'Think of "ay" as an equals sign between the topic and what\'s said about it.' },
+      { id: 'ay', tl: 'ay', en: 'is / are (in careful speech)', kind: 'word', hint: 'ai', note: 'In books and speeches the who or what comes first, then "ay": "Ako ay guro", I am a teacher. Everyday talk turns it round and drops it: "Guro ako". Also an "oh!" of surprise: "Ay, sorry!"', hook: 'Think of "ay" as an equals sign: "Ako ay guro" is I = teacher.' },
       { id: 'kung', tl: 'kung', en: 'if / whether', kind: 'word', hint: 'koong', note: '"Kung gusto mo" is "if you want". "Hindi ko alam kung..." is "I don\'t know whether...".', hook: 'Picture a kung fu master: if you attack, he\'ll block.' },
       { id: 'para', tl: 'para', en: 'for / in order to', kind: 'word', hint: 'PAH-rah', note: '"Para sa iyo" is "for you". The "Para po!" that stops a jeepney is a different word, from Spanish "parar", to stop.', hook: 'Spanish "para", for: "para ti", for you, became "para sa iyo".' },
-      { id: 'dahil', tl: 'dahil', en: 'because of / since', kind: 'word', hint: 'DAH-hil', note: 'A little more careful than "kasi": "dahil sa ulan", because of the rain.', hook: 'Its own word for the reason, "dahilan", is "dahil" with "-an".' },
+      { id: 'dahil', tl: 'dahil', en: 'because of / since', kind: 'word', hint: 'dah-HIL', note: 'A little more careful than "kasi": "dahil sa ulan", because of the rain.', hook: 'Its own word for the reason, "dahilan", is "dahil" with "-an".' },
       { id: 'kaya', tl: 'kaya', en: "so / that's why", kind: 'word', hint: 'kah-YAH', note: '"Pagod ako, kaya uuwi na ako" is "I\'m tired, so I\'m heading home". Stressed the other way, "KAH-yah", it means "can manage": "Kaya mo \'yan!", you can do it!', hook: 'Think "kayak": I had a kayak, so I went paddling.' },
       { id: 'kahit', tl: 'kahit', en: 'even / even if', kind: 'word', hint: 'kah-HIT', note: '"Kahit ano" is "anything at all", the answer to "what do you want to eat?". "Kahit saan" is "anywhere".', hook: 'Sounds like "car hit": even if a car hit it, it would still run.' },
       { id: 'kapag', tl: 'kapag', accept: ['pag'], en: 'when / whenever', kind: 'word', hint: 'kah-PAHG', note: 'For something that happens, or will: "Kapag umuulan, sa bahay lang ako", when it rains I stay home. Said fast, it\'s "pag".', hook: 'Think "cap, bag": whenever it rains, put on a cap and grab your bag.' },
@@ -311,7 +316,7 @@ export const UNITS: Unit[] = [
       { id: 'parang', tl: 'parang', en: 'it seems / sort of like', kind: 'word', hint: 'PAH-rahng', note: '"Parang uulan" is "looks like rain". It also softens a guess, like "kind of".', hook: 'From "para" (for, like) with "-ng": just like, it seems.' },
       { id: 'kaysa', tl: 'kaysa', accept: ['kesa'], en: 'than', kind: 'word', hint: 'kai-SAH', note: 'With "mas": "mas mura kaysa dito", cheaper than here. Said fast, it\'s "kesa".', hook: 'Think "kay, sir?": which one, sir, this one or that one?' },
       { id: 'mas', tl: 'mas', en: 'more', kind: 'word', hint: 'mahs', note: 'Before a describing word: "mas mura", cheaper; "mas malaki", bigger.', hook: 'Spanish "más", more. "Mas masarap!" is "tastier!"' },
-      { id: 'tapos', tl: 'tapos', en: 'then / and then', kind: 'word', hint: 'TAH-pos', note: 'How every story moves on: "...tapos, umuwi kami", and then we went home. "Tapos na" is "it\'s done".', hook: '"Tapos" means finished, so "tapos" in a story is: that\'s done, then...' },
+      { id: 'tapos', tl: 'tapos', en: 'then / and then', kind: 'word', hint: 'tah-POS', note: 'How every story moves on: "...tapos, umuwi kami", and then we went home. "Tapos na" is "it\'s done".', hook: '"Tapos" means finished, so "tapos" in a story is: that\'s done, then...' },
       { id: 'pagkatapos', tl: 'pagkatapos', en: 'after / afterwards', kind: 'word', hint: 'pahg-kah-TAH-pos', note: '"Pagkatapos kumain" is "after eating".', hook: 'Built on "tapos" (done): once it\'s done, afterwards.' },
     ],
   },
@@ -323,12 +328,12 @@ export const UNITS: Unit[] = [
     cards: [
       { id: 'ulit', tl: 'ulit', accept: ['uli'], en: 'again', kind: 'word', hint: 'OO-lit', note: '"Ulit!" is "again!", and "Ano ulit?" is "come again?". Written "muli" in books and songs.', hook: 'The "ulit" in "Pakiulit po", please say it again: "paki-" (please) + "ulit" (again).' },
       { id: 'naman', tl: 'naman', en: '(softens it) / on the other hand', kind: 'word', hint: 'nah-MAHN', note: 'It softens: "Mabuti naman", fine, thanks. It turns things round: "Ikaw naman!", your turn! And it mildly protests: "Ano ba naman!", oh come on!', hook: 'Think "nah, man": a gentle shrug of a word.' },
-      { id: 'pala', tl: 'pala', en: 'oh, so ... (just found out)', kind: 'word', hint: 'pah-LAH', note: 'For something you\'ve just realised: "Ikaw pala!", oh, it\'s you!; "Sarado pala", oh, it\'s closed.', hook: 'The light-bulb word. "Pala" is also a shovel: you\'ve just dug something up.' },
+      { id: 'pala', tl: 'pala', en: 'oh, so ... (just found out)', kind: 'word', hint: 'pah-LAH', note: 'For something you\'ve just realised: "Ikaw pala!", oh, it\'s you!; "Sarado pala", oh, it\'s closed.', hook: 'The light-bulb word: "pah-LAH!", oh, so that\'s it!' },
       { id: 'rin', tl: 'rin', accept: ['din'], en: 'too / also', kind: 'word', hint: 'rin', note: '"Rin" after a vowel, "din" after a consonant: "Ako rin", me too; "Gusto ko rin", I want some too; "Pagod din ako", I\'m tired too.', hook: 'Rin, din: like an echo, it repeats what came before. Me too.' },
-      { id: 'daw', tl: 'daw', accept: ['raw'], en: 'they say / apparently', kind: 'word', hint: 'dow', note: 'For news you heard from someone else: "Uulan daw", it\'s going to rain, apparently. After a vowel it\'s often "raw".', hook: 'Sounds like "though": it\'s true, though, or so they say.' },
+      { id: 'daw', tl: 'daw', accept: ['raw'], en: 'they say / apparently', kind: 'word', hint: 'dow', note: 'For news you heard from someone else: "Uulan daw", it\'s going to rain, apparently. After a vowel it\'s often "raw".', hook: 'Rhymes with "now", as in "now, I heard that...": the start of every bit of gossip.' },
       { id: 'muna', tl: 'muna', en: 'first (for now)', kind: 'word', hint: 'MOO-nah', note: '"Kain muna tayo" is "let\'s eat first". "Teka muna" is "hang on a sec".', hook: 'Before anything else: "muna" puts one thing first and leaves the rest for later.' },
       { id: 'siyempre', tl: 'siyempre', accept: ['syempre'], en: 'of course', kind: 'word', hint: 'SHEM-preh', note: 'Said with a smile: "Siyempre naman!", of course!', hook: 'Spanish "siempre", always: if it\'s always so, then of course.' },
-      { id: 'basta', tl: 'basta', en: 'just / as long as', kind: 'word', hint: 'BAHS-tah', note: '"Basta!" on its own is "just because!", the end of an argument. "Basta masaya ka" is "as long as you\'re happy".', hook: 'Italian "basta!", enough! In Tagalog it ends the discussion too.' },
+      { id: 'basta', tl: 'basta', en: 'just / as long as', kind: 'word', hint: 'BAHS-tah', note: '"Basta!" on its own is "just because!", the end of an argument. "Basta masaya ka" is "as long as you\'re happy".', hook: 'Spanish "¡basta!", enough! In Tagalog it ends the discussion too.' },
       { id: 'di-ba', tl: 'Di ba?', accept: ['Diba?', 'Hindi ba?'], en: "Right? / Isn't it?", kind: 'phrase', hint: 'dee BAH', note: 'Tacked on to check you agree: "Masarap, di ba?", it\'s good, right?', hook: '"Di" is "hindi" (not) cut short, and "ba" makes the question: not so?' },
       { id: 'heto', tl: 'Heto.', accept: ['Eto.'], en: 'Here you go. / Here it is.', kind: 'word', hint: 'HEH-toh', note: 'Said while handing something over: "Heto po ang bayad ko", here\'s my fare.', hook: 'The "ito" (this) you know, with an "h" in front: here, this!' },
       { id: 'ganito', tl: 'ganito', en: 'like this', kind: 'word', hint: 'gah-nee-TOH', note: '"Ganito" is like this (here, by me); "ganyan" like that (by you); "ganun" like that (over there). "Ganito ang gawin mo" is "do it like this".', hook: 'Built on "ito", this: gan-ito, the way this one is.' },
@@ -340,7 +345,7 @@ export const UNITS: Unit[] = [
       { id: 'iba', tl: 'iba', en: 'other / different', kind: 'word', hint: 'ee-BAH', note: '"Iba na lang" is "a different one, then". "Ibang tao" is "someone else". "Iba ka talaga!" is "you\'re one of a kind!"', hook: 'Think "eBay": somewhere to swap yours for a different one.' },
       { id: 'pareho', tl: 'pareho', accept: ['pareha'], en: 'the same / both', kind: 'word', hint: 'pah-REH-hoh', note: '"Pareho tayo!" is "same here!" or "we\'re the same!".', hook: 'From Spanish "parejo", even, matched: a pair that\'s the same.' },
       { id: 'dapat', tl: 'dapat', en: 'should / must', kind: 'word', hint: 'DAH-paht', note: '"Dapat kang magpahinga" is "you should rest". "Dapat lang!" is "and rightly so!"', hook: 'Think "the pat" on the back you get when you do what you should.' },
-      { id: 'huwag', tl: 'huwag', accept: ['wag'], en: "don't", kind: 'word', hint: 'hoo-WAHG', note: '"Huwag!" on its own is "don\'t!". With "po" it joins on with "-ng": "Huwag po!". Said fast, it\'s "\'Wag!"', hook: 'Think "who wag?": don\'t wag that finger at me!' },
+      { id: 'huwag', tl: 'huwag', accept: ['wag'], en: "don't", kind: 'word', hint: 'hoo-WAHG', note: '"Huwag!" on its own is "don\'t!", and "Huwag po!" the polite one. Before a doing word the word before it takes "-ng": "Huwag kang umalis", don\'t leave. Said fast, it\'s "\'Wag!"', hook: 'Think "who wag?": don\'t wag that finger at me!' },
     ],
   },
   {
@@ -422,7 +427,7 @@ export const UNITS: Unit[] = [
       { id: 'hintayin-mo-ako', tl: 'Hintayin mo ako.', en: 'Wait for me.', kind: 'phrase', hint: 'hin-tah-YIN moh ah-KOH', hook: '"Hintay" is wait. Picture holding up a hand: "HIN-tay!", stay there.', variants: [
         { tl: 'Hintayin mo kami.', en: 'Wait for us.', hint: 'hin-tah-YIN moh kah-MEE' },
       ] },
-      { id: 'para-po', tl: 'Para po!', en: 'Stop here, please! (to a driver)', kind: 'phrase', hint: 'PAH-rah poh', note: 'Call it out on a jeepney or bus when you want to get off.', hook: 'From Spanish "parar", to stop. A different word from the "para" that means "for".' },
+      { id: 'para-po', tl: 'Para po!', en: 'Stop here, please! (to a driver)', kind: 'phrase', homonyms: ['para'], hint: 'PAH-rah poh', note: 'Call it out on a jeepney or bus when you want to get off.', hook: 'From Spanish "parar", to stop. A different word from the "para" that means "for".' },
       { id: 'bayad-po', tl: 'Bayad po.', en: "Here's my fare.", kind: 'phrase', hint: 'BAH-yahd poh', note: 'On a jeepney, pass your fare forward with "Bayad po" and it gets handed along to the driver.', hook: '"Bayad" is payment. It travels hand to hand to the driver, and the change comes back the same way.' },
       { id: 'sa-tabi-lang', tl: 'Sa tabi lang po.', en: 'Just pull over here, please.', kind: 'phrase', hint: 'sah tah-BEE lahng poh', hook: '"Tabi" means side, so it is "just at the side". "Tabi!" on its own means "move aside!"' },
       { id: 'sumakay', tl: 'sumakay', en: 'to get on / ride', kind: 'word', hint: 'soo-mah-KAI', hook: '"Sakay" is ride. "-um-" slots inside to make a verb: s-um-akay. A driver calling "Sakay na!" means "get on!"' },
@@ -740,7 +745,7 @@ export const UNITS: Unit[] = [
       { id: 'magpahinga', tl: 'magpahinga', en: 'to rest', kind: 'word', hint: 'mahg-pah-hee-NGAH', hook: '"Hinga" is breath, so "pahinga" is a breather. "Magpahinga ka" is "get some rest".' },
       { id: 'maglaro', tl: 'maglaro', en: 'to play', kind: 'word', hint: 'mahg-lah-ROH', hook: '"Laro" is a game. Kids out in the "kalye" after school are "naglalaro", playing.' },
       { id: 'alam', tl: 'alam', en: 'to know (a fact)', kind: 'word', hint: 'ah-LAHM', note: 'For facts and how-tos; a person you know is "kilala". "Alam mo ba?" is "did you know?"', hook: 'The "alam" of "Hindi ko alam", I don\'t know, and hidden inside "paalam", goodbye, letting someone know you\'re going.' },
-      { id: 'kilala', tl: 'kilala', en: 'to know (a person)', kind: 'word', hint: 'kee-LAH-lah', note: '"Kilala mo ba siya?" is "do you know him?" or "do you know her?". For facts, use "alam".', hook: 'Doubled "kila", like a name you keep saying because you know them so well: kila-la.' },
+      { id: 'kilala', tl: 'kilala', en: 'to know (a person)', kind: 'word', hint: 'kee-LAH-lah', note: '"Kilala mo ba siya?" is "do you know him?" or "do you know her?". For facts, use "alam".', hook: 'Think "kee-LAH-lah", la-la: you know them so well you could sing their name.' },
       { id: 'sabi', tl: 'sabi', en: 'said / told', kind: 'word', hint: 'sah-BEE', note: 'Whoever said it comes after: "Sabi ko", I said; "Sabi niya", he said, she said; "Sabi nila", they say.', hook: 'The root of "sabihin", to say, from "Paano sabihin...?". "Sabi" is what got said.' },
       { id: 'gawin', tl: 'gawin', en: 'to do (it) / to make (it)', kind: 'word', hint: 'gah-WIN', note: '"Anong gagawin ko?" is "what will I do?". "Gawa" is the root: "Anong ginagawa mo?", what are you doing?', hook: 'Doing the deed: "gawa" (work, deed) with "-in". Think "go win": do it, and win.' },
       { id: 'nakita', tl: 'nakita', en: 'saw / found', kind: 'word', hint: 'nah-KEE-tah', note: '"Nakita mo ba?" is "did you see it?" or "did you find it?". "Nakita ko na!" is "found it!"', hook: '"Kita" is see, the one in "Kita tayo bukas", and "na-" makes it done: saw.' },
@@ -803,8 +808,8 @@ export const UNITS: Unit[] = [
       { id: 'kamay', tl: 'kamay', en: 'hand', kind: 'word', hint: 'kah-MAI', note: '"Kamayan" is eating with your hands, off banana leaves: a proper Filipino feast.', hook: 'Think "come, my hand": take my hand, come along.' },
       { id: 'puso', tl: 'puso', en: 'heart', kind: 'word', hint: 'POO-soh', note: 'Also the heart of feelings: "Ang laki ng puso niya" is "she has a big heart". A banana blossom is "puso ng saging".', hook: 'Sounds like "pulse-o": feel the pulse of your heart.' },
       { id: 'aso', tl: 'aso', en: 'dog', kind: 'word', picture: '🐕', hint: 'AH-soh', note: 'The local street dog has a nickname of its own: "askal", from "asong kalye", street dog.', hook: 'Think "a so-so dog": a scruffy aso that\'s so-so at fetching.' },
-      { id: 'kama', tl: 'kama', en: 'bed', kind: 'word', picture: '🛏️', hint: 'KAH-mah', note: '"Nasa kama pa ako" is "I\'m still in bed".', hook: 'Spanish "cama", bed. Think "calm-a": nothing is calmer than your bed.' },
-      { id: 'pinto', tl: 'pinto', en: 'door', kind: 'word', picture: '🚪', hint: 'pin-TOH', note: '"Pakisara ang pinto" is "please close the door".', hook: 'Picture a door painted with a pinto horse\'s patches. Knock on the pinto.' },
+      { id: 'kama', tl: 'kama', en: 'bed', kind: 'word', hint: 'KAH-mah', note: '"Nasa kama pa ako" is "I\'m still in bed".', hook: 'Spanish "cama", bed. Think "calm-a": nothing is calmer than your bed.' },
+      { id: 'pinto', tl: 'pinto', en: 'door', kind: 'word', hint: 'pin-TOH', note: '"Pakisara ang pinto" is "please close the door".', hook: 'Picture a door painted with a pinto horse\'s patches. Knock on the pinto.' },
       { id: 'kuwarto', tl: 'kuwarto', accept: ['kwarto'], en: 'room / bedroom', kind: 'word', hint: 'KWAHR-toh', note: 'Said, and often written, "kwarto".', hook: 'Spanish "cuarto", room. A quarter of the house is your room.' },
       { id: 'gamit', tl: 'gamit', en: 'stuff / belongings', kind: 'word', hint: 'GAH-mit', note: '"Nasaan ang gamit ko?" is "where are my things?". As a doing word, "gamitin" is to use.', hook: 'Think "game kit": all the stuff you pack for the game.' },
       { id: 'sarili', tl: 'sarili', en: 'self / (my) own', kind: 'word', hint: 'sah-REE-lee', note: '"Sarili ko" is "my own" or "myself": "sariling bahay", a house of your own. "Ingat sa sarili" is "look after yourself".', hook: 'Sounds like "sorry, Lee": sorry, Lee, this one is my own.' },
@@ -936,6 +941,7 @@ export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
   ['tingnan', 'nakita'], ['halika', 'tara-na'], ['ganito', 'ganoon-ba'],
   ['pakiusap', 'pakiulit'], ['sabi', 'sabihin'], ['umalis', 'aalis-na-ako'], ['magaling', 'mabuti'], ['pala', 'ikaw-pala'],
   ['rin', 'ako-rin'], ['sandali', 'sandali-lang'], ['para', 'para-saan'], ['matagal', 'gaano-katagal'],
+  ['trabaho', 'magtrabaho'], ['pare', 'kaibigan'], ['heto', 'dito'], ['bagay', 'gamit'],
 ];
 
 /**
@@ -979,7 +985,7 @@ export const LEARN_ORDER: readonly string[] = [
   'k-taglish', 'p-first', 't-rise', 't-soft', 's-stress', 'k-kain', 's-r',
   // Directions and getting a ride, and running late.
   'kaliwa', 'kanan', 'diretso', 'doon', 'malayo', 'pumunta', 'palengke', 'paano-pumunta', 'ate', 'kuya', 'pare',
-  'para', 'para-po', 'bayad-po', 'heto', 'aalis-na-ako', 'pauwi-na-ako', 'nasaan-ka-na', 'mahuhuli-ako', 'hintayin-mo-ako',
+  'para-po', 'bayad-po', 'heto', 'aalis-na-ako', 'pauwi-na-ako', 'nasaan-ka-na', 'mahuhuli-ako', 'hintayin-mo-ako',
   'teka',
   'k-kuya',
   // More people words and joiners, ordering a drink, and buying things.
@@ -1022,7 +1028,7 @@ export const LEARN_ORDER: readonly string[] = [
   'p-when',
   // Less everyday feelings, plans and family.
   'nauuhaw-ako', 'inaantok-ako', 'malamig', 'masaya', 'malungkot', 'gusto-ko-umuwi', 'sasama-ako',
-  'tuloy-ba-tayo', 'mga', 'p-mga', 'para-saan', 'kanino', 'lola', 'lolo', 'tita', 'tito',
+  'tuloy-ba-tayo', 'mga', 'p-mga', 'para', 'para-saan', 'kanino', 'lola', 'lolo', 'tita', 'tito',
   // Rarer places, dates and emergencies.
   'simbahan', 'opisina', 'bangko', 'paliparan', 'buwan', 'taon', 'lunes', 'biyernes', 'sabado', 'hatinggabi',
   'nawala-bag', 'tumawag-pulis', 'delikado', 'bahala-na',
@@ -1167,7 +1173,7 @@ export function buildsOn(card: Card): readonly string[] {
   if (!isVocab(card)) return card.needs ?? [];
   let ids = foundations.get(card.id);
   if (!ids) {
-    ids = [...new Set(tagalogWords(card.tl).map(cardForWord))].filter((id): id is string => !!id && id !== card.id);
+    ids = [...new Set(tagalogWords(card.tl).map(cardForWord))].filter((id): id is string => !!id && id !== card.id && !card.homonyms?.includes(id));
     foundations.set(card.id, ids);
   }
   return ids;

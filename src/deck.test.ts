@@ -97,6 +97,8 @@ describe('deck', () => {
     expect(buildsOn(getCard('magkano-lahat')!)).toEqual(['magkano', 'lahat']);
     expect(buildsOn(getCard('mabuti')!)).toEqual(['naman']);
     expect(buildsOn(getCard('salamat-po')!)).toEqual(['salamat', 'po']);
+    // A word only spelled the same isn't built on: "Para po!" is "stop", not "for".
+    expect(buildsOn(getCard('para-po')!)).toEqual(['po']);
   });
 
   it('brings at most one new word with each phrase', () => {
