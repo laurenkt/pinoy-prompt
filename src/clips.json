@@ -239,13 +239,37 @@
     "ano-ito-38b42ded",
     "ano-ito-93fc2de5"
   ],
+  "Ano iyan?": [
+    "ano-iyan-f8d09337",
+    "ano-iyan-4f466e28"
+  ],
+  "Ano iyon?": [
+    "ano-iyon-52be70cf",
+    "ano-iyon-2b7ba660"
+  ],
   "Magkano ito?": [
     "magkano-ito-e241f62f",
     "magkano-ito-b9a5106d"
   ],
+  "Magkano iyan?": [
+    "magkano-iyan-140e0c9f",
+    "magkano-iyan-d28c28dd"
+  ],
+  "Magkano ang kape?": [
+    "magkano-ang-kape-c30366c4",
+    "magkano-ang-kape-71c0cca2"
+  ],
   "Nasaan ka?": [
     "nasaan-ka-3d7a43aa",
     "nasaan-ka-644fe0ec"
+  ],
+  "Nasaan siya?": [
+    "nasaan-siya-982aff44",
+    "nasaan-siya-b64c0387"
+  ],
+  "Nasaan sila?": [
+    "nasaan-sila-b6705999",
+    "nasaan-sila-443f5330"
   ],
   "Saan ka pupunta?": [
     "saan-ka-pupunta-f73bd679",
@@ -262,6 +286,10 @@
   "Kanino ito?": [
     "kanino-ito-1ab62407",
     "kanino-ito-bfc05c96"
+  ],
+  "Kanino iyan?": [
+    "kanino-iyan-51195405",
+    "kanino-iyan-6569b95f"
   ],
   "Gaano katagal?": [
     "gaano-katagal-0807893c",
@@ -367,6 +395,14 @@
     "may-kape-ba-8457ff4f",
     "may-kape-ba-9e1d69d7"
   ],
+  "May tubig ba?": [
+    "may-tubig-ba-50e1274d",
+    "may-tubig-ba-041e6b2c"
+  ],
+  "May tinapay ba?": [
+    "may-tinapay-ba-2e7c21a7",
+    "may-tinapay-ba-655cc181"
+  ],
   "Meron.": [
     "meron-e33921f9",
     "meron-e3376174"
@@ -382,6 +418,14 @@
   "Kailangan ko ito.": [
     "kailangan-ko-ito-f9aadf88",
     "kailangan-ko-ito-d29962e7"
+  ],
+  "Kailangan ko ng tubig.": [
+    "kailangan-ko-ng-tubig-6fceb223",
+    "kailangan-ko-ng-tubig-71a6c171"
+  ],
+  "Kailangan ko iyan.": [
+    "kailangan-ko-iyan-9def91cb",
+    "kailangan-ko-iyan-a9db834a"
   ],
   "puwede": [
     "puwede-bdd92457",
@@ -567,6 +611,14 @@
     "papunta-na-ako-fb7026f4",
     "papunta-na-ako-6db2efa8"
   ],
+  "Papunta na kami.": [
+    "papunta-na-kami-243126db",
+    "papunta-na-kami-e201e86b"
+  ],
+  "Papunta na siya.": [
+    "papunta-na-siya-db18ccb3",
+    "papunta-na-siya-e775d017"
+  ],
   "Malapit na ako.": [
     "malapit-na-ako-099aee4d",
     "malapit-na-ako-d5866ca9"
@@ -599,6 +651,10 @@
     "hintayin-mo-ako-d7d6f0a0",
     "hintayin-mo-ako-f648519d"
   ],
+  "Hintayin mo kami.": [
+    "hintayin-mo-kami-7c8290c0",
+    "hintayin-mo-kami-41e14697"
+  ],
   "Para po!": [
     "para-po-f34d45d5",
     "para-po-58366101"
@@ -630,6 +686,14 @@
   "Nasa bahay ako.": [
     "nasa-bahay-ako-7d02964a",
     "nasa-bahay-ako-9a8f0849"
+  ],
+  "Nasa opisina ako.": [
+    "nasa-opisina-ako-c44ce7a5",
+    "nasa-opisina-ako-3bcb7116"
+  ],
+  "Nasa palengke ako.": [
+    "nasa-palengke-ako-3f1c13de",
+    "nasa-palengke-ako-ca9c9b59"
   ],
   "palengke": [
     "palengke-da8349db",
@@ -683,6 +747,18 @@
     "paano-pumunta-sa-palengke-8606a6cc",
     "paano-pumunta-sa-palengke-4855ca7a"
   ],
+  "Paano pumunta sa ospital?": [
+    "paano-pumunta-sa-ospital-e6104aa9",
+    "paano-pumunta-sa-ospital-862b65a3"
+  ],
+  "Paano pumunta sa botika?": [
+    "paano-pumunta-sa-botika-c8dd0aed",
+    "paano-pumunta-sa-botika-04a964fe"
+  ],
+  "Paano pumunta sa bangko?": [
+    "paano-pumunta-sa-bangko-b195cd6a",
+    "paano-pumunta-sa-bangko-b494fcfc"
+  ],
   "kaliwa": [
     "kaliwa-76ea5a80",
     "kaliwa-e9f403de"
@@ -735,6 +811,14 @@
     "libre-ka-ba-49ef9308",
     "libre-ka-ba-710dac01"
   ],
+  "Libre ka ba bukas?": [
+    "libre-ka-ba-bukas-c746e16b",
+    "libre-ka-ba-bukas-a2d74a02"
+  ],
+  "Libre ka ba mamaya?": [
+    "libre-ka-ba-mamaya-639f54b4",
+    "libre-ka-ba-mamaya-d441ca28"
+  ],
   "Anong plano?": [
     "anong-plano-47f0edb9",
     "anong-plano-b781ffc5"
@@ -750,6 +834,14 @@
   "Kita tayo bukas.": [
     "kita-tayo-bukas-f12bd51e",
     "kita-tayo-bukas-0f8b23de"
+  ],
+  "Kita tayo mamaya.": [
+    "kita-tayo-mamaya-e49e02c1",
+    "kita-tayo-mamaya-fcf44fe5"
+  ],
+  "Kita tayo sa Lunes.": [
+    "kita-tayo-sa-lunes-5cda73ea",
+    "kita-tayo-sa-lunes-130dd58c"
   ],
   "Puwede ako.": [
     "puwede-ako-73f11649",
@@ -879,6 +971,14 @@
     "pahingi-po-ng-tubig-78b91fb6",
     "pahingi-po-ng-tubig-89f19eea"
   ],
+  "Pahingi po ng kanin.": [
+    "pahingi-po-ng-kanin-da6201af",
+    "pahingi-po-ng-kanin-25141f6e"
+  ],
+  "Pahingi po ng asin.": [
+    "pahingi-po-ng-asin-b5a3d53f",
+    "pahingi-po-ng-asin-c9efb4b8"
+  ],
   "Anong masarap dito?": [
     "anong-masarap-dito-270312f6",
     "anong-masarap-dito-585e25c7"
@@ -982,6 +1082,14 @@
   "Meron ba kayong tinapay?": [
     "meron-ba-kayong-tinapay-25233626",
     "meron-ba-kayong-tinapay-6758c2a4"
+  ],
+  "Meron ba kayong itlog?": [
+    "meron-ba-kayong-itlog-4ab93389",
+    "meron-ba-kayong-itlog-5b440493"
+  ],
+  "Meron ba kayong manok?": [
+    "meron-ba-kayong-manok-f445414f",
+    "meron-ba-kayong-manok-76b16dbf"
   ],
   "iyan": [
     "iyan-be9ae91e",
@@ -1127,6 +1235,18 @@
     "nasaan-ang-banyo-69344a85",
     "nasaan-ang-banyo-371f4172"
   ],
+  "Nasaan ang kape?": [
+    "nasaan-ang-kape-9ac872ce",
+    "nasaan-ang-kape-3179a021"
+  ],
+  "Nasaan ang palengke?": [
+    "nasaan-ang-palengke-b6998d51",
+    "nasaan-ang-palengke-70e52ad1"
+  ],
+  "Nasaan ang botika?": [
+    "nasaan-ang-botika-66147288",
+    "nasaan-ang-botika-63f8961a"
+  ],
   "gusto": [
     "gusto-6e043f58",
     "gusto-4c411330"
@@ -1134,6 +1254,14 @@
   "Gusto ko ito.": [
     "gusto-ko-ito-bd9b50e4",
     "gusto-ko-ito-afa87bc6"
+  ],
+  "Gusto ko iyan.": [
+    "gusto-ko-iyan-99cd7de7",
+    "gusto-ko-iyan-0ef083e9"
+  ],
+  "Gusto ko ng kape.": [
+    "gusto-ko-ng-kape-d06a9dbb",
+    "gusto-ko-ng-kape-067a578d"
   ],
   "Ayoko.": [
     "ayoko-e33778e2",
@@ -1503,6 +1631,14 @@
     "sino-ito-44b231f9",
     "sino-ito-df415354"
   ],
+  "Sino siya?": [
+    "sino-siya-8d74a427",
+    "sino-siya-e7515ec2"
+  ],
+  "Sino iyan?": [
+    "sino-iyan-11296e1c",
+    "sino-iyan-73086217"
+  ],
   "Anong number mo?": [
     "anong-number-mo-60207a72",
     "anong-number-mo-376e5c40"
@@ -1510,6 +1646,14 @@
   "Walang signal.": [
     "walang-signal-b8633cd1",
     "walang-signal-9600ed3a"
+  ],
+  "Walang tubig.": [
+    "walang-tubig-5cfe1ddb",
+    "walang-tubig-5252d2d6"
+  ],
+  "Walang pera.": [
+    "walang-pera-a8f5eff4",
+    "walang-pera-39dbccd7"
   ],
   "Tulong!": [
     "tulong-b9cb85aa",
@@ -1526,6 +1670,14 @@
   "Nawala ang bag ko.": [
     "nawala-ang-bag-ko-5057bebb",
     "nawala-ang-bag-ko-68b2dd18"
+  ],
+  "Nawala ang selpon ko.": [
+    "nawala-ang-selpon-ko-354eb8a6",
+    "nawala-ang-selpon-ko-e7a43801"
+  ],
+  "Nawala ang pera ko.": [
+    "nawala-ang-pera-ko-6bd3114e",
+    "nawala-ang-pera-ko-a09e6aa9"
   ],
   "Tumawag ka ng pulis!": [
     "tumawag-ka-ng-pulis-6b38e00d",
@@ -1643,10 +1795,6 @@
     "pagod-na-kami-5f659ddf",
     "pagod-na-kami-8c9b10af"
   ],
-  "Gusto ko ng kape.": [
-    "gusto-ko-ng-kape-d06a9dbb",
-    "gusto-ko-ng-kape-067a578d"
-  ],
   "Gusto ko ng tubig.": [
     "gusto-ko-ng-tubig-5fe51b8d",
     "gusto-ko-ng-tubig-60a6aa03"
@@ -1662,10 +1810,6 @@
   "May tubig.": [
     "may-tubig-ed73b00e",
     "may-tubig-7d3b3280"
-  ],
-  "May tubig ba?": [
-    "may-tubig-ba-50e1274d",
-    "may-tubig-ba-041e6b2c"
   ],
   "May kanin ba?": [
     "may-kanin-ba-987dfc8f",
@@ -1715,10 +1859,6 @@
     "malayo-ang-palengke-1b4fcb46",
     "malayo-ang-palengke-c900ea56"
   ],
-  "Nasaan ang palengke?": [
-    "nasaan-ang-palengke-b6998d51",
-    "nasaan-ang-palengke-70e52ad1"
-  ],
   "Nasaan si Ana?": [
     "nasaan-si-ana-61e1ac8d",
     "nasaan-si-ana-d6995073"
@@ -1730,10 +1870,6 @@
   "Kita tayo sa kanto.": [
     "kita-tayo-sa-kanto-9a8453df",
     "kita-tayo-sa-kanto-2e81dc75"
-  ],
-  "Paano pumunta sa ospital?": [
-    "paano-pumunta-sa-ospital-e6104aa9",
-    "paano-pumunta-sa-ospital-862b65a3"
   ],
   "Kumakain ako.": [
     "kumakain-ako-5dc0f47b",
