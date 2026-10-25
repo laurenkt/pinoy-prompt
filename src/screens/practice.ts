@@ -161,6 +161,8 @@ export function practiceScreen(
   let spokenRight = false;
   /** An attempt at the current spoken question was heard and judged wrong. */
   let spokeWrong = false;
+  /** The latest attempt at it was the miss that set spokeWrong, so "I had it right" can take that back. */
+  let missNoted = false;
   /** Counting down to the next question after a right answer. */
   let auto: Countdown | null = null;
   /** What was picked on the question before; null when there's nothing to look back at (a spoken question has no pick). */
@@ -314,35 +316,53 @@ export function practiceScreen(
     speak = null;
     spokenRight = false;
     spokeWrong = false;
+    missNoted = false;
     const q = current;
     if (waiting) return draw();
     if (q?.mode === 'speak') {
+      /** How an attempt went, once any miss it was is noted. */
+      const spoken = (right: boolean, heard: boolean) => {
+        const first = right && !spokenRight;
+        if (first) {
+          spokenRight = true;
+          void chime();
+        }
+        // The word said back after any attempt it was heard in, right or wrong, as a Listen answer is: after the
+        // chime, and before moving on, which waits for it.
+        if (heard) sayCard(q);
+        if (!first) return;
+        // Pick what's next now, so its word loads while the coaching is up. Said wrong first, it comes back as a miss does.
+        settle(!spokeWrong);
+        if (!spokeWrong) noteHelp(q, false);
+        auto = countdown(root, () => {
+          autoMoved = true;
+          advance();
+        });
+      };
       speak = speakPanel(q.card, {
         say: (slow) => sayCard(q, slow),
         silence: () => stop(),
         onAttempt: (right, heard) => {
           // A miss heard as some other sounds comes up more to be said in later rounds, counted once a question, as it
           // happens. Nothing recognised says nothing about the word. Said right first time, it takes one off.
+          missNoted = false;
           if (!right && heard && !spokeWrong && !spokenRight) {
             spokeWrong = true;
+            missNoted = true;
+            q.helpBefore = drillHelp(app.progress.cards[q.card.id], q.mode);
             noteHelp(q, true);
           }
-          const first = right && !spokenRight;
-          if (first) {
-            spokenRight = true;
-            void chime();
+          spoken(right, heard);
+        },
+        onClaim: () => {
+          // Its stress measured wrong, as the learner says: if that miss was the first, it's taken back, as "I had it
+          // right" takes back a typed one, and it goes on as said right. A miss said before it still stands.
+          if (missNoted) {
+            if (setDrillHelp(app.progress, q.card.id, q.mode, () => q.helpBefore ?? 0, app.now())) app.commit();
+            spokeWrong = false;
           }
-          // The word said back after any attempt it was heard in, right or wrong, as a Listen answer is: after the
-          // chime, and before moving on, which waits for it.
-          if (heard) sayCard(q);
-          if (!first) return;
-          // Pick what's next now, so its word loads while the coaching is up. Said wrong first, it comes back as a miss does.
-          settle(!spokeWrong);
-          if (!spokeWrong) noteHelp(q, false);
-          auto = countdown(root, () => {
-            autoMoved = true;
-            advance();
-          });
+          missNoted = false;
+          spoken(true, false);
         },
         counting: () => auto !== null,
         onNext: () => advance(),

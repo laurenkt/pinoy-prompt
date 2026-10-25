@@ -2,7 +2,7 @@
 // letters to work on, and a tip for the most useful thing to fix first.
 
 import { baseSound, isGlidingVowel, type Comparison, type SoundResult } from './phonetics';
-import { leanAgainst, SURE, type Stress } from './stress';
+import { stressVerdict, type Stress } from './stress';
 
 /** How each sound is described to a learner, by example. */
 const DESCRIBE: Record<string, string> = {
@@ -116,14 +116,17 @@ export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
   return tips;
 }
 
+/** The one of the last two syllables the card doesn't stress, in capitals as it was leaned on. */
+const otherSyllable = ({ syllables, expected }: Stress) => syllables[expected === syllables.length - 1 ? expected - 1 : expected + 1].toUpperCase();
+
 /**
- * A tip for a word said leaning on the other one of its last two syllables, in the hint's own spelling, or null when
- * it wasn't, or it isn't sure. Kept apart from the sound tips: stress never changes the score, though
- * Speak fails a word that draws this tip.
+ * How an attempt's stress came out, in a line: what it leaned on, or what to lean on instead. Kept apart from the
+ * sound tips, as stress never changes the score, though Speak fails a word whose stress is off.
  */
-export function stressTip(stress: Stress | null): string | null {
-  if (!stress || leanAgainst(stress) <= SURE) return null;
-  const { syllables, expected } = stress;
-  const said = expected === syllables.length - 1 ? expected - 1 : expected + 1;
-  return `Lean on ${syllables[expected]}, not ${syllables[said].toUpperCase()}: higher and longer.`;
+export function stressLine(stress: Stress): string {
+  const aim = stress.syllables[stress.expected];
+  const verdict = stressVerdict(stress);
+  if (verdict === 'good') return `You leaned on ${aim}.`;
+  if (verdict === 'close') return `Nearly: lean on ${aim} more.`;
+  return `Lean on ${aim}, not ${otherSyllable(stress)}.`;
 }

@@ -6,15 +6,18 @@
 // from the recording: what was said to the left of the middle, what to aim for
 // to the right, louder the further the finger goes. The word itself, coloured
 // sound by sound, and the ribbon are scrubbers too: drag along the letters or the
-// recording to move between sounds.
+// recording to move between sounds. For a single word whose stress is judged,
+// one more page shows which of its last two syllables was leaned on, against
+// which to aim for, opened from a line under the word.
 
-import type { Tip } from '../coach';
+import { stressLine, type Tip } from '../coach';
 import type { Comparison, SoundResult, SoundVerdict } from '../phonetics';
 import { canSynthesize } from '../phone-synth';
 import type { Held, Player } from '../player';
 import { MANNERS, PLACES, placeOf, soundName, type Place } from '../sound-map';
 import { createSpectrogram, type Segment, type Spectrogram } from '../spectrogram';
 import { scrubbable } from '../speech';
+import { leanAgainst, leanedOn, stressVerdict, type Stress } from '../stress';
 import { h, icon, svg } from '../ui';
 
 export interface Attempt {
@@ -28,6 +31,8 @@ export interface Attempt {
   /** The recording, 16 kHz mono. */
   samples: Float32Array;
   features: { data: Float32Array; frames: number };
+  /** Which syllable it leaned on, when its stress was judged. */
+  stress?: Stress | null;
 }
 
 const SAMPLE_RATE = 16000;
@@ -121,12 +126,16 @@ const verdictOf = (p: Pair): SoundVerdict | 'extra' => p.result?.verdict ?? 'ext
 
 export interface ResultOptions {
   player: Player;
+  /** Offered on the stress page when only stress failed the attempt: the learner says it was right after all. */
+  onClaim?: () => void;
 }
 
 export interface ResultView {
   el: HTMLElement;
   /** The word, coloured by how each sound came out; drag along it to open each sound in turn. */
   word: HTMLElement;
+  /** How its stress came out, in a line that opens the stress page, when it was judged. */
+  stress: HTMLElement | null;
   /** Play the learner's whole attempt, without the silence either side. */
   playWhole(): void;
   dispose(): void;
@@ -306,6 +315,10 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   /** How to put each page's slider or button back at rest, as a finger still on it is let go when another opens. */
   const resets = new WeakMap<HTMLElement, () => void>();
   const pages = list.map((p) => page(p));
+  // The stress page comes after the sounds', opened only from its line.
+  const stress = attempt.stress ?? null;
+  const STRESS = list.length;
+  if (stress) pages.push(stressPage(stress));
   const detail = h('div', { class: 'sound-detail' }, pages);
   // Showing a page that was already there isn't read out, so the open sound is said here.
   const announce = h('p', { class: 'sr-only', 'aria-live': 'polite' });
@@ -321,15 +334,21 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       m.setAttribute('aria-pressed', String(i === index));
     });
     letterEls.forEach((el, i) => el.classList.toggle('on', covers(index, i)));
+    stressLink?.setAttribute('aria-pressed', String(index === STRESS));
+    pages.forEach((el, i) => {
+      el.classList.toggle('open', i === index);
+      el.inert = i !== index;
+    });
+    if (stress && index === STRESS) {
+      ribbon?.setFocus({ start: span(stress.heardAt[0]).start, end: span(stress.heardAt[1]).end });
+      announce.textContent = `Stress: ${VERDICT_LABEL[stressVerdict(stress)]}. ${stressLine(stress)}`;
+      return;
+    }
     word.setAttribute('aria-valuenow', String(index + 1));
     word.setAttribute('aria-valuetext', marks[index].getAttribute('aria-label')!);
     const p = list[index];
     if (p.heardAt !== undefined) ribbon?.setFocus(span(p.heardAt));
     else ribbon?.setFocus(gapFor(index));
-    pages.forEach((el, i) => {
-      el.classList.toggle('open', i === index);
-      el.inert = i !== index;
-    });
     announce.textContent = [pages[index].querySelector('.verdict-chip')?.textContent, marks[index].getAttribute('aria-label'), tipFor(p)].filter(Boolean).join('. ');
   }
 
@@ -391,6 +410,64 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       ].filter(Boolean) as Node[]),
     );
   }
+
+  /**
+   * The stress page: the word's syllables, with bars for its last two, as tall as each was high and as wide as it was
+   * long, for the attempt and for what to aim for; then which it leaned on and how to lean on the other, a button to hear the attempt's two again, and when
+   * only stress failed the attempt, one to say it was right after all.
+   */
+  function stressPage(stress: Stress): HTMLElement {
+    const verdict = stressVerdict(stress);
+    const { syllables, expected } = stress;
+    const said = leanedOn(stress);
+    // Most sure it leaned the card's way, full; most sure it leaned the other way, empty.
+    const closeness = 1 / (1 + Math.exp(leanAgainst(stress)));
+    const hear = { start: span(stress.heardAt[0]).start, end: span(stress.heardAt[1]).end };
+    return h(
+      'div',
+      { class: 'detail-page stress-page' },
+      h(
+        'div',
+        { class: `detail-head detail-${verdict}` },
+        h('p', { class: 'detail-title' }, h('span', { class: 'detail-letters' }, 'Stress'), ' ', h('span', { class: 'verdict-chip' }, VERDICT_LABEL[verdict])),
+        h(
+          'div',
+          { class: 'closeness', role: 'meter', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(Math.round(closeness * 100)), 'aria-label': 'How close' },
+          h('span', { style: { width: `${Math.round(closeness * 100)}%` } }),
+        ),
+      ),
+      drawStress(stress, verdict),
+      h(
+        'div',
+        { class: 'sound-ends' },
+        said !== expected && h('p', { class: 'end-heard' }, h('span', { class: 'end-label' }, 'You leaned on'), syllables[said].toUpperCase()),
+        // Said the card's way, the syllable is enough; otherwise, how to lean on it.
+        h('p', { class: 'end-target' }, h('span', { class: 'end-label' }, 'Aim for'), verdict === 'good' ? syllables[expected] : `${syllables[expected]}, higher and longer`),
+      ),
+      h(
+        'div',
+        { class: 'stress-actions' },
+        h(
+          'button',
+          // It makes its own sound.
+          { class: 'btn secondary hold-btn', 'data-no-tap': true, 'aria-label': `Your ${syllables.slice(-2).join('-')}`, onclick: () => void playMine(hear) },
+          icon('speaker'),
+          ' Yours',
+        ),
+        options.onClaim && h('button', { class: 'btn secondary claim', onclick: options.onClaim }, 'I had it right'),
+      ),
+    );
+  }
+
+  const stressLink = stress
+    ? h(
+        'button',
+        { class: `stress-line detail-${stressVerdict(stress)}`, 'aria-pressed': 'false', onclick: () => select(STRESS) },
+        h('span', { class: 'verdict-chip' }, `Stress: ${VERDICT_LABEL[stressVerdict(stress)]}`),
+        ' ',
+        stressLine(stress),
+      )
+    : null;
 
   /** The sound held now, so a new one, a redraw or leaving lets it go. */
   let holding: Held | null = null;
@@ -591,11 +668,14 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     detail,
     announce,
   );
-  if (list.length > 0) select(firstProblem >= 0 ? firstProblem : 0);
+  // Stress that's off is why a word with its sounds right failed, so it opens first.
+  if (stress && stressVerdict(stress) === 'off') select(STRESS);
+  else if (list.length > 0) select(firstProblem >= 0 ? firstProblem : 0);
 
   return {
     el,
     word,
+    stress: stressLink,
     playWhole: () => void playMine(whole()),
     dispose: () => {
       letGo();
@@ -723,4 +803,51 @@ function drawChart(target: string | null, heard: string | null): Chart {
     root.append(heardMark);
   }
   return { el: root, heard: heardMark, target: targetMark };
+}
+
+/** How tall a stress bar is at its lowest, and how much taller each semitone above the other makes it, in SVG units. */
+const BAR_LOW = 12;
+const BAR_PER_SEMITONE = 4;
+/** A semitone gap past this draws as this: the chart shows which was higher, not by how much past a point. */
+const MOST_SEMITONES = 8;
+/** What to aim for, drawn: the stressed syllable this many semitones higher, and this much longer, than the other. */
+const AIM = { semitones: 6, length: 1.6 };
+
+/**
+ * The stress chart: a column for each of the hint's syllables, and in two rows, the attempt's and what to aim for,
+ * a bar for each of the last two: as tall as it was high against the other, as wide as it was long. Earlier
+ * syllables, which stress doesn't fall on, get a low mark. The taller bar in the attempt's row is the one leaned on,
+ * coloured by how that came out.
+ */
+function drawStress(stress: Stress, verdict: SoundVerdict): SVGSVGElement {
+  const { syllables, expected } = stress;
+  const n = syllables.length;
+  const root = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'sound-chart chart-stress', role: 'img' });
+  root.setAttribute('aria-label', `Stress chart: you leaned on ${syllables[leanedOn(stress)].toUpperCase()}, aim for ${syllables[expected]}`);
+  const iw = W - PAD.left - PAD.right;
+  const col = iw / n;
+  const centre = (i: number) => PAD.left + (i + 0.5) * col;
+  syllables.forEach((syllable, i) => {
+    root.append(svg('text', { x: centre(i), y: 14, class: 'chart-axis', 'text-anchor': 'middle' }, syllable));
+  });
+  /** One row: its label, a low mark for each earlier syllable, and the last two syllables' bars. */
+  const row = (label: string, base: number, semitones: number, lengthRatio: number, className: (i: number) => string) => {
+    root.append(svg('text', { x: 6, y: base - 4, class: 'chart-axis' }, label));
+    root.append(svg('line', { x1: PAD.left, x2: W - PAD.right, y1: base, y2: base, class: 'chart-grid' }));
+    for (let i = 0; i < n - 2; i++) root.append(svg('rect', { x: centre(i) - col * 0.15, y: base - 6, width: col * 0.3, height: 6, rx: 3, class: 'stress-bar' }));
+    // Second-to-last over last: how much higher, and how much longer.
+    const rise = Math.max(-MOST_SEMITONES, Math.min(MOST_SEMITONES, semitones));
+    const heights = [BAR_LOW + Math.max(rise, 0) * BAR_PER_SEMITONE, BAR_LOW + Math.max(-rise, 0) * BAR_PER_SEMITONE];
+    const longest = Math.max(lengthRatio, 1);
+    const widths = [lengthRatio / longest, 1 / longest].map((w) => col * Math.max(0.3, 0.9 * w));
+    [0, 1].forEach((k) => {
+      const i = n - 2 + k;
+      root.append(svg('rect', { x: centre(i) - widths[k] / 2, y: base - heights[k], width: widths[k], height: heights[k], rx: 6, class: `stress-bar ${className(i)}` }));
+    });
+  };
+  const { length, pitch } = stress.differences;
+  row('You', 64, pitch * 6, Math.exp(length), (i) => (i === leanedOn(stress) ? `bar-${verdict}` : ''));
+  const aimFirst = expected === n - 2;
+  row('Aim for', H - PAD.bottom, aimFirst ? AIM.semitones : -AIM.semitones, aimFirst ? AIM.length : 1 / AIM.length, (i) => (i === expected ? 'bar-good' : ''));
+  return root;
 }

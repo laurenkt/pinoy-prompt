@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { stressTip } from './coach';
+import { stressLine } from './coach';
 import { getCard } from './deck';
 import { compare, toPhones } from './phonetics';
 import type { Measure } from './prosody';
-import { cardStress, hintSyllables, leanAgainst, measureStress, SURE, UNJUDGED } from './stress';
+import { cardStress, hintSyllables, leanAgainst, leanedOn, measureStress, stressVerdict, SURE, UNJUDGED } from './stress';
 import takes from './test/fixtures/stress-takes.json';
 
 /** Sounds as heard, each [ms, Hz, dB], as clip-sounds.json and the fixture keep them. */
@@ -31,14 +31,30 @@ describe('measureStress', () => {
     const stress = measureStress('Salamat', 'sah-LAH-maht', comparison, prosody)!;
     expect(stress.lean).toBeGreaterThan(SURE);
     expect(leanAgainst(stress)).toBeLessThan(0);
-    expect(stressTip(stress)).toBeNull();
+    expect(leanedOn(stress)).toBe(1);
+    expect(stressVerdict(stress)).toBe('good');
+    expect(stressLine(stress)).toBe('You leaned on LAH.');
   });
 
   it('hears the last syllable leaned on when it is the higher and longer one', () => {
     const { comparison, prosody } = salamat([[80, 200, -14], [80, 190, -16], [170, 270, -11]]);
     const stress = measureStress('Salamat', 'sah-LAH-maht', comparison, prosody)!;
     expect(leanAgainst(stress)).toBeGreaterThan(SURE);
-    expect(stressTip(stress)).toBe('Lean on LAH, not MAHT: higher and longer.');
+    expect(leanedOn(stress)).toBe(2);
+    expect(stressVerdict(stress)).toBe('off');
+    expect(stressLine(stress)).toBe('Lean on LAH, not MAHT.');
+    expect(stress.heardAt).toEqual([3, 5]);
+  });
+
+  it('calls a lean the other way that it isn\'t sure of nearly right', () => {
+    // LAH a touch higher and longer than MAHT, but less than the voices make it: a final syllable said alone is drawn
+    // out, so this still leans on MAHT, though not by enough to say so.
+    const { comparison, prosody } = salamat([[80, 200, -14], [130, 218, -13], [100, 200, -13]]);
+    const stress = measureStress('Salamat', 'sah-LAH-maht', comparison, prosody)!;
+    expect(leanAgainst(stress)).toBeGreaterThan(0);
+    expect(leanAgainst(stress)).toBeLessThanOrEqual(SURE);
+    expect(stressVerdict(stress)).toBe('close');
+    expect(stressLine(stress)).toBe('Nearly: lean on LAH more.');
   });
 
   it("doesn't judge a phrase, a missing vowel, or an attempt said another way", () => {
@@ -68,7 +84,7 @@ describe('takes said with the stress moved on purpose', () => {
     .map((t) => {
       const card = getCard(t.card)!;
       const stress = cardStress(card, card.tl, compare(toPhones(card.tl), t.sounds), unpack(t.prosody));
-      return { ...t, tip: stressTip(stress) };
+      return { ...t, tip: stress !== null && stressVerdict(stress) === 'off' };
     });
   const share = (kind: string) => {
     const these = judged.filter((t) => t.stress === kind);

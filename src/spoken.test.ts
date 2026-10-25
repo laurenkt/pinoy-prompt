@@ -10,9 +10,8 @@ import { drillSentence } from './session';
 import { compare, englishReadings, judge, lostFirstSound, PASS, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
 import { allClipUrls } from './speech';
 import { allSpoken, spokenText } from './spoken';
-import { stressTip } from './coach';
 import type { Measure } from './prosody';
-import { cardStress, leanAgainst, measureStress, UNJUDGED } from './stress';
+import { cardStress, CLIP_MARGIN, leanAgainst, measureStress, stressVerdict, UNJUDGED } from './stress';
 
 const CLIPS: Record<string, string[]> = clips;
 /** What Speak's recogniser hears in each clip file, as scripts/generate-audio.mjs listened to it. */
@@ -148,20 +147,33 @@ describe('recorded clips, measured for stress', () => {
     expect(VOCAB.flatMap((card) => files(spokenText(card)).filter((f) => !HEARD[f]?.prosody))).toEqual([]);
   });
 
-  it("never tells a learner who says a card like its clips to lean on another syllable", () => {
+  it("hears every clip of a judged card leaned the way its hint says", () => {
     const told = VOCAB.flatMap((card) =>
       measured(card).flatMap(({ file, comparison }) => {
-        const tip = stressTip(cardStress(card, card.tl, comparison, prosodyOf(file)));
-        return tip ? [`${file}: ${tip}`] : [];
+        const stress = cardStress(card, card.tl, comparison, prosodyOf(file));
+        return stress && stressVerdict(stress) !== 'good' ? [`${file}: ${stressVerdict(stress)}`] : [];
       }),
     );
     expect(told).toEqual([]);
   });
 
-  it("judges stress on exactly the words whose clips all measure as their hint says (else add them to UNJUDGED)", () => {
+  it('keeps CLIP_MARGIN about as wide as native takes of one word vary', () => {
+    // The spread of each word's clips around their own average, pooled over the words with three or more.
+    const spreads = VOCAB.flatMap((card) => {
+      const leans = measured(card).flatMap(({ file, comparison }) => measureStress(card.tl, card.hint ?? '', comparison, prosodyOf(file)) ?? []).map(leanAgainst);
+      if (leans.length < 3) return [];
+      const mean = leans.reduce((a, b) => a + b, 0) / leans.length;
+      return [leans.reduce((a, b) => a + (b - mean) ** 2, 0) / (leans.length - 1)];
+    });
+    const spread = Math.sqrt(spreads.reduce((a, b) => a + b, 0) / spreads.length);
+    expect(spread).toBeGreaterThan(CLIP_MARGIN * 0.8);
+    expect(spread).toBeLessThanOrEqual(CLIP_MARGIN);
+  });
+
+  it("judges stress on exactly the words whose clips all measure as their hint says, by CLIP_MARGIN (else add them to UNJUDGED)", () => {
     const unsure = VOCAB.filter((card) => {
       const stresses = measured(card).flatMap(({ file, comparison }) => measureStress(card.tl, card.hint ?? '', comparison, prosodyOf(file)) ?? []);
-      return stresses.length > 0 && stresses.some((s) => leanAgainst(s) > 0);
+      return stresses.length > 0 && stresses.some((s) => leanAgainst(s) > -CLIP_MARGIN);
     }).map((card) => card.id);
     expect([...UNJUDGED].sort()).toEqual(unsure.sort());
   });

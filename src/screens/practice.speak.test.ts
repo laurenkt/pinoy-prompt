@@ -111,6 +111,45 @@ describe('Speak mode', () => {
     expect(app.progress.cards[said].help).toBeUndefined();
   });
 
+  it('takes back the miss when a word failed only on its stress was right after all', async () => {
+    // Every sound of "salamat" right, its last "a" higher and louder than the one before: "sa-la-MAT". The stand-in
+    // recogniser hears sound i from 0.2 + 0.1i seconds.
+    const samples = new Float32Array(16000);
+    for (const [at, hz, gain] of [[1, 200, 0.1], [3, 190, 0.1], [5, 270, 0.3]]) {
+      for (let i = 0; i < 1600; i++) samples[(0.2 + 0.1 * at) * 16000 + i] = gain * Math.sin((2 * Math.PI * hz * i) / 16000);
+    }
+    // The other words are ones whose stress isn't judged, so they pass on their sounds until salamat comes up.
+    const app = fakeApp(['salamat', 'kumusta', 'paalam', 'oo']);
+    const stand = deps();
+    const root = practiceScreen(app, {
+      ...stand,
+      record: ((events: RecorderEvents = {}) => {
+        const take = stand.record(events);
+        return { ...take, audio: take.audio.then((t) => ({ ...t, samples })) };
+      }) as SpeakDeps['record'],
+    });
+    document.body.append(root);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    for (let i = 0; i < 20; i++) {
+      button('Tap and speak').click();
+      recorder.onListening?.();
+      button("I'm done").click();
+      await flush();
+      if (document.querySelector('.prompt .tl')?.textContent === 'Salamat') break;
+      button('Next').click();
+      await flush();
+    }
+    expect(document.querySelector('.feedback strong')?.textContent).toBe('Wrong stress.');
+    expect(app.progress.cards.salamat.help).toEqual({ speak: 1 });
+    button('I had it right').click();
+    await flush();
+    expect(document.querySelector('.feedback strong')?.textContent).toBe('Tama!');
+    expect(app.progress.cards.salamat.help).toBeUndefined();
+    expect(button('Next')).toBeTruthy();
+  });
+
   it('starts and stops listening with one big button in the same place, under what the mic hears', async () => {
     const root = practiceScreen(fakeApp(KNOWN), deps());
     document.body.append(root);
