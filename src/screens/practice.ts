@@ -55,6 +55,8 @@ interface Question {
   helpBefore?: number;
   /** Where this way stood in coming back on its own (see noteDrillRepeat) before this answer, likewise. */
   repeatBefore?: DrillRepeat;
+  /** How it went has been noted for the round (see settle), so moving on doesn't note it again. */
+  tallied?: boolean;
   /** What's typed so far, kept while the screen is redrawn. */
   draft?: string;
   /** What was typed, once it's sent. */
@@ -149,6 +151,8 @@ export function practiceScreen(
   let distractorPool: Card[] = VOCAB;
   /** The last few words asked, oldest first. */
   let recent: string[] = [];
+  /** `recent` as it was before the question waiting to be asked was picked, should it be picked again. */
+  let recentBeforeUpcoming: string[] = [];
   /** Ways missed this round, by drillKey, coming back on their own until they've been got right a few times running. */
   const repeats = new Map<string, DrillRepeat>();
   /** Each guide's drill asked last, so the next is another. */
@@ -281,16 +285,22 @@ export function practiceScreen(
     });
   }
 
-  /** Note how the current question went, so a miss comes back soon, and pick the one after it. */
-  function settle(right: boolean): void {
-    if (!current || upcoming) return;
-    tally(current, right);
+  /**
+   * Note how the current question went, once, so a miss comes back soon (null: it can't be told, as when the check
+   * failed), and pick the one after it.
+   */
+  function settle(right: boolean | null): void {
+    if (!current) return;
+    if (right !== null && !current.tallied) tally(current, right);
+    if (upcoming) return;
+    recentBeforeUpcoming = recent;
     upcoming = nextQuestion(done + 1);
     load(upcoming);
   }
 
   function tally(q: Question, right: boolean): void {
     const key = drillKey(q.card.id, q.mode);
+    q.tallied = true;
     q.repeatBefore = repeats.get(key);
     noteDrillRepeat(repeats, key, right, done);
   }
@@ -524,8 +534,8 @@ export function practiceScreen(
     // The chime first, so the word said back is heard after it.
     if (right) void chime();
     if (q.guide || q.mode === 'recall' || q.mode === 'listen') sayCard(q);
-    // Picked from the choices, it comes back as soon as a miss does.
-    settle(right && !q.hinted);
+    // Picked from the choices, it comes back as soon as a miss does. A miss the check couldn't confirm doesn't count.
+    settle(q.failure !== undefined && !right ? null : right && !q.hinted);
     // Got wrong, or from the choices, it comes up more asked this way in later rounds too, until it's got right unaided.
     // Not when the check itself failed (offline, say): the answer may well have been right.
     q.helpBefore = drillHelp(app.progress.cards[q.card.id], q.mode);
@@ -550,7 +560,7 @@ export function practiceScreen(
     if (q.repeatBefore) repeats.set(key, q.repeatBefore);
     else repeats.delete(key);
     tally(q, true);
-    recent = recent.slice(0, -1);
+    recent = recentBeforeUpcoming;
     upcoming = nextQuestion(done + 1);
     load(upcoming);
     // And on the card: back to before the miss, less one for a right answer that doesn't leave it coming back (see noteHelp).

@@ -220,6 +220,10 @@ describe('listening to words that have settled', () => {
     await flush();
     expect(root.querySelector('.feedback')?.textContent).toContain("Couldn't reach OpenAI");
     expect(has(root, 'I had it right')).toBe(true);
+    // It may well have been right, so it isn't asked again straight away as a miss would be.
+    vi.mocked(play).mockClear();
+    button(root, 'Next').click();
+    expect(vi.mocked(play).mock.lastCall?.[0].tl).not.toBe('Salamat');
   });
 
   it('keeps what was typed while looking back, and holds the way back while checking', async () => {

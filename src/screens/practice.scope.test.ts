@@ -95,6 +95,19 @@ describe('the kinds of question in a drill round', () => {
     expect(kind(root)).toBe('recall');
   });
 
+  it('counts a right answer once, when the question picked after it is dropped by a change of kinds', () => {
+    drillScope(root, ['read']);
+    const word = root.querySelector('.prompt .tl')?.textContent;
+    chooseRight(root);
+    expect(root.querySelector('.feedback.good')).not.toBeNull();
+    // The question picked to come next goes with the change, and comes back with the change back.
+    drillScope(root, ['recall']);
+    drillScope(root, ['read']);
+    button(root, 'Next').click();
+    // Got right, it isn't asked again straight away as a miss would be.
+    expect(root.querySelector('.prompt .tl')?.textContent).not.toBe(word);
+  });
+
   it('always keeps one kind in', () => {
     drillScope(root, ['read']);
     root.querySelector<HTMLButtonElement>('#drill-scope [data-mode="read"]')!.click();

@@ -297,6 +297,8 @@ const FOCUS_PER_CARD = 0.1;
  */
 const HELP_SHARE = 0.6;
 const HELP_PER_ANSWER = 0.15;
+/** The share of a drill round always left for cards neither helped with nor settling in, so the ones known well still turn up. */
+const REST_SHARE = 0.2;
 
 /** A card and a way of asking it: what a drill round picks, and what it keeps count of. */
 export interface DrillPick {
@@ -476,21 +478,22 @@ export function drillOdds(
   const open = pool.filter((p) => !skip.has(p.pick.card.id));
   const total = (ps: typeof open) => ps.reduce((sum, p) => sum + p.w, 0);
   const all = total(open);
-  // Each part's share is never less than its questions would get by weight alone, and is counted before the sit-out,
-  // which so often holds the cards it's for that it would shrink their share.
+  // Each part's share is never less than its questions would get by weight alone.
   const helped = open.filter((p) => p.help > 0);
-  const helpShare = Math.max(total(helped) / all, Math.min(HELP_SHARE, HELP_PER_ANSWER * pool.reduce((sum, p) => sum + p.help, 0)));
+  // Only the ways open now count towards it: helped ways sitting out would hand their share to the others.
+  const helpShare = Math.max(total(helped) / all, Math.min(HELP_SHARE, HELP_PER_ANSWER * helped.reduce((sum, p) => sum + p.help, 0)));
   const rest = open.filter((p) => p.help === 0);
   const focus = rest.filter((p) => p.focus);
+  // Counted before the sit-out, which so often holds cards settling in that it would shrink their share.
   const settling = cards(pool.filter((p) => p.focus && p.help === 0)).size;
-  // What's left after the ways helped with, never less than its weight gives.
-  const focusShare = Math.min(1 - helpShare, Math.max(total(focus) / all, Math.min(FOCUS_SHARE, FOCUS_PER_CARD * settling)));
+  // What's left after the ways helped with, keeping REST_SHARE for the others.
+  const focusShare = Math.max(0, Math.min(1 - REST_SHARE - helpShare, Math.max(total(focus) / all, Math.min(FOCUS_SHARE, FOCUS_PER_CARD * settling))));
   const parts: [typeof open, number][] = [
     [helped, helpShare],
     [focus, focusShare],
     [rest.filter((p) => !p.focus), 1 - helpShare - focusShare],
   ];
-  // A part with nothing to ask passes its share on to the parts after it, or with none after, the ones before.
+  // A part with nothing to ask has its share spread over the others, in proportion.
   const filled = parts.filter(([ps]) => ps.length > 0);
   const given = filled.reduce((sum, [, share]) => sum + share, 0);
   return filled.flatMap(([ps, share]) => {

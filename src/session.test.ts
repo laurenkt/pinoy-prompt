@@ -633,6 +633,34 @@ describe('picking the next card to drill', () => {
     expect(chance(VOCAB_ORDER[50])).toBeLessThan(chance(fresh[0]));
   });
 
+  it('always leaves a fifth of the round for words known well, however many need help or are new', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 100), 30);
+    const fresh = VOCAB_ORDER.slice(100, 110);
+    for (const id of fresh) {
+      recordAnswer(progress, id, 'good', LATER - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], introduced: LATER - DAY_MS };
+    }
+    const helped = VOCAB_ORDER.slice(0, 6);
+    for (const id of helped) helpWith(progress, id);
+    const odds = drillOdds(progress, LATER, [], new Map(), everyWay);
+    const known = odds
+      .filter((o) => drillHelp(progress.cards[o.pick.card.id], o.pick.way) === 0 && !fresh.includes(o.pick.card.id))
+      .reduce((sum, o) => sum + o.chance, 0);
+    expect(known).toBeCloseTo(0.2);
+  });
+
+  it("doesn't hand a helped word sitting out its share to the others helped with", () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 100), 30);
+    const [hard, once] = VOCAB_ORDER;
+    for (let i = 0; i < 3; i++) helpWith(progress, hard, 'read');
+    helpWith(progress, once, 'listen');
+    const odds = drillOdds(progress, LATER, [hard], new Map(), everyWay);
+    const chance = odds.find((o) => o.pick.card.id === once && o.pick.way === 'listen')!.chance;
+    expect(chance).toBeCloseTo(0.15, 1);
+  });
+
   it('leans on cards that are fading, still being learned, newly met or often forgotten, and still asks the rest', () => {
     const progress = settledProgress();
     const strong = (id: string) => counts(progress).get(id)! / 4000;
