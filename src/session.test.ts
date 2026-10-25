@@ -650,6 +650,23 @@ describe('picking the next card to drill', () => {
     expect(known).toBeCloseTo(0.2);
   });
 
+  it('keeps room for new words and words known well in a small deck where most need help', () => {
+    const progress = emptyProgress(NOW);
+    const known = VOCAB_ORDER.slice(0, 8);
+    learn(progress, known, 30);
+    const fresh = VOCAB_ORDER.slice(8, 11);
+    for (const id of fresh) {
+      recordAnswer(progress, id, 'good', LATER - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], introduced: LATER - DAY_MS };
+    }
+    for (const id of known.slice(0, 6)) for (const way of WAYS) helpWith(progress, id, way);
+    const odds = drillOdds(progress, LATER, [], new Map(), everyWay);
+    const share = (ids: string[]) => odds.filter((o) => ids.includes(o.pick.card.id)).reduce((sum, o) => sum + o.chance, 0);
+    expect(share(known.slice(0, 6))).toBeCloseTo(0.6);
+    expect(share(fresh)).toBeGreaterThan(0.1);
+    expect(share(known.slice(6))).toBeGreaterThanOrEqual(0.19);
+  });
+
   it("doesn't hand a helped word sitting out its share to the others helped with", () => {
     const progress = emptyProgress(NOW);
     learn(progress, VOCAB_ORDER.slice(0, 100), 30);

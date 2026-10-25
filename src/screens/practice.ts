@@ -291,7 +291,8 @@ export function practiceScreen(
    */
   function settle(right: boolean | null): void {
     if (!current) return;
-    if (right !== null && !current.tallied) tally(current, right);
+    if (right === null) current.tallied = true;
+    else if (!current.tallied) tally(current, right);
     if (upcoming) return;
     recentBeforeUpcoming = recent;
     upcoming = nextQuestion(done + 1);

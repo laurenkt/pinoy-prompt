@@ -478,10 +478,11 @@ export function drillOdds(
   const open = pool.filter((p) => !skip.has(p.pick.card.id));
   const total = (ps: typeof open) => ps.reduce((sum, p) => sum + p.w, 0);
   const all = total(open);
-  // Each part's share is never less than its questions would get by weight alone.
+  // Each part's share is never less than its questions would get by weight alone, within its cap.
   const helped = open.filter((p) => p.help > 0);
   // Only the ways open now count towards it: helped ways sitting out would hand their share to the others.
-  const helpShare = Math.max(total(helped) / all, Math.min(HELP_SHARE, HELP_PER_ANSWER * helped.reduce((sum, p) => sum + p.help, 0)));
+  // Never more than HELP_SHARE, even by weight, so a small deck with many helped still has room for the rest.
+  const helpShare = Math.min(HELP_SHARE, Math.max(total(helped) / all, HELP_PER_ANSWER * helped.reduce((sum, p) => sum + p.help, 0)));
   const rest = open.filter((p) => p.help === 0);
   const focus = rest.filter((p) => p.focus);
   // Counted before the sit-out, which so often holds cards settling in that it would shrink their share.

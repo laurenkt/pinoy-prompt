@@ -224,6 +224,12 @@ describe('listening to words that have settled', () => {
     vi.mocked(play).mockClear();
     button(root, 'Next').click();
     expect(vi.mocked(play).mock.lastCall?.[0].tl).not.toBe('Salamat');
+    // Nor on the one after.
+    type(root, 'thanks a lot');
+    await flush();
+    vi.mocked(play).mockClear();
+    button(root, 'Next').click();
+    expect(vi.mocked(play).mock.lastCall?.[0].tl).not.toBe('Salamat');
   });
 
   it('keeps what was typed while looking back, and holds the way back while checking', async () => {
