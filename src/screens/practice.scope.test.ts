@@ -71,8 +71,15 @@ describe('the kinds of question in a drill round', () => {
     }
     drillScope(root, ['read', 'recall']);
     expect(toggle(root).textContent).toBe('2 kinds');
+    // Drawn at random, so a short run can miss one kind by chance: go until both have come up, or long past when
+    // they should have.
     const seen = new Set<string>();
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 400 && seen.size < 2; i++) {
+      seen.add(kind(root));
+      next(root);
+    }
+    // Only the kinds left in, from then on.
+    for (let i = 0; i < 12; i++) {
       seen.add(kind(root));
       next(root);
     }

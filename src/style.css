@@ -1356,19 +1356,45 @@ p {
   box-shadow: var(--shadow);
   padding: 0 12px;
   min-height: 56px;
+  /* Bars gliding into their slots after a squeeze start wider than the box has room for. */
+  overflow: hidden;
+  /* Each bar's slot: --bars of them fill the box. */
+  --slot: calc((100% - (var(--bars) - 1) * 1px) / var(--bars));
 }
 
 .meaning-wave span {
   /*
-   * Each bar its slot of the box (--bars of them, filling it), so the wave grows from the left without the bars
-   * resizing, and is squeezed rather than scrolled once it reaches the right.
+   * Each bar its slot of the box, so the wave grows from the left without the bars resizing, and is squeezed rather
+   * than scrolled once it reaches the right.
    */
-  flex: 0 0 calc((100% - (var(--bars) - 1) * 1px) / var(--bars));
+  flex: 0 0 var(--slot);
   min-width: 0;
   /* At most 34px, and 44px as the beat passes, inside the box's 50px. */
   height: calc(4px + var(--level, 0) * 30px);
   border-radius: 1px;
   background: var(--on-accent);
+  /* A bar standing for several levels grows as they come in; merged bars glide into their slots. */
+  transition:
+    height 0.12s ease-out,
+    flex-basis 0.25s ease-out;
+}
+
+/* A new bar rises out of the middle line as it comes in. */
+.meaning-wave span.new {
+  animation: wave-bar-in 0.18s ease-out;
+}
+
+@keyframes wave-bar-in {
+  from {
+    transform: scaleY(0.1);
+    opacity: 0.3;
+  }
+}
+
+/* Two bars just merged into one, at the width of both, until the class comes off and it glides into its slot. */
+.meaning-wave span.merged {
+  flex-basis: calc(var(--slot) * 2 + 1px);
+  transition: none;
 }
 
 /*
@@ -1397,6 +1423,12 @@ p {
   .meaning-wave.thinking span {
     animation: none;
     background: var(--magenta);
+  }
+
+  .meaning-wave span,
+  .meaning-wave span.new {
+    animation: none;
+    transition: none;
   }
 }
 
