@@ -77,7 +77,7 @@ Progress is the one thing the app can't lose; the README's "Saved progress" sect
 
 ### Tests and CI as one system
 
-- **One pipeline.** `.github/workflows/ci.yml` tests and builds every pull request and every push to `main`, and publishes to GitHub Pages from `main` only after that has passed, using the build it tested.
+- **One pipeline.** `.github/workflows/ci.yml` tests and builds every pull request and every push to `main`, and publishes to GitHub Pages from `main` only after that has passed, using the build it tested. Beside it, `.github/workflows/open-prs.yml` checks hourly for pull requests left open (conflicting with `main`, or open over three hours) and lists them in one issue, closing it when there are none.
 - **One runner.** Vitest. Logic tests run in Node; screen tests opt into `happy-dom` with `// @vitest-environment happy-dom` on their first line.
 - **Shared test pieces live in `src/test/`.** `screen.ts` has the stand-in `App` (`fakeApp`), `button`, `noMic` and `flush` for screen tests; `fake-speech.ts` stands in for the recogniser and player; `fake-audio.ts` for the shared AudioContext, counting chimes; `fake-storage.ts` for storage; `fixtures/` holds saved progress from every schema. When `App` or `Settings` changes, change `fakeApp` once.
 - **Stand-ins go through deps, not module mocks,** where a screen offers them (`SpeakDeps`, `TalkDeps`, `CallDeps`, `Player`). Prefer adding a dep over `vi.mock` of a shared module, which can hide a change in that module from every screen test.
