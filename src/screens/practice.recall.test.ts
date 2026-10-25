@@ -91,6 +91,7 @@ describe("how well the card is known, on its back", () => {
     expect(root.querySelector('.prompt button')?.getAttribute('aria-expanded')).toBe('true');
     expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Read: Long-term.');
     expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Recall: Just met, asked now.');
+    expect(root.querySelector('.asked-label')?.textContent).toBe('asked now');
     expect(root.querySelector('.tag.asked')).not.toBeNull();
     // Still turned once answered, as nothing on it changed.
     root.querySelector<HTMLButtonElement>('.choice')!.click();
