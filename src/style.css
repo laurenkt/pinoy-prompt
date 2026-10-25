@@ -1803,13 +1803,26 @@ p {
   opacity: 0.8;
 }
 
-/* Which syllable to lean on, under the word, when an attempt clearly leaned on the other. */
-.result-card .stress-tip {
-  margin: 6px 0 0;
+/* How the stress came out, under the word: a line that opens the stress page below. */
+.result-card .stress-line {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
   font-size: 0.9rem;
   font-weight: 700;
   line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
 }
+
 
 .result-card .dial {
   width: 56px;
@@ -2034,7 +2047,8 @@ p {
 
 /* The button keeps its own height where other sounds have the taller slider. */
 .detail-page > .sound-slider,
-.detail-page > .hold-btn {
+.detail-page > .hold-btn,
+.detail-page > .stress-actions {
   grid-row: 5;
   align-self: start;
 }
@@ -2276,6 +2290,34 @@ p {
 
 .hold-btn.holding {
   background: var(--saffron);
+}
+
+/* Stress: hearing the two syllables back, and saying it was right after all, side by side. */
+.stress-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.stress-actions .btn {
+  flex: 1;
+  margin-top: 8px;
+}
+
+/* The stress chart's bars: the one leaned on coloured by how it came out, what to aim for in teal. */
+.stress-bar {
+  fill: var(--line);
+}
+
+.stress-bar.bar-good {
+  fill: var(--teal);
+}
+
+.stress-bar.bar-close {
+  fill: var(--saffron);
+}
+
+.stress-bar.bar-off {
+  fill: var(--magenta);
 }
 
 /* Where the sound is made: target ring, your mark, and the way from one to the other. */

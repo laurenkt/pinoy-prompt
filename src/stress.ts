@@ -21,17 +21,31 @@ const WEIGHTS = { bias: -1.36, length: 1.37, pitch: 1.52, level: 0.56 };
 export const SURE = 1;
 
 /**
- * Words whose own clips don't all measure the way their hint says, so a learner who says them like the clips could be
- * told otherwise: mostly ones the voices say with little between the two syllables, often final-stress words said
- * gently. Never judged. Kept in step with the clips by src/spoken.test.ts.
+ * How far inside the line every clip of a judged word must sit, in log odds. Native takes of one word vary by about
+ * this much between them (src/spoken.test.ts measures it), so a learner who copies a clip that sits right by the
+ * line could still be told otherwise. Kept this far in, saying a word like whichever of its clips sits nearest the
+ * line trips the tip about one time in fifty, and most clips sit further in than that.
+ */
+export const CLIP_MARGIN = 1;
+
+/**
+ * Words whose own clips don't all measure the way their hint says, by CLIP_MARGIN, so a learner who says them like the
+ * clips could be told otherwise: mostly ones the voices say with little between the two syllables, often final-stress
+ * words said gently. Never judged. Kept in step with the clips by src/spoken.test.ts.
  */
 export const UNJUDGED = new Set<string>([
-  'anim', 'apatnapu', 'apo', 'asukal', 'ayoko', 'bagyo', 'bangko', 'barya', 'baso', 'bumaba', 'dalawampu', 'gusto',
-  'hindi', 'ingat', 'kahapon', 'kailangan', 'kainan', 'kulay', 'kumain', 'kumusta', 'labindalawa', 'labing-isa',
-  'labinlima', 'lalaki', 'lima', 'linggo', 'mabaho', 'maghintay', 'magluto', 'magpahinga', 'magsalita', 'magtrabaho',
-  'malapit', 'maligo', 'mamaya', 'mangga', 'masaya', 'matulog', 'ninong', 'paalam', 'paaralan', 'panganay', 'pero',
-  'pula', 'pumunta', 'sabihin', 'sige', 'sunog', 'tag-init', 'tag-ulan', 'tanghalian', 'tatlumpu', 'tayo', 'teka',
-  'tinapay', 'tinidor', 'tubig', 'uminom',
+  'ako', 'anak', 'anim', 'apatnapu', 'apo', 'araw', 'asukal', 'ate', 'ayoko', 'babae', 'baboy', 'bagyo', 'bakit',
+  'bangko', 'barya', 'baso', 'biyernes', 'bumaba', 'bumili', 'dalawampu', 'dilaw', 'dito', 'dumating', 'gamot',
+  'gatas', 'gulay', 'gusto', 'hatinggabi', 'hindi', 'ingat', 'isa', 'isda', 'kahapon', 'kaibigan', 'kailangan',
+  'kainan', 'kalahati', 'kaliwa', 'kanan', 'kanin', 'kasi', 'kayo', 'kulay', 'kumain', 'kumusta', 'kutsara',
+  'labindalawa', 'labing-isa', 'labinlima', 'lalaki', 'lima', 'limampu', 'linggo', 'lunes', 'maaraw', 'mabagal',
+  'mabaho', 'madali', 'maganda', 'maghintay', 'magluto', 'magnanakaw', 'magpahinga', 'magsalita', 'magtrabaho',
+  'magulang', 'mahirap', 'makinig', 'malapit', 'maligo', 'malungkot', 'mamaya', 'mangga', 'manok', 'marami', 'masaya',
+  'matanda', 'matulog', 'meron', 'minsan', 'nanay', 'nasaan', 'ninang', 'ninong', 'oo', 'opo', 'ospital', 'paalam',
+  'paaralan', 'palengke', 'paliparan', 'pamangkin', 'panganay', 'pangit', 'pero', 'pinsan', 'pito', 'pula', 'pumunta',
+  'puti', 'sabihin', 'saging', 'selpon', 'sige', 'siguro', 'sila', 'simbahan', 'sino', 'sukli', 'sunog', 'tag-init',
+  'tag-ulan', 'tanghalian', 'tatay', 'tatlumpu', 'tayo', 'teka', 'tinapay', 'tindahan', 'tinidor', 'tita', 'trapik',
+  'tubig', 'tulong', 'uminom', 'umuulan', 'wala',
 ]);
 
 /** A pronunciation hint's syllables, and which is stressed (written in capitals), if exactly one is. */
@@ -50,6 +64,8 @@ export interface Stress {
   differences: { length: number; pitch: number; level: number };
   /** Log odds that the attempt leaned on the second-to-last syllable rather than the last. */
   lean: number;
+  /** Which heard sounds the last two vowels were. */
+  heardAt: [number, number];
 }
 
 /**
@@ -64,18 +80,32 @@ export function measureStress(text: string, hint: string, comparison: Comparison
   const n = syllables.length;
   const vowels = comparison.sounds.filter((r) => isVowelSound(r.phone.ipa));
   if (n < 2 || stressed < n - 2 || vowels.length !== n) return null;
-  const [before, last] = vowels.slice(-2).map((r) => (r.heardAt !== undefined && (r.verdict === 'good' || r.verdict === 'close') ? measure(r.heardAt) : undefined));
+  const heardAt = vowels.slice(-2).map((r) => (r.verdict === 'good' || r.verdict === 'close' ? r.heardAt : undefined));
+  if (heardAt[0] === undefined || heardAt[1] === undefined) return null;
+  const [before, last] = heardAt.map((i) => measure(i!));
   if (!before?.pitch || !last?.pitch) return null;
   const length = Math.log(Math.max(before.length, 0.01) / Math.max(last.length, 0.01));
   const pitch = (12 * Math.log2(before.pitch / last.pitch)) / 6;
   const level = (before.level - last.level) / 6;
   const lean = WEIGHTS.bias + WEIGHTS.length * length + WEIGHTS.pitch * pitch + WEIGHTS.level * level;
-  return { syllables, expected: stressed, differences: { length, pitch, level }, lean };
+  return { syllables, expected: stressed, differences: { length, pitch, level }, lean, heardAt: [heardAt[0], heardAt[1]] };
 }
 
 /** How sure it is that the attempt leaned on the other syllable than the card stresses (above SURE: say so). */
 export function leanAgainst(stress: Stress): number {
   return stress.expected === stress.syllables.length - 2 ? -stress.lean : stress.lean;
+}
+
+/** Which syllable the attempt leaned on: the second-to-last or the last. */
+export function leanedOn(stress: Stress): number {
+  const other = stress.expected === stress.syllables.length - 1 ? stress.expected - 1 : stress.expected + 1;
+  return leanAgainst(stress) > 0 ? other : stress.expected;
+}
+
+/** How the attempt's stress came out: leaned the card's way, the other way but not surely (close), or surely (off). */
+export function stressVerdict(stress: Stress): 'good' | 'close' | 'off' {
+  const against = leanAgainst(stress);
+  return against > SURE ? 'off' : against > 0 ? 'close' : 'good';
 }
 
 /** The stress of an attempt at a card, when the card is one that's judged and the attempt was said as its main spelling. */

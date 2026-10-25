@@ -71,7 +71,8 @@ async function speakResult(page, mistakes, stress = false) {
       modelDownloaded: async () => true,
       modelKnownDownloaded: () => true,
       microphoneAllowed: () => true,
-      holdMicrophone: async () => true,
+      askMicrophone: async () => true,
+      warmRecorder: () => null,
       record: () => ({ audio: Promise.resolve({ samples, speech: true }), stop() {}, cancel() {} }),
       loadPhoneModel: async () => ({
         async recognise(heardSamples) {
@@ -104,8 +105,8 @@ async function speakResult(page, mistakes, stress = false) {
   await drillOnlySpeak(page);
   await page.click('.speak .btn.mic');
   await page.waitForSelector('.sound-results');
-  // Only single words with a judged stress get the tip: move on until one does.
-  for (let tries = 0; stress && !(await page.$('.stress-tip')) && tries < 40; tries++) {
+  // Only single words with a judged stress fail on it: move on until one does.
+  for (let tries = 0; stress && !(await page.$('.stress-line.detail-off')) && tries < 40; tries++) {
     await page.click('.result-actions .btn');
     await page.waitForSelector('.speak .btn.mic');
     await page.click('.speak .btn.mic');
@@ -227,7 +228,7 @@ const SCREENS = {
   'speak-result': (page) => speakResult(page, true),
   // The same, heard exactly right: a full ring.
   'speak-result-perfect': (page) => speakResult(page, false),
-  // The same, heard right but leaning on the other syllable than the card's hint: the stress tip under the word.
+  // The same, heard right but leaning on the other syllable than the card's hint: failed, with the stress page open.
   'speak-result-stress': (page) => speakResult(page, false, true),
   // The same, with a finger held on the slider three quarters of the way from the middle to the right: the target, fairly loud.
   'speak-result-held': async (page) => {

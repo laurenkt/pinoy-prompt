@@ -1,14 +1,14 @@
 // The Speak question: record the learner saying a card, recognise the sounds
 // on the device, and coach them sound by sound.
 
-import { coach, stressTip, type Tip } from '../coach';
+import { coach, type Tip } from '../coach';
 import { askMicrophone, microphoneAllowed } from '../microphone';
 import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
 import { compare, judge, passes, toPhones, type Comparison } from '../phonetics';
 import { measurer } from '../prosody';
-import { cardStress } from '../stress';
+import { cardStress, stressVerdict, type Stress } from '../stress';
 import { record, RecordError, recordingSupported, warmRecorder, type RecordProblem, type Recording, type Warmth } from '../recorder';
 import { audioButton, h, icon } from '../ui';
 import { webAudioPlayer, type Player } from '../player';
@@ -92,9 +92,9 @@ type State =
       text: string;
       comparison: Comparison;
       tips: Tip[];
-      /** Which syllable to lean on, when the attempt clearly leaned on the other (it then fails). */
-      stress?: string | null;
-      /** Whether it passed: its sounds did, and it wasn't leaned on the wrong syllable. */
+      /** Which syllable it leaned on, when its stress was judged. */
+      stress?: Stress | null;
+      /** Whether it passed: its sounds did, and its stress wasn't off (or the learner says it wasn't). */
       right: boolean;
       heard: string[];
       recognition?: Recognition;
@@ -110,6 +110,11 @@ export interface SpeakOptions {
   silence(): void;
   /** Called after each judged attempt; `right` is true for a good one, `heard` false when no sound of it was recognised. */
   onAttempt(right: boolean, heard: boolean): void;
+  /**
+   * The learner says an attempt that failed only on its stress was right after all, as measuring stress can be wrong:
+   * it then counts as right, and onAttempt isn't called again for it.
+   */
+  onClaim?(): void;
   /** Whether the screen is counting down to the next word after a right attempt. */
   counting?(): boolean;
   onNext(): void;
@@ -167,7 +172,10 @@ export function micWaiting(dictation = false): HTMLElement {
   );
 }
 
-/** True when the attempt was good enough to count as right. */
+/** Whether a judged stress came out leaning surely the other way. */
+const stressOff = (stress: Stress | null | undefined) => !!stress && stressVerdict(stress) === 'off';
+
+/** True when the attempt's sounds were good enough to count as right. */
 export const isRight = passes;
 
 /** What an attempt at the card is judged against: its spelling and any other accepted pronunciations (Kamusta for Kumusta). */
@@ -297,14 +305,14 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
       // Pitch takes a moment to find, so only the two vowels a judged card compares are measured.
-      let stress: string | null = null;
+      let stress: Stress | null = null;
       try {
-        stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
+        stress = cardStress(card, text, comparison, measurer(take.samples, recognition.timing));
       } catch {
         // Unmeasured, it's judged on its sounds alone.
       }
       // A single word leaned on the wrong syllable doesn't pass, however clear its sounds.
-      const right = isRight(comparison) && !stress;
+      const right = isRight(comparison) && !stressOff(stress);
       options.onAttempt(right, sounds.length > 0);
       set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples, right });
     } catch (err) {
@@ -446,10 +454,18 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   /** The sound-by-sound breakdown currently on screen, so it can stop its audio when replaced. */
   let breakdown: ResultView | null = null;
 
+  /** Only its stress failed it, and the learner says it was right: it counts as right from here. */
+  function claim(): void {
+    if (state.name !== 'result' || state.right || !isRight(state.comparison)) return;
+    // Told first, so the countdown it starts shows on the redrawn result.
+    options.onClaim?.();
+    set({ ...state, right: true });
+  }
+
   function resultView(result: Extract<State, { name: 'result' }>): HTMLElement[] {
     const { text, comparison, tips, stress, heard, recognition, samples, right } = result;
     const pct = Math.round(comparison.score * 100);
-    const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : stress && isRight(comparison) ? 'Wrong stress.' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
+    const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : stressOff(stress) && isRight(comparison) ? 'Wrong stress.' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
     const detail =
       heard.length === 0
         ? 'Speak a little louder or closer to the phone.'
@@ -460,7 +476,10 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           : 'Letters in pink need work; yellow ones were nearly there.';
     breakdown =
       heard.length > 0 && recognition && samples
-        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: silencing(deps.player(), options.silence) })
+        ? soundResults(
+            { text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples, stress },
+            { player: silencing(deps.player(), options.silence), onClaim: !right && isRight(comparison) ? claim : undefined },
+          )
         : null;
     if (breakdown) {
       // The breakdown takes the card's place: the word, coloured by how each sound came
@@ -472,7 +491,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           'div',
           { class: `feedback result-card ${right ? 'good' : 'bad'}`, role: 'status' },
           h('div', { class: 'feedback-head' }, h('div', null, h('p', { class: 'eyebrow' }, h('strong', null, title), ' ', h('span', { class: 'result-meaning' }, card.en)), breakdown.word), dial(comparison.score, `${pct}% of the way there`)),
-          stress && h('p', { class: 'stress-tip' }, stress),
+          breakdown.stress,
         ),
         breakdown.el,
         h(

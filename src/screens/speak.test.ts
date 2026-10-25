@@ -46,6 +46,7 @@ let panel: SpeakPanel;
 let player: FakePlayer;
 const onAttempt = vi.fn();
 const onNext = vi.fn();
+const onClaim = vi.fn();
 const say = vi.fn();
 
 function deps(overrides: Partial<SpeakDeps> = {}): SpeakDeps {
@@ -73,7 +74,7 @@ function button(name: string): HTMLButtonElement {
 }
 
 async function open(cardId: string, overrides?: Partial<SpeakDeps>): Promise<void> {
-  panel = speakPanel(getCard(cardId)!, { say, silence: () => {}, onAttempt, onNext, deps: deps(overrides) });
+  panel = speakPanel(getCard(cardId)!, { say, silence: () => {}, onAttempt, onClaim, onNext, deps: deps(overrides) });
   document.body.replaceChildren(panel.el);
   await flush();
 }
@@ -236,28 +237,66 @@ describe('an attempt', () => {
     expect(dial.querySelector('span')!.textContent).toBe('');
   });
 
-  it("fails a word leaned on the wrong syllable, however clear its sounds, and says which to lean on", async () => {
+  /**
+   * Says "salamat" with every sound right, its last two "a"s as given, each [Hz, loudness]. The stand-in recogniser
+   * hears sound i from 0.2 + 0.1i seconds.
+   */
+  async function saySalamat(middle: [number, number], last: [number, number]): Promise<void> {
     heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
-    // Every sound right, but the last "a" higher and louder than the one before: "sa-la-MAT". The stand-in recogniser
-    // hears sound i from 0.2 + 0.1i seconds.
     const samples = new Float32Array(16000);
-    const vowel = (at: number, hz: number, gain: number) => {
+    const vowel = (at: number, [hz, gain]: [number, number]) => {
       for (let i = 0; i < 1600; i++) samples[(0.2 + 0.1 * at) * 16000 + i] = gain * Math.sin((2 * Math.PI * hz * i) / 16000);
     };
-    vowel(1, 200, 0.1);
-    vowel(3, 190, 0.1);
-    vowel(5, 270, 0.3);
+    vowel(1, [200, 0.1]);
+    vowel(3, middle);
+    vowel(5, last);
     await open('salamat');
     button('Tap and speak').click();
     mic.events.onListening?.();
     mic.finish({ samples, speech: true });
     await flush();
+  }
+
+  it("fails a word leaned on the wrong syllable, however clear its sounds, and shows which to lean on", async () => {
+    // "sa-la-MAT": the last "a" higher and louder than the one before.
+    await saySalamat([190, 0.1], [270, 0.3]);
     expect(text('.feedback strong')).toBe('Wrong stress.');
     expect(onAttempt).toHaveBeenCalledWith(false, true);
     expect(panel.el.querySelector('.result-card.bad')).not.toBeNull();
     expect(panel.el.querySelector('.dial')!.getAttribute('aria-label')).toBe('100% of the way there');
-    expect(text('.result-card .stress-tip')).toBe('Lean on LAH, not MAHT: higher and longer.');
+    expect(text('.result-card .stress-line')).toBe('Stress: lean on LAH, not MAHT.');
+    // The stress page opens first: MAHT drawn the taller, in pink, against LAH to aim for.
+    const page = panel.el.querySelector('.stress-page.open')!;
+    expect(page.querySelector('.verdict-chip')!.textContent).toBe('Off');
+    expect(page.querySelector('.detail-tip')).toBeNull();
+    expect(page.querySelector('.end-heard')!.textContent).toBe('You leaned onMAHT');
+    expect(page.querySelector('.end-target')!.textContent).toBe('Aim forLAH, higher and longer');
+    const bars = [...page.querySelectorAll<SVGRectElement>('.stress-bar.bar-off, .stress-bar.bar-good')];
+    expect(bars.map((b) => b.getAttribute('class'))).toEqual(['stress-bar bar-off', 'stress-bar bar-good']);
     expect(button('Try again')).toBeTruthy();
+  });
+
+  it('takes "I had it right" for a word failed only on its stress', async () => {
+    await saySalamat([190, 0.1], [270, 0.3]);
+    button('I had it right').click();
+    await flush();
+    expect(onClaim).toHaveBeenCalledTimes(1);
+    expect(onAttempt).toHaveBeenCalledTimes(1);
+    expect(text('.feedback strong')).toBe('Tama!');
+    expect(panel.el.querySelector('.result-card.good')).not.toBeNull();
+    expect([...panel.el.querySelectorAll('button')].some((b) => b.textContent === 'I had it right')).toBe(false);
+  });
+
+  it('shows stress said the right way as spot on, and offers no "I had it right"', async () => {
+    // "sa-LA-mat": the middle "a" the higher and louder.
+    await saySalamat([270, 0.3], [190, 0.1]);
+    expect(text('.feedback strong')).toBe('Tama!');
+    expect(onAttempt).toHaveBeenCalledWith(true, true);
+    expect(text('.result-card .stress-line')).toBe('Stress: you leaned on LAH.');
+    button('Stress: you leaned on LAH.').click();
+    const page = panel.el.querySelector('.stress-page.open')!;
+    expect(page.querySelector('.end-heard')).toBeNull();
+    expect([...panel.el.querySelectorAll('button')].some((b) => b.textContent === 'I had it right')).toBe(false);
   });
 
   it("doesn't mention stress when it can't tell", async () => {
@@ -267,7 +306,7 @@ describe('an attempt', () => {
     mic.events.onListening?.();
     button("I'm done").click();
     await flush();
-    expect(panel.el.querySelector('.stress-tip')).toBeNull();
+    expect(panel.el.querySelector('.stress-line')).toBeNull();
   });
 
   it('marks the letters that were off and coaches on them', async () => {
