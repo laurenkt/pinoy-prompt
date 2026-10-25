@@ -107,6 +107,10 @@
     "tao-po-afd6109f",
     "tao-po-098aee3a"
   ],
+  "pakiusap": [
+    "pakiusap-c524c83c",
+    "pakiusap-c2b72369"
+  ],
   "Anong pangalan mo?": [
     "anong-pangalan-mo-2d046c80",
     "anong-pangalan-mo-6cda6d3e"
@@ -463,6 +467,182 @@
     "pa-1ed6ec24",
     "pa-2760c89d"
   ],
+  "niya": [
+    "niya-f58501df",
+    "niya-2054eaaa"
+  ],
+  "natin": [
+    "natin-41f3279f",
+    "natin-7e9b7534"
+  ],
+  "namin": [
+    "namin-e09590b2",
+    "namin-0a2b811e"
+  ],
+  "nila": [
+    "nila-765284eb",
+    "nila-d9fc1ba7"
+  ],
+  "niyo": [
+    "niyo-2ab96762",
+    "niyo-9f693181"
+  ],
+  "akin": [
+    "akin-0a6ed1ab",
+    "akin-4043eaca"
+  ],
+  "iyo": [
+    "iyo-4705aacb",
+    "iyo-582f3fad"
+  ],
+  "ay": [
+    "ay-7843ced1",
+    "ay-b89e6bb1"
+  ],
+  "kung": [
+    "kung-4b4b8fd4",
+    "kung-f214dc9a"
+  ],
+  "para": [
+    "para-c71fab69",
+    "para-fac38554"
+  ],
+  "dahil": [
+    "dahil-bd204012",
+    "dahil-a8168bb8"
+  ],
+  "kaya": [
+    "kaya-d25b0417",
+    "kaya-7e1a71b2"
+  ],
+  "kahit": [
+    "kahit-b5b7bfb9",
+    "kahit-60f9f890"
+  ],
+  "kapag": [
+    "kapag-10a645f0",
+    "kapag-c8665eed"
+  ],
+  "habang": [
+    "habang-4a5efc8f",
+    "habang-3ebd0226"
+  ],
+  "hanggang": [
+    "hanggang-fa4fee65",
+    "hanggang-f666d0c2"
+  ],
+  "mula": [
+    "mula-8ced3167",
+    "mula-e65f6c0d"
+  ],
+  "tungkol": [
+    "tungkol-f1b5b7ef",
+    "tungkol-4ebda083"
+  ],
+  "tulad": [
+    "tulad-bb6757a2",
+    "tulad-bce4489a"
+  ],
+  "parang": [
+    "parang-36133a07",
+    "parang-4c57f066"
+  ],
+  "kaysa": [
+    "kaysa-47a7a490",
+    "kaysa-be192d67"
+  ],
+  "mas": [
+    "mas-c2e5af55",
+    "mas-6667fa56"
+  ],
+  "tapos": [
+    "tapos-81787a84",
+    "tapos-5677ac75"
+  ],
+  "pagkatapos": [
+    "pagkatapos-9b17782d",
+    "pagkatapos-7810df92"
+  ],
+  "ulit": [
+    "ulit-8005daf4",
+    "ulit-d5442a8d"
+  ],
+  "naman": [
+    "naman-32a06366",
+    "naman-68cf5448"
+  ],
+  "pala": [
+    "pala-a1bec9b4",
+    "pala-39bd02b1"
+  ],
+  "rin": [
+    "rin-f14a2cda",
+    "rin-5aee70ba"
+  ],
+  "daw": [
+    "daw-ef5fdeae",
+    "daw-6a6978ba"
+  ],
+  "muna": [
+    "muna-eaa0ba28",
+    "muna-552e2a38"
+  ],
+  "siyempre": [
+    "siyempre-dd89e5b8",
+    "siyempre-ed7e8dcc"
+  ],
+  "basta": [
+    "basta-f484a2a4",
+    "basta-850189f7"
+  ],
+  "Di ba?": [
+    "di-ba-2153f7fc",
+    "di-ba-be1dd697"
+  ],
+  "Heto.": [
+    "heto-df57d13b",
+    "heto-d381af36"
+  ],
+  "ganito": [
+    "ganito-3125845a",
+    "ganito-83dd57c4"
+  ],
+  "masyado": [
+    "masyado-ce9e4f46",
+    "masyado-2bcb3568"
+  ],
+  "medyo": [
+    "medyo-68c8952c",
+    "medyo-9ffe7f40"
+  ],
+  "halos": [
+    "halos-378bf736",
+    "halos-7742e1bf"
+  ],
+  "lahat": [
+    "lahat-713a4285",
+    "lahat-b92053e9"
+  ],
+  "bawat": [
+    "bawat-f3a1f66b",
+    "bawat-0533fb95"
+  ],
+  "iba": [
+    "iba-c39f32f3",
+    "iba-11c0987c"
+  ],
+  "pareho": [
+    "pareho-115ef6cf",
+    "pareho-77e9224d"
+  ],
+  "dapat": [
+    "dapat-2178dfd7",
+    "dapat-336896ca"
+  ],
+  "huwag": [
+    "huwag-653312eb",
+    "huwag-bcc726ac"
+  ],
   "oras": [
     "oras-8a83954a",
     "oras-8802926c"
@@ -606,6 +786,34 @@
   "Huwebes": [
     "huwebes-e3c3d416",
     "huwebes-a56ff0ea"
+  ],
+  "umaga": [
+    "umaga-767765fb",
+    "umaga-3e03c737"
+  ],
+  "gabi": [
+    "gabi-ddcbbedd",
+    "gabi-fd29ddb9"
+  ],
+  "kagabi": [
+    "kagabi-e9392000",
+    "kagabi-fdc3d7dd"
+  ],
+  "sandali": [
+    "sandali-4b940765",
+    "sandali-09393cb1"
+  ],
+  "noon": [
+    "noon-02f0fc94",
+    "noon-bfb2d7d2"
+  ],
+  "dati": [
+    "dati-cc6cbb40",
+    "dati-d4c0cbc8"
+  ],
+  "matagal": [
+    "matagal-a038e72a",
+    "matagal-ad772c11"
   ],
   "Papunta na ako.": [
     "papunta-na-ako-fb7026f4",
@@ -963,6 +1171,10 @@
     "asin-81ff49f0",
     "asin-5d6ae99b"
   ],
+  "pagkain": [
+    "pagkain-43336095",
+    "pagkain-bb5de9d6"
+  ],
   "Isa pong adobo.": [
     "isa-pong-adobo-9602e3b8",
     "isa-pong-adobo-ee2cf23b"
@@ -1223,6 +1435,10 @@
     "bata-2dea02a9",
     "bata-20c6d301"
   ],
+  "pare": [
+    "pare-257aee6f",
+    "pare-794cdb94"
+  ],
   "Tara na!": [
     "tara-na-5f08b15f",
     "tara-na-086f6024"
@@ -1423,6 +1639,10 @@
     "gusto-ko-nang-umuwi-1c4d03f2",
     "gusto-ko-nang-umuwi-a9d15664"
   ],
+  "takot": [
+    "takot-c4af75bb",
+    "takot-eec97914"
+  ],
   "kumain": [
     "kumain-ada4f177",
     "kumain-528ff39a"
@@ -1495,6 +1715,74 @@
     "maglaro-89ea0be0",
     "maglaro-c0062486"
   ],
+  "alam": [
+    "alam-5bb63ff3",
+    "alam-a1549eea"
+  ],
+  "kilala": [
+    "kilala-0a0f4fff",
+    "kilala-dcc6e1a1"
+  ],
+  "sabi": [
+    "sabi-af942791",
+    "sabi-473f83d5"
+  ],
+  "gawin": [
+    "gawin-fba5ee96",
+    "gawin-8cec6829"
+  ],
+  "nakita": [
+    "nakita-07d9582f",
+    "nakita-0109c2af"
+  ],
+  "tingnan": [
+    "tingnan-eb67264e",
+    "tingnan-04c61798"
+  ],
+  "umalis": [
+    "umalis-a1641446",
+    "umalis-6ed81466"
+  ],
+  "bumalik": [
+    "bumalik-956b04b5",
+    "bumalik-5d18d4fd"
+  ],
+  "kunin": [
+    "kunin-526a7fed",
+    "kunin-ed36ed47"
+  ],
+  "ibigay": [
+    "ibigay-949756c0",
+    "ibigay-c9c920e8"
+  ],
+  "buksan": [
+    "buksan-0a020f49",
+    "buksan-d514491a"
+  ],
+  "pumasok": [
+    "pumasok-a735180c",
+    "pumasok-976405bc"
+  ],
+  "nakalimutan": [
+    "nakalimutan-a5cc08a5",
+    "nakalimutan-0a5127ca"
+  ],
+  "akala": [
+    "akala-d40d4156",
+    "akala-68efed88"
+  ],
+  "maging": [
+    "maging-7bad6eb2",
+    "maging-2e98c726"
+  ],
+  "nangyari": [
+    "nangyari-b7188d58",
+    "nangyari-079c8c21"
+  ],
+  "Halika!": [
+    "halika-f8c0190a",
+    "halika-d5d60967"
+  ],
   "maganda": [
     "maganda-26ad9d75",
     "maganda-2ad396da"
@@ -1554,6 +1842,118 @@
   "mabaho": [
     "mabaho-2a032507",
     "mabaho-8ea07418"
+  ],
+  "totoo": [
+    "totoo-f8f90066",
+    "totoo-bd7a3d7a"
+  ],
+  "mali": [
+    "mali-b843606c",
+    "mali-ad9743f3"
+  ],
+  "masama": [
+    "masama-f6430c45",
+    "masama-6ce0dedc"
+  ],
+  "magaling": [
+    "magaling-503c9ade",
+    "magaling-28ad98fe"
+  ],
+  "malakas": [
+    "malakas-13df8994",
+    "malakas-940f4185"
+  ],
+  "tahimik": [
+    "tahimik-87c1ff99",
+    "tahimik-4162d697"
+  ],
+  "tao": [
+    "tao-ef81f30a",
+    "tao-0ae42159"
+  ],
+  "buhay": [
+    "buhay-ca0aab8b",
+    "buhay-354d7d22"
+  ],
+  "mundo": [
+    "mundo-e665a1ce",
+    "mundo-e70a5a00"
+  ],
+  "bagay": [
+    "bagay-2ea90a6b",
+    "bagay-ac5971c5"
+  ],
+  "lugar": [
+    "lugar-b7621978",
+    "lugar-be0a585f"
+  ],
+  "pangalan": [
+    "pangalan-1d54fbd4",
+    "pangalan-f5413c2a"
+  ],
+  "trabaho": [
+    "trabaho-dded5228",
+    "trabaho-9ea41482"
+  ],
+  "kamay": [
+    "kamay-4a5a798a",
+    "kamay-9db9fc3d"
+  ],
+  "puso": [
+    "puso-70950298",
+    "puso-b6a4e787"
+  ],
+  "aso": [
+    "aso-498d11ce",
+    "aso-4526c391"
+  ],
+  "kama": [
+    "kama-6f23c095",
+    "kama-ad695906"
+  ],
+  "pinto": [
+    "pinto-5fb24f8b",
+    "pinto-45247995"
+  ],
+  "kuwarto": [
+    "kuwarto-c960f4e4",
+    "kuwarto-d3ee24d0"
+  ],
+  "gamit": [
+    "gamit-4288be1e",
+    "gamit-822d975c"
+  ],
+  "sarili": [
+    "sarili-2c9d7de2",
+    "sarili-b66c2483"
+  ],
+  "loob": [
+    "loob-423d0344",
+    "loob-87a5d7a7"
+  ],
+  "labas": [
+    "labas-df0dba81",
+    "labas-70e70f44"
+  ],
+  "dahilan": [
+    "dahilan-1eede86e",
+    "dahilan-576eb572"
+  ],
+  "paraan": [
+    "paraan-2ed851bd",
+    "paraan-9b3d3258"
+  ],
+  "beses": [
+    "beses-ac822d5b",
+    "beses-caa0270e"
+  ],
+  "kasalanan": [
+    "kasalanan-9ce04f23",
+    "kasalanan-254e6cdc"
+  ],
+  "bansa": [
+    "bansa-fe0ed368",
+    "bansa-dea63bba"
   ],
   "kulay": [
     "kulay-280a9eed",

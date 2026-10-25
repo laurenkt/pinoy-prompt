@@ -34,18 +34,22 @@ export const CLIP_MARGIN = 1;
  * words said gently. Never judged. Kept in step with the clips by src/spoken.test.ts.
  */
 export const UNJUDGED = new Set<string>([
-  'ako', 'anak', 'anim', 'apatnapu', 'apo', 'araw', 'asukal', 'ate', 'ayoko', 'babae', 'baboy', 'bagyo', 'bakit',
-  'bangko', 'barya', 'baso', 'biyernes', 'bumaba', 'bumili', 'dalawampu', 'dilaw', 'dito', 'dumating', 'gamot',
-  'gatas', 'gulay', 'gusto', 'hatinggabi', 'hindi', 'ingat', 'isa', 'isda', 'kahapon', 'kaibigan', 'kailangan',
-  'kainan', 'kalahati', 'kaliwa', 'kanan', 'kanin', 'kasi', 'kayo', 'kulay', 'kumain', 'kumusta', 'kutsara',
-  'labindalawa', 'labing-isa', 'labinlima', 'lalaki', 'lima', 'limampu', 'linggo', 'lunes', 'maaraw', 'mabagal',
-  'mabaho', 'madali', 'maganda', 'maghintay', 'magluto', 'magnanakaw', 'magpahinga', 'magsalita', 'magtrabaho',
-  'magulang', 'mahirap', 'makinig', 'malapit', 'maligo', 'malungkot', 'mamaya', 'mangga', 'manok', 'marami', 'masaya',
-  'matanda', 'matulog', 'meron', 'minsan', 'nanay', 'nasaan', 'ninang', 'ninong', 'oo', 'opo', 'ospital', 'paalam',
-  'paaralan', 'palengke', 'paliparan', 'pamangkin', 'panganay', 'pangit', 'pero', 'pinsan', 'pito', 'pula', 'pumunta',
-  'puti', 'sabihin', 'saging', 'selpon', 'sige', 'siguro', 'sila', 'simbahan', 'sino', 'sukli', 'sunog', 'tag-init',
-  'tag-ulan', 'tanghalian', 'tatay', 'tatlumpu', 'tayo', 'teka', 'tinapay', 'tindahan', 'tinidor', 'tita', 'trapik',
-  'tubig', 'tulong', 'uminom', 'umuulan', 'wala',
+  'akala', 'akin', 'ako', 'anak', 'anim', 'apatnapu', 'apo', 'araw', 'aso', 'asukal', 'ate', 'ayoko', 'babae',
+  'baboy', 'bagay', 'bagyo', 'bakit', 'bangko', 'bansa', 'barya', 'baso', 'basta', 'bawat', 'beses', 'biyernes',
+  'buhay', 'buksan', 'bumaba', 'bumalik', 'bumili', 'dahilan', 'dalawampu', 'dilaw', 'dito', 'dumating', 'gamot',
+  'gatas', 'gulay', 'gusto', 'habang', 'hatinggabi', 'heto', 'hindi', 'ingat', 'isa', 'isda', 'iyo', 'kahapon',
+  'kahit', 'kaibigan', 'kailangan', 'kainan', 'kalahati', 'kaliwa', 'kanan', 'kanin', 'kasalanan', 'kasi', 'kaya',
+  'kayo', 'kaysa', 'kilala', 'kulay', 'kumain', 'kumusta', 'kunin', 'kutsara', 'labindalawa', 'labing-isa',
+  'labinlima', 'lalaki', 'lima', 'limampu', 'linggo', 'loob', 'lugar', 'lunes', 'maaraw', 'mabagal', 'mabaho',
+  'madali', 'maganda', 'maghintay', 'magluto', 'magnanakaw', 'magpahinga', 'magsalita', 'magtrabaho', 'magulang',
+  'mahirap', 'makinig', 'malapit', 'mali', 'maligo', 'malungkot', 'mamaya', 'mangga', 'manok', 'marami', 'masama',
+  'masaya', 'masyado', 'matanda', 'matulog', 'meron', 'minsan', 'mula', 'mundo', 'nakalimutan', 'namin', 'nanay',
+  'nasaan', 'natin', 'nila', 'ninang', 'ninong', 'oo', 'opo', 'ospital', 'paalam', 'paaralan', 'pagkain',
+  'pagkatapos', 'pakiusap', 'pala', 'palengke', 'paliparan', 'pamangkin', 'panganay', 'pangit', 'parang', 'pare',
+  'pareho', 'pero', 'pinsan', 'pinto', 'pito', 'pula', 'pumasok', 'pumunta', 'puso', 'puti', 'sabi', 'sabihin',
+  'saging', 'sandali', 'sarili', 'selpon', 'sige', 'siguro', 'sila', 'simbahan', 'sino', 'sukli', 'sunog', 'tag-init',
+  'tag-ulan', 'takot', 'tanghalian', 'tao', 'tapos', 'tatay', 'tatlumpu', 'tayo', 'teka', 'tinapay', 'tindahan',
+  'tinidor', 'tita', 'totoo', 'trapik', 'tubig', 'tulong', 'ulit', 'umaga', 'umalis', 'uminom', 'umuulan', 'wala',
 ]);
 
 /** A pronunciation hint's syllables, and which is stressed (written in capitals), if exactly one is. */
