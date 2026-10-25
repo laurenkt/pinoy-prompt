@@ -5,7 +5,7 @@ import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../open
 import { everyWordSaid, judge } from '../phonetics';
 import { askWithPicture } from '../pictures';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, drillOdds, pickDrillCard, setDrillHelp, settled, shuffle, type DrillRepeat } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, askAs, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, drillOdds, pickDrillCard, setDrillHelp, settled, shuffle, type DrillRepeat } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -224,7 +224,9 @@ export function practiceScreen(
     const ways = modes();
     const pick = pickDrillCard(app.progress, app.now(), recent, repeats, asked, askable(ways));
     if (!pick) return null;
-    const { card, way: mode } = pick;
+    const { way: mode } = pick;
+    // A phrase may be asked as a variant on its pattern: the same card, in other words.
+    const card = isVocab(pick.card) ? askAs(app.progress, pick.card, mode) : pick.card;
     recent = [...recent.slice(-DRILL_GAP), card.id];
     if (!isVocab(card)) {
       const format = guideFormats(card).find((f) => GUIDE_MODES[f] === mode)!;

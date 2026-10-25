@@ -44,6 +44,13 @@ export interface Card {
   say?: string;
   /** Other accepted pronunciations, as spelled, for when the learner says the card out loud. */
   accept?: string[];
+  /**
+   * Phrases only: other sentences on the same pattern, one part swapped ("Nasaan ang kape?" for "Nasaan ang banyo?"),
+   * so the pattern sinks in rather than one sentence. Study and Drills sometimes ask one in place of the phrase: the
+   * same card, asked another way round the same schedule (askAs in session.ts). Every word is the phrase's own or has a
+   * card of its own (deck.test.ts checks), and a variant is only asked once the learner has met them all.
+   */
+  variants?: Variant[];
   /** Guides only: examples, each tappable to hear, built from cards met earlier where possible. */
   examples?: Example[];
   /** Guides only: cards that must be met, and have lasted a day, before this one is introduced. */
@@ -55,6 +62,15 @@ export interface Card {
 export interface Example {
   tl: string;
   en: string;
+}
+
+/** A phrase said another way on the same pattern (see `variants`). */
+export interface Variant {
+  tl: string;
+  en: string;
+  hint: string;
+  say?: string;
+  accept?: string[];
 }
 
 /**
@@ -185,8 +201,14 @@ export const UNITS: Unit[] = [
       { id: 'paano', tl: 'Paano?', en: 'How?', kind: 'word', hint: 'pah-AH-noh', hook: '"Ano" (what) is hiding inside "pa-ano": by what way? How?' },
       { id: 'nasaan', tl: 'Nasaan?', en: 'Where is it?', kind: 'word', hint: 'nah-sah-AHN', note: '"Saan" asks where to or where from; "nasaan" asks where someone or something is right now. Put the thing after it: "Nasaan ang ...?".', hook: '"Na" (at) + "saan" (where): where-at? Its answers are "dito" (here), "diyan" (there by you) and "doon" (over there).' },
       { id: 'gaano', tl: 'Gaano?', en: 'How (long, far, big)?', kind: 'word', hint: 'gah-AH-noh', note: 'It comes before a describing word with "ka-": "gaano katagal?", how long; "gaano kalayo?", how far.', hook: '"Paano" asks how, by what way; "gaano" asks how much of something. They differ by one letter.' },
-      { id: 'ano-ito', tl: 'Ano ito?', en: 'What is this?', kind: 'phrase', hint: 'ah-NOH ee-TOH', hook: '"Ano" (what) + "ito" (this). "Ito" sounds like "it, oh": what is it?' },
-      { id: 'magkano', tl: 'Magkano ito?', en: 'How much is this?', kind: 'phrase', hint: 'mahg-KAH-noh ee-TOH', note: 'Your most useful phrase at the market.', hook: 'Fun fact: "Kano" is also slang for an American. Handy to remember when the price suddenly doubles.' },
+      { id: 'ano-ito', tl: 'Ano ito?', en: 'What is this?', kind: 'phrase', hint: 'ah-NOH ee-TOH', hook: '"Ano" (what) + "ito" (this). "Ito" sounds like "it, oh": what is it?', variants: [
+        { tl: 'Ano iyan?', en: 'What is that?', hint: 'ah-NOH ee-YAHN', accept: ['Ano yan?'] },
+        { tl: 'Ano iyon?', en: 'What is that over there?', hint: 'ah-NOH ee-YON', accept: ['Ano yon?'] },
+      ] },
+      { id: 'magkano', tl: 'Magkano ito?', en: 'How much is this?', kind: 'phrase', hint: 'mahg-KAH-noh ee-TOH', note: 'Your most useful phrase at the market.', hook: 'Fun fact: "Kano" is also slang for an American. Handy to remember when the price suddenly doubles.', variants: [
+        { tl: 'Magkano iyan?', en: 'How much is that?', hint: 'mahg-KAH-noh ee-YAHN', accept: ['Magkano yan?'] },
+        { tl: 'Magkano ang kape?', en: 'How much is the coffee?', hint: 'mahg-KAH-noh ahng kah-PEH' },
+      ] },
     ],
   },
   {
@@ -195,11 +217,16 @@ export const UNITS: Unit[] = [
     tlTitle: 'Pagtatanong',
     intro: 'More questions for getting around: where someone is, where they are going, how many, which one, how long.',
     cards: [
-      { id: 'nasaan-ka', tl: 'Nasaan ka?', en: 'Where are you?', kind: 'phrase', hint: 'nah-sah-AHN kah', hook: '"Nasaan" (where is) + "ka" (you): where are you right now? The text you send when someone is late.' },
+      { id: 'nasaan-ka', tl: 'Nasaan ka?', en: 'Where are you?', kind: 'phrase', hint: 'nah-sah-AHN kah', hook: '"Nasaan" (where is) + "ka" (you): where are you right now? The text you send when someone is late.', variants: [
+        { tl: 'Nasaan siya?', en: 'Where is he? / Where is she?', hint: 'nah-sah-AHN shah' },
+        { tl: 'Nasaan sila?', en: 'Where are they?', hint: 'nah-sah-AHN see-LAH' },
+      ] },
       { id: 'saan-ka-pupunta', tl: 'Saan ka pupunta?', en: 'Where are you going?', kind: 'phrase', hint: 'sah-AHN kah poo-POON-tah', note: 'Also a friendly greeting in passing. "Diyan lang" ("just over there") is a fine vague answer.', hook: '"Punta" (go to) is from Spanish "punta", a point: the point you are heading for. Doubling the first syllable, pu-punta, makes it "will go".' },
       { id: 'ilan', tl: 'Ilan?', en: 'How many?', kind: 'word', hint: 'ee-LAHN', hook: '"Ilan" counts things; "magkano" counts money. "Ilan kayo?" is what a waiter asks at the door: how many of you?' },
       { id: 'alin', tl: 'Alin?', en: 'Which one?', kind: 'word', hint: 'ah-LIN', hook: 'Sounds like "a line": which one in the line? "Alin dito?" means "which of these?"' },
-      { id: 'kanino', tl: 'Kanino ito?', en: 'Whose is this?', kind: 'phrase', hint: 'kah-NEE-noh ee-TOH', hook: '"Sino" is who, and "kanino" is its "whose, to whom" form. The "-no" ending ties the two together.' },
+      { id: 'kanino', tl: 'Kanino ito?', en: 'Whose is this?', kind: 'phrase', hint: 'kah-NEE-noh ee-TOH', hook: '"Sino" is who, and "kanino" is its "whose, to whom" form. The "-no" ending ties the two together.', variants: [
+        { tl: 'Kanino iyan?', en: 'Whose is that?', hint: 'kah-NEE-noh ee-YAHN', accept: ['Kanino yan?'] },
+      ] },
       { id: 'gaano-katagal', tl: 'Gaano katagal?', en: 'How long does it take?', kind: 'phrase', hint: 'gah-AH-noh kah-tah-GAHL', hook: '"Gaano" (how much) + "katagal" (long, from "tagal", a long while): how much long?' },
       { id: 'gaano-kalayo', tl: 'Gaano kalayo?', en: 'How far is it?', kind: 'phrase', hint: 'gah-AH-noh kah-LAH-yoh', hook: '"Layo" is distance, as in "malayo" (far). Same "gaano ka-" pattern as "Gaano katagal?".' },
       { id: 'anong-ginagawa-mo', tl: 'Anong ginagawa mo?', en: 'What are you doing?', kind: 'phrase', hint: 'ah-NONG ghee-nah-GAH-wah moh', hook: '"Gawa" means do or make. In "gi-na-gawa" the doubled "ga" marks it as happening right now.' },
@@ -233,11 +260,17 @@ export const UNITS: Unit[] = [
       { id: 'kami', tl: 'kami', en: 'we (not including you)', kind: 'word', hint: 'kah-MEE', hook: '"Kami" leaves the listener out. Tell a waiter "Dalawa kami", "we are two", because the waiter isn\'t eating with you.' },
       { id: 'sila', tl: 'sila', en: 'they', kind: 'word', hint: 'see-LAH', hook: 'Sounds like "see la": see them, over there.' },
       { id: 'may', tl: 'may', en: 'there is / has', kind: 'word', hint: 'mai', note: 'Always with a thing after it: "may tubig", there\'s water. On its own, say "meron".', hook: 'Sounds like English "my", and works like "I\'ve got": "may kape", there\'s coffee, someone has coffee.' },
-      { id: 'may-kape-ba', tl: 'May kape ba?', en: 'Is there any coffee?', kind: 'phrase', hint: 'mai kah-PEH bah', hook: '"May" (there is) + "kape" (coffee) + "ba" (the question): coffee, is there? Swap in anything you\'re after.' },
+      { id: 'may-kape-ba', tl: 'May kape ba?', en: 'Is there any coffee?', kind: 'phrase', hint: 'mai kah-PEH bah', hook: '"May" (there is) + "kape" (coffee) + "ba" (the question): coffee, is there? Swap in anything you\'re after.', variants: [
+        { tl: 'May tubig ba?', en: 'Is there any water?', hint: 'mai TOO-big bah' },
+        { tl: 'May tinapay ba?', en: 'Is there any bread?', hint: 'mai tee-NAH-pai bah' },
+      ] },
       { id: 'meron', tl: 'Meron.', en: 'There is. / I have some.', kind: 'word', hint: 'MEH-ron', hook: 'The answer to "May ... ba?". It is short for "mayroon", the long form of "may".' },
       { id: 'wala', tl: 'Wala.', en: "There's none. / Nothing.", kind: 'word', hint: 'wah-LAH', hook: 'Nothing, none, not here. With "-ng" it joins the next word: "walang anuman", it\'s nothing (you\'re welcome). "Meron" and "wala" are the yes and no of having.' },
       { id: 'kailangan', tl: 'kailangan', en: 'need / have to', kind: 'word', hint: 'kah-ee-LAH-ngahn', note: 'Whoever needs it comes after: "kailangan ko", I need.', hook: '"Kai-LANG-an": think of longing for something you need.' },
-      { id: 'kailangan-ko', tl: 'Kailangan ko ito.', en: 'I need this.', kind: 'phrase', hint: 'kah-ee-LAH-ngahn koh ee-TOH', hook: '"Kailangan" (need) + "ko" (I) + "ito" (this). Swap "kailangan" for "gusto" (want) and you get "I want this".' },
+      { id: 'kailangan-ko', tl: 'Kailangan ko ito.', en: 'I need this.', kind: 'phrase', hint: 'kah-ee-LAH-ngahn koh ee-TOH', hook: '"Kailangan" (need) + "ko" (I) + "ito" (this). Swap "kailangan" for "gusto" (want) and you get "I want this".', variants: [
+        { tl: 'Kailangan ko ng tubig.', en: 'I need some water.', hint: 'kah-ee-LAH-ngahn koh nahng TOO-big' },
+        { tl: 'Kailangan ko iyan.', en: 'I need that.', hint: 'kah-ee-LAH-ngahn koh ee-YAHN', accept: ['Kailangan ko yan.'] },
+      ] },
       { id: 'puwede', tl: 'puwede', accept: ['pwede'], en: 'can / allowed', kind: 'word', hint: 'PWEH-deh', hook: 'From Spanish "puede", it can. Said in two beats, "PWEH-deh", and texts spell it "pwede".' },
       { id: 'puwede-ba', tl: 'Puwede ba?', en: 'Can I? / Is it allowed?', kind: 'phrase', hint: 'PWEH-deh bah', hook: '"Puwede" (can) plus the question-maker "ba". Point at an empty chair and ask.' },
       { id: 'dito', tl: 'dito', en: 'here', kind: 'word', hint: 'DEE-toh', hook: 'Three steps of distance: "dito" by me, "diyan" by you, "doon" away from us both.' },
@@ -307,7 +340,10 @@ export const UNITS: Unit[] = [
     tlTitle: 'Papunta',
     intro: 'Texting a friend where you are, or telling a driver where to stop: the phrases for getting from A to B.',
     cards: [
-      { id: 'papunta-na-ako', tl: 'Papunta na ako.', en: "I'm on my way.", kind: 'phrase', hint: 'pah-POON-tah nah ah-KOH', hook: 'The "punta" (go to) from "Saan ka pupunta?", with "pa-" for heading towards: "heading there already, me".' },
+      { id: 'papunta-na-ako', tl: 'Papunta na ako.', en: "I'm on my way.", kind: 'phrase', hint: 'pah-POON-tah nah ah-KOH', hook: 'The "punta" (go to) from "Saan ka pupunta?", with "pa-" for heading towards: "heading there already, me".', variants: [
+        { tl: 'Papunta na kami.', en: "We're on our way.", hint: 'pah-POON-tah nah kah-MEE' },
+        { tl: 'Papunta na siya.', en: "He's on the way. / She's on the way.", hint: 'pah-POON-tah nah shah' },
+      ] },
       { id: 'malapit-na-ako', tl: 'Malapit na ako.', en: "I'm almost there.", kind: 'phrase', hint: 'mah-LAH-pit nah ah-KOH', hook: '"Lapit" means near: "near already, me". In Manila traffic it can mean anything up to an hour.' },
       { id: 'nandito-na-ako', tl: 'Nandito na ako.', en: "I'm here.", kind: 'phrase', hint: 'nahn-DEE-toh nah ah-KOH', hook: '"Dito" means here, and "nandito" means "is here". Swap "dito" for "diyan" or "doon" to say you are there.' },
       { id: 'nasaan-ka-na', tl: 'Nasaan ka na?', en: 'Where are you now?', kind: 'phrase', hint: 'nah-sah-AHN kah nah', hook: 'Add "na" (already) to "Nasaan ka?" and you get the impatient text: where are you by now?' },
@@ -315,7 +351,9 @@ export const UNITS: Unit[] = [
       { id: 'pauwi-na-ako', tl: 'Pauwi na ako.', en: "I'm heading home.", kind: 'phrase', hint: 'pah-OO-wee nah ah-KOH', hook: '"Uwi" means go home, and "pa-" points the way, just like in "papunta": home-bound already.' },
       { id: 'trapik', tl: 'Trapik!', en: 'Traffic!', kind: 'word', hint: 'TRAH-pik', hook: 'English "traffic" spelled the Tagalog way, with f turned to p. The all-purpose reason for being late.' },
       { id: 'mahuhuli-ako', tl: 'Mahuhuli ako.', en: "I'll be late.", kind: 'phrase', hint: 'mah-hoo-hoo-LEE ah-KOH', note: 'In everyday Taglish you will also hear "Male-late ako".', hook: '"Huli" means late or last. Doubling the "hu" makes it future: will be late.' },
-      { id: 'hintayin-mo-ako', tl: 'Hintayin mo ako.', en: 'Wait for me.', kind: 'phrase', hint: 'hin-tah-YIN moh ah-KOH', hook: '"Hintay" is wait. Picture holding up a hand: "HIN-tay!", stay there.' },
+      { id: 'hintayin-mo-ako', tl: 'Hintayin mo ako.', en: 'Wait for me.', kind: 'phrase', hint: 'hin-tah-YIN moh ah-KOH', hook: '"Hintay" is wait. Picture holding up a hand: "HIN-tay!", stay there.', variants: [
+        { tl: 'Hintayin mo kami.', en: 'Wait for us.', hint: 'hin-tah-YIN moh kah-MEE' },
+      ] },
       { id: 'para-po', tl: 'Para po!', en: 'Stop here, please! (to a driver)', kind: 'phrase', hint: 'PAH-rah poh', note: 'Call it out on a jeepney or bus when you want to get off.', hook: 'From Spanish "parar", to stop. A different word from the "para" that means "for".' },
       { id: 'bayad-po', tl: 'Bayad po.', en: "Here's my fare.", kind: 'phrase', hint: 'BAH-yahd poh', note: 'On a jeepney, pass your fare forward with "Bayad po" and it gets handed along to the driver.', hook: '"Bayad" is payment. It travels hand to hand to the driver, and the change comes back the same way.' },
       { id: 'sa-tabi-lang', tl: 'Sa tabi lang po.', en: 'Just pull over here, please.', kind: 'phrase', hint: 'sah tah-BEE lahng poh', hook: '"Tabi" means side, so it is "just at the side". "Tabi!" on its own means "move aside!"' },
@@ -331,7 +369,10 @@ export const UNITS: Unit[] = [
     intro: '"Sa" marks a place: "sa bahay" is at home, "sa palengke" at the market. Most of town is one "sa" away.',
     cards: [
       { id: 'bahay', tl: 'bahay', en: 'house / home', kind: 'word', picture: '🏠', hint: 'BAH-hai', hook: '"Bahay kubo" is the bamboo hut from the best-known Filipino folk song. Sounds like "bye, hi": the door you say both through.' },
-      { id: 'nasa-bahay-ako', tl: 'Nasa bahay ako.', en: "I'm at home.", kind: 'phrase', hint: 'NAH-sah BAH-hai ah-KOH', hook: '"Nasa" means "at, in": the "na" of "nasaan" plus the place word "sa". Swap in any place: "Nasa opisina ako".' },
+      { id: 'nasa-bahay-ako', tl: 'Nasa bahay ako.', en: "I'm at home.", kind: 'phrase', hint: 'NAH-sah BAH-hai ah-KOH', hook: '"Nasa" means "at, in": the "na" of "nasaan" plus the place word "sa". Swap in any place: "Nasa opisina ako".', variants: [
+        { tl: 'Nasa opisina ako.', en: "I'm at the office.", hint: 'NAH-sah oh-pee-SEE-nah ah-KOH' },
+        { tl: 'Nasa palengke ako.', en: "I'm at the market.", hint: 'NAH-sah pah-LENG-keh ah-KOH' },
+      ] },
       { id: 'palengke', tl: 'palengke', en: 'market', kind: 'word', hint: 'pah-LENG-keh', hook: 'From Spanish "palenque", a fenced enclosure where markets were held. Fresh fish, haggling and noise: the palengke.' },
       { id: 'tindahan', tl: 'tindahan', en: 'shop / store', kind: 'word', picture: '🏪', hint: 'tin-DAH-hahn', note: 'A "sari-sari store" is the tiny corner shop on almost every street.', hook: 'Spanish "tienda" (shop) + "-han" (place). "Sari-sari" means "assorted": it sells a bit of everything.' },
       { id: 'simbahan', tl: 'simbahan', en: 'church', kind: 'word', picture: '⛪', hint: 'sim-BAH-hahn', hook: '"Simba" means to go to Mass, and "-han" makes a place: where you go to Mass.' },
@@ -352,7 +393,11 @@ export const UNITS: Unit[] = [
     tlTitle: 'Direksyon',
     intro: 'Ask the way and follow the answer. Watch the lips: a quick pout towards a place is a very Filipino way to point.',
     cards: [
-      { id: 'paano-pumunta', tl: 'Paano pumunta sa palengke?', en: 'How do I get to the market?', kind: 'phrase', hint: 'pah-AH-noh poo-MOON-tah sah pah-LENG-keh', hook: '"Paano" (how) + "pumunta" (to go) + "sa palengke". Swap in any place you know.' },
+      { id: 'paano-pumunta', tl: 'Paano pumunta sa palengke?', en: 'How do I get to the market?', kind: 'phrase', hint: 'pah-AH-noh poo-MOON-tah sah pah-LENG-keh', hook: '"Paano" (how) + "pumunta" (to go) + "sa palengke". Swap in any place you know.', variants: [
+        { tl: 'Paano pumunta sa ospital?', en: 'How do I get to the hospital?', hint: 'pah-AH-noh poo-MOON-tah sah os-pee-TAHL' },
+        { tl: 'Paano pumunta sa botika?', en: 'How do I get to the pharmacy?', hint: 'pah-AH-noh poo-MOON-tah sah boh-TEE-kah' },
+        { tl: 'Paano pumunta sa bangko?', en: 'How do I get to the bank?', hint: 'pah-AH-noh poo-MOON-tah sah BAHNG-koh' },
+      ] },
       { id: 'kaliwa', tl: 'kaliwa', en: 'left', kind: 'word', hint: 'kah-lee-WAH', hook: 'Starts with "Cali": California is on the left of a map of the US.' },
       { id: 'kanan', tl: 'kanan', en: 'right (direction)', kind: 'word', hint: 'KAH-nahn', hook: 'Think "Canon": you hold a camera and press the shutter with your right hand.' },
       { id: 'diretso', tl: 'diretso', en: 'straight ahead', kind: 'word', hint: 'dee-RET-choh', hook: 'Spanish "derecho", straight, with the ch written "ts". "Diretso lang" is "just keep going".' },
@@ -373,11 +418,17 @@ export const UNITS: Unit[] = [
     tlTitle: 'Mga Plano',
     intro: 'Set a time, pick a place, and say yes or "maybe later". Plans are flexible here, so "mamaya" does a lot of work.',
     cards: [
-      { id: 'libre-ka-ba', tl: 'Libre ka ba?', en: 'Are you free?', kind: 'phrase', hint: 'LEE-breh kah bah', note: '"Libre" also means free of charge: "Libre ko!" is "my treat!".', hook: 'Spanish "libre", free. One word for free time and a free meal.' },
+      { id: 'libre-ka-ba', tl: 'Libre ka ba?', en: 'Are you free?', kind: 'phrase', hint: 'LEE-breh kah bah', note: '"Libre" also means free of charge: "Libre ko!" is "my treat!".', hook: 'Spanish "libre", free. One word for free time and a free meal.', variants: [
+        { tl: 'Libre ka ba bukas?', en: 'Are you free tomorrow?', hint: 'LEE-breh kah bah BOO-kahs' },
+        { tl: 'Libre ka ba mamaya?', en: 'Are you free later?', hint: 'LEE-breh kah bah mah-mah-YAH' },
+      ] },
       { id: 'ano-ang-plano', tl: 'Anong plano?', accept: ['Ano ang plano?'], en: "What's the plan?", kind: 'phrase', hint: 'ah-NONG PLAH-noh', hook: '"Plano" is Spanish for plan. A freebie.' },
       { id: 'saan-tayo-magkikita', tl: 'Saan tayo magkikita?', en: 'Where shall we meet?', kind: 'phrase', hint: 'sah-AHN tah-YOH mahg-kee-KEE-tah', hook: '"Kita" is see, "mag-" makes it each other, and the doubled "ki" makes it future: where will we see each other?' },
       { id: 'anong-oras-magkikita', tl: 'Anong oras tayo magkikita?', en: 'What time shall we meet?', kind: 'phrase', hint: 'ah-NONG OH-rahs tah-YOH mahg-kee-KEE-tah', hook: 'Swap "saan" for "anong oras" in "Saan tayo magkikita?". The same sentence, now asking the time.' },
-      { id: 'kita-tayo-bukas', tl: 'Kita tayo bukas.', en: 'See you tomorrow.', kind: 'phrase', hint: 'KEE-tah tah-YOH BOO-kahs', hook: '"Kita" (see) + "tayo" (we) + "bukas" (tomorrow): we see each other tomorrow.' },
+      { id: 'kita-tayo-bukas', tl: 'Kita tayo bukas.', en: 'See you tomorrow.', kind: 'phrase', hint: 'KEE-tah tah-YOH BOO-kahs', hook: '"Kita" (see) + "tayo" (we) + "bukas" (tomorrow): we see each other tomorrow.', variants: [
+        { tl: 'Kita tayo mamaya.', en: 'See you later.', hint: 'KEE-tah tah-YOH mah-mah-YAH' },
+        { tl: 'Kita tayo sa Lunes.', en: 'See you on Monday.', hint: 'KEE-tah tah-YOH sah LOO-nes' },
+      ] },
       { id: 'puwede-ako', tl: 'Puwede ako.', en: 'I can make it.', kind: 'phrase', hint: 'PWEH-deh ah-KOH', hook: 'The "puwede" (can) from "Puwede ba?", answered with "ako": I can.' },
       { id: 'hindi-ako-puwede', tl: 'Hindi ako puwede.', en: "I can't make it.", kind: 'phrase', hint: 'hin-DEE ah-KOH PWEH-deh', hook: '"Hindi" (not) in front of "ako puwede". Kinder with "pasensya na" in front.' },
       { id: 'mamaya-na-lang', tl: 'Mamaya na lang.', en: "Later, then.", kind: 'phrase', hint: 'mah-mah-YAH nah lahng', hook: '"Mamaya" (later) + "na lang" (just, instead): "just later instead". A soft way to put something off.' },
@@ -425,7 +476,10 @@ export const UNITS: Unit[] = [
     intro: 'Order, ask for water and get the bill. Staff often answer in English, but trying Tagalog gets smiles.',
     cards: [
       { id: 'isa-pong-adobo', tl: 'Isa pong adobo.', en: 'One adobo, please.', kind: 'phrase', hint: 'ee-SAH pong ah-DOH-boh', hook: '"Isa" (one) + "po" (respect), joined by "-ng". Swap in any dish: "Isa pong sinigang".' },
-      { id: 'pahingi-tubig', tl: 'Pahingi po ng tubig.', en: 'Some water, please.', kind: 'phrase', hint: 'pah-HEE-ngee poh nahng TOO-big', hook: '"Hingi" means ask for, and "pa-" makes it a polite request. The little "ng" is said "nang".' },
+      { id: 'pahingi-tubig', tl: 'Pahingi po ng tubig.', en: 'Some water, please.', kind: 'phrase', hint: 'pah-HEE-ngee poh nahng TOO-big', hook: '"Hingi" means ask for, and "pa-" makes it a polite request. The little "ng" is said "nang".', variants: [
+        { tl: 'Pahingi po ng kanin.', en: 'Some rice, please.', hint: 'pah-HEE-ngee poh nahng KAH-nin' },
+        { tl: 'Pahingi po ng asin.', en: 'Some salt, please.', hint: 'pah-HEE-ngee poh nahng ah-SIN' },
+      ] },
       { id: 'ano-masarap-dito', tl: 'Anong masarap dito?', accept: ['Ano ang masarap dito?'], en: "What's good here?", kind: 'phrase', hint: 'ah-NONG mah-sah-RAHP DEE-toh', hook: '"Masarap" (delicious) + "dito" (here): what is delicious here? Staff love this question.' },
       { id: 'maanghang', tl: 'maanghang', en: 'spicy', kind: 'word', hint: 'mah-ahng-HAHNG', hook: '"Anghang" is the heat in food, and "ma-" makes it a describing word, as in "masarap".' },
       { id: 'huwag-maanghang', tl: 'Huwag pong maanghang.', en: 'Not spicy, please.', kind: 'phrase', hint: 'hoo-WAG pong mah-ahng-HAHNG', hook: '"Huwag" means don\'t, and "po" joins on with "-ng": "don\'t make it spicy, please".' },
@@ -467,7 +521,10 @@ export const UNITS: Unit[] = [
     intro: 'From the sari-sari store window to the market stall. Pointing plus "ito" or "iyan" gets you most things.',
     cards: [
       { id: 'pabili-po', tl: 'Pabili po.', en: "I'd like to buy, please.", kind: 'phrase', hint: 'pah-bee-LEE poh', note: 'Called out at a sari-sari store window to get someone\'s attention.', hook: '"Bili" means buy, and "pa-" asks for it: "let me buy, please".' },
-      { id: 'meron-ba-kayong', tl: 'Meron ba kayong tinapay?', en: 'Do you have bread?', kind: 'phrase', hint: 'MEH-ron bah kah-YONG tee-NAH-pai', hook: '"Meron ba" asks if there is, "kayo" is the polite you, and the "-ng" links it to the thing.' },
+      { id: 'meron-ba-kayong', tl: 'Meron ba kayong tinapay?', en: 'Do you have bread?', kind: 'phrase', hint: 'MEH-ron bah kah-YONG tee-NAH-pai', hook: '"Meron ba" asks if there is, "kayo" is the polite you, and the "-ng" links it to the thing.', variants: [
+        { tl: 'Meron ba kayong itlog?', en: 'Do you have eggs?', hint: 'MEH-ron bah kah-YONG it-LOG' },
+        { tl: 'Meron ba kayong manok?', en: 'Do you have chicken?', hint: 'MEH-ron bah kah-YONG mah-NOK' },
+      ] },
       { id: 'iyan', tl: 'iyan', en: 'that (near you)', kind: 'word', hint: 'ee-YAHN', hook: '"Ito" (this, by me), "iyan" (that, by you), "iyon" (that, over there): the same three steps as dito, diyan, doon.' },
       { id: 'iyon', tl: 'iyon', en: 'that (over there)', kind: 'word', hint: 'ee-YON', hook: 'The farthest of ito, iyan, iyon. Often shortened to "yon", as in "Yon na!", "That\'s it!"' },
       { id: 'isa-pa', tl: 'Isa pa.', en: 'One more.', kind: 'phrase', hint: 'ee-SAH pah', hook: '"Isa" (one) + "pa" (still, more). "Isa pa po" orders another round.' },
@@ -519,9 +576,16 @@ export const UNITS: Unit[] = [
     cards: [
       { id: 'tara-na', tl: 'Tara na!', en: "Let's go!", kind: 'phrase', hint: 'TAH-rah nah', hook: 'Often said to be "tayo na" (let\'s go now) squashed together. Or hear it as "ta-ra!", the fanfare as you head out.' },
       { id: 'sandali-lang', tl: 'Sandali lang.', en: 'Just a moment.', kind: 'phrase', hint: 'sahn-dah-LEE lahng', hook: '"Sandali" is a moment, "lang" is just. Think "sand, dally": dallying while the sand runs through the hourglass.' },
-      { id: 'nasaan-banyo', tl: 'Nasaan ang banyo?', en: 'Where is the bathroom?', kind: 'phrase', hint: 'nah-sah-AHN ahng BAHN-yoh', note: 'You will also hear "CR" (comfort room) for the toilet.', hook: '"Banyo" comes from Spanish "baño" (bath), and "nasaan" has "saan" (where) inside it.' },
+      { id: 'nasaan-banyo', tl: 'Nasaan ang banyo?', en: 'Where is the bathroom?', kind: 'phrase', hint: 'nah-sah-AHN ahng BAHN-yoh', note: 'You will also hear "CR" (comfort room) for the toilet.', hook: '"Banyo" comes from Spanish "baño" (bath), and "nasaan" has "saan" (where) inside it.', variants: [
+        { tl: 'Nasaan ang kape?', en: 'Where is the coffee?', hint: 'nah-sah-AHN ahng kah-PEH' },
+        { tl: 'Nasaan ang palengke?', en: 'Where is the market?', hint: 'nah-sah-AHN ahng pah-LENG-keh' },
+        { tl: 'Nasaan ang botika?', en: 'Where is the pharmacy?', hint: 'nah-sah-AHN ahng boh-TEE-kah' },
+      ] },
       { id: 'gusto', tl: 'gusto', en: 'want / like', kind: 'word', hint: 'GOOS-toh', note: 'Whoever wants it comes after: "gusto ko", I want.', hook: '"Gusto" is Spanish for liking, as in "con mucho gusto".' },
-      { id: 'gusto-ko-ito', tl: 'Gusto ko ito.', en: 'I want this. / I like this.', kind: 'phrase', hint: 'GOOS-toh koh ee-TOH', hook: '"Gusto" (want) + "ko" (I) + "ito" (this): "my liking, this".' },
+      { id: 'gusto-ko-ito', tl: 'Gusto ko ito.', en: 'I want this. / I like this.', kind: 'phrase', hint: 'GOOS-toh koh ee-TOH', hook: '"Gusto" (want) + "ko" (I) + "ito" (this): "my liking, this".', variants: [
+        { tl: 'Gusto ko iyan.', en: 'I want that. / I like that.', hint: 'GOOS-toh koh ee-YAHN', accept: ['Gusto ko yan.'] },
+        { tl: 'Gusto ko ng kape.', en: 'I want some coffee.', hint: 'GOOS-toh koh nahng kah-PEH' },
+      ] },
       { id: 'ayoko', tl: 'Ayoko.', en: "I don't want to.", kind: 'word', hint: 'ah-YOH-koh', hook: '"Ayaw ko" (I don\'t like) squashed into one word.' },
       { id: 'hindi-ko-alam', tl: 'Hindi ko alam.', en: "I don't know.", kind: 'phrase', hint: 'hin-DEE koh ah-LAHM', hook: '"Hindi" (not) + "ko" (I) + "alam" (know). The same "alam" is inside "paalam".' },
       { id: 'mahal', tl: 'mahal', en: 'expensive / love', kind: 'word', hint: 'mah-HAHL', note: 'Same word for both. "Mahal kita" means "I love you".', hook: 'Works like English "dear": something dear to you, and something dear in price.' },
@@ -669,9 +733,15 @@ export const UNITS: Unit[] = [
       { id: 'selpon', tl: 'selpon', en: 'mobile phone', kind: 'word', picture: '📱', hint: 'SEL-pon', hook: 'English "cellphone", said the Tagalog way. Often just "CP".' },
       { id: 'i-text-mo-ako', tl: 'I-text mo ako.', en: 'Text me.', kind: 'phrase', hint: 'ee-TEKST moh ah-KOH', hook: 'English "text" with "i-" to make it a Tagalog doing word, then "mo ako": you, me.' },
       { id: 'tawagan-mo-ako', tl: 'Tawagan mo ako.', en: 'Call me.', kind: 'phrase', hint: 'tah-WAH-gahn moh ah-KOH', hook: '"Tawag" (call), from "Tumawag ka ng pulis!", with "-an": call me up.' },
-      { id: 'sino-ito', tl: 'Sino ito?', en: 'Who is this?', kind: 'phrase', hint: 'SEE-noh ee-TOH', hook: '"Sino" (who) + "ito" (this): the reply to a text from a number you don\'t know.' },
+      { id: 'sino-ito', tl: 'Sino ito?', en: 'Who is this?', kind: 'phrase', hint: 'SEE-noh ee-TOH', hook: '"Sino" (who) + "ito" (this): the reply to a text from a number you don\'t know.', variants: [
+        { tl: 'Sino siya?', en: 'Who is he? / Who is she?', hint: 'SEE-noh shah' },
+        { tl: 'Sino iyan?', en: 'Who is that?', hint: 'SEE-noh ee-YAHN', accept: ['Sino yan?'] },
+      ] },
       { id: 'ano-numero-mo', tl: 'Anong number mo?', accept: ['Ano ang numero mo?', 'Anong numero mo?', 'Anong namber mo?', 'Ano ang namber mo?'], en: "What's your number?", kind: 'phrase', hint: 'ah-NONG NUM-ber moh', note: 'Phone numbers are nearly always said in English, so the word is too.', hook: 'English "number" in the shape of "Anong pangalan mo?". Taglish at work.' },
-      { id: 'walang-signal', tl: 'Walang signal.', en: "There's no signal.", kind: 'phrase', hint: 'wah-LAHNG SIG-nahl', hook: '"Wala" (none) + "-ng" + English "signal". The excuse for every missed call.' },
+      { id: 'walang-signal', tl: 'Walang signal.', en: "There's no signal.", kind: 'phrase', hint: 'wah-LAHNG SIG-nahl', hook: '"Wala" (none) + "-ng" + English "signal". The excuse for every missed call.', variants: [
+        { tl: 'Walang tubig.', en: "There's no water.", hint: 'wah-LAHNG TOO-big' },
+        { tl: 'Walang pera.', en: "There's no money.", hint: 'wah-LAHNG PEH-rah' },
+      ] },
     ],
   },
   {
@@ -683,7 +753,10 @@ export const UNITS: Unit[] = [
       { id: 'tulong', tl: 'Tulong!', en: 'Help!', kind: 'word', hint: 'TOO-long', hook: 'Sounds like "too long": you have waited too long, shout for help.' },
       { id: 'pakitulungan', tl: 'Pakitulungan mo ako.', en: 'Please help me.', kind: 'phrase', hint: 'pah-kee-too-LOO-ngahn moh ah-KOH', hook: '"Paki-" (please) from "Pakiulit" + "tulong" (help). Politeness works even in a hurry.' },
       { id: 'naliligaw-ako', tl: 'Naliligaw ako.', en: "I'm lost.", kind: 'phrase', hint: 'nah-lee-LEE-gaow ah-KOH', hook: '"Ligaw" means astray, wild: a stray dog is an "asong ligaw". Right now, you are the stray.' },
-      { id: 'nawala-bag', tl: 'Nawala ang bag ko.', en: 'I lost my bag.', kind: 'phrase', hint: 'nah-WAH-lah ahng bahg koh', hook: '"Nawala" means went missing, from "wala" (none). Your bag became "wala".' },
+      { id: 'nawala-bag', tl: 'Nawala ang bag ko.', en: 'I lost my bag.', kind: 'phrase', hint: 'nah-WAH-lah ahng bahg koh', hook: '"Nawala" means went missing, from "wala" (none). Your bag became "wala".', variants: [
+        { tl: 'Nawala ang selpon ko.', en: 'I lost my phone.', hint: 'nah-WAH-lah ahng SEL-pon koh' },
+        { tl: 'Nawala ang pera ko.', en: 'I lost my money.', hint: 'nah-WAH-lah ahng PEH-rah koh' },
+      ] },
       { id: 'tumawag-pulis', tl: 'Tumawag ka ng pulis!', en: 'Call the police!', kind: 'phrase', hint: 'too-mah-WAHG kah nahng poo-LEES', hook: '"Tawag" is call, with the "-um-" verb trick: t-um-awag. "Pulis" is police, spelled the Tagalog way.' },
       { id: 'kailangan-doktor', tl: 'Kailangan ko ng doktor.', en: 'I need a doctor.', kind: 'phrase', hint: 'kah-ee-LAH-ngahn koh nahng dok-TOR', hook: '"Kailangan ko" (I need) + "ng" + the thing. Swap in anything you need.' },
       { id: 'nasaan-ospital', tl: 'Nasaan ang ospital?', en: 'Where is the hospital?', kind: 'phrase', hint: 'nah-sah-AHN ahng os-pee-TAHL', hook: 'The "Nasaan ang banyo?" pattern again, with "ospital". It works for any place.' },
@@ -842,6 +915,46 @@ export const LEARN_ORDER: readonly string[] = [
 ];
 
 const byId = new Map(ALL_CARDS.map((c) => [c.id, c]));
+
+const variantCards = new WeakMap<Card, Card[]>();
+
+/**
+ * A phrase's variants, each as the card it's asked as: the phrase's id (so its answer goes to the phrase's schedule)
+ * with the variant's words, and a hook pointing back to the phrase it's a variant of. Made once, so each is the same
+ * object every time it's asked. A variant has none of its own.
+ */
+export function variantsOf(card: Card): Card[] {
+  let found = variantCards.get(card);
+  if (!found) {
+    found = (card.variants ?? []).map(({ tl, en, hint, say, accept }) => ({
+      id: card.id,
+      kind: card.kind,
+      tl,
+      en,
+      hint,
+      say,
+      accept,
+      hook: patternHook(card, tl),
+    }));
+    variantCards.set(card, found);
+  }
+  return found;
+}
+
+/** What a variant changes from its phrase: `The pattern of "Nasaan ang banyo?" (Where is the bathroom?), with "kape" in place of "banyo".` */
+function patternHook(card: Card, tl: string): string {
+  const own = tagalogWords(card.tl);
+  const words = tagalogWords(tl);
+  // As written, so a name keeps its capital ("sa Lunes").
+  const written = tl.split(/[^A-Za-z'-]+/).filter((w) => /[a-z]/i.test(w));
+  const added = written.filter((_, i) => !own.includes(words[i])).join(' ');
+  const dropped = card.tl.split(/[^A-Za-z'-]+/).filter((w) => /[a-z]/i.test(w)).filter((w) => !words.includes(w.toLowerCase())).join(' ');
+  const change = dropped ? `"${added}" in place of "${dropped}"` : `"${added}" added`;
+  return `The pattern of "${card.tl}" (${card.en}), with ${change}.`;
+}
+
+/** Every word or phrase as Study and Drills can ask it: each card, and each phrase's variants (variantsOf). */
+export const ASKED_VOCAB: Card[] = VOCAB.flatMap((c) => [c, ...variantsOf(c)]);
 
 export function getCard(id: string): Card | undefined {
   return byId.get(id);

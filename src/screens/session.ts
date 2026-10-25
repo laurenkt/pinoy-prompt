@@ -4,6 +4,7 @@ import { KIND_INFO } from '../guides';
 import {
   DRILL_MIN_WORDS,
   abilities,
+  askAs,
   buildExtraSession,
   canDrill,
   distractors,
@@ -170,6 +171,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       askGuide(c);
       return;
     }
+    // A phrase settled this way may be asked as a variant on its pattern, whose clip loads now.
+    card = c = askAs(app.progress, c, s.way ?? 'read');
+    preload(c);
     pictured = (format === 'recall' || format === 'produce') && askWithPicture(c);
     if (format === 'remember' || format === 'hear' || format === 'produce') {
       phase = 'front';
