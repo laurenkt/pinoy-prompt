@@ -7,7 +7,7 @@
 import { studyWays, type Card, type Way } from '../deck';
 import { STRENGTHS, intervalSteps, lastSeen, recallChance, strengthOf, type Strength } from '../memory';
 import type { Progress } from '../progress-schema';
-import { drillHelp, wayState, type DrillOdds } from '../session';
+import { DRILL_GAP, drillHelp, wayState, type DrillOdds } from '../session';
 import { DAY_MS, MINUTE_MS, answersOf, formatInterval, formatWait, type CardState } from '../srs';
 import { h, svg } from '../ui';
 
@@ -168,61 +168,74 @@ function slope(state: CardState, now: number): HTMLElement {
   );
 }
 
-/** A chance as a percent: to a tenth below 1%, so a small one doesn't read as none. */
-function percentOf(chance: number): string {
-  return chance < 0.01 ? `${(Math.round(chance * 1000) / 10).toFixed(1)}%` : `${Math.round(chance * 100)}%`;
+/** A share as a percent: to a tenth below 10%, so the ways' shares add up and a small one doesn't read as none. */
+function percentOf(share: number): string {
+  if (share >= 0.1) return `${Math.round(share * 100)}%`;
+  return share < 0.0005 ? 'under 0.1%' : `${(Math.round(share * 1000) / 10).toFixed(1)}%`;
 }
 
 /**
- * How often Drills picks the card: the chance any one question is this card, any way (from drillOdds, the chances
- * pickDrillCard draws by), from now on to a little past when Study asks again, if it isn't reviewed before then. As a
- * line over a wash, with the chance now and at the end labelled, and how it splits between the ways asked under it.
+ * How often Drills picks the card: the share of drill questions that are this card, any way, from now on to a little
+ * past when Study asks again, if it isn't reviewed before then. From drillOdds, the chances pickDrillCard draws by,
+ * with no card sitting out; as a card then sits out the next few questions (DRILL_GAP), a chance p of being picked
+ * comes round as one question in 1/p plus those it sits out. As a line over a wash, the share now and at the end
+ * labelled, and how it splits between the ways asked under it.
  */
 function picks(card: Card, state: CardState, ways: { id: Way; title: string }[], now: number, drills: (at: number) => DrillOdds[]): HTMLElement {
   const H = 84;
   const top = 18;
   const base = H - 4;
   const end = now + Math.min(Math.max((Math.max(state.due, now) - now) * 1.2, 7 * DAY_MS), 90 * DAY_MS);
-  const chanceAt = (at: number) => {
-    const odds = drills(at).filter((o) => o.pick.card.id === card.id);
-    return { all: odds.reduce((sum, o) => sum + o.chance, 0), odds };
+  const shareAt = (at: number) => {
+    const odds = drills(at);
+    const sitsOut = Math.min(DRILL_GAP, new Set(odds.map((o) => o.pick.card.id)).size - 1);
+    const mine = odds.filter((o) => o.pick.card.id === card.id);
+    const chance = mine.reduce((sum, o) => sum + o.chance, 0);
+    const share = chance / (1 + sitsOut * chance);
+    // Each way gets its part of the card's share.
+    return { share, ways: mine.map((o) => ({ way: o.pick.way, share: chance ? (share * o.chance) / chance : 0 })) };
   };
   const samples = Array.from({ length: 13 }, (_, i) => {
     const at = now + ((end - now) * i) / 12;
-    return [at, chanceAt(at).all] as const;
+    return { at, ...shareAt(at) };
   });
-  const [, first] = samples[0];
-  const [, last] = samples[samples.length - 1];
-  const highest = Math.max(...samples.map(([, c]) => c), 0.001);
-  const x = (t: number) => GUTTER + ((t - now) / (end - now)) * (W - GUTTER);
-  const y = (c: number) => base - (c / (highest * 1.15)) * (base - top);
-  const points = samples.map(([at, c]) => `${f(x(at))},${f(y(c))}`);
-  const split = chanceAt(now)
-    .odds.filter((o) => o.chance > 0)
-    .sort((a, b) => b.chance - a.chance)
-    .map((o) => `${ways.find((w) => w.id === o.pick.way)?.title ?? o.pick.way} ${percentOf(o.chance)}`);
+  const first = samples[0].share;
+  const last = samples[samples.length - 1].share;
+  if (first === 0 && last === 0) {
+    return figure('How often Drills picks it', 'This round’s drills don’t ask it.', h('div'));
+  }
+  const highest = Math.max(...samples.map((p) => p.share));
+  // Room above the line for its labels; zero at the ground, so a flat line reads as steady.
+  const left = GUTTER + 8;
+  const x = (t: number) => left + ((t - now) / (end - now)) * (W - left);
+  const y = (c: number) => base - (c / (highest * 1.5)) * (base - top);
+  const points = samples.map((p) => `${f(x(p.at))},${f(y(p.share))}`);
+  const split = samples[0].ways
+    .filter((w) => w.share > 0)
+    .sort((a, b) => b.share - a.share)
+    .map((w) => `${ways.find((t) => t.id === w.way)?.title ?? w.way} ${percentOf(w.share)}`);
   const later = formatWait(end - now);
-  const oneIn = (chance: number) => Math.round(1 / chance);
+  const oneIn = (share: number) => Math.max(1, Math.round(1 / share));
   // Within a tenth either way reads as no change.
   const trend =
-    first === 0 ? '' : Math.abs(last - first) <= first / 10 ? `, about the same in ${later}` : `, ${last > first ? 'rising' : 'falling'} to 1 in ${oneIn(last)} in ${later}`;
+    first === 0 ? '' : Math.abs(last - first) <= first / 10 ? `, about the same in ${later}` : `, ${last > first ? 'rising' : 'falling'} to 1 in ${oneIn(last)}`;
   return figure(
     'How often Drills picks it',
-    'The chance a drill question is this card, from now on if you don’t review it.',
+    'The share of drill questions that are this card, from now on if you don’t review it.',
     picture(
       'picks',
       H,
-      `About ${percentOf(first)} of drill questions are this card now${split.length > 1 ? ` (${split.join(', ')})` : ''}; ${percentOf(last)} in ${later} if it isn't reviewed.`,
+      `About ${percentOf(first)} of drill questions are this card now${split.length > 1 ? ` (${split.join(', ')})` : ''}; ${percentOf(last)} in ${later} if it isn’t reviewed.`,
       svg('line', { class: 'grid', x1: GUTTER, x2: W, y1: f(y(highest)), y2: f(y(highest)) }),
       text('tick', GUTTER - 6, y(highest) + 4, 'end', percentOf(highest)),
-      svg('path', { class: 'hill picks-area', d: `M${GUTTER},${base} L${points.join(' L')} L${W},${base} Z` }),
+      svg('path', { class: 'hill picks-area', d: `M${f(left)},${base} L${points.join(' L')} L${W},${base} Z` }),
       svg('line', { class: 'ground', x1: GUTTER, x2: W, y1: base, y2: base }),
       svg('circle', { class: 'ball', cx: f(x(now)), cy: f(y(first)), r: 6 }),
       text('over-hill', x(now) + 10, y(first) - 10, 'start', `${percentOf(first)} now`),
-      text('over-hill', W - 2, y(last) - 10, 'end', `${percentOf(last)} in ${later}`),
+      text('over-hill', W - 2, y(last) - 10, 'end', percentOf(last)),
     ),
     h('div', { class: 'back-axis' }, h('span', null, 'Today'), h('span', null, `In ${later}`)),
-    h('p', { class: 'back-help back-odds' }, first > 0 ? `About 1 in ${oneIn(first)} drill questions is this card now${trend}.` : 'This round’s drills don’t ask it.'),
+    h('p', { class: 'back-help back-odds' }, first > 0 ? `About 1 in ${oneIn(first)} drill questions is this card now${trend}.` : `None now, rising to 1 in ${oneIn(last)}.`),
     split.length > 1 && h('p', { class: 'back-help back-split' }, `By way: ${split.join(' · ')}`),
   );
 }

@@ -200,10 +200,15 @@ export function practiceScreen(
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
 
+  /** The ways a card can be asked, of `ways`: what the round picks from, and what its card backs count. */
+  function askable(ways: readonly Way[]): (c: Card) => Way[] {
+    return (c) => modesFor(c).filter((m) => ways.includes(m));
+  }
+
   /** A question on the next card, asked any way the scope allows right now. Null only with nothing to ask. */
   function nextQuestion(): Question | null {
     const ways = modes();
-    const pick = pickDrillCard(app.progress, app.now(), recent, missed, (c) => modesFor(c).filter((m) => ways.includes(m)));
+    const pick = pickDrillCard(app.progress, app.now(), recent, missed, askable(ways));
     if (!pick) return null;
     const { card, way: mode } = pick;
     recent = [...recent.slice(-DRILL_GAP), card.id];
@@ -736,11 +741,11 @@ export function practiceScreen(
    */
   function backOf(q: Question): CardBack {
     return {
-      // As this round would pick at that time: its misses so far and its kinds, without the cards sitting out.
+      // As this round would pick at that time, its misses so far and its kinds (the card back allows for sitting out).
       back: () => {
         const ways = modes();
         return cardBack(app.progress, q.card, q.mode, q.guide ? GUIDE_WAYS : MODES, app.now(), (at) =>
-          drillOdds(app.progress, at, [], missed, (c) => modesFor(c).filter((m) => ways.includes(m))),
+          drillOdds(app.progress, at, [], missed, askable(ways)),
         );
       },
       turned: memoryFor === q,
