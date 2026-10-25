@@ -8,7 +8,7 @@ import { recordAnswer } from '../store';
 import { practiceScreen } from './practice';
 import { quietToggle } from './quiet';
 import type { SpeakDeps } from './speak';
-import { button, drillScope, fakeApp as knowing, flush } from '../test/screen';
+import { button, chooseRight, drillScope, fakeApp as knowing, flush } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'paalam', 'tatlo', 'kape'];
 
@@ -91,7 +91,7 @@ describe('asking for the microphone in Drills', () => {
     expect(waiting(root)).toBe(false);
     for (let i = 0; i < 20; i++) {
       expect(speaking(root)).toBe(false);
-      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      chooseRight(root);
       button(root, 'Next').click();
     }
     expect(root.querySelector<HTMLButtonElement>('[data-mode="speak"]')!.disabled).toBe(true);
@@ -173,7 +173,7 @@ describe('asking for the microphone in Drills', () => {
     await flush();
     for (let i = 0; i < 20; i++) {
       expect(speaking(root)).toBe(false);
-      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      chooseRight(root);
       button(root, 'Next').click();
     }
   });
@@ -185,7 +185,7 @@ describe('asking for the microphone in Drills', () => {
     await flush();
     for (let i = 0; i < 20; i++) {
       expect(speaking(root)).toBe(false);
-      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      chooseRight(root);
       button(root, 'Next').click();
     }
     expect(mic.askMicrophone).not.toHaveBeenCalled();
@@ -204,7 +204,7 @@ describe('asking for the microphone in Drills', () => {
     for (let i = 0; i < 40 && !spoke; i++) {
       spoke = speaking(root);
       if (spoke) break;
-      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      chooseRight(root);
       button(root, 'Next').click();
     }
     expect(spoke).toBe(true);

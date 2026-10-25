@@ -205,17 +205,22 @@ describe('moving on after a right answer in a drill', () => {
     expect(root.querySelector('.session-count')?.textContent).toBe('25 done');
   });
 
-  it('waits for Next after a miss', () => {
+  it('waits for Next after a miss, then asks it again straight away, with no answer to look back at', () => {
     const root = round();
+    const missed = shownCard(root);
     answer(root, false);
     vi.advanceTimersByTime(ADVANCE_MS * 5);
     expect(root.querySelector('.choice:disabled')).not.toBeNull();
-    const missed = root.querySelector('.choice.wrong')?.textContent;
     button(root, 'Next').click();
-    button(root, 'Previous card').click();
-    expect(root.querySelector('.feedback.bad')).not.toBeNull();
-    expect(root.querySelector('.choice.wrong')?.textContent).toBe(missed);
-    button(root, 'Back to the current card').click();
+    expect(shownCard(root).id).toBe(missed.id);
     expect(root.querySelector('.choice:disabled')).toBeNull();
+    expect(has(root, 'Previous card')).toBe(false);
+    // Got right this time, it can be looked back at from the question after.
+    answer(root, true);
+    vi.advanceTimersByTime(ADVANCE_MS);
+    expect(shownCard(root).id).not.toBe(missed.id);
+    button(root, 'Previous card').click();
+    expect(shownCard(root).id).toBe(missed.id);
+    expect(root.querySelector('.feedback.good')).not.toBeNull();
   });
 });

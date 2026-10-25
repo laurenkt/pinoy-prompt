@@ -7,6 +7,7 @@ import type { App } from '../app';
 import { cardKey, type Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
 import { recordAnswer } from '../store';
+import { drillHelp } from '../session';
 import { button, fakeApp, flush, noMic } from '../test/screen';
 import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen, type MeaningHearer } from './practice';
@@ -112,18 +113,16 @@ describe('listening to words that have settled', () => {
     expect(has(root, 'I had it right')).toBe(false);
   });
 
-  it('looks back at a typed miss from the next question', async () => {
+  it('asks a typed miss again on the next question, with no answer to look back at', async () => {
     const root = listen(learner(true));
     type(root, 'good night');
     await flush();
-    button(root, 'Next').click();
-    button(root, 'Previous card').click();
-    expect(box(root)!.value).toBe('good night');
     expect(box(root)!.classList.contains('wrong')).toBe(true);
-    expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
-    expect(has(root, 'I had it right')).toBe(false);
-    button(root, 'Back to the current card').click();
+    vi.mocked(play).mockClear();
+    button(root, 'Next').click();
+    expect(vi.mocked(play).mock.lastCall?.[0].tl).toBe('Salamat');
     expect(box(root)!.value).toBe('');
+    expect(has(root, 'Previous card')).toBe(false);
   });
 
   it("doesn't take an empty box as an answer", async () => {
@@ -216,12 +215,39 @@ describe('listening to words that have settled', () => {
     expect(root.querySelector('.feedback')).toBeNull();
   });
 
+  it('keeps a word coming back after a miss when an answer the check could not reach is claimed right', async () => {
+    const app = learner(true);
+    let offline = false;
+    const root = listen(app, async () => (offline ? Promise.reject(new Error('offline')) : false));
+    type(root, 'good night');
+    await flush();
+    expect(drillHelp(app.progress.cards.salamat, 'listen')).toBe(1);
+    // Straight back; this time the check can't be reached, and it was right.
+    button(root, 'Next').click();
+    offline = true;
+    type(root, 'thanks a lot');
+    await flush();
+    button(root, 'I had it right').click();
+    // Still coming back after the miss, so the right answer takes nothing off yet.
+    expect(drillHelp(app.progress.cards.salamat, 'listen')).toBe(1);
+  });
+
   it('says when OpenAI could not be asked', async () => {
     const root = listen(learner(true), async () => Promise.reject(new Error('offline')));
     type(root, 'thanks a lot');
     await flush();
     expect(root.querySelector('.feedback')?.textContent).toContain("Couldn't reach OpenAI");
     expect(has(root, 'I had it right')).toBe(true);
+    // It may well have been right, so it isn't asked again straight away as a miss would be.
+    vi.mocked(play).mockClear();
+    button(root, 'Next').click();
+    expect(vi.mocked(play).mock.lastCall?.[0].tl).not.toBe('Salamat');
+    // Nor on the one after.
+    type(root, 'thanks a lot');
+    await flush();
+    vi.mocked(play).mockClear();
+    button(root, 'Next').click();
+    expect(vi.mocked(play).mock.lastCall?.[0].tl).not.toBe('Salamat');
   });
 
   it('keeps what was typed while looking back, and holds the way back while checking', async () => {

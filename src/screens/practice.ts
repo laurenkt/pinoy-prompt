@@ -5,7 +5,7 @@ import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../open
 import { everyWordSaid, judge } from '../phonetics';
 import { askWithPicture } from '../pictures';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, askAs, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, drillOdds, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, askAs, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, drillOdds, pickDrillCard, setDrillHelp, settled, shuffle, type DrillRepeat } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -53,6 +53,10 @@ interface Question {
   hinted?: boolean;
   /** How many answers asked this way had needed help before this one, to go back to if "I had it right". */
   helpBefore?: number;
+  /** Where this way stood in coming back on its own (see noteDrillRepeat) before this answer, likewise. */
+  repeatBefore?: DrillRepeat;
+  /** How it went has been noted for the round (see settle), so moving on doesn't note it again. */
+  tallied?: boolean;
   /** What's typed so far, kept while the screen is redrawn. */
   draft?: string;
   /** What was typed, once it's sent. */
@@ -147,8 +151,10 @@ export function practiceScreen(
   let distractorPool: Card[] = VOCAB;
   /** The last few words asked, oldest first. */
   let recent: string[] = [];
-  /** Cards missed this round, by the way they were asked (drillKey), and not yet got right since, with how many times. */
-  let missed = new Map<string, number>();
+  /** `recent` as it was before the question waiting to be asked was picked, should it be picked again. */
+  let recentBeforeUpcoming: string[] = [];
+  /** Ways missed this round, by drillKey, coming back on their own until they've been got right a few times running. */
+  const repeats = new Map<string, DrillRepeat>();
   /** Each guide's drill asked last, so the next is another. */
   const lastDrill = new Map<string, Drill>();
   let speak: SpeakPanel | null = null;
@@ -208,10 +214,13 @@ export function practiceScreen(
     return (c) => modesFor(c).filter((m) => ways.includes(m));
   }
 
-  /** A question on the next card, asked any way the scope allows right now. Null only with nothing to ask. */
-  function nextQuestion(): Question | null {
+  /**
+   * A question on the next card, asked any way the scope allows right now, as question number `asked` of the round
+   * (from 0): the current one (`done`) unless given. Null only with nothing to ask.
+   */
+  function nextQuestion(asked = done): Question | null {
     const ways = modes();
-    const pick = pickDrillCard(app.progress, app.now(), recent, missed, askable(ways));
+    const pick = pickDrillCard(app.progress, app.now(), recent, repeats, asked, askable(ways));
     if (!pick) return null;
     const { way: mode } = pick;
     // A phrase may be asked as a variant on its pattern: the same card, in other words.
@@ -278,20 +287,28 @@ export function practiceScreen(
     });
   }
 
-  /** Note how the current question went, so a miss comes back soon, and pick the one after it. */
-  function settle(right: boolean): void {
-    if (!current || upcoming) return;
-    tally(current, right);
-    upcoming = nextQuestion();
+  /**
+   * Note how the current question went, once, so a miss comes back soon (null: it can't be told, as when the check
+   * failed), and pick the one after it.
+   */
+  function settle(right: boolean | null): void {
+    if (!current) return;
+    if (right === null) {
+      // Kept as it stands, for "I had it right" to tally from.
+      current.tallied = true;
+      current.repeatBefore = repeats.get(drillKey(current.card.id, current.mode));
+    } else if (!current.tallied) tally(current, right);
+    if (upcoming) return;
+    recentBeforeUpcoming = recent;
+    upcoming = nextQuestion(done + 1);
     load(upcoming);
   }
 
   function tally(q: Question, right: boolean): void {
     const key = drillKey(q.card.id, q.mode);
-    const misses = missed.get(key) ?? 0;
-    if (!right) missed.set(key, misses + 1);
-    else if (misses > 1) missed.set(key, misses - 1);
-    else missed.delete(key);
+    q.tallied = true;
+    q.repeatBefore = repeats.get(key);
+    noteDrillRepeat(repeats, key, right, done);
   }
 
   function ask(): void {
@@ -315,15 +332,15 @@ export function practiceScreen(
           const first = right && !spokenRight;
           if (first) {
             spokenRight = true;
-            if (!spokeWrong) noteHelp(q, false);
             void chime();
           }
           // The word said back after any attempt it was heard in, right or wrong, as a Listen answer is: after the
           // chime, and before moving on, which waits for it.
           if (heard) sayCard(q);
           if (!first) return;
-          // Pick what's next now, so its word loads while the coaching is up.
-          settle(true);
+          // Pick what's next now, so its word loads while the coaching is up. Said wrong first, it comes back as a miss does.
+          settle(!spokeWrong);
+          if (!spokeWrong) noteHelp(q, false);
           auto = countdown(root, () => {
             autoMoved = true;
             advance();
@@ -523,12 +540,14 @@ export function practiceScreen(
     // The chime first, so the word said back is heard after it.
     if (right) void chime();
     if (q.guide || q.mode === 'recall' || q.mode === 'listen') sayCard(q);
-    settle(right);
+    // Picked from the choices, it comes back as soon as a miss does. A miss the check couldn't confirm doesn't count.
+    settle(q.failure !== undefined && !right ? null : right && !q.hinted);
     // Got wrong, or from the choices, it comes up more asked this way in later rounds too, until it's got right unaided.
     // Not when the check itself failed (offline, say): the answer may well have been right.
     q.helpBefore = drillHelp(app.progress.cards[q.card.id], q.mode);
     if (q.failure === undefined || right) noteHelp(q, q.hinted || !right);
-    if (right)
+    // From the choices it waits for Next, as a miss does, so the hook can be read.
+    if (right && !q.hinted)
       auto = countdown(root, () => {
         autoMoved = true;
         advance();
@@ -541,19 +560,28 @@ export function practiceScreen(
     const q = current;
     if (!q || picked !== MISSED) return;
     picked = q.card.id;
-    // Count it as the right answer it was: take back the miss, then tally it right.
+    // Count it as the right answer it was: take back the miss, then tally it right, and pick what's next again, as it
+    // was picked to bring this one straight back.
     const key = drillKey(q.card.id, q.mode);
-    const misses = missed.get(key) ?? 0;
-    if (misses > 1) missed.set(key, misses - 1);
-    else missed.delete(key);
+    if (q.repeatBefore) repeats.set(key, q.repeatBefore);
+    else repeats.delete(key);
     tally(q, true);
-    // And on the card: back to before the miss, less one for a right answer.
+    recent = recentBeforeUpcoming;
+    upcoming = nextQuestion(done + 1);
+    load(upcoming);
+    // And on the card: back to before the miss, less one for a right answer that doesn't leave it coming back (see noteHelp).
     const before = q.helpBefore ?? 0;
-    if (setDrillHelp(app.progress, q.card.id, q.mode, () => Math.max(before - 1, 0), app.now())) app.commit();
+    const after = repeats.has(key) ? before : Math.max(before - 1, 0);
+    if (setDrillHelp(app.progress, q.card.id, q.mode, () => after, app.now())) app.commit();
     draw();
   }
 
+  /**
+   * Note on the card how the answer went, once it's tallied. Got right while it's still coming back after a miss (see
+   * noteDrillRepeat), it takes nothing off: asked again so soon, a right answer says little. The one that ends it does.
+   */
   function noteHelp(q: Question, helped: boolean): void {
+    if (!helped && repeats.has(drillKey(q.card.id, q.mode))) return;
     if (noteDrillAnswer(app.progress, q.card.id, q.mode, helped, app.now())) app.commit();
   }
 
@@ -579,6 +607,8 @@ export function practiceScreen(
     // Picked before the mic or sound may have gone off, or the scope changed.
     current = upcoming && modes().includes(upcoming.mode) ? upcoming : nextQuestion();
     upcoming = null;
+    // A missed card asked again straight away can't offer its own answer to look back at.
+    if (previous && previous.card.id === current?.card.id) previousPick = null;
     picked = null;
     checking = false;
     // Ten minutes without a take and WebKit has forgotten the Allow: the phone asks now, over the holding screen, rather
@@ -736,7 +766,7 @@ export function practiceScreen(
       back: () => {
         const ways = modes();
         return cardBack(app.progress, q.card, q.mode, q.guide ? GUIDE_WAYS : MODES, app.now(), (at) =>
-          drillOdds(app.progress, at, [], missed, askable(ways)),
+          drillOdds(app.progress, at, [], repeats, askable(ways)),
         );
       },
       turned: memoryFor === q,
@@ -836,7 +866,8 @@ export function practiceScreen(
             !right && q.failure !== undefined && h('p', { class: 'feedback-note' }, checkProblem(q.failure)),
             !right && q.misspelt && h('p', { class: 'feedback-note' }, 'Nearly: check the spelling.'),
           ),
-        q.mode !== 'speak' && answered && (!right || reviewing) &&
+        // Picked from the choices after "Show choices" is half a miss: the hook shows then too.
+        q.mode !== 'speak' && answered && (!right || reviewing || q.hinted) &&
           hookView(q.card),
         // Not for a misspelling: the spelling is what was wrong.
         picked === MISSED && !reviewing && !q.misspelt && h('button', { class: 'btn secondary claim', onclick: claim }, 'I had it right'),

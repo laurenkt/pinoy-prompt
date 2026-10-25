@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { practiceScreen } from './practice';
 import type { SpeakDeps } from './speak';
-import { button, drillScope, fakeApp, flush, noMic } from '../test/screen';
+import { button, chooseRight, drillScope, fakeApp, flush, noMic } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
 
@@ -22,7 +22,7 @@ const kind = (root: HTMLElement) => {
 
 /** Answer the question showing and go on to the next. */
 function next(root: HTMLElement): void {
-  root.querySelector<HTMLButtonElement>('.choice')!.click();
+  chooseRight(root);
   button(root, 'Next').click();
 }
 
@@ -93,6 +93,19 @@ describe('the kinds of question in a drill round', () => {
     expect(kind(root)).toBe('read');
     button(root, 'Next').click();
     expect(kind(root)).toBe('recall');
+  });
+
+  it('counts a right answer once, when the question picked after it is dropped by a change of kinds', () => {
+    drillScope(root, ['read']);
+    const word = root.querySelector('.prompt .tl')?.textContent;
+    chooseRight(root);
+    expect(root.querySelector('.feedback.good')).not.toBeNull();
+    // The question picked to come next goes with the change, and comes back with the change back.
+    drillScope(root, ['recall']);
+    drillScope(root, ['read']);
+    button(root, 'Next').click();
+    // Got right, it isn't asked again straight away as a miss would be.
+    expect(root.querySelector('.prompt .tl')?.textContent).not.toBe(word);
   });
 
   it('always keeps one kind in', () => {

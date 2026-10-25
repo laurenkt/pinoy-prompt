@@ -24,6 +24,9 @@ import {
   noteDrillAnswer,
   drillOdds,
   pickDrillCard,
+  noteDrillRepeat,
+  DRILL_REPEATS,
+  type DrillRepeat,
   setDrillHelp,
   pickFormat,
   requeue,
@@ -540,16 +543,16 @@ describe('picking the next card to drill', () => {
   const everyWay = (card: Card): readonly Way[] => (isVocab(card) ? WAYS : ['read']);
 
   /** The card picked next, asked any way. */
-  function pick(progress: ReturnType<typeof emptyProgress>, now: number, recent: string[], missed = new Map<string, number>(), ways = everyWay, random?: () => number) {
-    return pickDrillCard(progress, now, recent, missed, ways, random)?.card ?? null;
+  function pick(progress: ReturnType<typeof emptyProgress>, now: number, recent: string[], repeats = new Map<string, DrillRepeat>(), ways = everyWay, random?: () => number) {
+    return pickDrillCard(progress, now, recent, repeats, 0, ways, random)?.card ?? null;
   }
 
   /** How often each card comes up over many picks, and (`byWay`) how often each card asked each way, by drillKey. */
-  function tallies(progress: ReturnType<typeof emptyProgress>, recent: string[] = [], missed = new Map<string, number>(), now = LATER) {
+  function tallies(progress: ReturnType<typeof emptyProgress>, recent: string[] = [], repeats = new Map<string, DrillRepeat>(), now = LATER) {
     const seen = new Map<string, number>();
     const byWay = new Map<string, number>();
     for (let i = 0; i < 4000; i++) {
-      const { card, way } = pickDrillCard(progress, now, recent, missed, everyWay, () => (i + 0.5) / 4000)!;
+      const { card, way } = pickDrillCard(progress, now, recent, repeats, 0, everyWay, () => (i + 0.5) / 4000)!;
       seen.set(card.id, (seen.get(card.id) ?? 0) + 1);
       byWay.set(drillKey(card.id, way), (byWay.get(drillKey(card.id, way)) ?? 0) + 1);
     }
@@ -591,11 +594,132 @@ describe('picking the next card to drill', () => {
     expect(pick(settledProgress(), LATER, [], new Map(), () => [])).toBeNull();
   });
 
-  it('brings a card missed this round back more often, asked the way it was missed', () => {
+  it('brings a card missed this round back more often between its repeats, asked the way it was missed', () => {
     const plain = tallies(settledProgress()).byWay;
-    const missed = tallies(settledProgress(), [], new Map([[drillKey('kape', 'recall'), 2]])).byWay;
+    const missed = tallies(settledProgress(), [], new Map([[drillKey('kape', 'recall'), { misses: 2, rights: 1, due: 10 }]])).byWay;
     expect(missed.get(drillKey('kape', 'recall'))!).toBeGreaterThan(plain.get(drillKey('kape', 'recall'))! * 5);
     expect(missed.get(drillKey('kape', 'recall'))!).toBeGreaterThan(missed.get(drillKey('kape', 'read'))! * 5);
+  });
+
+  it('asks a miss again on the very next question, then after one other, then easing off', () => {
+    const progress = settledProgress();
+    const repeats = new Map<string, DrillRepeat>();
+    const key = drillKey('salamat', 'recall');
+    // Every random draw lands on the last question it could pick, among the rest, so it's never salamat by chance.
+    const first = () => 0.9999;
+    const at = (asked: number, recent: string[]) => pickDrillCard(progress, LATER, recent, repeats, asked, everyWay, first);
+    noteDrillRepeat(repeats, key, false, 0);
+    // Straight back, though it was just asked.
+    expect(at(1, ['salamat'])).toEqual({ card: getCard('salamat'), way: 'recall' });
+    noteDrillRepeat(repeats, key, true, 1);
+    const asked: number[] = [];
+    let recent = ['salamat'];
+    for (let q = 2; q < 30; q++) {
+      const { card, way } = at(q, recent)!;
+      recent = [...recent.slice(-DRILL_GAP), card.id];
+      if (card.id !== 'salamat') continue;
+      expect(way).toBe('recall');
+      asked.push(q);
+      noteDrillRepeat(repeats, key, true, q);
+    }
+    // One question between, then three, then six; then it takes its chances with the rest.
+    expect(asked).toEqual([3, 7, 14]);
+    expect(repeats.size).toBe(0);
+    expect(DRILL_REPEATS).toEqual([0, 1, 3, 6]);
+  });
+
+  it('keeps a word that slips again close for longer, starting over each time it is missed', () => {
+    const repeats = new Map<string, DrillRepeat>();
+    const key = drillKey('kape', 'recall');
+    noteDrillRepeat(repeats, key, false, 0);
+    noteDrillRepeat(repeats, key, true, 1);
+    expect(repeats.get(key)).toEqual({ misses: 1, rights: 1, due: 3 });
+    // Missed again when it came back: next question again, and one more one-question gap before it eases off.
+    noteDrillRepeat(repeats, key, false, 3);
+    expect(repeats.get(key)).toEqual({ misses: 2, rights: 0, due: 4 });
+    const dues: number[] = [];
+    while (repeats.has(key)) {
+      const q = repeats.get(key)!.due;
+      noteDrillRepeat(repeats, key, true, q);
+      if (repeats.has(key)) dues.push(repeats.get(key)!.due - q - 1);
+    }
+    expect(dues).toEqual([1, 1, 3, 6]);
+    // Right with nothing coming back changes nothing.
+    noteDrillRepeat(repeats, key, true, 40);
+    expect(repeats.size).toBe(0);
+  });
+
+  it('holds a repeat that the round can no longer ask until it can', () => {
+    const progress = settledProgress();
+    const repeats = new Map<string, DrillRepeat>([[drillKey('kape', 'recall'), { misses: 1, rights: 0, due: 1 }]]);
+    const readOnly = () => ['read'] as const;
+    expect(pickDrillCard(progress, LATER, [], repeats, 1, readOnly, () => 0)!.card.id).not.toBe('kape');
+    expect(pickDrillCard(progress, LATER, [], repeats, 5, everyWay, () => 0)).toEqual({ card: getCard('kape'), way: 'recall' });
+  });
+
+  it('gives a word the drills keep having to help with a big share of the round, even among many new words', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 100), 30);
+    const fresh = VOCAB_ORDER.slice(100, 112);
+    for (const id of fresh) {
+      recordAnswer(progress, id, 'good', LATER - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], introduced: LATER - DAY_MS };
+    }
+    const [hard, once] = VOCAB_ORDER;
+    for (let i = 0; i < 3; i++) helpWith(progress, hard);
+    helpWith(progress, once);
+    const odds = drillOdds(progress, LATER, [], new Map(), everyWay);
+    const chance = (id: string) => odds.filter((o) => o.pick.card.id === id).reduce((sum, o) => sum + o.chance, 0);
+    expect(chance(hard)).toBeGreaterThan(0.4);
+    expect(chance(once)).toBeGreaterThan(0.12);
+    // A word met yesterday comes up far less than either; one held for a month, less again.
+    expect(chance(fresh[0])).toBeLessThan(chance(once) / 3);
+    expect(chance(VOCAB_ORDER[50])).toBeLessThan(chance(fresh[0]));
+  });
+
+  it('always leaves a fifth of the round for words known well, however many need help or are new', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 100), 30);
+    const fresh = VOCAB_ORDER.slice(100, 110);
+    for (const id of fresh) {
+      recordAnswer(progress, id, 'good', LATER - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], introduced: LATER - DAY_MS };
+    }
+    const helped = VOCAB_ORDER.slice(0, 6);
+    for (const id of helped) helpWith(progress, id);
+    const odds = drillOdds(progress, LATER, [], new Map(), everyWay);
+    const known = odds
+      .filter((o) => drillHelp(progress.cards[o.pick.card.id], o.pick.way) === 0 && !fresh.includes(o.pick.card.id))
+      .reduce((sum, o) => sum + o.chance, 0);
+    expect(known).toBeCloseTo(0.2);
+  });
+
+  it('keeps room for new words and words known well in a small deck where most need help', () => {
+    const progress = emptyProgress(NOW);
+    const known = VOCAB_ORDER.slice(0, 8);
+    learn(progress, known, 30);
+    const fresh = VOCAB_ORDER.slice(8, 11);
+    for (const id of fresh) {
+      recordAnswer(progress, id, 'good', LATER - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], introduced: LATER - DAY_MS };
+    }
+    for (const id of known.slice(0, 6)) for (const way of WAYS) helpWith(progress, id, way);
+    const odds = drillOdds(progress, LATER, [], new Map(), everyWay);
+    const share = (ids: string[]) => odds.filter((o) => ids.includes(o.pick.card.id)).reduce((sum, o) => sum + o.chance, 0);
+    expect(share(known.slice(0, 6))).toBeCloseTo(0.6);
+    expect(share(fresh)).toBeGreaterThan(0.1);
+    expect(share(known.slice(6))).toBeGreaterThanOrEqual(0.19);
+  });
+
+  it("doesn't hand a helped word sitting out its share to the others helped with", () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, VOCAB_ORDER.slice(0, 100), 30);
+    const [hard, once] = VOCAB_ORDER;
+    for (let i = 0; i < 3; i++) helpWith(progress, hard, 'read');
+    helpWith(progress, once, 'listen');
+    const odds = drillOdds(progress, LATER, [hard], new Map(), everyWay);
+    const chance = odds.find((o) => o.pick.card.id === once && o.pick.way === 'listen')!.chance;
+    expect(chance).toBeCloseTo(0.15, 1);
   });
 
   it('leans on cards that are fading, still being learned, newly met or often forgotten, and still asks the rest', () => {
@@ -725,7 +849,7 @@ describe('picking the next card to drill', () => {
     const seen = new Map<string, number>();
     const oneWay = (card: Card): readonly Way[] => (card.id === 'kape' ? WAYS : ['read']);
     for (let i = 0; i < 4000; i++) {
-      const { card } = pickDrillCard(progress, LATER, [], new Map(), oneWay, () => (i + 0.5) / 4000)!;
+      const { card } = pickDrillCard(progress, LATER, [], new Map(), 0, oneWay, () => (i + 0.5) / 4000)!;
       seen.set(card.id, (seen.get(card.id) ?? 0) + 1);
     }
     expect(seen.get('kape')! / seen.get('oo')!).toBeCloseTo(1, 1);

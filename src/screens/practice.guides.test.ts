@@ -7,7 +7,7 @@ import { getCard } from '../deck';
 import { buildTiles, drillSentence } from '../session';
 import { DAY_MS } from '../srs';
 import { practiceScreen } from './practice';
-import { button, drillScope, fakeApp, noMic } from '../test/screen';
+import { button, chooseRight, drillScope, fakeApp, noMic } from '../test/screen';
 
 const WORDS = ['salamat', 'kumusta', 'oo', 'hindi', 'gusto-ko-ito', 'kape'];
 
@@ -26,7 +26,8 @@ function untilGuide(root: HTMLElement, eyebrow: string): void {
   for (let i = 0; i < 40 && !root.textContent?.includes(eyebrow); i++) {
     // Words settled in Study are typed; picking from choices is quicker here.
     if (root.querySelector('.meaning-input')) button(root, 'Show choices').click();
-    if (!root.querySelector('.feedback')) root.querySelector<HTMLButtonElement>('.choice')!.click();
+    // Right, so a missed word doesn't keep coming back ahead of the pattern.
+    if (!root.querySelector('.feedback')) chooseRight(root);
     button(root, 'Next').click();
   }
   expect(root.textContent).toContain(eyebrow);
