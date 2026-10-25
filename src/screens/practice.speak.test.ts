@@ -258,6 +258,12 @@ describe('the word after an attempt', () => {
     expect(speaking()).toBe(true);
   });
 
+  it('stops when the learner plays their attempt back, so the two never overlap', async () => {
+    await attempt(deps());
+    button('▶ Yours').click();
+    expect(speaking()).toBe(false);
+  });
+
   it("isn't played when nothing of it was heard, which doesn't give it away", async () => {
     await attempt(deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition([]) }) }));
     expect(speaking()).toBe(false);
