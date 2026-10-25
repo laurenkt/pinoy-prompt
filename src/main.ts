@@ -12,7 +12,7 @@ import { wordsScreen } from './screens/words';
 import { forgetRetiredVoiceChoice } from './openai';
 import { applyAudioMode } from './screens/quiet';
 import { cancelRecording } from './recorder';
-import { endMicrophoneHold } from './microphone';
+import { endMicrophoneAsk } from './microphone';
 import { keepClipsOffline } from './clip-cache';
 import { keepSpeakingReady, modelDownloaded } from './model-cache';
 import { watchFit } from './fit';
@@ -49,7 +49,7 @@ const app: App = {
     stop();
     cancelRecording();
     hangUpTalk();
-    endMicrophoneHold();
+    endMicrophoneAsk();
     keyHandler = null;
     backHandler = null;
     screens.go(route);

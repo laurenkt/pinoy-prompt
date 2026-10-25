@@ -898,6 +898,28 @@ p {
   margin: 0;
 }
 
+/* A picture recall asks from in place of the English, on a cream tile in the middle; bigger on taller phones. */
+.prompt-picture {
+  width: clamp(76px, (var(--fill) - 640px) * 0.6 + 76px, 160px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  background: var(--cream);
+  border: var(--outline);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.prompt-picture svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.prompt-picture + .prompt-meaning,
+.prompt:has(.prompt-picture) .eyebrow {
+  text-align: center;
+}
+
 .audio-group {
   display: flex;
   gap: 8px;
@@ -2681,7 +2703,8 @@ p {
   margin-bottom: 10px;
 }
 
-.key-form a {
+.key-form a,
+.credits a {
   color: var(--saffron);
 }
 
@@ -3161,7 +3184,7 @@ p {
   color: var(--cream);
 }
 
-/* Each picture: its title, how to read it, then the picture framed like Home's chart. */
+/* Each picture: its title, how to read it, then the picture, straight on the card. */
 .back-fig {
   margin: 14px 0 0;
 }
@@ -3185,12 +3208,9 @@ p {
   color: var(--muted);
 }
 
+/* The pictures sit straight on the card, so nothing about them looks pressable. */
 .back-frame {
-  padding: 10px 10px 0;
-  border: var(--outline);
-  border-radius: 14px;
-  background: var(--surface-dim);
-  box-shadow: var(--shadow);
+  padding-top: 4px;
 }
 
 .back-chart {
@@ -3216,7 +3236,7 @@ p {
 }
 
 .back-chart .ground {
-  stroke: var(--ink);
+  stroke: var(--line);
   stroke-width: 3;
   stroke-linecap: round;
 }
@@ -3274,7 +3294,7 @@ p {
   stroke-width: 3;
 }
 
-/* The stairs: a tag for each way, cream with its name, the way asked now dark. */
+/* The stairs: a tag for each way, cream with its name, the way asked now saffron and labelled. */
 .back-chart .tag {
   fill: var(--cream);
   stroke: var(--ink);
@@ -3282,8 +3302,7 @@ p {
 }
 
 .back-chart .tag.asked {
-  fill: var(--on-accent);
-  stroke: var(--cream);
+  fill: var(--saffron);
 }
 
 .back-chart .tag-name {
@@ -3292,8 +3311,10 @@ p {
   fill: var(--on-accent);
 }
 
-.back-chart .tag-name.asked {
-  fill: var(--cream);
+.back-chart .asked-label {
+  font-size: 11px;
+  font-weight: 800;
+  fill: var(--saffron);
 }
 
 /* The skyline's windows, cut in ink. */
@@ -3323,25 +3344,28 @@ p {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin-top: 14px;
+  padding-top: 14px;
+  border-top: 2px solid var(--line);
 }
 
 .count {
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 4px;
   min-width: 0;
-  padding: 10px;
-  border: var(--outline);
-  border-radius: 14px;
-  background: var(--surface-dim);
-  box-shadow: var(--shadow);
+}
+
+.count-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--cream);
 }
 
 .count-n {
   font-size: 1.6rem;
   font-weight: 800;
   line-height: 1;
-  color: var(--cream);
 }
 
 .count-label {

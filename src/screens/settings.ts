@@ -189,6 +189,15 @@ export function settingsScreen(app: App): HTMLElement {
           'Reset progress',
         ),
       ),
+      h(
+        'p',
+        { class: 'muted small credits' },
+        'Pictures by ',
+        h('a', { href: 'https://openmoji.org', target: '_blank', rel: 'noopener' }, 'OpenMoji'),
+        ', under ',
+        h('a', { href: 'https://creativecommons.org/licenses/by-sa/4.0/', target: '_blank', rel: 'noopener' }, 'CC BY-SA 4.0'),
+        '.',
+      ),
     );
   }
 

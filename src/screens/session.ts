@@ -19,10 +19,11 @@ import {
   type Format,
   type Step,
 } from '../session';
+import { askWithPicture } from '../pictures';
 import { formatInterval, nextInterval, newCardState, type CardState, type Rating } from '../srs';
 import { canPlay, play, preload, stop } from '../speech';
 import { recordAnswer, rollDay } from '../store';
-import { audioPair, choiceList, h, hookView, iconButton, progressBar } from '../ui';
+import { audioPair, choiceList, h, hookView, iconButton, progressBar, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { drillPrompt, gapLine, guideAnswer, guideBody, guideFeedback, guideQuestion, guideQuestionView, sentenceClip, type GuideQuestion } from './guide-question';
 import { quietToggle } from './quiet';
@@ -60,6 +61,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   /** The picked choice: a card id for a word, the answer text for a guide. */
   let picked: string | null = null;
   let hookShown = false;
+  /** A recall step asked from the card's picture rather than its English. */
+  let pictured = false;
   /** For a guide: the drill being asked, and while it's a gap or a build, the question as it's asked. */
   let drill: Drill | undefined;
   let guide: GuideQuestion | null = null;
@@ -83,10 +86,10 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   /** Everything that makes up the card on screen. */
   type Shown = ReturnType<typeof snapshot>;
   function snapshot() {
-    return { step, card, phase, format, choices, picked, hookShown, drill, guide, praise };
+    return { step, card, phase, format, choices, picked, hookShown, pictured, drill, guide, praise };
   }
   function restore(s: Shown): void {
-    ({ step, card, phase, format, choices, picked, hookShown, drill, guide, praise } = s);
+    ({ step, card, phase, format, choices, picked, hookShown, pictured, drill, guide, praise } = s);
   }
 
   holdOnTap(root, hold);
@@ -128,6 +131,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     } while (step && !card);
     picked = null;
     hookShown = false;
+    pictured = false;
     format = 'read';
     drill = undefined;
     guide = null;
@@ -166,6 +170,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       askGuide(c);
       return;
     }
+    pictured = (format === 'recall' || format === 'produce') && askWithPicture(c);
     if (format === 'remember' || format === 'hear' || format === 'produce') {
       phase = 'front';
       if (format === 'hear') say();
@@ -472,7 +477,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   function quizPrompt(c: Card, answered: boolean): HTMLElement {
     if (format === 'recall') {
-      return h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, c.en));
+      return h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), ...recallCue(c, pictured, answered && step?.kind === 'new'));
     }
     if (format === 'listen') {
       return h(
@@ -517,7 +522,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     const showBack = phase === 'back';
     const reverse = format === 'produce';
     const prompt = reverse
-      ? h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), h('p', { class: 'prompt-en' }, c.en))
+      ? h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), ...recallCue(c, pictured, showBack))
       : format === 'hear'
         ? h(
             'div',

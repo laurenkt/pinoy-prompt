@@ -158,3 +158,43 @@ describe('open-ended study', () => {
     expect(app.progress.today.newCount).toBe(0);
   });
 });
+
+describe('recall from a picture', () => {
+  const kape = getCard('kape')!;
+
+  it('asks a word with a picture from it some of the time, picked or self-rated, on the recall card', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      const app = fakeApp(['kape', 'tubig', 'isda', 'bahay', 'salamat', 'oo']);
+      const root = sessionScreen(app, [
+        { kind: 'review', cardId: 'kape', way: 'recall', format: 'recall' },
+        { kind: 'review', cardId: 'kape', way: 'recall', format: 'produce' },
+      ]);
+      expect(root.querySelector('.prompt-picture')?.getAttribute('aria-label')).toBe(kape.en);
+      expect(root.querySelector('.prompt-en')).toBeNull();
+      button(root, kape.tl).click();
+      expect(app.progress.cards[cardKey('kape', 'recall')]?.reps).toBeGreaterThan(0);
+      button(root, 'Continue').click();
+      // Self-rated: turned over, the Tagalog and the English it pictures.
+      expect(root.querySelector('.prompt-picture')).not.toBeNull();
+      button(root, 'Show the Tagalog').click();
+      expect(root.querySelector('.prompt .prompt-meaning')?.textContent).toBe(kape.en);
+      expect(root.querySelector('.answer')?.textContent).toContain(kape.tl);
+    } finally {
+      random.mockRestore();
+    }
+  });
+
+  it('asks from the English the rest of the time, and always for a word without a picture', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    try {
+      const root = sessionScreen(fakeApp(['kape']), [{ kind: 'review', cardId: 'kape', way: 'recall', format: 'produce' }]);
+      expect(root.querySelector('.prompt-en')?.textContent).toBe(kape.en);
+      random.mockReturnValue(0);
+      const plain = sessionScreen(fakeApp(['salamat']), [{ kind: 'review', cardId: 'salamat', way: 'recall', format: 'produce' }]);
+      expect(plain.querySelector('.prompt-picture')).toBeNull();
+    } finally {
+      random.mockRestore();
+    }
+  });
+});
