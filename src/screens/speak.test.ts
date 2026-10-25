@@ -252,7 +252,7 @@ describe('an attempt', () => {
     mic.events.onListening?.();
     mic.finish({ samples, speech: true });
     await flush();
-    expect(text('.feedback strong')).toBe('Close.');
+    expect(text('.feedback strong')).toBe('Wrong stress.');
     expect(onAttempt).toHaveBeenCalledWith(false, true);
     expect(panel.el.querySelector('.result-card.bad')).not.toBeNull();
     expect(panel.el.querySelector('.dial')!.getAttribute('aria-label')).toBe('100% of the way there');

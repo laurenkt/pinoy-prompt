@@ -85,6 +85,8 @@ type State =
       tips: Tip[];
       /** Which syllable to lean on, when the attempt clearly leaned on the other (it then fails). */
       stress?: string | null;
+      /** Whether it passed: its sounds did, and it wasn't leaned on the wrong syllable. */
+      right: boolean;
       heard: string[];
       recognition?: Recognition;
       samples?: Float32Array;
@@ -275,7 +277,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       if (stale()) return;
       recording = null;
       if (!take.speech) {
-        return set({ name: 'result', text: card.tl, comparison: compare(toPhones(card.tl), []), tips: [], heard: [] });
+        return set({ name: 'result', text: card.tl, comparison: compare(toPhones(card.tl), []), tips: [], heard: [], right: false });
       }
       set({ name: 'analysing' });
       const recognition = await model.recognise(take.samples);
@@ -285,9 +287,16 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
       // Pitch takes a moment to find, so only the two vowels a judged card compares are measured.
-      const stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
-      options.onAttempt(isRight(comparison) && !stress, sounds.length > 0);
-      set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples });
+      let stress: string | null = null;
+      try {
+        stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
+      } catch {
+        // Unmeasured, it's judged on its sounds alone.
+      }
+      // A single word leaned on the wrong syllable doesn't pass, however clear its sounds.
+      const right = isRight(comparison) && !stress;
+      options.onAttempt(right, sounds.length > 0);
+      set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples, right });
     } catch (err) {
       if (stale()) return;
       recording = null;
@@ -428,11 +437,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let breakdown: ResultView | null = null;
 
   function resultView(result: Extract<State, { name: 'result' }>): HTMLElement[] {
-    const { text, comparison, tips, stress, heard, recognition, samples } = result;
-    // A single word leaned on the wrong syllable doesn't pass, however clear its sounds.
-    const right = isRight(comparison) && !stress;
+    const { text, comparison, tips, stress, heard, recognition, samples, right } = result;
     const pct = Math.round(comparison.score * 100);
-    const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
+    const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : stress && isRight(comparison) ? 'Wrong stress.' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
     const detail =
       heard.length === 0
         ? 'Speak a little louder or closer to the phone.'
