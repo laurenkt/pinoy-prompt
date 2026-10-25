@@ -219,10 +219,10 @@ describe('clips', () => {
   });
 
   it('makes a new context once the microphone has opened or closed, as the old one can play distorted', async () => {
-    // No audio session, as before iOS 17: the microphone still changes the hardware rate.
+    // No audio session, as before iOS 17: the microphone still changes the hardware rate. Each play is a tap.
     const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
     const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
-    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream } });
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream }, userActivation: { isActive: true } });
     await play({ tl: 'Salamat' });
     const before = contexts.at(-1)!;
     await play({ tl: 'Salamat' });
@@ -237,6 +237,46 @@ describe('clips', () => {
     await play({ tl: 'Salamat' });
     expect(withMic.closed).toBe(true);
     expect(contexts.at(-1)).not.toBe(withMic);
+  });
+
+  it('keeps the context made with the microphone after it closes until a tap can start a new one', async () => {
+    const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+    const userActivation = { isActive: true };
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream }, userActivation });
+    const { closeMicrophone, getMicrophone } = await import('./microphone');
+    await getMicrophone();
+    await play({ tl: 'Salamat' });
+    const withMic = contexts.at(-1)!;
+    // A take ended by itself, and the word is said back: outside a tap, iOS wouldn't start a new context.
+    closeMicrophone();
+    userActivation.isActive = false;
+    await play({ tl: 'Salamat' });
+    expect(withMic.closed).toBe(false);
+    expect(contexts.at(-1)).toBe(withMic);
+    // The next tap makes one at the rate the phone plays at now.
+    userActivation.isActive = true;
+    await play({ tl: 'Salamat' });
+    expect(withMic.closed).toBe(true);
+    expect(contexts.at(-1)).not.toBe(withMic);
+  });
+
+  it('replaces a context kept past the microphone closing once it opens again, as the rate has changed twice since', async () => {
+    const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream }, userActivation: { isActive: false } });
+    const { closeMicrophone, getMicrophone } = await import('./microphone');
+    await getMicrophone();
+    await play({ tl: 'Salamat' });
+    const withMic = contexts.at(-1)!;
+    closeMicrophone();
+    await play({ tl: 'Salamat' });
+    expect(contexts.at(-1)).toBe(withMic);
+    // The next question warms the microphone up again, outside a tap: WebKit starts a context while it's open.
+    await getMicrophone();
+    await play({ tl: 'Salamat' });
+    expect(withMic.closed).toBe(true);
+    closeMicrophone();
   });
 
   it('counts words as playable from clips alone, and says a recorded voice reads them', () => {

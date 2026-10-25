@@ -3,10 +3,11 @@ import { VOCAB, cardKey, getCard, isVocab, type Card, type Drill, type Way } fro
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
+import { askWithPicture } from '../pictures';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, drillOdds, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
+import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { promptBlock, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type CardBack, type GuideFormat, type GuideQuestion } from './guide-question';
 import { cardBack } from './card-back';
@@ -46,6 +47,8 @@ interface Question {
    * typed (or dictated), not picked.
    */
   typed: boolean;
+  /** A recall question asked from the card's picture rather than its English. */
+  picture?: boolean;
   /** "Show choices" was tapped on a typed question, so an answer to it was picked rather than recalled. */
   hinted?: boolean;
   /** How many answers asked this way had needed help before this one, to go back to if "I had it right". */
@@ -109,12 +112,12 @@ export function practiceScreen(
   const canSpeak = deps.recordingSupported();
   // Mixed rounds only include speaking once the model is on the device, so they never stop for a download.
   let speakReady = deps.modelKnownDownloaded?.() ?? false;
-  /** The model turned out to be on the device after the round opened; speaking joins once the microphone is held. */
+  /** The model turned out to be on the device after the round opened; speaking joins once the microphone has been asked for. */
   let modelFound = false;
   /** The model was there, but the phone has cleared it since: nothing more is heard on the device this round. */
   let modelGone = false;
   if (canSpeak) {
-    // Found only after the round opened (the app's own check hadn't finished), it's too late to hold the microphone
+    // Found only after the round opened (the app's own check hadn't finished), it's too late to ask for the microphone
     // from the opening tap, so speaking waits for a later tap that does (see askForMicrophoneIfNeeded).
     deps.modelDownloaded().then(
       (ready) => (modelFound ||= ready),
@@ -163,8 +166,8 @@ export function practiceScreen(
   let autoMoved = false;
   /** The kinds of question are tucked away until asked for. */
   let scopeOpen = false;
-  /** The microphone has been held this visit, or is being (see askForMicrophone). */
-  let micHeld = false;
+  /** The microphone has been asked for this visit, or is being (see askForMicrophone). */
+  let micAsked = false;
   /** The phone is asking for the microphone, as the round starts (see askForMicrophone). */
   let waiting = false;
   /** The microphone was refused as the round started, so speaking is left out of this visit. */
@@ -195,7 +198,7 @@ export function practiceScreen(
   function modes(): Way[] {
     const picks = chosen();
     if (picks.length === 1 && picks[0] === 'speak') return picks;
-    const ready = (m: Way) => m !== 'speak' || speakReady || (modelFound && micHeld);
+    const ready = (m: Way) => m !== 'speak' || speakReady || (modelFound && micAsked);
     const ways = picks.filter(ready);
     return ways.length ? ways : MODES.map((m) => m.id).filter((m) => unavailable(m) === null && ready(m));
   }
@@ -224,7 +227,7 @@ export function practiceScreen(
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
     // Typed once that way of studying it has settled in Study.
     const typed = settled(app.progress, cardKey(card.id, mode)) && (mode === 'recall' || (mode === 'listen' && canTypeMeaning(card)));
-    return { card, mode, choices, typed };
+    return { card, mode, choices, typed, picture: mode === 'recall' && askWithPicture(card) };
   }
 
   /** What a right answer to the question is: the card, or for a guide, its answer. */
@@ -242,19 +245,19 @@ export function practiceScreen(
 
   /**
    * From a tap that may let the round ask to speak (opening Drills, the Speak chip, the mic going on): the
-   * microphone is held for the rest of the visit, so the phone never asks over a speaking question. If the browser
+   * microphone is asked for now, so the phone doesn't ask over a speaking question. If the browser
    * would ask, it asks now, over a holding screen.
    */
   function askForMicrophoneIfNeeded(): void {
     const speaks = modes().includes('speak') || (modelFound && chosen().includes('speak'));
     if (waiting || !canSpeak || !current || !speaks) return;
-    // While WebKit still remembers the Allow it goes straight through, with no holding screen. Held anyway, as that
-    // only lasts minutes. Once it has lapsed (a long while in the background closes the stream), the phone asks again.
+    // While WebKit still remembers the Allow it goes straight through, with no holding screen. Asked anyway, as that
+    // starts its ten minutes again. Once it has lapsed (ten minutes without a take), the phone asks again.
     const asks = needsMicrophone(deps);
-    if (!asks && micHeld) return;
+    if (!asks && micAsked) return;
     // Not over an answer being checked or heard, or one counting down to the next: the holding screen would hide it. A later tap asks.
     if (asks && (checking || hearing || listening || auto)) return;
-    micHeld = true;
+    micAsked = true;
     waiting = asks;
     void askForMicrophone(deps).then((answer) => {
       if (answer === 'left') return;
@@ -593,6 +596,9 @@ export function practiceScreen(
     upcoming = null;
     picked = null;
     checking = false;
+    // Ten minutes without a take and WebKit has forgotten the Allow: the phone asks now, over the holding screen, rather
+    // than at the question's own tap.
+    if (current?.mode === 'speak') askForMicrophoneIfNeeded();
     ask();
   }
 
@@ -812,7 +818,7 @@ export function practiceScreen(
         h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
       );
     } else {
-      prompt = promptBlock('prompt', 'How do you say…', turnable, h('p', { class: 'prompt-en' }, q.card.en));
+      prompt = promptBlock('prompt', 'How do you say…', turnable, ...recallCue(q.card, !!q.picture));
     }
 
     return h(

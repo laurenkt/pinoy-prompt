@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeMicrophone, getMicrophone, releaseMicrophone } from './microphone';
+import { closeMicrophone, getMicrophone, REOPEN_QUIETLY_MS, releaseMicrophone } from './microphone';
 import { cancelRecording, record, RecordError, resample, SIGNAL_WAIT_MS, toWav, WARM_MS, warmRecorder } from './recorder';
 
 const sine = (hz: number, rate: number, seconds = 0.5) =>
@@ -223,7 +223,7 @@ describe('a microphone that gives no sound', () => {
     await expect(recording.audio).rejects.toEqual(new RecordError('silent'));
     open();
     await vi.advanceTimersByTimeAsync(0);
-    expect(opened[1].track.enabled).toBe(false);
+    expect(opened[1].track.readyState).toBe('ended');
   });
 
   it('stops without waiting on a context that never resumes after the reopen', async () => {
@@ -278,38 +278,56 @@ describe('warming the microphone up ahead of a take', () => {
     vi.unstubAllGlobals();
   });
 
-  /** The microphone opened and switched off again, as a drill round holds it. */
-  async function held() {
+  /** The microphone allowed and closed again, as a drill round asks for it as it opens. */
+  async function allowed() {
     releaseMicrophone(await getMicrophone());
-    return opened[0].track;
+    expect(opened[0].track.readyState).toBe('ended');
   }
 
-  it("never opens the microphone itself, so it can't ask for it", async () => {
+  it("never opens the microphone where the browser would ask, so it can't ask over a question", async () => {
+    // Long after any earlier test's stream closed.
+    vi.setSystemTime(Date.now() + 60 * 60 * 1000);
     const before = FakeRecorderContext.count;
+    vi.stubGlobal('event', { isTrusted: true, type: 'click' });
     expect(warmRecorder()).toBeNull();
     await vi.advanceTimersByTimeAsync(0);
     expect(opened).toHaveLength(0);
     expect(FakeRecorderContext.count).toBe(before);
   });
 
-  it('switches the held microphone on ahead of a take, and off again when cooled', async () => {
-    const track = await held();
-    expect(track.enabled).toBe(false);
+  it('opens the microphone ahead of a take, and closes it again when cooled', async () => {
+    await allowed();
     const warmth = warmRecorder()!;
     await vi.advanceTimersByTimeAsync(0);
-    expect(track.enabled).toBe(true);
+    expect(opened).toHaveLength(2);
+    const track = opened[1].track;
+    expect(track.readyState).toBe('live');
     expect(warmth.warm).toBe(true);
     const context = FakeRecorderContext.last;
     warmth.cool();
     expect(warmth.warm).toBe(false);
-    expect(track.enabled).toBe(false);
+    expect(track.readyState).toBe('ended');
     expect(context.state).toBe('suspended');
   });
 
-  it('hands the warm microphone and context to the take, so it starts with sound and nothing switches off', async () => {
-    const track = await held();
+  it('opens it outside a tap only within a minute of the last take, as WebKit asks again after that', async () => {
+    await allowed();
+    await vi.advanceTimersByTimeAsync(REOPEN_QUIETLY_MS);
+    expect(warmRecorder()).toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(opened).toHaveLength(1);
+    // A tap still opens it without asking.
+    vi.stubGlobal('event', { isTrusted: true, type: 'click' });
+    expect(warmRecorder()).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(opened).toHaveLength(2);
+  });
+
+  it('hands the warm microphone and context to the take, so it starts with sound, and closes it once done', async () => {
+    await allowed();
     const warmth = warmRecorder()!;
     await vi.advanceTimersByTimeAsync(0);
+    const track = opened[1].track;
     const context = FakeRecorderContext.last;
     const made = FakeRecorderContext.count;
     const onListening = vi.fn();
@@ -317,49 +335,55 @@ describe('warming the microphone up ahead of a take', () => {
     // Cooling after the take adopted it does nothing.
     expect(warmth.warm).toBe(false);
     warmth.cool();
-    expect(track.enabled).toBe(true);
+    expect(track.readyState).toBe('live');
     await vi.advanceTimersByTimeAsync(0);
     expect(FakeRecorderContext.count).toBe(made);
     context.feed(0.2);
     expect(onListening).toHaveBeenCalledOnce();
     recording.stop();
     expect((await recording.audio).speech).toBe(true);
-    // The take's done: the microphone is off and the context rests for the next one.
-    expect(track.enabled).toBe(false);
-    expect(context.state).toBe('suspended');
-    expect(opened).toHaveLength(1);
-  });
-
-  it('only warms a live stream, never opening another for a muted one', async () => {
-    const track = await held();
-    track.muted = true;
-    expect(warmRecorder()).toBeNull();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(opened).toHaveLength(1);
+    // The take's done: the microphone is closed, so the word said back plays as media rather than through a call.
+    expect(track.readyState).toBe('ended');
+    expect(opened).toHaveLength(2);
   });
 
   it('gives up after a minute unused, so a question left up does not keep the microphone on', async () => {
-    const track = await held();
+    await allowed();
     const warmth = warmRecorder()!;
     await vi.advanceTimersByTimeAsync(WARM_MS);
     expect(warmth.warm).toBe(false);
-    expect(track.enabled).toBe(false);
+    expect(opened[1].track.readyState).toBe('ended');
   });
 
   it("doesn't keep the context past the stream it was made under", async () => {
-    await held();
-    warmRecorder()!.cool();
+    await allowed();
+    const warmth = warmRecorder()!;
+    await vi.advanceTimersByTimeAsync(0);
+    warmth.cool();
     const first = FakeRecorderContext.last;
-    // The stream closes (the app was in the background a while) and a new one opens.
-    closeMicrophone();
-    releaseMicrophone(await getMicrophone());
+    warmRecorder();
+    expect(FakeRecorderContext.last).not.toBe(first);
+    expect(first.state).toBe('closed');
+  });
+
+  it("doesn't keep a warm-up's context for a later stream when the take adopted it before its stream came", async () => {
+    await allowed();
+    warmRecorder();
+    const first = FakeRecorderContext.last;
+    // Tapped before the warm-up's stream came.
+    const recording = record();
+    await vi.advanceTimersByTimeAsync(0);
+    first.feed(0.2);
+    recording.stop();
+    await recording.audio;
     warmRecorder();
     expect(FakeRecorderContext.last).not.toBe(first);
     expect(first.state).toBe('closed');
   });
 
   it("doesn't rest the context under a newer take when a cancelled one finishes late", async () => {
-    await held();
+    // Kept for the stream a call has open.
+    await getMicrophone();
     const first = record();
     const context = FakeRecorderContext.last;
     // The first take waits on the context starting (iOS can be slow to), and is cancelled meanwhile.
@@ -380,12 +404,12 @@ describe('warming the microphone up ahead of a take', () => {
   });
 
   it('lets the microphone and context go when the screen is left', async () => {
-    const track = await held();
+    await allowed();
     warmRecorder();
     await vi.advanceTimersByTimeAsync(0);
     const context = FakeRecorderContext.last;
     cancelRecording();
-    expect(track.enabled).toBe(false);
+    expect(opened[1].track.readyState).toBe('ended');
     expect(context.state).toBe('closed');
   });
 });
