@@ -91,6 +91,7 @@ describe("how well the card is known, on its back", () => {
     expect(root.querySelector('.prompt button')?.getAttribute('aria-expanded')).toBe('true');
     expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Read: Long-term.');
     expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Recall: Just met, asked now.');
+    expect(root.querySelector('.asked-label')?.textContent).toBe('asked now');
     expect(root.querySelector('.tag.asked')).not.toBeNull();
     // Still turned once answered, as nothing on it changed.
     root.querySelector<HTMLButtonElement>('.choice')!.click();
@@ -120,6 +121,8 @@ describe("how well the card is known, on its back", () => {
     expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Recall: Long-term, the drills helped twice lately, asked now.');
     expect(root.querySelector('.back-help')?.textContent).toBe('Lately the drills had to help with Recall twice.');
     expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent)).toEqual(['6', '1', '0']);
+    expect([...root.querySelectorAll('.count')].map((n) => n.textContent)).toEqual(['Reviewed in Study6 times', 'Forgotten in Study1 time', 'Known for0 days']);
+    expect(root.querySelector('.back-fig:last-of-type .back-axis')?.textContent).toContain('Study waits 1mo now');
     expect(root.querySelector('.slope')?.getAttribute('aria-label')).toContain('Study asks in 1mo');
     expect(root.querySelector('.skyline .building.s-long')).not.toBeNull();
     expect(root.querySelector('.hero-way')?.textContent).toBe('Recall');

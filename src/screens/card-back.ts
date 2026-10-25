@@ -1,8 +1,8 @@
 // The back of a drill card: how well it's known, turned over by a tap on the card (see promptBlock in
 // guide-question.ts). A dial leads with the one number that matters, how likely it is to come to mind now; then three
-// pictures explain it, each titled with what it shows and a line on how to read it: the slope it slides down until
-// Study asks again, the stairs each way it's asked climbs as it holds longer, and the skyline of how long Study has
-// waited between asks over its life. Then a few counts. All read from saved progress; nothing here is stored.
+// pictures explain it, each under a plain title and a short line on how to read it: the slope a memory slides down
+// until Study asks again, the stairs each way it's asked climbs as it sticks for longer, and a skyline of the gaps
+// between reviews over its life. Then a few counts. All read from saved progress; nothing here is stored.
 
 import { studyWays, type Card, type Way } from '../deck';
 import { STRENGTHS, intervalSteps, lastSeen, recallChance, strengthOf, type Strength } from '../memory';
@@ -14,7 +14,7 @@ import { h, svg } from '../ui';
 const LABEL = new Map(STRENGTHS.map((s) => [s.id, s.label]));
 /** The width of every picture's viewBox, and of the gutter at its left that holds its scale. */
 const W = 300;
-const GUTTER = 30;
+const GUTTER = 36;
 /** The skyline's gridlines, in days: ones past its top are left out, but a month is always shown. */
 const MARKS: [number, string][] = [
   [1, '1d'],
@@ -137,8 +137,8 @@ function slope(state: CardState, now: number): HTMLElement {
   // The ball's words go under it, on the hill, unless it has slid too near the ground.
   const under = base - ball.y > 30;
   return figure(
-    'The slope it slides down',
-    'Since you last answered, the chance it comes to mind slides downhill. Study asks again at the flag, and each good answer makes the next slope gentler.',
+    'Memories slide out of your mind',
+    'The hill is the chance you’d remember it. The ball is today; the flag is when Study asks.',
     picture(
       'slope',
       H,
@@ -160,7 +160,7 @@ function slope(state: CardState, now: number): HTMLElement {
 
 /**
  * Every way the card is asked as a tag on a staircase of strengths: on the ground until Study has asked it, then a
- * step up for each strength it reaches, Just met to Long-term. The way asked now is the dark tag. Then, in words,
+ * step up for each strength it reaches, Just met to Long-term. The way asked now is in saffron, labelled. Then, in words,
  * the ways the drills had to help with.
  */
 function stairs(progress: Progress, card: Card, asked: Way, ways: { id: Way; title: string }[]): HTMLElement {
@@ -174,8 +174,11 @@ function stairs(progress: Progress, card: Card, asked: Way, ways: { id: Way; tit
   });
   const level = (strength: Strength | undefined) => (strength ? STRENGTHS.findIndex((s) => s.id === strength) + 1 : 0);
   // Tags stand in a pile on their step, so the picture is as tall as the highest pile.
-  const piles = placed.map((p) => ({ ...p, at: level(p.strength), n: placed.filter((q) => level(q.strength) === level(p.strength)).indexOf(p) }));
-  const tallest = Math.max(...piles.map((p) => p.at * rise + (p.n + 1) * (tag.height + tag.gap)));
+  // The way asked now goes on top of its pile, so its label above it has room.
+  const order = [...placed.filter((p) => p.id !== asked), ...placed.filter((p) => p.id === asked)];
+  const piles = order.map((p) => ({ ...p, at: level(p.strength), n: order.filter((q) => level(q.strength) === level(p.strength)).indexOf(p) }));
+  const lift = 16;
+  const tallest = Math.max(...piles.map((p) => p.at * rise + (p.n + 1) * (tag.height + tag.gap) + (p.id === asked ? lift : 0)));
   const base = tallest + 8;
   const H = base + 20;
   const steps = STRENGTHS.map((s, i) =>
@@ -189,6 +192,7 @@ function stairs(progress: Progress, card: Card, asked: Way, ways: { id: Way; tit
     return [
       svg('rect', { class: `tag${cls}`, x: f(cx - tag.width / 2), y: f(y), width: tag.width, height: tag.height, rx: 10 }),
       text(`tag-name${cls}`, cx, y + 14, 'middle', title),
+      ...(cls ? [text('asked-label', cx, y - 6, 'middle', 'asked now')] : []),
     ];
   });
   const helped = placed.filter((p) => p.help);
@@ -196,15 +200,15 @@ function stairs(progress: Progress, card: Card, asked: Way, ways: { id: Way; tit
     .map(({ id, title, strength, help }) => `${title}: ${strength ? LABEL.get(strength) : 'not started yet'}${help ? `, the drills helped ${times(help)} lately` : ''}${id === asked ? ', asked now' : ''}`)
     .join('. ');
   return figure(
-    'The stairs each way climbs',
-    'Each way it’s asked climbs a step as it holds longer, from Just met up to Long-term. The dark tag is the way asked now.',
-    picture('stairs', H, `${label}.`, ...steps, svg('line', { class: 'ground', x1: 0, x2: W, y1: base, y2: base }), ...names, ...tags),
+    'Learning is like climbing stairs',
+    'Each way you’re asked climbs as it sticks for longer.',
+    picture('stairs', H, `${label}.`, svg('line', { class: 'ground', x1: 0, x2: W, y1: base, y2: base }), ...steps, ...names, ...tags),
     helped.length > 0 && h('p', { class: 'back-help' }, `Lately the drills had to help with ${list(helped.map((p) => `${p.title} ${times(p.help)}`))}.`),
   );
 }
 
 /**
- * How long Study waited between asks over the card's life, as a skyline: from the day it was met to now, a building
+ * The gaps Study left between reviews over the card's life, as a skyline: from the day it was met to now, a building
  * for each stretch at one strength, as tall as the wait (on a log scale, gridlined at a day, a week and a month, so
  * days and months both show) and in that strength's colour. A forgotten card drops back to the ground.
  */
@@ -239,8 +243,8 @@ function skyline(state: CardState, now: number): HTMLElement {
   const days = Math.floor((now - start) / DAY_MS);
   const label = `Over ${days ? `${days} days` : 'today'}, the longest Study waited was ${formatInterval(longest)}; now ${formatInterval(state.interval)}.`;
   return figure(
-    'The skyline of its waits',
-    'How long Study waited before asking again, from the day you met it to today. Taller means a longer wait; a drop means it was forgotten and started over.',
+    'Gaps between reviews',
+    'Study waits longer each time you remember it. A drop means you forgot.',
     picture(
       'skyline',
       H,
@@ -249,31 +253,32 @@ function skyline(state: CardState, now: number): HTMLElement {
         svg('line', { class: 'grid', x1: GUTTER, x2: W, y1: f(y(days)), y2: f(y(days)) }),
         text('tick', GUTTER - 6, y(days) + 4, 'end', mark),
       ]),
-      ...buildings,
       svg('line', { class: 'ground', x1: GUTTER, x2: W, y1: base, y2: base }),
+      ...buildings,
     ),
     h(
       'div',
       { class: 'back-axis' },
-      h('span', null, days ? `Met ${ago(now - start)}` : 'Met today'),
-      h('span', null, state.interval < 1 ? 'Still settling in' : `Waits ${formatInterval(state.interval)} now`),
+      h('span', null, 'First seen'),
+      h('span', null, state.interval < 1 ? 'Today: still settling in' : `Study waits ${formatInterval(state.interval)} now`),
     ),
   );
 }
 
-/** Big numbers: answers in Study, times forgotten, days since it was met. */
+/** Big numbers, each under the words saying what it counts: reviews in Study, times forgotten there, how long it has been known. */
 function counts(state: CardState, now: number): HTMLElement {
   const answers = answersOf(state);
   // A way only copied from reading's schedule carries reading's lapses too, not its own.
   const lapses = state.split ? 0 : state.lapses;
   const days = Math.floor((now - Math.min(state.introduced, now)) / DAY_MS);
-  const count = (n: string, label: string) => h('div', { class: 'count' }, h('span', { class: 'count-n' }, n), h('span', { class: 'count-label' }, label));
+  const count = (label: string, n: string, unit: string) =>
+    h('div', { class: 'count' }, h('span', { class: 'count-label' }, label), h('span', { class: 'count-value' }, h('span', { class: 'count-n' }, n), ` ${unit}`));
   return h(
     'div',
     { class: 'counts' },
-    count(`${answers.count}${answers.atLeast ? '+' : ''}`, answers.count === 1 && !answers.atLeast ? 'answer in Study' : 'answers in Study'),
-    count(String(lapses), lapses === 1 ? 'time forgotten' : 'times forgotten'),
-    count(String(days), days === 1 ? 'day known' : 'days known'),
+    count('Reviewed in Study', `${answers.count}${answers.atLeast ? '+' : ''}`, answers.count === 1 && !answers.atLeast ? 'time' : 'times'),
+    count('Forgotten in Study', String(lapses), lapses === 1 ? 'time' : 'times'),
+    count('Known for', String(days), days === 1 ? 'day' : 'days'),
   );
 }
 

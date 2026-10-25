@@ -45,7 +45,8 @@ describe('guides in a drill round', () => {
     const before = structuredClone(a.progress.cards);
     untilGuide(root, 'Fill the gap');
     root.querySelector<HTMLElement>('.prompt .drill-q')!.click();
-    expect([...root.querySelectorAll('.tag-name')].map((n) => n.textContent)).toEqual(['Gap', 'Build']);
+    // The way asked now is drawn last, on top of its pile.
+    expect([...root.querySelectorAll('.tag-name')].map((n) => n.textContent)).toEqual(['Build', 'Gap']);
     expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Gap: Just met, asked now.');
     root.querySelector<HTMLElement>('.prompt')!.click();
     const drill = drillOf(root);
