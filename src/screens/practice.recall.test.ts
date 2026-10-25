@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { App } from '../app';
-import { cardKey, type Card } from '../deck';
+import { cardKey, getCard, type Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
 import type { RecorderEvents, Take } from '../recorder';
 import { recordAnswer } from '../store';
@@ -330,5 +330,36 @@ describe('a Tagalog answer said into the box, with the pronunciation model on th
     expect(recognise).not.toHaveBeenCalled();
     expect(hearer).toHaveBeenCalledWith(expect.any(Blob), 'en');
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+});
+
+describe('recalling a word from its picture', () => {
+  const PICTURED = ['kape', 'tubig', 'isda', 'bahay'];
+
+  it('sometimes shows the picture in place of the English, on the same card asked the same way', () => {
+    const root = (last = recall(fakeApp(PICTURED)));
+    const picture = root.querySelector('.prompt-picture');
+    expect(picture?.querySelector('svg')).not.toBeNull();
+    expect(root.querySelector('.prompt-en')).toBeNull();
+    const card = getCard(PICTURED.find((id) => getCard(id)!.en === picture!.getAttribute('aria-label'))!)!;
+    expect(root.textContent).toContain('How do you say…');
+    // The Tagalog is picked from choices, as from the English.
+    button(root, card.tl).click();
+    expect(root.querySelector('.feedback')?.textContent).toContain(`${card.tl} = ${card.en}`);
+  });
+
+  it('shows the English the rest of the time', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    const root = (last = recall(fakeApp(PICTURED)));
+    expect(root.querySelector('.prompt-picture')).toBeNull();
+    expect(root.querySelector('.prompt-en')).not.toBeNull();
+  });
+
+  it('keeps the picture once answered, however the dice roll then', () => {
+    const root = (last = recall(fakeApp(PICTURED)));
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    root.querySelector<HTMLButtonElement>('.choice')!.click();
+    expect(root.querySelector('.feedback')).not.toBeNull();
+    expect(root.querySelector('.prompt-picture')).not.toBeNull();
   });
 });

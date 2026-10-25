@@ -180,6 +180,9 @@ const SCREENS = {
   },
   // A pattern in a drill round, asked as Study asks it: a gap to fill under Read, a sentence to build under Recall.
   'drills-gap': (page) => drillGuide(page, 'read'),
+  // Recall asked from a word's picture instead of its English, then answered right.
+  'drills-picture': (page) => pictureRecall(page),
+  'drills-picture-answered': (page) => pictureRecall(page, true),
   'drills-build': (page) => drillGuide(page, 'recall'),
   study: (page) => page.click('.hub-btn.big:not(.chat-btn)'),
   // Nothing due and today's new cards in: Study says so and points to Drills.
@@ -222,11 +225,7 @@ const SCREENS = {
   'drills-recall': (page) => typedOnly(page, 'recall'),
   'drills-recall-answered': async (page) => {
     await typedOnly(page, 'recall');
-    const tl = await page.evaluate(async () => {
-      const { VOCAB } = await import('/src/deck.ts');
-      const en = document.querySelector('.prompt-en').textContent;
-      return VOCAB.find((c) => c.en === en).tl;
-    });
+    const tl = await page.evaluate(recallAnswer);
     await page.fill('.meaning-input', tl);
     await page.press('.meaning-input', 'Enter');
     await page.waitForSelector('.feedback');
@@ -234,11 +233,7 @@ const SCREENS = {
   // The same, typed with a letter missing: wrong, with a note to check the spelling.
   'drills-recall-misspelt': async (page) => {
     await typedOnly(page, 'recall');
-    const tl = await page.evaluate(async () => {
-      const { VOCAB } = await import('/src/deck.ts');
-      const en = document.querySelector('.prompt-en').textContent;
-      return VOCAB.find((c) => c.en === en).tl;
-    });
+    const tl = await page.evaluate(recallAnswer);
     // A letter dropped from its longest word, still near enough to tell what was meant.
     const word = tl.split(' ').reduce((a, b) => (b.length > a.length ? b : a));
     const at = Math.min(2, word.length - 1);
@@ -400,12 +395,7 @@ async function drillGuide(page, mode) {
   await page.reload();
   await page.waitForSelector('.home');
   await page.click('.drills-btn');
-  await page.click('.filter-toggle');
-  for (const other of ['listen', 'read', 'recall', 'speak']) {
-    const chip = page.locator(`#drill-scope [data-mode="${other}"]`);
-    if (other !== mode && (await chip.getAttribute('aria-pressed')) === 'true' && (await chip.isEnabled())) await chip.click();
-  }
-  await page.click('.filter-toggle');
+  await onlyAsk(page, mode);
   for (let i = 0; i < 40 && !(await page.locator('.drill-q').count()); i++) {
     if (!(await page.locator('.feedback').count())) {
       // A settled word is typed, so ask for its choices.
@@ -414,6 +404,49 @@ async function drillGuide(page, mode) {
     }
     await page.click('button:has-text("Next")');
   }
+}
+
+/** In a drill round, ask only `mode` from the next question on. */
+async function onlyAsk(page, mode) {
+  await page.click('.filter-toggle');
+  for (const other of ['listen', 'read', 'recall', 'speak']) {
+    const chip = page.locator(`#drill-scope [data-mode="${other}"]`);
+    if (other !== mode && (await chip.getAttribute('aria-pressed')) === 'true' && (await chip.isEnabled())) await chip.click();
+  }
+  await page.click('.filter-toggle');
+}
+
+/**
+ * Drills asking only Recall, with a few words that have pictures met, moved on until one is asked from its picture.
+ * With `answered`, its Tagalog then picked.
+ */
+async function pictureRecall(page, answered = false) {
+  await page.evaluate(async () => {
+    const { load, recordAnswer, save } = await import('/src/store.ts');
+    const progress = load(Date.now());
+    for (const id of ['kape', 'tubig', 'isda', 'saging', 'pula', 'bahay']) recordAnswer(progress, id, 'good', Date.now() - 3 * 86_400_000);
+    save(progress, { replace: true });
+  });
+  await page.reload();
+  await page.waitForSelector('.home');
+  await page.click('.drills-btn');
+  await onlyAsk(page, 'recall');
+  for (let i = 0; i < 60 && !(await page.locator('.prompt-picture').count()); i++) {
+    await page.locator('.choice').first().click();
+    await page.click('button:has-text("Next")');
+  }
+  if (!(await page.locator('.prompt-picture').count())) throw new Error('No question was asked from a picture');
+  if (answered) {
+    const tl = await page.evaluate(recallAnswer);
+    await page.click(`.choice:has-text("${tl}")`);
+  }
+}
+
+/** In the page: the Tagalog a recall question on screen asks for, from its English or its picture. */
+async function recallAnswer() {
+  const { VOCAB } = await import('/src/deck.ts');
+  const en = document.querySelector('.prompt-en')?.textContent ?? document.querySelector('.prompt-picture').getAttribute('aria-label');
+  return VOCAB.find((c) => c.en === en).tl;
 }
 
 /** Nothing due for `hours`, and today's new cards in. */
@@ -534,12 +567,7 @@ async function typedOnly(page, mode, live = true) {
     };
   }, live);
   await page.click('.drills-btn');
-  await page.click('.filter-toggle');
-  for (const other of ['listen', 'read', 'recall', 'speak']) {
-    const chip = page.locator(`#drill-scope [data-mode="${other}"]`);
-    if (other !== mode && (await chip.getAttribute('aria-pressed')) === 'true' && (await chip.isEnabled())) await chip.click();
-  }
-  await page.click('.filter-toggle');
+  await onlyAsk(page, mode);
 }
 
 /** Drills, asking only Speak, ready to listen. */

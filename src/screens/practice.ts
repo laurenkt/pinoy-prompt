@@ -3,10 +3,11 @@ import { VOCAB, cardKey, getCard, isVocab, type Card, type Drill, type Way } fro
 import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
+import { askWithPicture } from '../pictures';
 import { RecordError, toWav, type Recording } from '../recorder';
 import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
+import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { promptBlock, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type CardBack, type GuideFormat, type GuideQuestion } from './guide-question';
 import { cardBack } from './card-back';
@@ -46,6 +47,8 @@ interface Question {
    * typed (or dictated), not picked.
    */
   typed: boolean;
+  /** A recall question asked from the card's picture rather than its English. */
+  picture?: boolean;
   /** "Show choices" was tapped on a typed question, so an answer to it was picked rather than recalled. */
   hinted?: boolean;
   /** How many answers asked this way had needed help before this one, to go back to if "I had it right". */
@@ -219,7 +222,7 @@ export function practiceScreen(
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
     // Typed once that way of studying it has settled in Study.
     const typed = settled(app.progress, cardKey(card.id, mode)) && (mode === 'recall' || (mode === 'listen' && canTypeMeaning(card)));
-    return { card, mode, choices, typed };
+    return { card, mode, choices, typed, picture: mode === 'recall' && askWithPicture(card) };
   }
 
   /** What a right answer to the question is: the card, or for a guide, its answer. */
@@ -801,7 +804,7 @@ export function practiceScreen(
         h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
       );
     } else {
-      prompt = promptBlock('prompt', 'How do you say…', turnable, h('p', { class: 'prompt-en' }, q.card.en));
+      prompt = promptBlock('prompt', 'How do you say…', turnable, ...recallCue(q.card, !!q.picture));
     }
 
     return h(
