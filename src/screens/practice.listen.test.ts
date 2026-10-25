@@ -530,31 +530,53 @@ describe('saying the meaning out loud', () => {
     const root = practiceScreen(learner(true), deps, () => new Promise<boolean>((r) => (judged = r)), () => () => new Promise<string>((r) => (heard = r)));
     document.body.replaceChildren(root);
     const bars = () => [...root.querySelectorAll<HTMLElement>('.meaning-wave span')].map((b) => Number(b.style.getPropertyValue('--level')));
-    micButton(root)!.click();
-    // The box gives way to an empty wave, which grows from the left only while there's speech: the room's hiss and
-    // the pauses draw nothing.
-    expect(box(root)).toBeNull();
-    expect(root.querySelector('.meaning-wave.thinking')).toBeNull();
-    expect(bars()).toEqual([]);
-    onLevel!(0.01, false, [0.01, 0.01, 0.01, 0.01]);
-    expect(bars()).toEqual([]);
-    // A bar for each part of a block of speech.
-    onLevel!(0.5, true, [0.5, 0.25, 0.5, 0.25]);
-    onLevel!(0.01, false, [0.01, 0.01, 0.01, 0.01]);
-    expect(bars()).toEqual([0.5, 0.25, 0.5, 0.25]);
-    // Once the box is full, neighbouring bars merge in pairs, each the louder, and later ones stand for two parts.
-    for (let i = 0; i < 19; i++) onLevel!(0.75, true, [0.75, 0.75, 0.75, 0.75]);
-    expect(bars()).toHaveLength(80);
-    onLevel!(0.1, true, [0.1, 0.2, 0.3, 0.1]);
-    expect(bars()).toHaveLength(42);
-    expect(bars().slice(0, 3)).toEqual([0.5, 0.5, 0.75]);
-    expect(bars().slice(-2)).toEqual([0.2, 0.3]);
-    finish({ samples: new Float32Array(160), speech: true });
-    await flush();
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'performance'] });
+    try {
+      micButton(root)!.click();
+      // The box gives way to an empty wave, which grows from the left only while there's speech: the room's hiss and
+      // the pauses draw nothing.
+      expect(box(root)).toBeNull();
+      expect(root.querySelector('.meaning-wave.thinking')).toBeNull();
+      expect(bars()).toEqual([]);
+      onLevel!(0.01, false, [0.01, 0.01, 0.01, 0.01]);
+      vi.advanceTimersByTime(200);
+      expect(bars()).toEqual([]);
+      // A bar for each part of a block of speech, let in one by one at the pace they were said rather than all at once.
+      onLevel!(0.5, true, [0.5, 0.5, 0.5, 0.5]);
+      expect(bars()).toEqual([]);
+      vi.advanceTimersByTime(50);
+      expect(bars().length).toBeGreaterThan(0);
+      expect(bars().length).toBeLessThan(4);
+      vi.advanceTimersByTime(100);
+      expect(bars()).toEqual([0.5, 0.5, 0.5, 0.5]);
+      expect(root.querySelector('.meaning-wave span:last-child')?.classList).toContain('new');
+      // Each level smoothed towards the one before, so a jump in loudness rises over a few bars.
+      onLevel!(1, true, [1, 1, 1, 1]);
+      vi.advanceTimersByTime(200);
+      const rise = bars().slice(4);
+      expect(rise).toHaveLength(4);
+      rise.reduce((before, level) => (expect(level).toBeGreaterThan(before), level), 0.5);
+      expect(rise.at(-1)).toBeLessThan(1);
+      // Once the box is full, neighbouring bars merge in pairs, each the louder, and later ones stand for two parts.
+      for (let i = 0; i < 18; i++) onLevel!(0.75, true, [0.75, 0.25, 0.75, 0.25]);
+      vi.advanceTimersByTime(3000);
+      const full = bars();
+      expect(full).toHaveLength(80);
+      onLevel!(0.75, true, [0.75, 0.25, 0.75, 0.25]);
+      vi.advanceTimersByTime(1000);
+      expect(bars()).toHaveLength(42);
+      expect(bars().slice(0, 40)).toEqual(Array.from({ length: 40 }, (_, i) => Math.max(full[2 * i], full[2 * i + 1])));
+      // A block still to come in when the take ends goes in at once.
+      onLevel!(0.75, true, [0.75, 0.75, 0.75, 0.75]);
+      finish({ samples: new Float32Array(160), speech: true });
+      await flush();
+    } finally {
+      vi.useRealTimers();
+    }
     // Hearing it: the same wave, kept across the redraw, with the beat running along it.
     expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
-    expect(bars()).toHaveLength(42);
-    expect(bars().slice(-2)).toEqual([0.2, 0.3]);
+    expect(bars()).toHaveLength(44);
+    expect(bars()[0]).toBe(0.5);
     heard('Many thanks.');
     await flush();
     expect(root.querySelector('.meaning-wave.thinking')).not.toBeNull();
