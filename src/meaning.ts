@@ -2,7 +2,8 @@
 // English meaning, from the Tagalog, or its Tagalog, from the English.
 // A meaning is judged on meaning, not spelling: typos, word order,
 // contractions, "a" and "the", and digits for numbers don't matter. Tagalog is
-// judged on the card's own wording, give or take a typo and a "po". Anything
+// judged on the card's own wording, give or take a "po", and a typo when it was
+// said rather than typed: spelling it is part of learning it. Anything
 // this can't match may still be right in other words, so it goes to OpenAI
 // when the learner has a key, and the learner can always say they had it. The
 // answer has to be in the language asked for: saying the prompt back means the
@@ -13,8 +14,8 @@ import { VOCAB, type Card } from './deck';
 /** The language an answer is asked for in: the card's English meaning, or its Tagalog. */
 export type AnswerLanguage = 'en' | 'tl';
 
-/** Asks whether `answer` says the card in `language`, or null when it can't be asked. */
-export type MeaningJudge = (answer: string, card: Card, language: AnswerLanguage) => Promise<boolean | null>;
+/** Asks whether `answer` says the card in `language`, or null when it can't be asked. Tagalog that was `typed` has to be spelled right. */
+export type MeaningJudge = (answer: string, card: Card, language: AnswerLanguage, typed: boolean) => Promise<boolean | null>;
 
 const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 
@@ -447,10 +448,40 @@ function matchesAnswer(answer: string, card: Card, language: AnswerLanguage): bo
  * can't be: half a word is often within a typo of the whole.
  */
 export function exactAnswer(answer: string, card: Card, language: AnswerLanguage): boolean {
-  const letters = (list: string[]) => list.join('');
-  const given = letters(plainWords(answer));
-  const wanted = language === 'tl' ? cardWords(card) : englishTexts(card).map(plainWords);
-  return given !== '' && wanted.some((list) => letters(list) === given);
+  if (language === 'tl') return spellsTagalog(answer, card);
+  const given = plainWords(answer).join('');
+  return given !== '' && englishTexts(card).some((text) => plainWords(text).join('') === given);
+}
+
+/**
+ * Whether the answer is one of the card's Tagalog wordings spelled right, whatever the case, accents, punctuation or
+ * spacing, with a "po" or "ho" added if wanted but not left out where the card has one.
+ */
+export function spellsTagalog(answer: string, card: Card): boolean {
+  const given = plainWords(answer);
+  if (given.length === 0) return false;
+  const g = bare(given).join('');
+  return cardWords(card).some((want) => want.length > 0 && !(polite(want) && !polite(given)) && bare(want).join('') === g);
+}
+
+/**
+ * Whether typed Tagalog is the card's wording misspelt: a letter wrong, missing,
+ * extra or swapped (two from nine letters), however short ("hidi" for "hindi"),
+ * and with no word the deck uses elsewhere, which would be a different word,
+ * not a misspelling ("iyo" for "ito").
+ */
+function nearlySpells(answer: string, card: Card): boolean {
+  const given = plainWords(answer);
+  if (given.length === 0) return false;
+  const own = ownTagalog(card);
+  if (given.some((w) => !own.has(w) && !RESPECT.includes(w) && deckTagalogWords().has(w))) return false;
+  const g = bare(given).join('');
+  return cardWords(card).some((want) => {
+    // A "po" left out isn't spelling: leavesOutPo and OpenAI judge that.
+    if (polite(want) && !polite(given)) return false;
+    const w = bare(want).join('');
+    return w.length > 0 && distance(g, w) <= (Math.min(g.length, w.length) >= 9 ? 2 : 1);
+  });
 }
 
 /**
@@ -460,19 +491,30 @@ export function exactAnswer(answer: string, card: Card, language: AnswerLanguage
  * told it's wrong: on the device it can't be told from a word Tagalog
  * borrows ("traffic" for "trapik") or a number dictated as digits. The card's
  * Tagalog with a look-alike word from elsewhere in the deck swapped in, or
- * without the "po" it always has, is wrong without asking too. Without an answer from `ask` (no key, offline, an error), the device's
+ * without the "po" it always has, is wrong without asking too. Tagalog that was
+ * `typed`, not said, has to be spelled right: the card's own wording with a
+ * typo is wrong without asking, and noted as `misspelt`, and `ask` is told to
+ * judge spelling too. Without an answer from `ask` (no key, offline, an error), the device's
  * answer stands; a failed ask is noted, so the learner knows why.
  */
-export async function judgeMeaning(answer: string, card: Card, ask: MeaningJudge | null, language: AnswerLanguage = 'en'): Promise<Verdict> {
+export async function judgeMeaning(
+  answer: string,
+  card: Card,
+  ask: MeaningJudge | null,
+  language: AnswerLanguage = 'en',
+  typed = false,
+): Promise<Verdict> {
   if (!answer.trim()) return { right: false };
-  if (matchesAnswer(answer, card, language)) return { right: true };
+  const spelled = language === 'tl' && typed;
+  if (spelled ? spellsTagalog(answer, card) : matchesAnswer(answer, card, language)) return { right: true };
+  if (spelled && nearlySpells(answer, card)) return { right: false, misspelt: true };
   // Not asked: OpenAI would see that it means the same.
   if (language === 'en' && repeatsTagalog(answer, card)) return { right: false };
   // Not asked either: two words that look alike can pass for a typo, and a missing "po" can go unseen.
   if (language === 'tl' && (swapsTagalog(answer, card) || leavesOutPo(answer, card))) return { right: false };
   if (!ask) return { right: false };
   try {
-    return { right: (await ask(answer, card, language)) ?? false };
+    return { right: (await ask(answer, card, language, typed)) ?? false };
   } catch (e) {
     return { right: false, failure: e };
   }
@@ -482,4 +524,6 @@ export interface Verdict {
   right: boolean;
   /** Why OpenAI couldn't answer when it was asked, so only the device's check counted. */
   failure?: unknown;
+  /** Typed Tagalog that's the card's own wording but misspelt. */
+  misspelt?: boolean;
 }

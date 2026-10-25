@@ -177,7 +177,7 @@ describe('recalling words that have settled', () => {
     await flush();
     expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
     expect(root.querySelector('.feedback')?.textContent).toContain('Salamat');
-    expect(judge).toHaveBeenCalledWith('thank you', expect.objectContaining<Partial<Card>>({ id: 'salamat' }), 'tl');
+    expect(judge).toHaveBeenCalledWith('thank you', expect.objectContaining<Partial<Card>>({ id: 'salamat' }), 'tl', true);
   });
 
   it('checks other wording with OpenAI, as Tagalog', async () => {
@@ -185,8 +185,19 @@ describe('recalling words that have settled', () => {
     const root = (last = recall(learner(true), judge));
     type(root, 'salamat sa iyo');
     await flush();
-    expect(judge).toHaveBeenCalledWith('salamat sa iyo', expect.objectContaining<Partial<Card>>({ id: 'salamat' }), 'tl');
+    expect(judge).toHaveBeenCalledWith('salamat sa iyo', expect.objectContaining<Partial<Card>>({ id: 'salamat' }), 'tl', true);
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+
+  it('turns a misspelling down, says to check the spelling, and offers no "I had it right"', async () => {
+    const judge = vi.fn<MeaningJudge>(async () => true);
+    const root = (last = recall(learner(true), judge));
+    type(root, 'salamt');
+    await flush();
+    expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
+    expect(root.querySelector('.feedback')?.textContent).toContain('Nearly: check the spelling.');
+    expect([...root.querySelectorAll('button')].some((b) => b.textContent === 'I had it right')).toBe(false);
+    expect(judge).not.toHaveBeenCalled();
   });
 
   it('offers the choices instead, in Tagalog', () => {

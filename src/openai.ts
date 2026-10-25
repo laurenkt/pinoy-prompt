@@ -257,26 +257,37 @@ export const CHECK_MODEL = 'gpt-5.4-mini';
 /** A check slower than this isn't worth the wait; the learner can judge it themselves. */
 const CHECK_TIMEOUT_MS = 8000;
 
+/** What a recall check is told about the Tagalog, after how it was given and how to judge spelling. */
+const TL_RULES = `Leaving out a "po" or "ho" that the given Tagalog has is wrong: it's what makes it polite.
+It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.
+The answer has to be in Tagalog. It's wrong if they just repeat the English or answer in English (or any other language), even though that means the same thing. Tagalog that uses a word borrowed from English or Spanish, as Filipinos say it (okay, bill, dyip, traffic for trapik), is still Tagalog.`;
+
 const CHECK_INSTRUCTIONS: Record<AnswerLanguage, string> = {
   en: `You check a beginner's answer in a Tagalog listening drill. They heard a Tagalog word or phrase and wrote what they think it means in English, possibly with a phone's dictation.
 Judge only whether they understood the meaning. Spelling, grammar, word order and wording don't matter; synonyms, paraphrases and a missing "please" or "very" are still right, and so is any one of the meanings separated by "/".
 It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.
 The answer has to be in English. It's wrong if they just repeat the Tagalog or answer in Tagalog (or any other language), even though that means the same thing. English that uses a word Tagalog borrows or English borrows from Tagalog (okay, bill, adobo, jeepney) is still English.`,
-  tl: `You check a beginner's answer in a Tagalog recall drill. They were shown an English meaning and wrote how to say it in Tagalog, possibly with a phone's dictation.
+  tl: `You check a beginner's answer in a Tagalog recall drill. They were shown an English meaning and said how to say it in Tagalog, written out by a phone's dictation.
 Judge whether it's a right way to say that meaning in everyday Tagalog, as the given Tagalog is. Small spelling differences don't matter: common spellings (kamusta, ganun, dyan), o for u, e for i, a letter or two wrong, missing or swapped, and how dictation spells what was said are still right, and so are an added "po" or "ho", "ho" for "po", and other natural wordings that mean the same.
-A different word is wrong, even one that looks like the right one (maraming for magandang): that's mixing up two words, not a typo. A shortened or dictated spelling of the right word (san for saan, ung for yung) is still right.
-Leaving out a "po" or "ho" that the given Tagalog has is wrong: it's what makes it polite.
-It's wrong if the meaning differs: a different word, time, person, number, place, or the opposite.
-The answer has to be in Tagalog. It's wrong if they just repeat the English or answer in English (or any other language), even though that means the same thing. Tagalog that uses a word borrowed from English or Spanish, as Filipinos say it (okay, bill, dyip, traffic for trapik), is still Tagalog, and so is a Tagalog number that dictation wrote as digits.`,
+A different word is wrong, even one that looks like the right one (maraming for magandang): that's mixing up two words, not a typo. A shortened or dictated spelling of the right word (san for saan, ung for yung) is still right, and so is a Tagalog number that dictation wrote as digits.
+${TL_RULES}`,
 };
+
+/** A recall answer typed rather than said: the learner is learning to spell it, so spelling counts. */
+const CHECK_TYPED_TAGALOG = `You check a beginner's answer in a Tagalog recall drill. They were shown an English meaning and typed how to say it in Tagalog. They are learning to spell it, so spelling counts.
+Judge whether it's a right way to say that meaning in everyday Tagalog, as the given Tagalog is, with every word spelled the standard way. Other natural wordings that mean the same are right when spelled right, and so are an added "po" or "ho" and "ho" for "po". Capitals, accents, punctuation, and spaces or hyphens between parts of a word don't matter.
+A misspelt word is wrong, even one letter off and even if it sounds the same (salamt for salamat, magandag for magandang, o for u or e for i where the word isn't written that way), and so is a shortened or texting spelling (san for saan, musta for kumusta) and a number written in digits rather than spelled out.
+A different word is wrong, even one that looks like the right one (maraming for magandang).
+${TL_RULES}`;
 
 /**
  * Ask OpenAI whether `answer` says the card in `language`: its meaning in
- * English, or its Tagalog. Sends only the card and the typed answer.
+ * English, or its Tagalog. Sends only the card and the answer. Tagalog that was
+ * `typed`, not said, has to be spelled right.
  */
 export async function checkMeaning(
   key: string,
-  { tl, en, answer, language = 'en' }: { tl: string; en: string; answer: string; language?: AnswerLanguage },
+  { tl, en, answer, language = 'en', typed = false }: { tl: string; en: string; answer: string; language?: AnswerLanguage; typed?: boolean },
   fetchFn: typeof fetch = (...args) => fetch(...args),
 ): Promise<boolean> {
   type Answer = { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
@@ -288,7 +299,7 @@ export async function checkMeaning(
         {
           model: CHECK_MODEL,
           reasoning: { effort: 'none' },
-          instructions: CHECK_INSTRUCTIONS[language],
+          instructions: language === 'tl' && typed ? CHECK_TYPED_TAGALOG : CHECK_INSTRUCTIONS[language],
           input: `Tagalog: ${tl}\nMeaning: ${en}\nAnswer: ${answer.slice(0, 200)}`,
           text: {
             format: {

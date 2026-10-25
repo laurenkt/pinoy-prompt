@@ -90,7 +90,7 @@ describe('listening to words that have settled', () => {
     button(root, 'Next').click();
     type(root, 'thanks a lot');
     expect(button(root, 'Checking').disabled).toBe(true);
-    expect(judge).toHaveBeenCalledWith('thanks a lot', expect.objectContaining<Partial<Card>>({ id: 'maraming-salamat' }), 'en');
+    expect(judge).toHaveBeenCalledWith('thanks a lot', expect.objectContaining<Partial<Card>>({ id: 'maraming-salamat' }), 'en', true);
     answer(true);
     await flush();
     expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
