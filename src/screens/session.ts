@@ -4,6 +4,7 @@ import { KIND_INFO } from '../guides';
 import {
   DRILL_MIN_WORDS,
   abilities,
+  askAs,
   buildExtraSession,
   canDrill,
   distractors,
@@ -170,6 +171,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       askGuide(c);
       return;
     }
+    // A review may ask a phrase as a variant on its pattern; a way still new asks the phrase itself.
+    if (s.kind === 'review') card = c = askAs(app.progress, c);
     pictured = (format === 'recall' || format === 'produce') && askWithPicture(c);
     if (format === 'remember' || format === 'hear' || format === 'produce') {
       phase = 'front';

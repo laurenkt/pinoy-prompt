@@ -85,7 +85,7 @@ const key = process.env.OPENAI_API_KEY;
 // The app's own modules, loaded through Vite as the app loads them.
 const vite = await createServer({ root: ROOT, server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
 const { allSpoken, spokenText } = await vite.ssrLoadModule('/src/spoken.ts');
-const { VOCAB } = await vite.ssrLoadModule('/src/deck.ts');
+const { ASKED_VOCAB } = await vite.ssrLoadModule('/src/deck.ts');
 const { englishReadings, judge, lostFirstSound, packOdds, passes, unpackOdds } = await vite.ssrLoadModule('/src/phonetics.ts');
 const { recognise } = await vite.ssrLoadModule('/src/phone-model.ts');
 const { measurer } = await vite.ssrLoadModule('/src/prosody.ts');
@@ -137,9 +137,9 @@ async function listen(file, asked) {
   return { ...found, odds: packOdds(odds), prosody };
 }
 
-/** The spellings Speak takes for each text, from every card that says it (Speak asks words and phrases, not guides). */
+/** The spellings Speak takes for each text, from every card that says it (Speak asks words and phrases and their variants, not guides). */
 const speakAs = new Map();
-for (const card of VOCAB) speakAs.set(spokenText(card), [...(speakAs.get(spokenText(card)) ?? []), [card.tl, ...(card.accept ?? [])]]);
+for (const card of ASKED_VOCAB) speakAs.set(spokenText(card), [...(speakAs.get(spokenText(card)) ?? []), [card.tl, ...(card.accept ?? [])]]);
 
 /** What's wrong with a clip of the text, as Speak hears it: a first sound gone, letters said the English way, or a card it wouldn't pass as. */
 function soundProblems(text, heard) {

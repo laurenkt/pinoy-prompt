@@ -1,10 +1,10 @@
 // Every piece of Tagalog the app can say has its recorded clip, and every clip listed is there to keep offline.
-// Every card's clips pass Speak as that card, and never as a different one.
+// Every card's clips (and each phrase variant's) pass Speak as that card, and never as a different one.
 
 import { describe, expect, it } from 'vitest';
 import clips from './clips.json';
 import clipSounds from './clip-sounds.json';
-import { VOCAB, type Card } from './deck';
+import { ASKED_VOCAB, VOCAB, type Card } from './deck';
 import { GUIDES } from './guides';
 import { drillSentence } from './session';
 import { compare, englishReadings, judge, lostFirstSound, PASS, passes, ROUGHLY, toPhones, unpackOdds, type Heard } from './phonetics';
@@ -67,7 +67,7 @@ describe('recorded clips, heard by Speak', () => {
   });
 
   it("passes every card's own clips, so a learner who says it like them passes too", () => {
-    const failing = VOCAB.flatMap((card) =>
+    const failing = ASKED_VOCAB.flatMap((card) =>
       files(spokenText(card)).flatMap((file) => {
         const heard = said(file);
         const { comparison } = judge(texts(card), heard);
@@ -101,8 +101,8 @@ describe('recorded clips, heard by Speak', () => {
     const different = (a: Card, b: Card) => texts(a).every((t) => judge(texts(b), { sounds: perfectly(t) }).comparison.score < ROUGHLY);
     // At natural speed: the slow clips are the same takes.
     let pairs = 0;
-    const passing = VOCAB.flatMap((card) => {
-      const others = VOCAB.filter((other) => other !== card && different(card, other));
+    const passing = ASKED_VOCAB.flatMap((card) => {
+      const others = ASKED_VOCAB.filter((other) => other !== card && different(card, other));
       return (CLIPS[spokenText(card)] ?? []).flatMap((file) => {
         const heard = said(file);
         pairs += others.length;
@@ -122,8 +122,8 @@ describe('recorded clips, heard by Speak', () => {
     const perfectly = (text: string) => toPhones(text).filter((p) => !p.optional).map((p) => p.ipa);
     const closeness = (a: Card, b: Card) => Math.max(...texts(a).map((t) => judge(texts(b), { sounds: perfectly(t) }).comparison.score));
     let pairs = 0;
-    const passing = VOCAB.flatMap((card) => {
-      const near = VOCAB.filter((other) => other !== card && closeness(card, other) >= ROUGHLY && closeness(card, other) < PASS);
+    const passing = ASKED_VOCAB.flatMap((card) => {
+      const near = ASKED_VOCAB.filter((other) => other !== card && closeness(card, other) >= ROUGHLY && closeness(card, other) < PASS);
       return (CLIPS[spokenText(card)] ?? []).flatMap((file) => {
         const heard = said(file);
         pairs += near.length;
@@ -145,11 +145,11 @@ describe('recorded clips, measured for stress', () => {
     files(spokenText(card)).map((file) => ({ file, comparison: compare(toPhones(card.tl), HEARD[file]?.sounds ?? [], HEARD[file]?.runnersUp) }));
 
   it('has measured every clip Speak asks (run `npm run audio` to measure new ones)', () => {
-    expect(VOCAB.flatMap((card) => files(spokenText(card)).filter((f) => !HEARD[f]?.prosody))).toEqual([]);
+    expect(ASKED_VOCAB.flatMap((card) => files(spokenText(card)).filter((f) => !HEARD[f]?.prosody))).toEqual([]);
   });
 
   it("never tells a learner who says a card like its clips to lean on another syllable", () => {
-    const told = VOCAB.flatMap((card) =>
+    const told = ASKED_VOCAB.flatMap((card) =>
       measured(card).flatMap(({ file, comparison }) => {
         const tip = stressTip(cardStress(card, card.tl, comparison, prosodyOf(file)));
         return tip ? [`${file}: ${tip}`] : [];
@@ -159,7 +159,7 @@ describe('recorded clips, measured for stress', () => {
   });
 
   it("judges stress on exactly the words whose clips all measure as their hint says (else add them to UNJUDGED)", () => {
-    const unsure = VOCAB.filter((card) => {
+    const unsure = ASKED_VOCAB.filter((card) => {
       const stresses = measured(card).flatMap(({ file, comparison }) => measureStress(card.tl, card.hint ?? '', comparison, prosodyOf(file)) ?? []);
       return stresses.length > 0 && stresses.some((s) => leanAgainst(s) > 0);
     }).map((card) => card.id);

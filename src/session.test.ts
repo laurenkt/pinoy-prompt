@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ALL_CARDS, LEARN_ORDER, UNITS, WAYS, buildsOn, cardKey, getCard, isVocab, studyWays, type Card, type Way } from './deck';
 import {
   MAX_LEARNING,
+  askAs,
   PATTERN_START,
   GUIDE_START,
   buildExtraSession,
@@ -402,6 +403,35 @@ describe('requeue', () => {
 
   it('appends when the queue is short', () => {
     expect(requeue([], { cardId: 'x', kind: 'review' })).toEqual([{ cardId: 'x', kind: 'review' }]);
+  });
+});
+
+describe('askAs', () => {
+  const now = Date.UTC(2026, 0, 1);
+  const banyo = getCard('nasaan-banyo')!;
+  const met = (...ids: string[]) => {
+    const progress = emptyProgress(now);
+    for (const id of ids) recordAnswer(progress, id, 'good', now);
+    return progress;
+  };
+
+  it('sometimes asks a phrase as a variant whose words are all met', () => {
+    const progress = met('nasaan', 'ang', 'nasaan-banyo', 'kape');
+    expect(askAs(progress, banyo, () => 0).tl).toBe('Nasaan ang kape?');
+    expect(askAs(progress, banyo, () => 0).id).toBe('nasaan-banyo');
+    expect(askAs(progress, banyo, () => 0.99)).toBe(banyo);
+  });
+
+  it('never asks a variant with a word not met yet', () => {
+    expect(askAs(met('nasaan', 'ang', 'nasaan-banyo'), banyo, () => 0)).toBe(banyo);
+    // "palengke" met but not "kape": only the market is asked.
+    const progress = met('nasaan', 'ang', 'nasaan-banyo', 'palengke');
+    expect(askAs(progress, banyo, () => 0).tl).toBe('Nasaan ang palengke?');
+  });
+
+  it('asks a card without variants as itself', () => {
+    const salamat = getCard('salamat')!;
+    expect(askAs(met('salamat'), salamat, () => 0)).toBe(salamat);
   });
 });
 

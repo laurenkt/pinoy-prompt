@@ -1,7 +1,7 @@
 // Builds a study session and tracks it as the learner works through it.
 // Kept free of DOM code so it can be unit tested.
 
-import { LEARN_ORDER, VOCAB, buildsOn, cardKey, closeInMeaning, getCard, isVocab, keyed, studyWays, type Card, type CardKind, type Drill, type Way } from './deck';
+import { LEARN_ORDER, VOCAB, buildsOn, cardForWord, cardKey, closeInMeaning, getCard, isVocab, keyed, studyWays, tagalogWords, variantsOf, type Card, type CardKind, type Drill, type Way } from './deck';
 import { recallChance } from './memory';
 import { DAY_MS, MAX_HELP, START_EASE, isDue, newCardState, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
@@ -441,6 +441,24 @@ export function setDrillHelp(progress: Progress, cardId: string, way: Way, to: (
   // Kept even once it's back to none, so a sync keeps the clearing too.
   state.helpAt = now;
   return true;
+}
+
+/** How often a phrase with variants the learner can be asked is asked as one of them, rather than as itself. */
+export const VARIANT_CHANCE = 0.5;
+
+/**
+ * The card as it's asked this time: itself, or now and then (VARIANT_CHANCE) one of its variants (variantsOf in
+ * deck.ts), picked from those whose words the learner has all met, so a variant never brings a word they don't know.
+ * Decided once per question, as askWithPicture is, so a redraw keeps it.
+ */
+export function askAs(progress: Progress, card: Card, random: () => number = Math.random): Card {
+  const met = (word: string) => {
+    const id = cardForWord(word);
+    return !id || isIntroduced(progress, id);
+  };
+  const ready = variantsOf(card).filter((v) => tagalogWords(v.tl).every(met));
+  if (!ready.length || random() >= VARIANT_CHANCE) return card;
+  return ready[Math.floor(random() * ready.length)];
 }
 
 /** A few more new cards beyond the daily rate, for when the learner wants them. */

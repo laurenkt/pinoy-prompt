@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_CARDS, CORE_WORDS, LEARN_ORDER, UNITS, VOCAB, buildsOn, cardForWord, getCard, isVocab, tagalogWords } from './deck';
+import { ALL_CARDS, ASKED_VOCAB, CORE_WORDS, LEARN_ORDER, UNITS, VOCAB, buildsOn, cardForWord, getCard, isVocab, tagalogWords, variantsOf } from './deck';
 import { GUIDES } from './guides';
 import { canBuild, upcomingNewCards } from './session';
 import { emptyProgress, recordAnswer } from './store';
@@ -53,7 +53,7 @@ describe('deck', () => {
   });
 
   it('has unique English meanings so quiz answers are unambiguous', () => {
-    const meanings = ALL_CARDS.map((c) => c.en.toLowerCase());
+    const meanings = [...ASKED_VOCAB, ...GUIDES].map((c) => c.en.toLowerCase());
     expect(new Set(meanings).size).toBe(meanings.length);
   });
 
@@ -105,7 +105,7 @@ describe('deck', () => {
   });
 
   it('writes a hard g before e or i as "gh" in pronunciation hints, as English reads "gee" like "jee"', () => {
-    for (const card of ALL_CARDS) expect(card.hint ?? '', card.id).not.toMatch(/(?<!n)g[ei]/i);
+    for (const card of [...ASKED_VOCAB, ...GUIDES]) expect(card.hint ?? '', card.tl).not.toMatch(/(?<!n)g[ei]/i);
   });
 
   it('keeps every card id that saved progress may point at', () => {
@@ -118,6 +118,35 @@ describe('deck', () => {
     for (const id of SHIPPED_IDS) recordAnswer(progress, id, 'good', now);
     const [next] = upcomingNewCards(progress, 1);
     expect(SHIPPED_IDS).not.toContain(next);
+  });
+});
+
+describe('phrase variants', () => {
+  const varied = VOCAB.filter((c) => c.variants?.length);
+
+  it('are only on phrases, each a sentence no card or other variant already is', () => {
+    for (const card of varied) expect(card.kind, card.id).toBe('phrase');
+    const sentences = ASKED_VOCAB.map((c) => c.tl.toLowerCase());
+    expect(sentences.filter((t, i) => sentences.indexOf(t) !== i)).toEqual([]);
+  });
+
+  it('bring no word that has no card of its own, other than the phrase\'s own', () => {
+    for (const card of varied) {
+      const own = tagalogWords(card.tl);
+      for (const v of variantsOf(card)) {
+        const unknown = tagalogWords(v.tl).filter((w) => !own.includes(w) && !cardForWord(w));
+        expect(unknown, v.tl).toEqual([]);
+      }
+    }
+  });
+
+  it('are asked as the phrase, with a hook saying what changed', () => {
+    const [kape] = variantsOf(getCard('nasaan-banyo')!);
+    expect(kape).toMatchObject({ id: 'nasaan-banyo', kind: 'phrase', tl: 'Nasaan ang kape?', en: 'Where is the coffee?' });
+    expect(kape.hook).toBe('The pattern of "Nasaan ang banyo?" (Where is the bathroom?), with "kape" in place of "banyo".');
+    expect(variantsOf(getCard('libre-ka-ba')!)[0].hook).toBe('The pattern of "Libre ka ba?" (Are you free?), with "bukas" added.');
+    expect(variantsOf(getCard('nasaan-banyo')!)[0]).toBe(kape);
+    expect(variantsOf(getCard('salamat')!)).toEqual([]);
   });
 });
 
