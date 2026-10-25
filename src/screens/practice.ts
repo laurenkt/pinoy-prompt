@@ -302,10 +302,16 @@ export function practiceScreen(
             spokeWrong = true;
             noteHelp(q, true);
           }
-          if (!right || spokenRight) return;
-          spokenRight = true;
-          if (!spokeWrong) noteHelp(q, false);
-          void chime();
+          const first = right && !spokenRight;
+          if (first) {
+            spokenRight = true;
+            if (!spokeWrong) noteHelp(q, false);
+            void chime();
+          }
+          // The word said back after any attempt it was heard in, right or wrong, as a Listen answer is: after the
+          // chime, and before moving on, which waits for it.
+          if (heard) sayCard(q);
+          if (!first) return;
           // Pick what's next now, so its word loads while the coaching is up.
           settle(true);
           auto = countdown(root, () => {

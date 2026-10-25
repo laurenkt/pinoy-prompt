@@ -52,6 +52,15 @@ export const defaultDeps: SpeakDeps = {
 };
 let sharedPlayer: Player | null = null;
 
+/** The result's own sounds (the attempt, a sound held) stop the card's word, which may be playing by itself, so the two never overlap. */
+function silencing(player: Player, silence: () => void): Player {
+  return {
+    playSlice: (...args) => (silence(), player.playSlice(...args)),
+    hold: (...args) => (silence(), player.hold(...args)),
+    stop: () => player.stop(),
+  };
+}
+
 type Problem = RecordProblem | 'download' | 'start' | 'failed';
 
 /** What went wrong, in words; the recording ones are used by Drills' spoken meanings too. */
@@ -442,7 +451,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           : 'Letters in pink need work; yellow ones were nearly there.';
     breakdown =
       heard.length > 0 && recognition && samples
-        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: deps.player() })
+        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: silencing(deps.player(), options.silence) })
         : null;
     if (breakdown) {
       // The breakdown takes the card's place: the word, coloured by how each sound came
