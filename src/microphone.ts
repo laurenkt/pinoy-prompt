@@ -1,23 +1,23 @@
-// One microphone stream shared by speaking drills and Talk, kept open between
-// uses so the learner's "Allow" lasts. Between uses the tracks are switched
-// off, and the stream is closed for real after a few idle minutes or when the
-// app goes into the background.
+// One microphone stream shared by speaking drills and Talk, open only while
+// something is listening: a take, a warm-up for one, or a call.
+//
+// While a stream is open, even with its tracks switched off, iOS puts the
+// whole page in a call (WebKit's PlayAndRecord category in VideoChat mode,
+// see MediaSessionManagerCocoa): playback goes through voice processing,
+// much quieter, on a volume of its own that the side buttons only reach
+// while it's in a call. So the stream is closed as soon as nothing is using
+// it, and every sound between takes plays as media, at the phone's volume.
 //
 // What WebKit remembers (UserMediaPermissionRequestManagerProxy): an "Allow"
-// lasts for the page while a stream is open (a switched-off track still
-// counts), and for 10 minutes after the last one closes if the next request
-// comes from a tap (1 minute if not, on iPhone). Reloading forgets it, and so
-// does a fresh launch of the home-screen app. Only Safari's own site setting
-// (Microphone: Allow) keeps it for longer, and the home-screen app has none. So
-// callers ask from a tap. Holding the stream longer would stretch the window,
-// but an open microphone puts playback through voice processing and keeps the
-// orange dot on, so it's only held a few minutes, unless a screen that will
-// keep asking (a drill round, Study's practice) holds it until it's left.
+// lasts for the page while a stream is open, and for 10 minutes after the
+// last one closes if the next request comes from a tap (1 minute if not, on
+// iPhone). Reloading forgets it, and so does a fresh launch of the home-screen
+// app. Only Safari's own site setting (Microphone: Allow) keeps it for
+// longer, and the home-screen app has none. So callers ask from a tap, and a
+// screen that will keep asking (a drill round) asks as it opens
+// (askMicrophone), which starts those 10 minutes; each take starts them again.
 
 import { setAudioSession } from './audio-session';
-
-/** Close the stream after this long unused, so the microphone isn't held forever. */
-export const IDLE_CLOSE_MS = 3 * 60 * 1000;
 
 // Auto gain is left at the browser's default, as both callers had it before.
 const CONSTRAINTS: MediaStreamConstraints = {
@@ -27,11 +27,8 @@ const CONSTRAINTS: MediaStreamConstraints = {
 let stream: MediaStream | null = null;
 let opening: Promise<MediaStream> | null = null;
 let users = 0;
-let idle: ReturnType<typeof setTimeout> | undefined;
-/** Whether a screen wants the stream kept until it's left (holdMicrophone). */
-let held = false;
-/** Bumped as each hold ends, so a hold asked for by a screen already left isn't taken up. */
-let holds = 0;
+/** Bumped as each screen that asked is left, so an answer that comes after isn't taken as the screen's. */
+let asks = 0;
 /** When the last stream closed, by Date.now(); WebKit keeps the learner's Allow for 10 minutes after. */
 let closedAt = -Infinity;
 /** Under WebKit's 10 minutes, so a request just inside it doesn't race the watchdog. */
@@ -39,7 +36,7 @@ export const ALLOW_KEPT_MS = 9 * 60 * 1000;
 /** The site setting says Allow (a Safari tab set so), as read when the app opened. */
 let allowedBySite = false;
 
-/** Whether a microphone stream is open, even if switched off between uses. */
+/** Whether a microphone stream is open, or being opened. */
 export function microphoneOpen(): boolean {
   return stream !== null || opening !== null;
 }
@@ -52,7 +49,7 @@ export function liveMicrophone(): MediaStream | null {
   return stream && live(stream) ? stream : null;
 }
 
-/** Whether something is recording or on a call now, rather than the stream waiting switched off. */
+/** Whether something is recording, warming up or on a call now, rather than the stream just being asked for. */
 export function microphoneInUse(): boolean {
   return users > 0 || opening !== null;
 }
@@ -65,12 +62,22 @@ export function microphoneAllowed(): boolean {
   return microphoneOpen() || Date.now() - closedAt < ALLOW_KEPT_MS || allowedBySite;
 }
 
+/** WebKit asks again from outside a tap once the last stream closed more than a minute ago; a little under it. */
+export const REOPEN_QUIETLY_MS = 50 * 1000;
+
+/**
+ * Whether getMicrophone() now would go straight through without the browser asking, for a caller that may not be
+ * inside a tap (`fromTap` false): outside one, WebKit only remembers the Allow for a minute after the last stream closed.
+ */
+export function microphoneOpensQuietly(fromTap: boolean): boolean {
+  return microphoneOpen() || allowedBySite || Date.now() - closedAt < (fromTap ? ALLOW_KEPT_MS : REOPEN_QUIETLY_MS);
+}
+
 // A track iOS muted (a phone call, Siri) can stay "live" but silent, so it doesn't count.
 const live = (s: MediaStream) => s.getAudioTracks().some((t) => t.readyState === 'live' && !t.muted);
 
 /** The microphone, switched on. Only asks for permission when no stream is open. Pair with releaseMicrophone(). */
 export async function getMicrophone(): Promise<MediaStream> {
-  clearTimeout(idle);
   if (stream && !live(stream)) closeMicrophone();
   if (!stream) {
     setAudioSession('play-and-record');
@@ -88,64 +95,51 @@ export async function getMicrophone(): Promise<MediaStream> {
   return stream;
 }
 
-/** Done with the stream from getMicrophone(). Call once per getMicrophone(). It's switched off now and closed later if nothing else wants it. */
+/** Done with the stream from getMicrophone(). Call once per getMicrophone(). It's closed once nothing else is using it. */
 export function releaseMicrophone(released: MediaStream): void {
   if (released !== stream) {
     released.getTracks().forEach((t) => t.stop());
     return;
   }
   users = Math.max(0, users - 1);
-  if (users > 0) return;
-  for (const t of released.getTracks()) t.enabled = false;
-  closeWhenIdle();
+  if (users === 0) closeMicrophone();
 }
 
 /**
  * Done with a stream from getMicrophone() that gave no sound at all (iOS can leave a track live but silent):
- * in place of releaseMicrophone(), it's closed unless something else is using it, so the next getMicrophone()
- * opens a fresh one.
+ * in place of releaseMicrophone(). It's closed unless something else is using it, as any stream is, so the
+ * next getMicrophone() opens a fresh one.
  */
 export function dropMicrophone(dead: MediaStream): void {
   releaseMicrophone(dead);
-  if (dead === stream && users === 0) closeMicrophone();
-}
-
-function closeWhenIdle(): void {
-  clearTimeout(idle);
-  if (!held && stream && users === 0) idle = setTimeout(closeMicrophone, IDLE_CLOSE_MS);
 }
 
 /**
- * Open the microphone and keep it, switched off, until endMicrophoneHold() (app.navigate calls it), so a
- * screen that asks for it up front isn't asked again partway through. Call from a tap: it may ask the learner.
- * False if the hold was ended while the learner was being asked (the screen has gone), whether or not they allowed it.
+ * Ask for the microphone now, and close it again straight away, so takes over the next few minutes open it without
+ * the browser asking (microphoneAllowed). Call from a tap: it may ask the learner. False if the screen that asked was
+ * left (endMicrophoneAsk) while the learner was being asked, whether or not they allowed it.
  */
-export async function holdMicrophone(): Promise<boolean> {
-  const mine = holds;
+export async function askMicrophone(): Promise<boolean> {
+  const mine = asks;
   let s: MediaStream;
   try {
     s = await getMicrophone();
   } catch (error) {
     // Refused (or no microphone) after the screen went: nothing is waiting to hear it.
-    if (mine !== holds) return false;
+    if (mine !== asks) return false;
     throw error;
   }
-  held = mine === holds;
   releaseMicrophone(s);
-  return held;
+  return mine === asks;
 }
 
-/** Let the stream close once it's been idle a while, as usual. */
-export function endMicrophoneHold(): void {
-  holds++;
-  if (!held) return;
-  held = false;
-  closeWhenIdle();
+/** The screen that asked has gone (app.navigate calls it), so an answer still to come isn't its. */
+export function endMicrophoneAsk(): void {
+  asks++;
 }
 
 /** Stop the stream now. The next getMicrophone() opens a new one. */
 export function closeMicrophone(): void {
-  clearTimeout(idle);
   // Only hand the session back if the microphone had it: this also runs on every trip to the background.
   const had = stream !== null;
   if (had) closedAt = Date.now();

@@ -239,6 +239,28 @@ describe('clips', () => {
     expect(contexts.at(-1)).not.toBe(withMic);
   });
 
+  it('keeps the context made with the microphone after it closes until a tap can start a new one', async () => {
+    const track = { enabled: true, readyState: 'live', muted: false, stop() {} };
+    const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+    const userActivation = { isActive: true };
+    vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: async () => stream }, userActivation });
+    const { closeMicrophone, getMicrophone } = await import('./microphone');
+    await getMicrophone();
+    await play({ tl: 'Salamat' });
+    const withMic = contexts.at(-1)!;
+    // A take ended by itself, and the word is said back: outside a tap, iOS wouldn't start a new context.
+    closeMicrophone();
+    userActivation.isActive = false;
+    await play({ tl: 'Salamat' });
+    expect(withMic.closed).toBe(false);
+    expect(contexts.at(-1)).toBe(withMic);
+    // The next tap makes one at the rate the phone plays at now.
+    userActivation.isActive = true;
+    await play({ tl: 'Salamat' });
+    expect(withMic.closed).toBe(true);
+    expect(contexts.at(-1)).not.toBe(withMic);
+  });
+
   it('counts words as playable from clips alone, and says a recorded voice reads them', () => {
     expect(canPlay()).toBe(true);
     expect(voiceQuality()).toBe('recorded');

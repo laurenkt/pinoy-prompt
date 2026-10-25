@@ -2,7 +2,7 @@
 // on the device, and coach them sound by sound.
 
 import { coach, stressTip, type Tip } from '../coach';
-import { holdMicrophone, microphoneAllowed } from '../microphone';
+import { askMicrophone, microphoneAllowed } from '../microphone';
 import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
@@ -32,10 +32,10 @@ export interface SpeakDeps {
   modelKnownDownloaded?(): boolean;
   /** Whether the microphone would open without the browser asking (see askForMicrophone). A stand-in without it always would. */
   microphoneAllowed?(): boolean;
-  /** Open the microphone and keep it until the screen is left; false if it was left meanwhile. */
-  holdMicrophone?(): Promise<boolean>;
-  /** Get the held microphone going ahead of a take, its sound thrown away until then; null if there was nothing to warm. */
-  warmRecorder?(): Warmth | null;
+  /** Ask for the microphone now, so takes for the next few minutes don't; false if the screen was left meanwhile. */
+  askMicrophone?(): Promise<boolean>;
+  /** Get the microphone going ahead of a take, its sound thrown away until then; null if it couldn't without the browser asking. */
+  warmRecorder?(fromTap: boolean): Warmth | null;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -47,7 +47,7 @@ export const defaultDeps: SpeakDeps = {
   player: () => (sharedPlayer ??= webAudioPlayer()),
   modelKnownDownloaded,
   microphoneAllowed,
-  holdMicrophone,
+  askMicrophone,
   warmRecorder,
 };
 let sharedPlayer: Player | null = null;
@@ -137,13 +137,13 @@ export function needsMicrophone(deps: SpeakDeps): boolean {
 }
 
 /**
- * Open the microphone and hold it until the screen is left. Called from the tap that starts a round that may ask the
- * learner to speak, so the phone asks then, over micWaiting(), rather than over a speaking question. 'refused' if
+ * Ask for the microphone, so takes over the next few minutes open it without asking. Called from the tap that starts a
+ * round that may ask the learner to speak, so the phone asks then, over micWaiting(), rather than over a speaking question. 'refused' if
  * it was refused or there's no microphone (the round then leaves speaking out), 'left' if the screen went meanwhile.
  */
 export async function askForMicrophone(deps: SpeakDeps): Promise<'on' | 'refused' | 'left'> {
   try {
-    return (await (deps.holdMicrophone?.() ?? true)) ? 'on' : 'left';
+    return (await (deps.askMicrophone?.() ?? true)) ? 'on' : 'left';
   } catch {
     return 'refused';
   }
@@ -189,14 +189,15 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   /**
    * The microphone warmed for this question. It's warmed from the tap that brought the question up (or, once
    * the model is ready, as it can be without one) and while ready to listen, so a take starts with sound already
-   * flowing; anything else (a result, a problem, the question going) lets it go.
+   * flowing; anything else (a result, a problem, the question going) lets it go, which closes the microphone, so
+   * the word said back plays at the phone's own volume rather than a call's (microphone.ts).
    */
   let warmth: Warmth | null = null;
   let mayWarm = true;
-  /** Again if the last one ended by itself (timed out, or the app went into the background). */
-  const warmUp = () => {
+  /** Again if the last one ended by itself (timed out, or the app went into the background). `fromTap`: inside a tap now. */
+  const warmUp = (fromTap = false) => {
     if (warmth?.warm || disposed || !mayWarm) return;
-    warmth = deps.warmRecorder?.() ?? null;
+    warmth = deps.warmRecorder?.(fromTap) ?? null;
   };
   const coolDown = () => {
     warmth?.cool();
@@ -528,7 +529,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   draw();
   // Inside the tap that brought the question up, if one did: a model already on the device means a take is coming.
-  if (deps.modelKnownDownloaded?.()) warmUp();
+  if (deps.modelKnownDownloaded?.()) warmUp(options.autofocus ?? true);
   void prepare();
 
   return {
