@@ -7,6 +7,7 @@ import type { App } from '../app';
 import { cardKey, type Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
 import { recordAnswer } from '../store';
+import { drillHelp } from '../session';
 import { button, fakeApp, flush, noMic } from '../test/screen';
 import { ADVANCE_MS } from './auto-advance';
 import { practiceScreen, type MeaningHearer } from './practice';
@@ -212,6 +213,23 @@ describe('listening to words that have settled', () => {
     answer(true);
     await flush();
     expect(root.querySelector('.feedback')).toBeNull();
+  });
+
+  it('keeps a word coming back after a miss when an answer the check could not reach is claimed right', async () => {
+    const app = learner(true);
+    let offline = false;
+    const root = listen(app, async () => (offline ? Promise.reject(new Error('offline')) : false));
+    type(root, 'good night');
+    await flush();
+    expect(drillHelp(app.progress.cards.salamat, 'listen')).toBe(1);
+    // Straight back; this time the check can't be reached, and it was right.
+    button(root, 'Next').click();
+    offline = true;
+    type(root, 'thanks a lot');
+    await flush();
+    button(root, 'I had it right').click();
+    // Still coming back after the miss, so the right answer takes nothing off yet.
+    expect(drillHelp(app.progress.cards.salamat, 'listen')).toBe(1);
   });
 
   it('says when OpenAI could not be asked', async () => {
