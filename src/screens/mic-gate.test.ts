@@ -16,7 +16,7 @@ const KNOWN = ['salamat', 'kumusta', 'oo', 'paalam', 'tatlo', 'kape'];
 function micNotYet(overrides: Partial<SpeakDeps> = {}) {
   let allowed = false;
   let answer: (allow: boolean) => void = () => {};
-  const holdMicrophone = vi.fn(
+  const askMicrophone = vi.fn(
     () =>
       new Promise<boolean>((resolve, reject) => {
         answer = (allow) => (allow ? ((allowed = true), resolve(true)) : reject(new DOMException('no', 'NotAllowedError')));
@@ -28,10 +28,10 @@ function micNotYet(overrides: Partial<SpeakDeps> = {}) {
     modelKnownDownloaded: () => true,
     loadPhoneModel: () => new Promise(() => {}),
     microphoneAllowed: () => allowed,
-    holdMicrophone,
+    askMicrophone,
     ...overrides,
   } as unknown as SpeakDeps;
-  return { deps, holdMicrophone, answer: (allow: boolean) => answer(allow) };
+  return { deps, askMicrophone, answer: (allow: boolean) => answer(allow) };
 }
 
 const fakeApp = (quiet = false) => knowing(KNOWN, { dailyNew: KNOWN.length, mic: !quiet });
@@ -45,7 +45,7 @@ describe('asking for the microphone in Drills', () => {
     const mic = micNotYet();
     const root = practiceScreen(fakeApp(), mic.deps);
     document.body.append(root);
-    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(mic.askMicrophone).toHaveBeenCalledOnce();
     expect(waiting(root)).toBe(true);
     expect(root.querySelector('.choice, .speak')).toBeNull();
     mic.answer(true);
@@ -110,27 +110,27 @@ describe('asking for the microphone in Drills', () => {
   it("doesn't ask with the mic off, or when the round can't ask to speak", () => {
     const quiet = micNotYet();
     practiceScreen(fakeApp(true), quiet.deps);
-    expect(quiet.holdMicrophone).not.toHaveBeenCalled();
+    expect(quiet.askMicrophone).not.toHaveBeenCalled();
     const first = micNotYet();
     const root = practiceScreen(fakeApp(), first.deps);
     first.answer(true);
     drillScope(root, ['read']);
     const readOnly = micNotYet();
     practiceScreen(fakeApp(), readOnly.deps);
-    expect(readOnly.holdMicrophone).not.toHaveBeenCalled();
+    expect(readOnly.askMicrophone).not.toHaveBeenCalled();
     // The scope is kept across visits, so the rest get the whole mix back.
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
   });
 
-  it("holds it without a holding screen when the browser wouldn't ask, since its remembered Allow runs out", () => {
+  it("asks without a holding screen when the browser wouldn't, so its remembered Allow starts again", () => {
     const allowed = micNotYet({ microphoneAllowed: () => true });
     const root = practiceScreen(fakeApp(), allowed.deps);
-    expect(allowed.holdMicrophone).toHaveBeenCalledOnce();
+    expect(allowed.askMicrophone).toHaveBeenCalledOnce();
     expect(waiting(root)).toBe(false);
     expect(root.querySelector('.choice, .speak')).not.toBeNull();
     // Once is enough for the visit.
     drillScope(root, ['read', 'speak']);
-    expect(allowed.holdMicrophone).toHaveBeenCalledOnce();
+    expect(allowed.askMicrophone).toHaveBeenCalledOnce();
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
   });
 
@@ -138,16 +138,34 @@ describe('asking for the microphone in Drills', () => {
     let allowed = true;
     const mic = micNotYet({ microphoneAllowed: () => allowed });
     const root = practiceScreen(fakeApp(), mic.deps);
-    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(mic.askMicrophone).toHaveBeenCalledOnce();
     // A long while in the background closes the stream.
     allowed = false;
     drillScope(root, ['read', 'speak']);
-    expect(mic.holdMicrophone).toHaveBeenCalledTimes(2);
+    expect(mic.askMicrophone).toHaveBeenCalledTimes(2);
     expect(waiting(root)).toBe(true);
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
   });
 
-  it('leaves speaking out when a hold that should have gone straight through is refused', async () => {
+  it('asks again over the holding screen when a speaking question comes up after ten minutes without a take', async () => {
+    let allowed = true;
+    // A model that won't start, so the speaking question offers Skip.
+    const mic = micNotYet({ microphoneAllowed: () => allowed, loadPhoneModel: async () => Promise.reject(new Error('no')) });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    document.body.append(root);
+    mic.answer(true);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    expect(mic.askMicrophone).toHaveBeenCalledOnce();
+    allowed = false;
+    button(root, 'Skip').click();
+    expect(mic.askMicrophone).toHaveBeenCalledTimes(2);
+    expect(waiting(root)).toBe(true);
+    drillScope(root, ['listen', 'read', 'recall', 'speak']);
+  });
+
+  it('leaves speaking out when an ask that should have gone straight through is refused', async () => {
     const allowed = micNotYet({ microphoneAllowed: () => true });
     const root = practiceScreen(fakeApp(), allowed.deps);
     document.body.append(root);
@@ -170,7 +188,7 @@ describe('asking for the microphone in Drills', () => {
       root.querySelector<HTMLButtonElement>('.choice')!.click();
       button(root, 'Next').click();
     }
-    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+    expect(mic.askMicrophone).not.toHaveBeenCalled();
   });
 
   it('lets speaking in once a later tap holds the microphone, when the model is found late', async () => {
@@ -178,10 +196,10 @@ describe('asking for the microphone in Drills', () => {
     const root = practiceScreen(fakeApp(), mic.deps);
     document.body.append(root);
     await flush();
-    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+    expect(mic.askMicrophone).not.toHaveBeenCalled();
     // Narrowing to Speak and back is a tap that may ask to speak.
     drillScope(root, ['read', 'speak']);
-    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(mic.askMicrophone).toHaveBeenCalledOnce();
     let spoke = false;
     for (let i = 0; i < 40 && !spoke; i++) {
       spoke = speaking(root);
@@ -221,7 +239,7 @@ describe('asking for the microphone in Drills', () => {
     const sound = () => root.querySelector<HTMLButtonElement>('[aria-label="Sound off"]')!;
     sound().click();
     sound().click();
-    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(mic.askMicrophone).toHaveBeenCalledOnce();
     expect(waiting(root)).toBe(false);
   });
 
@@ -231,10 +249,10 @@ describe('asking for the microphone in Drills', () => {
     drillScope(root, ['read']);
     const mic = micNotYet();
     const again = practiceScreen(fakeApp(), mic.deps);
-    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+    expect(mic.askMicrophone).not.toHaveBeenCalled();
     again.querySelector<HTMLButtonElement>('.filter-toggle')!.click();
     again.querySelector<HTMLButtonElement>('[data-mode="speak"]')!.click();
-    expect(mic.holdMicrophone).toHaveBeenCalledOnce();
+    expect(mic.askMicrophone).toHaveBeenCalledOnce();
     expect(waiting(again)).toBe(true);
     drillScope(again, ['listen', 'read', 'recall', 'speak']);
   });
@@ -281,6 +299,6 @@ describe('asking for the microphone around a typed meaning', () => {
     send('thanks a lot');
     micOn();
     expect(waiting(root)).toBe(false);
-    expect(mic.holdMicrophone).not.toHaveBeenCalled();
+    expect(mic.askMicrophone).not.toHaveBeenCalled();
   });
 });
