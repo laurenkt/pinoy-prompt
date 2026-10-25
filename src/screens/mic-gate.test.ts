@@ -91,7 +91,7 @@ describe('asking for the microphone in Drills', () => {
     expect(waiting(root)).toBe(false);
     for (let i = 0; i < 20; i++) {
       expect(speaking(root)).toBe(false);
-      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      chooseRight(root);
       button(root, 'Next').click();
     }
     expect(root.querySelector<HTMLButtonElement>('[data-mode="speak"]')!.disabled).toBe(true);
@@ -173,7 +173,7 @@ describe('asking for the microphone in Drills', () => {
     await flush();
     for (let i = 0; i < 20; i++) {
       expect(speaking(root)).toBe(false);
-      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      chooseRight(root);
       button(root, 'Next').click();
     }
   });
@@ -185,7 +185,7 @@ describe('asking for the microphone in Drills', () => {
     await flush();
     for (let i = 0; i < 20; i++) {
       expect(speaking(root)).toBe(false);
-      root.querySelector<HTMLButtonElement>('.choice')!.click();
+      chooseRight(root);
       button(root, 'Next').click();
     }
     expect(mic.askMicrophone).not.toHaveBeenCalled();
