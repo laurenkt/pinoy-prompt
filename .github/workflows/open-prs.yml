@@ -3,7 +3,7 @@
 # thread can miss the event that says CI passed, so a PR can sit open unnoticed.
 # After every push to main (when a PR is most likely to start conflicting), and
 # hourly, this finds each open PR that conflicts with main or has been open two
-# hours or more. It comments on the PR, once per commit, which wakes the thread
+# hours or more. It comments on the PR, once per commit and reason, which wakes the thread
 # watching it, and lists them all in one issue, "Pull requests left open",
 # which closes itself once there are none. Draft PRs are left out.
 name: Open PRs
@@ -34,10 +34,11 @@ jobs:
         run: |
           list() { gh pr list --state open --base main --limit 500 --json number,title,url,isDraft,mergeable,createdAt,headRefOid --jq 'map(select(.isDraft | not))'; }
           # GitHub works out mergeability on request, and a push to main resets it, so give it a moment.
+          if [ "${{ github.event_name }}" = push ]; then sleep 20; fi
           for try in 1 2 3; do
             prs=$(list)
             echo "$prs" | jq -e 'any(.mergeable == "UNKNOWN")' > /dev/null || break
-            sleep 15
+            if [ "$try" -lt 3 ]; then sleep 15; fi
           done
           stuck=$(echo "$prs" | jq -c '
             map(.hours = ((now - (.createdAt | fromdateiso8601)) / 3600 | floor)
@@ -48,13 +49,15 @@ jobs:
           echo "$stuck" | jq -c '.[]' | while read -r pr; do
             number=$(echo "$pr" | jq .number)
             marker="<!-- open-prs:$(echo "$pr" | jq -r '.headRefOid + ":" + .reason') -->"
-            if gh pr view "$number" --json comments --jq '.comments[].body' | grep -qF "$marker"; then continue; fi
+            bodies=$(gh pr view "$number" --json comments --jq '.comments[].body') || continue
+            if grep -qF "$marker" <<< "$bodies"; then continue; fi
             if [ "$(echo "$pr" | jq -r .reason)" = conflict ]; then
               message='This pull request conflicts with `main`, so CI has not run on it and it cannot be merged. Merge `main` into the branch, run the tests and build, push, wait for CI, then merge and check it shows as merged.'
             else
               message="This pull request has been open $(echo "$pr" | jq .hours) hours without being merged. If CI is green and its review is addressed, merge it and check it shows as merged. If it was superseded, close it."
             fi
-            gh pr comment "$number" --body "$(printf '%s\n\n%s' "$message" "$marker")"
+            gh pr comment "$number" --body "$(printf '%s\n\n%s' "$message" "$marker")" \
+              || echo "::warning::Couldn't comment on #$number"
           done
 
           lines=$(echo "$stuck" | jq -r 'map("- [#\(.number)](\(.url)) \(.title): "
