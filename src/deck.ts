@@ -653,7 +653,7 @@ export const UNITS: Unit[] = [
       { id: 'panahon', tl: 'panahon', en: 'weather', kind: 'word', hint: 'pah-nah-HON', hook: 'It also means time or era: "noong panahon ng Kastila" is "back in Spanish times".' },
       { id: 'maaraw', tl: 'Maaraw.', en: "It's sunny. / Sunny", kind: 'word', hint: 'mah-AH-raow', hook: '"Araw" (sun, day) with "ma-": sunny. The same trick as "mainit".' },
       { id: 'umuulan', tl: 'Umuulan.', en: "It's raining. / Raining", kind: 'word', hint: 'oo-moo-oo-LAHN', hook: '"Ulan" is rain. "-um-" and the doubled "u" make it happening right now.' },
-      { id: 'payong', tl: 'payong', en: 'umbrella', kind: 'word', picture: '☂', hint: 'PAH-yong', hook: 'For rain and for sun alike: at noon you will see plenty of "payong" open under a clear sky.' },
+      { id: 'payong', tl: 'payong', en: 'umbrella', kind: 'word', hint: 'PAH-yong', hook: 'For rain and for sun alike: at noon you will see plenty of "payong" open under a clear sky.' },
       { id: 'mahangin', tl: 'Mahangin.', en: "It's windy. / Windy", kind: 'word', hint: 'mah-HAH-ngin', hook: '"Hangin" is wind and air. Said of a show-off, "mahangin" means full of hot air.' },
       { id: 'bagyo', tl: 'bagyo', en: 'typhoon', kind: 'word', hint: 'bahg-YOH', note: 'A strong one closes schools and offices: "Walang pasok", no school or work today.', hook: 'About twenty a year pass near the Philippines, so "May bagyo" (there\'s a typhoon) is everyday news.' },
       { id: 'tag-init', tl: 'tag-init', en: 'hot season / summer', kind: 'word', hint: 'tahg-EE-nit', hook: '"Tag-" means the season of, and "init" is heat, from "Mainit!". March to May: beach time.' },
@@ -729,7 +729,7 @@ export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
   ['kapatid', 'ate', 'kuya'], ['walang-problema', 'walang-anuman', 'wala-yon', 'ayos-lang'],
   ['saan', 'nasaan'], ['paano', 'gaano'], ['may', 'meron'], ['puwede', 'puwede-ba'], ['kailangan', 'kailangan-ko'], ['gusto', 'gusto-ko-ito'],
   ['sabihin', 'magsalita'], ['mauna-na-ako', 'aalis-na-ako'], ['uy', 'kumusta', 'ikaw-pala'], ['anong-meron', 'anong-balita'],
-  ['maghintay', 'teka'], ['tumulong', 'tulong'],
+  ['maghintay', 'teka'], ['tumulong', 'tulong'], ['prutas', 'saging', 'mangga'],
 ];
 
 /**
