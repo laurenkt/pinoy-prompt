@@ -9,6 +9,7 @@ import { cardKey, type Card } from '../deck';
 import type { MeaningJudge } from '../meaning';
 import type { RecorderEvents, Take } from '../recorder';
 import { recordAnswer } from '../store';
+import { DAY_MS } from '../srs';
 import { button, drillScope, fakeApp, flush, noMic } from '../test/screen';
 import { practiceScreen, type MeaningHearer } from './practice';
 import type { SpeakDeps } from './speak';
@@ -69,28 +70,78 @@ describe('recalling words still being learned', () => {
   });
 });
 
-describe("the card's memory strength", () => {
-  it('shows beside the question, and stays the same once answered', () => {
+describe("how well the card is known, on its back", () => {
+  const card = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt')!;
+  // Drawn only once the card is first turned.
+  const back = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-back') ?? { hidden: true, click() {} };
+  const front = (root: HTMLElement) => root.querySelector<HTMLElement>('.prompt .card-front')!;
+
+  it('turns over with a tap anywhere on the card, back again with another, and is face up for the next question', () => {
     const app = learner(false);
     // Recalling it is a card of its own (see Way), started here and still being learned; reading it is held for weeks.
     app.progress.cards['salamat:recall'] = { ...app.progress.cards.salamat, interval: 0 };
     app.progress.cards.salamat.interval = 30;
     const root = (last = recall(app));
-    expect(root.querySelector('.prompt .eyebrow')?.textContent).toBe('How do you say… Memory: Just met');
+    expect(back(root).hidden).toBe(true);
+    expect(root.querySelector('.prompt button')?.getAttribute('aria-expanded')).toBe('false');
+    root.querySelector<HTMLElement>('.prompt-en')!.click();
+    expect(back(root).hidden).toBe(false);
+    expect(front(root).hidden).toBe(true);
+    expect(card(root).classList.contains('turned')).toBe(true);
+    expect(root.querySelector('.prompt button')?.getAttribute('aria-expanded')).toBe('true');
+    expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Read: Long-term.');
+    expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Recall: Just met, asked now.');
+    expect(root.querySelector('.tag.asked')).not.toBeNull();
+    // Still turned once answered, as nothing on it changed.
     root.querySelector<HTMLButtonElement>('.choice')!.click();
-    expect(root.querySelector('.prompt .eyebrow .badge.s-new')?.textContent).toBe('Memory: Just met');
+    expect(back(root).hidden).toBe(false);
+    back(root).click();
+    expect(back(root).hidden).toBe(true);
+    back(root).click();
+    button(root, 'Next').click();
+    expect(back(root).hidden).toBe(true);
   });
 
-  it('follows the schedule of the way it is asked', () => {
+  it("doesn't turn for a tap on one of the card's own controls", () => {
     const app = learner(true);
-    app.progress.cards['salamat:recall'].interval = 30;
-    const root = (last = recall(app));
-    expect(root.querySelector('.prompt .eyebrow .badge.s-long')?.textContent).toBe('Memory: Long-term');
+    const root = (last = practiceScreen(app, noMic));
+    document.body.replaceChildren(root);
+    drillScope(root, ['read']);
+    root.querySelector<HTMLButtonElement>('.prompt .audio-btn')!.click();
+    expect(back(root).hidden).toBe(true);
   });
 
-  it("isn't shown for a way not studied yet", () => {
+  it('draws the way asked from its own schedule, with how often Study asked it and the drills helped', () => {
+    const app = learner(true);
+    Object.assign(app.progress.cards['salamat:recall'], { interval: 30, due: app.now() + 30 * DAY_MS, reviews: 6, lapses: 1 });
+    app.progress.cards.salamat.help = { recall: 2 };
+    const root = (last = recall(app));
+    card(root).click();
+    expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Recall: Long-term, the drills helped twice lately, asked now.');
+    expect(root.querySelector('.back-help')?.textContent).toBe('Lately the drills had to help with Recall twice.');
+    expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent)).toEqual(['6', '1', '0']);
+    expect(root.querySelector('.slope')?.getAttribute('aria-label')).toContain('Study asks in 1mo');
+    expect(root.querySelector('.skyline .building.s-long')).not.toBeNull();
+    expect(root.querySelector('.hero-way')?.textContent).toBe('Recall');
+    expect(root.querySelector('.hero-text')?.textContent).toContain('Study asks it again in 1mo.');
+    expect([...root.querySelectorAll('.skyline .tick')].map((n) => n.textContent)).toEqual(['1d', '1w', '1mo']);
+  });
+
+  it("draws a way only copied from reading's schedule from reading, and says so", () => {
+    const app = learner(true);
+    Object.assign(app.progress.cards['salamat:recall'], { split: true, lapses: 2, reps: 3 });
+    const root = (last = recall(app));
+    card(root).click();
+    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so these are Read’s numbers.');
+    expect([...root.querySelectorAll('.count-n')].map((n) => n.textContent)[1]).toBe('0');
+  });
+
+  it("draws a way Study hasn't asked yet from reading, and says so", () => {
     const root = (last = recall(learner(false)));
-    expect(root.querySelector('.prompt .eyebrow .badge')).toBeNull();
+    card(root).click();
+    expect(root.querySelector('.stairs')?.getAttribute('aria-label')).toContain('Recall: not started yet, asked now.');
+    expect(root.querySelector('.hero-way')?.textContent).toBe('Read');
+    expect(root.querySelector('.back-note')?.textContent).toBe('Study hasn’t asked Recall yet, so these are Read’s numbers.');
   });
 });
 
@@ -155,6 +206,13 @@ describe('recalling words that have settled', () => {
     const choices = [...root.querySelectorAll('.choice')];
     expect(choices).toHaveLength(4);
     expect(choices.some((c) => c.textContent?.includes('Salamat'))).toBe(true);
+  });
+
+  it('has no microphone without a key or the pronunciation model', () => {
+    const deps = { recordingSupported: () => true, modelDownloaded: async () => false, record: vi.fn() } as unknown as SpeakDeps;
+    const root = (last = recall(learner(true), null, deps, null));
+    expect(box(root)).not.toBeNull();
+    expect(root.querySelector('.meaning-mic')).toBeNull();
   });
 
   it('hears a Tagalog answer said into the box as Tagalog', async () => {
@@ -227,6 +285,34 @@ describe('a Tagalog answer said into the box, with the pronunciation model on th
     expect(hearer).toHaveBeenCalledWith(expect.any(Blob), 'tl');
     expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
     expect(box(root)!.value).toBe('Bukas');
+  });
+
+  it('needs no OpenAI key: a right answer passes on the device', async () => {
+    const { deps } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
+    const root = (last = recall(learner(true), null, deps, null));
+    await say(root);
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+  });
+
+  it("without a key, says to try again or type it when the device doesn't pass it, rather than marking it wrong", async () => {
+    const { deps } = onDevice(['b', 'u', 'k', 'a', 's']);
+    const root = (last = recall(learner(true), null, deps, null));
+    await say(root);
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(root.querySelector('.meaning-status')?.textContent).toBe("That didn't sound like it. Tap the microphone and try again, or type it.");
+    expect(box(root)).not.toBeNull();
+    expect(root.querySelector('.meaning-mic')).not.toBeNull();
+  });
+
+  it("without a key, says it couldn't be checked once the phone has cleared the model, and drops the mic", async () => {
+    const { deps } = onDevice(['s', 'a', 'l', 'a', 'm', 'a', 't']);
+    const root = (last = recall(learner(true), null, deps, null));
+    (deps as { modelDownloaded: () => Promise<boolean> }).modelDownloaded = async () => false;
+    await say(root);
+    expect(root.querySelector('.feedback')).toBeNull();
+    expect(root.querySelector('.meaning-status')?.textContent).toBe("Couldn't check it on this phone. Type it instead.");
+    expect(root.querySelector('.meaning-mic')).toBeNull();
+    expect(box(root)).not.toBeNull();
   });
 
   it("leaves English meanings to speech-to-text", async () => {

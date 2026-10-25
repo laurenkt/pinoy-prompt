@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DAY_MS, formatInterval, isDue, newCardState, nextInterval, review } from './srs';
+import { DAY_MS, answersOf, formatInterval, formatWait, isDue, newCardState, nextInterval, review } from './srs';
 
 const NOW = Date.UTC(2026, 0, 1);
 
@@ -68,5 +68,41 @@ describe('formatInterval', () => {
     expect(formatInterval(2.2, { up: true })).toBe('3d');
     expect(formatInterval(361, { up: true })).toBe('1y');
     expect(formatInterval(380, { up: true })).toBe('1.1y');
+  });
+});
+
+describe('answers in Study', () => {
+  it('counts each review', () => {
+    let card = newCardState(0);
+    expect(answersOf(card)).toEqual({ count: 0, atLeast: false });
+    card = review(card, 'good', 0);
+    card = review(card, 'again', DAY_MS);
+    expect(answersOf(card)).toEqual({ count: 2, atLeast: false });
+  });
+
+  it('starts a card saved before they were counted from what its schedule shows for certain', () => {
+    const old = { ...newCardState(0), reps: 3, lapses: 1, interval: 10 };
+    expect(answersOf(old)).toEqual({ count: 4, atLeast: true });
+    // Still a floor once counted on, as answers before it are unknown.
+    expect(answersOf(review(old, 'good', DAY_MS))).toEqual({ count: 5, atLeast: true });
+    // Answered only with "again" before, it has no run and no lapses to show, but it was answered.
+    const missed = { ...newCardState(0), reviewed: 0 };
+    expect(answersOf(missed)).toEqual({ count: 1, atLeast: true });
+  });
+
+  it("starts from none on a way only copied from reading's schedule", () => {
+    const copied = { ...newCardState(0), reps: 3, interval: 10, split: true as const };
+    expect(answersOf(copied)).toEqual({ count: 0, atLeast: false });
+    expect(review(copied, 'good', DAY_MS).reviews).toBe(1);
+  });
+});
+
+describe('formatWait', () => {
+  it('rounds up to the minute, hour, day or longer', () => {
+    expect(formatWait(0)).toBe('1m');
+    expect(formatWait(25 * 60_000 - 1)).toBe('25m');
+    expect(formatWait(61 * 60_000)).toBe('2h');
+    expect(formatWait(25 * 3_600_000)).toBe('2d');
+    expect(formatWait(40 * DAY_MS)).toBe('2mo');
   });
 });

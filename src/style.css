@@ -87,7 +87,8 @@ svg,
 .segmented,
 .stat,
 .strength-card,
-.badge {
+.badge,
+.card-back {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
@@ -546,19 +547,23 @@ p {
   stroke: none;
 }
 
-.growth-svg .layer.s-new {
+.growth-svg .layer.s-new,
+.back-chart .s-new {
   fill: var(--cream);
 }
 
-.growth-svg .layer.s-days {
+.growth-svg .layer.s-days,
+.back-chart .s-days {
   fill: var(--pink);
 }
 
-.growth-svg .layer.s-weeks {
+.growth-svg .layer.s-weeks,
+.back-chart .s-weeks {
   fill: var(--saffron);
 }
 
-.growth-svg .layer.s-long {
+.growth-svg .layer.s-long,
+.back-chart .s-long {
   fill: var(--teal);
 }
 
@@ -2471,10 +2476,6 @@ p {
   background: var(--teal);
 }
 
-/* On a drill's prompt, the card's strength sits after the eyebrow, outlined so it shows on the prompt's own colour. */
-.prompt .eyebrow .badge {
-  border: 2px solid var(--ink);
-}
 
 /* Talk */
 
@@ -3008,4 +3009,311 @@ p {
 /* Settings: how long the test word took to be heard, under the Test voice button. */
 .voice-lag {
   margin: 12px 0 0;
+}
+
+/* A drill card turns over when tapped (promptBlock in guide-question.ts): its back is the night side of the card, how
+   well it's known in the strength colours of Home's chart. */
+.prompt[data-turnable] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.prompt.turning {
+  animation: card-turn 0.28s ease-out;
+}
+
+@keyframes card-turn {
+  from {
+    transform: perspective(900px) rotateY(80deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt.turning {
+    animation: none;
+  }
+}
+
+.prompt.turned {
+  background: var(--on-accent);
+  color: var(--cream);
+}
+
+.card-back {
+  text-align: left;
+}
+
+.card-back[hidden] {
+  display: none;
+}
+
+.back-note {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+/* The headline: a dial in the strength's colour beside the big figure, what it means, and when Study asks again. */
+.back-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.gauge {
+  flex: 0 0 112px;
+  width: 112px;
+  overflow: visible;
+}
+
+.gauge path {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.gauge-rim {
+  stroke: var(--ink);
+  stroke-width: 22;
+}
+
+.gauge-track {
+  stroke: var(--surface);
+  stroke-width: 16;
+}
+
+.gauge-fill {
+  stroke-width: 16;
+}
+
+.gauge-needle {
+  stroke: var(--cream);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.gauge-hub {
+  fill: var(--cream);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.hero-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.hero-way {
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--faint);
+}
+
+.hero-n {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--cream);
+}
+
+.hero-text strong {
+  font-size: 0.9rem;
+  color: var(--cream);
+}
+
+/* Each picture: its title, how to read it, then the picture framed like Home's chart. */
+.back-fig {
+  margin: 14px 0 0;
+}
+
+.back-fig figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.back-label {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--cream);
+}
+
+.back-how {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.back-frame {
+  padding: 10px 10px 0;
+  border: var(--outline);
+  border-radius: 14px;
+  background: var(--surface-dim);
+  box-shadow: var(--shadow);
+}
+
+.back-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.back-chart text {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.back-chart .grid {
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.back-chart .tick {
+  fill: var(--faint);
+}
+
+.back-chart .ground {
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* Every picture's shapes: solid strength colours with ink outlines, as on Home. */
+.back-chart .hill,
+.back-chart .stair,
+.back-chart .building {
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.gauge-fill.s-new {
+  stroke: var(--cream);
+}
+
+.gauge-fill.s-days {
+  stroke: var(--pink);
+}
+
+.gauge-fill.s-weeks {
+  stroke: var(--saffron);
+}
+
+.gauge-fill.s-long {
+  stroke: var(--teal);
+}
+
+/* The slope: a ball where it is now, a flag where Study asks. */
+.back-chart .pole {
+  stroke: var(--cream);
+  stroke-width: 2.5;
+}
+
+.back-chart .flag {
+  fill: var(--saffron);
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.back-chart .flag-label,
+.back-chart .over-hill {
+  fill: var(--cream);
+}
+
+.back-chart .on-hill {
+  fill: var(--on-accent);
+}
+
+.back-chart .ball {
+  fill: var(--cream);
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+/* The stairs: a tag for each way, cream with its name, the way asked now dark. */
+.back-chart .tag {
+  fill: var(--cream);
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.back-chart .tag.asked {
+  fill: var(--on-accent);
+  stroke: var(--cream);
+}
+
+.back-chart .tag-name {
+  font-size: 11.5px;
+  font-weight: 800;
+  fill: var(--on-accent);
+}
+
+.back-chart .tag-name.asked {
+  fill: var(--cream);
+}
+
+/* The skyline's windows, cut in ink. */
+.back-chart .window {
+  fill: var(--ink);
+  opacity: 0.35;
+}
+
+.back-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.back-help {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.count {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: var(--outline);
+  border-radius: 14px;
+  background: var(--surface-dim);
+  box-shadow: var(--shadow);
+}
+
+.count-n {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--cream);
+}
+
+.count-label {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--muted);
 }

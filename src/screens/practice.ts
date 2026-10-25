@@ -4,11 +4,12 @@ import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type Me
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle, wayState } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
-import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, strengthBadge } from '../ui';
+import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
-import { eyebrowLine, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type GuideFormat, type GuideQuestion } from './guide-question';
+import { promptBlock, guideAnswer, guideFeedback, guideFormats, guideQuestion, guideQuestionView, sentenceClip, type CardBack, type GuideFormat, type GuideQuestion } from './guide-question';
+import { cardBack } from './card-back';
 import { quietToggle } from './quiet';
 import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PROBLEMS, speakPanel, targets, type SpeakDeps, type SpeakPanel } from './speak';
 
@@ -17,6 +18,12 @@ import { askForMicrophone, defaultDeps, isRight, micWaiting, needsMicrophone, PR
  * sentence from the English is recalling it. Guides aren't heard or said.
  */
 const GUIDE_MODES: Record<GuideFormat, Way> = { gap: 'read', build: 'recall' };
+
+/** A guide's ways, by what Drills asks: filling a gap is reading it, building a sentence recalling it. */
+const GUIDE_WAYS: { id: Way; title: string }[] = [
+  { id: 'read', title: 'Gap' },
+  { id: 'recall', title: 'Build' },
+];
 
 const MODES: { id: Way; title: string }[] = [
   { id: 'listen', title: 'Listen' },
@@ -64,11 +71,14 @@ interface Question {
 /** Turns a spoken answer, in the language asked for, into text. */
 export type MeaningHearer = (audio: Blob, language: AnswerLanguage) => Promise<string>;
 
-/** OpenAI's speech-to-text, when the learner has given a key for Chat; without one, answers are typed. */
+/** OpenAI's speech-to-text, when the learner has given a key for Chat; without one, meanings are typed (see canSay). */
 const hearWithOpenAi = (): MeaningHearer | null => {
   const key = getApiKey();
   return key ? (audio, language) => transcribe(key, audio, language) : null;
 };
+
+/** What saidOnDevice gives when the device couldn't judge a take at all. */
+const UNCHECKED = Symbol('unchecked');
 
 /** What `picked` holds for a typed meaning that wasn't right. */
 const MISSED = '';
@@ -101,6 +111,8 @@ export function practiceScreen(
   let speakReady = deps.modelKnownDownloaded?.() ?? false;
   /** The model turned out to be on the device after the round opened; speaking joins once the microphone is held. */
   let modelFound = false;
+  /** The model was there, but the phone has cleared it since: nothing more is heard on the device this round. */
+  let modelGone = false;
   if (canSpeak) {
     // Found only after the round opened (the app's own check hadn't finished), it's too late to hold the microphone
     // from the opening tap, so speaking waits for a later tap that does (see askForMicrophoneIfNeeded).
@@ -145,6 +157,8 @@ export function practiceScreen(
   /** What was picked on the question before; null when there's nothing to look back at (a spoken question has no pick). */
   let previousPick: string | null = null;
   let lookingBack = false;
+  /** The question whose memory is open: none to begin with, so a card's rating stays out of sight until asked for. */
+  let memoryFor: Question | null = null;
   /** Set as a question moves on by itself, so the next one doesn't take focus: an Enter meant for Next would answer it. */
   let autoMoved = false;
   /** The kinds of question are tucked away until asked for. */
@@ -355,13 +369,21 @@ export function practiceScreen(
   }
 
   /**
+   * Whether the answer to `q` can be said into the box: through OpenAI's speech-to-text, or for Tagalog without a key,
+   * on the device alone once the pronunciation model is there (see saidOnDevice).
+   */
+  const canSay = (q: Question): boolean => hearMeaning() !== null || (answerLanguage(q) === 'tl' && modelOnDevice());
+  /** The pronunciation model is on the device, as far as this round knows. */
+  const modelOnDevice = () => (speakReady || modelFound) && !modelGone;
+
+  /**
    * The box's microphone button: record the meaning said out loud, turn it into text, and check that. A second tap
    * stops early, or before the microphone gives sound (when nothing could have been heard) throws the take away.
    */
   function sayMeaning(q: Question): void {
     if (listening) return micLive ? listening.stop() : cancelSaying(q);
     const hearer = hearMeaning();
-    if (!hearer || picked !== null || checking || hearing) return;
+    if (!canSay(q) || picked !== null || checking || hearing) return;
     // The word playing would be recorded too.
     stop();
     q.unheard = undefined;
@@ -424,13 +446,16 @@ export function practiceScreen(
         if (answerLanguage(q) === 'tl') {
           const said = await saidOnDevice(q.card, take.samples);
           if (hearing !== recording) return;
-          if (said) {
+          if (typeof said === 'string') {
             hearing = null;
             if (current !== q || !q.typed || !root.isConnected || picked !== null) return;
             q.draft = q.answer = said;
             return answer(q, q.card.id);
           }
+          // Without a key there's nothing to write out what else was said.
+          if (!hearer) return unheard(said === UNCHECKED ? "Couldn't check it on this phone. Type it instead." : "That didn't sound like it. Tap the microphone and try again, or type it.");
         }
+        if (!hearer) return unheard("Couldn't hear it. Type it instead.");
         let text: string;
         try {
           text = await hearer(toWav(take.samples), answerLanguage(q));
@@ -456,19 +481,19 @@ export function practiceScreen(
 
   /**
    * The card's Tagalog (or an accepted spelling) the recording passes as, judged as Speak judges it, with every word
-   * said, or null when it doesn't pass or can't be heard on the device: the model is never downloaded for this, and
-   * checked for again in case the phone has cleared it since.
+   * said; null when it doesn't pass; UNCHECKED when it can't be heard on the device: the model is never downloaded for
+   * this, and checked for again in case the phone has cleared it since.
    */
-  async function saidOnDevice(card: Card, samples: Float32Array): Promise<string | null> {
-    if (!speakReady && !modelFound) return null;
+  async function saidOnDevice(card: Card, samples: Float32Array): Promise<string | null | typeof UNCHECKED> {
+    if (!modelOnDevice()) return UNCHECKED;
     try {
-      if (!(await deps.modelDownloaded())) return null;
+      if (!(await deps.modelDownloaded())) return (modelGone = true), UNCHECKED;
       const model = await deps.loadPhoneModel();
       const { text, comparison } = judge(targets(card), await model.recognise(samples));
       return isRight(comparison) && everyWordSaid(text, comparison) ? text : null;
     } catch {
       // Left to OpenAI, as it would be without the model.
-      return null;
+      return UNCHECKED;
     }
   }
 
@@ -612,7 +637,7 @@ export function practiceScreen(
 
   function draw(): void {
     if (!current) root.replaceChildren(tooFew());
-    // An answer can be said into the box only on a listening or recall question, and with a way to hear it.
+    // An answer said into the box goes to OpenAI only on a listening or recall question, and with a key to send it.
     else if (waiting) root.replaceChildren(h('div', { class: 'session' }, ...header(), micWaiting((modes().includes('listen') || modes().includes('recall')) && hearMeaning() !== null)));
     else if (lookingBack && previous && previousPick !== null) root.replaceChildren(questionView(previous, previousPick));
     else root.replaceChildren(questionView(current, picked));
@@ -698,12 +723,25 @@ export function practiceScreen(
     ];
   }
 
+  /**
+   * How well the card is known, on its back: a tap on the card turns it over, so it doesn't colour the answer unless
+   * asked for. A drill never changes the schedule, so it reads the same once answered. Turned only on the question it
+   * was turned on.
+   */
+  function backOf(q: Question): CardBack {
+    return {
+      back: () => cardBack(app.progress, q.card, q.mode, q.guide ? GUIDE_WAYS : MODES, app.now()),
+      turned: memoryFor === q,
+      onTurn: (turned) => {
+        memoryFor = turned ? q : null;
+      },
+    };
+  }
+
   /** A question with what was picked on it; the one before, while looking back. */
   function questionView(q: Question, picked: string | null): HTMLElement {
     const reviewing = q !== current;
-    // How well the card is held, beside the question. A drill never changes the schedule, so it stays put once answered.
-    // The card asked this way, as Study keeps it; none for a way Study doesn't ask (Speak).
-    const badge = strengthBadge(wayState(app.progress, q.card, q.mode));
+    const turnable = backOf(q);
     const answered = picked !== null;
     const right = picked === answerOf(q);
     const field = answerLanguage(q);
@@ -726,39 +764,38 @@ export function practiceScreen(
           onChange: draw,
           feedback: (right) => guideFeedback(q.card, d, right, { praise: 'Tama!', miss: 'Mali.' }),
           after: [onward()],
-          badge,
+          back: turnable,
         }),
       );
     }
 
-    const eyebrow = (text: string) => eyebrowLine(text, badge);
     let prompt: HTMLElement;
     if (q.mode === 'speak') {
-      prompt = h(
-        'div',
-        { class: 'prompt' },
-        eyebrow('Say this out loud'),
+      prompt = promptBlock(
+        'prompt',
+        'Say this out loud',
+        turnable,
         // No audio until the learner has had a go: the word is played on the result.
         h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
         h('p', { class: 'prompt-meaning' }, q.card.en),
       );
     } else if (q.mode === 'listen') {
-      prompt = h(
-        'div',
-        { class: 'prompt center' },
-        eyebrow(q.typed ? 'What does it mean?' : 'What did you hear?'),
+      prompt = promptBlock(
+        'prompt center',
+        q.typed ? 'What does it mean?' : 'What did you hear?',
+        turnable,
         audioPair(say, true),
         answered && h('p', { class: 'tl', lang: 'fil' }, q.card.tl),
       );
     } else if (q.mode === 'read') {
-      prompt = h(
-        'div',
-        { class: 'prompt' },
-        eyebrow('What does this mean?'),
+      prompt = promptBlock(
+        'prompt',
+        'What does this mean?',
+        turnable,
         h('div', { class: 'tl-row' }, h('p', { class: 'tl', lang: 'fil' }, q.card.tl), audioButton(() => say())),
       );
     } else {
-      prompt = h('div', { class: 'prompt' }, eyebrow('How do you say…'), h('p', { class: 'prompt-en' }, q.card.en));
+      prompt = promptBlock('prompt', 'How do you say…', turnable, h('p', { class: 'prompt-en' }, q.card.en));
     }
 
     return h(
@@ -834,8 +871,8 @@ export function practiceScreen(
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
-   * wrong. An answer that is the card's own wording, exactly, is taken as it's typed, without Check. With a key for OpenAI, and
-   * with the mic on, a microphone button beside it records the answer said out loud instead.
+   * wrong. An answer that is the card's own wording, exactly, is taken as it's typed, without Check. With the mic on and a
+   * way to hear it (canSay), a microphone button beside it records the answer said out loud instead.
    */
   function typedAnswer(q: Question, picked: string | null): HTMLElement {
     const answered = picked !== null;
@@ -877,7 +914,7 @@ export function practiceScreen(
       app.progress.settings.mic &&
       canSpeak &&
       !speakSkipped &&
-      hearMeaning() !== null &&
+      canSay(q) &&
       micButton(q);
     const status = listening
       ? micLive

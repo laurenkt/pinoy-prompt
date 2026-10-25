@@ -76,9 +76,50 @@ export function gapLine(d: Drill, filled: boolean, say: (slow: boolean) => void)
   );
 }
 
-/** A prompt's eyebrow, with a badge after it if there is one (Drills shows the card's memory strength). */
-export function eyebrowLine(text: string, badge: HTMLElement | null = null): HTMLElement {
-  return h('p', { class: 'eyebrow' }, text, badge && [' ', badge]);
+/** The back of a card that turns over when tapped (Drills: how well it's known), drawn when first turned; whether it's turned now, and what to tell when it turns. */
+export interface CardBack {
+  back: () => HTMLElement;
+  turned: boolean;
+  onTurn: (turned: boolean) => void;
+}
+
+/** What a tap on the card presses instead of turning it: its own controls. */
+const PRESSABLE = 'button, a[href], input, textarea, select, [role="button"], [role="slider"]';
+
+/**
+ * A prompt: its eyebrow, then the rest. Given a back, a tap anywhere on the card that isn't on one of its controls
+ * (or picking out its text) turns it over, and again turns it back. A screen reader or keyboard has a hidden button
+ * for the same.
+ */
+export function promptBlock(cls: string, eyebrow: string, back: CardBack | null | undefined, ...rest: (HTMLElement | null | false)[]): HTMLElement {
+  const face = [h('p', { class: 'eyebrow' }, eyebrow), ...rest];
+  if (!back) return h('div', { class: cls }, ...face);
+  let turned = back.turned;
+  let drawn: HTMLElement | null = null;
+  const front = h('div', { class: 'card-front' }, ...face);
+  const button = h('button', { class: 'sr-only', type: 'button' }, 'How well you know it');
+  const card = h('div', { class: cls, 'data-turnable': '' }, front, button);
+  const show = () => {
+    if (turned && !drawn) card.insertBefore((drawn = back.back()), button);
+    card.classList.toggle('turned', turned);
+    front.hidden = turned;
+    if (drawn) drawn.hidden = !turned;
+    button.setAttribute('aria-expanded', String(turned));
+  };
+  card.addEventListener('click', (e) => {
+    const pressed = (e.target as Element).closest(PRESSABLE);
+    if (pressed && pressed !== button) return;
+    if (!pressed && String(window.getSelection?.() ?? '')) return;
+    turned = !turned;
+    show();
+    // Played again from the start on every turn.
+    card.classList.remove('turning');
+    void card.offsetWidth;
+    card.classList.add('turning');
+    back.onTurn(turned);
+  });
+  show();
+  return card;
 }
 
 /** The question, as asked: an English sentence to complete in Tagalog, or a plain question. */
@@ -88,11 +129,11 @@ export function drillPrompt(
   filled: boolean,
   eyebrow: string,
   say: (slow: boolean) => void,
-  { showTl = true, badge = null }: { showTl?: boolean; badge?: HTMLElement | null } = {},
+  { showTl = true, back = null }: { showTl?: boolean; back?: CardBack | null } = {},
 ): HTMLElement {
   return d.tl
-    ? h('div', { class: `prompt kind-${c.kind}` }, eyebrowLine(eyebrow, badge), h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
-    : h('div', { class: `prompt kind-${c.kind}` }, eyebrowLine(c.en, badge), h('p', { class: 'drill-q' }, d.q));
+    ? promptBlock(`prompt kind-${c.kind}`, eyebrow, back, h('p', { class: 'drill-q' }, d.q), showTl && gapLine(d, filled, say))
+    : promptBlock(`prompt kind-${c.kind}`, c.en, back, h('p', { class: 'drill-q' }, d.q));
 }
 
 /** A guide's explanation: its rule in plain words, and examples to hear. */
@@ -143,8 +184,8 @@ export interface GuideViewOptions {
   feedback: (right: boolean) => HTMLElement;
   /** Anything else to show once it's answered: a hook, the way on. */
   after: (HTMLElement | null | false)[];
-  /** Shown beside the question's eyebrow: Drills puts the card's memory strength there. */
-  badge?: HTMLElement | null;
+  /** How well the card is known, on the card's back (Drills). */
+  back?: CardBack | null;
 }
 
 /** The panel asking a guide's question, with `picked` as the pick so far (null before it's answered). */
@@ -156,7 +197,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
     return h(
       'div',
       { class: 'panel' },
-      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say, { badge: opts.badge }),
+      drillPrompt(c, d, answered, d.tl ? 'Fill the gap' : KIND_INFO[c.kind].label, opts.say, { back: opts.back }),
       choiceList(q.choices, { key: (o) => o, label: (o) => o, answer: d.answer, picked, lang: d.tl ? 'fil' : undefined, onPick: opts.onPick }),
       answered && opts.feedback(right),
       ...(answered ? opts.after : []),
@@ -175,7 +216,7 @@ export function guideQuestionView(c: Card, q: GuideQuestion, picked: string | nu
   return h(
     'div',
     { class: 'panel' },
-    h('div', { class: `prompt kind-${c.kind}` }, eyebrowLine('Put it in order', opts.badge), h('p', { class: 'drill-q' }, d.q)),
+    promptBlock(`prompt kind-${c.kind}`, 'Put it in order', opts.back, h('p', { class: 'drill-q' }, d.q)),
     h(
       'div',
       { class: `build-line ${answered ? (right ? 'right' : 'wrong') : ''}`, lang: 'fil', 'aria-label': 'Your sentence' },
