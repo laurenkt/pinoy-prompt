@@ -98,7 +98,8 @@ export function leanAgainst(stress: Stress): number {
 
 /** Which syllable the attempt leaned on: the second-to-last or the last. */
 export function leanedOn(stress: Stress): number {
-  return stress.syllables.length - (stress.lean > 0 ? 2 : 1);
+  const other = stress.expected === stress.syllables.length - 1 ? stress.expected - 1 : stress.expected + 1;
+  return leanAgainst(stress) > 0 ? other : stress.expected;
 }
 
 /** How the attempt's stress came out: leaned the card's way, the other way but not surely (close), or surely (off). */

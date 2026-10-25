@@ -264,7 +264,7 @@ describe('an attempt', () => {
     expect(onAttempt).toHaveBeenCalledWith(false, true);
     expect(panel.el.querySelector('.result-card.bad')).not.toBeNull();
     expect(panel.el.querySelector('.dial')!.getAttribute('aria-label')).toBe('100% of the way there');
-    expect(text('.result-card .stress-line')).toBe('Stress: Off Lean on LAH, not MAHT.');
+    expect(text('.result-card .stress-line')).toBe('Stress: lean on LAH, not MAHT.');
     // The stress page opens first: MAHT drawn the taller, in pink, against LAH to aim for.
     const page = panel.el.querySelector('.stress-page.open')!;
     expect(page.querySelector('.verdict-chip')!.textContent).toBe('Off');
@@ -292,8 +292,8 @@ describe('an attempt', () => {
     await saySalamat([270, 0.3], [190, 0.1]);
     expect(text('.feedback strong')).toBe('Tama!');
     expect(onAttempt).toHaveBeenCalledWith(true, true);
-    expect(text('.result-card .stress-line')).toBe('Stress: Spot on You leaned on LAH.');
-    button('Spot on You leaned on LAH.').click();
+    expect(text('.result-card .stress-line')).toBe('Stress: you leaned on LAH.');
+    button('Stress: you leaned on LAH.').click();
     const page = panel.el.querySelector('.stress-page.open')!;
     expect(page.querySelector('.end-heard')).toBeNull();
     expect([...panel.el.querySelectorAll('button')].some((b) => b.textContent === 'I had it right')).toBe(false);

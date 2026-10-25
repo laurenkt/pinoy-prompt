@@ -126,7 +126,7 @@ const otherSyllable = ({ syllables, expected }: Stress) => syllables[expected ==
 export function stressLine(stress: Stress): string {
   const aim = stress.syllables[stress.expected];
   const verdict = stressVerdict(stress);
-  if (verdict === 'good') return `You leaned on ${aim}.`;
-  if (verdict === 'close') return `Nearly: lean on ${aim} more.`;
-  return `Lean on ${aim}, not ${otherSyllable(stress)}.`;
+  if (verdict === 'good') return `Stress: you leaned on ${aim}.`;
+  if (verdict === 'close') return `Stress: nearly, lean on ${aim} more.`;
+  return `Stress: lean on ${aim}, not ${otherSyllable(stress)}.`;
 }

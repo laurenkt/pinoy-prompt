@@ -318,6 +318,8 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
   // The stress page comes after the sounds', opened only from its line.
   const stress = attempt.stress ?? null;
   const STRESS = list.length;
+  /** The stretch of the recording that holds the last two vowels, the ones stress is judged on. */
+  const stressSpan = stress && { start: span(stress.heardAt[0]).start, end: span(stress.heardAt[1]).end };
   if (stress) pages.push(stressPage(stress));
   const detail = h('div', { class: 'sound-detail' }, pages);
   // Showing a page that was already there isn't read out, so the open sound is said here.
@@ -339,9 +341,10 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
       el.classList.toggle('open', i === index);
       el.inert = i !== index;
     });
-    if (stress && index === STRESS) {
-      ribbon?.setFocus({ start: span(stress.heardAt[0]).start, end: span(stress.heardAt[1]).end });
-      announce.textContent = `Stress: ${VERDICT_LABEL[stressVerdict(stress)]}. ${stressLine(stress)}`;
+    if (stress && stressSpan && index === STRESS) {
+      ribbon?.setFocus(stressSpan);
+      word.setAttribute('aria-valuetext', 'Stress');
+      announce.textContent = `${VERDICT_LABEL[stressVerdict(stress)]}. ${stressLine(stress)}`;
       return;
     }
     word.setAttribute('aria-valuenow', String(index + 1));
@@ -422,7 +425,6 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     const said = leanedOn(stress);
     // Most sure it leaned the card's way, full; most sure it leaned the other way, empty.
     const closeness = 1 / (1 + Math.exp(leanAgainst(stress)));
-    const hear = { start: span(stress.heardAt[0]).start, end: span(stress.heardAt[1]).end };
     return h(
       'div',
       { class: 'detail-page stress-page' },
@@ -450,7 +452,7 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
         h(
           'button',
           // It makes its own sound.
-          { class: 'btn secondary hold-btn', 'data-no-tap': true, 'aria-label': `Your ${syllables.slice(-2).join('-')}`, onclick: () => void playMine(hear) },
+          { class: 'btn secondary hold-btn', 'data-no-tap': true, 'aria-label': `Your ${syllables.slice(-2).join('-')}`, onclick: () => void playMine(stressSpan!) },
           icon('speaker'),
           ' Yours',
         ),
@@ -463,8 +465,6 @@ export function resultView(attempt: Attempt, options: ResultOptions): ResultView
     ? h(
         'button',
         { class: `stress-line detail-${stressVerdict(stress)}`, 'aria-pressed': 'false', onclick: () => select(STRESS) },
-        h('span', { class: 'verdict-chip' }, `Stress: ${VERDICT_LABEL[stressVerdict(stress)]}`),
-        ' ',
         stressLine(stress),
       )
     : null;
@@ -816,8 +816,8 @@ const AIM = { semitones: 6, length: 1.6 };
 /**
  * The stress chart: a column for each of the hint's syllables, and in two rows, the attempt's and what to aim for,
  * a bar for each of the last two: as tall as it was high against the other, as wide as it was long. Earlier
- * syllables, which stress doesn't fall on, get a low mark. The taller bar in the attempt's row is the one leaned on,
- * coloured by how that came out.
+ * syllables, which stress doesn't fall on, get a low mark. The one leaned on, from pitch, length and loudness together,
+ * is coloured by how that came out, so it can be the wider bar rather than the taller.
  */
 function drawStress(stress: Stress, verdict: SoundVerdict): SVGSVGElement {
   const { syllables, expected } = stress;

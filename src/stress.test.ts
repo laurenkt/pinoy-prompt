@@ -33,7 +33,7 @@ describe('measureStress', () => {
     expect(leanAgainst(stress)).toBeLessThan(0);
     expect(leanedOn(stress)).toBe(1);
     expect(stressVerdict(stress)).toBe('good');
-    expect(stressLine(stress)).toBe('You leaned on LAH.');
+    expect(stressLine(stress)).toBe('Stress: you leaned on LAH.');
   });
 
   it('hears the last syllable leaned on when it is the higher and longer one', () => {
@@ -42,7 +42,7 @@ describe('measureStress', () => {
     expect(leanAgainst(stress)).toBeGreaterThan(SURE);
     expect(leanedOn(stress)).toBe(2);
     expect(stressVerdict(stress)).toBe('off');
-    expect(stressLine(stress)).toBe('Lean on LAH, not MAHT.');
+    expect(stressLine(stress)).toBe('Stress: lean on LAH, not MAHT.');
     expect(stress.heardAt).toEqual([3, 5]);
   });
 
@@ -54,7 +54,7 @@ describe('measureStress', () => {
     expect(leanAgainst(stress)).toBeGreaterThan(0);
     expect(leanAgainst(stress)).toBeLessThanOrEqual(SURE);
     expect(stressVerdict(stress)).toBe('close');
-    expect(stressLine(stress)).toBe('Nearly: lean on LAH more.');
+    expect(stressLine(stress)).toBe('Stress: nearly, lean on LAH more.');
   });
 
   it("doesn't judge a phrase, a missing vowel, or an attempt said another way", () => {
@@ -74,6 +74,14 @@ describe('measureStress', () => {
     const stress = measureStress('kape', 'kah-PEH', comparison, unpack([[60, 0, -30], [80, 190, -16], [60, 0, -30], [170, 270, -11]]));
     expect(stress?.expected).toBe(1);
     expect(leanAgainst(stress!)).toBeLessThan(0);
+  });
+});
+
+describe('leanedOn', () => {
+  it('agrees with the verdict when it could go either way', () => {
+    const stress = { syllables: ['sah', 'LAH', 'maht'], expected: 1, differences: { length: 0, pitch: 0, level: 0 }, lean: 0, heardAt: [3, 5] as [number, number] };
+    expect(stressVerdict(stress)).toBe('good');
+    expect(leanedOn(stress)).toBe(1);
   });
 });
 

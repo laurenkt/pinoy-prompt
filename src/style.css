@@ -1805,9 +1805,13 @@ p {
 
 /* How the stress came out, under the word: a line that opens the stress page below. */
 .result-card .stress-line {
-  display: block;
-  margin: 6px 0 0;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
   padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   border: 0;
   background: none;
   color: inherit;
@@ -1819,9 +1823,6 @@ p {
   cursor: pointer;
 }
 
-.result-card .stress-line .verdict-chip {
-  margin-right: 2px;
-}
 
 .result-card .dial {
   width: 56px;
@@ -2294,7 +2295,7 @@ p {
 /* Stress: hearing the two syllables back, and saying it was right after all, side by side. */
 .stress-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .stress-actions .btn {

@@ -457,8 +457,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   /** Only its stress failed it, and the learner says it was right: it counts as right from here. */
   function claim(): void {
     if (state.name !== 'result' || state.right || !isRight(state.comparison)) return;
-    set({ ...state, right: true });
+    // Told first, so the countdown it starts shows on the redrawn result.
     options.onClaim?.();
+    set({ ...state, right: true });
   }
 
   function resultView(result: Extract<State, { name: 'result' }>): HTMLElement[] {

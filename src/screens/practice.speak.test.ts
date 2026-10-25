@@ -147,7 +147,8 @@ describe('Speak mode', () => {
     await flush();
     expect(document.querySelector('.feedback strong')?.textContent).toBe('Tama!');
     expect(app.progress.cards.salamat.help).toBeUndefined();
-    expect(button('Next')).toBeTruthy();
+    // It moves on by itself, as a word said right does, and shows that it will.
+    expect(button('Next').classList.contains('counting')).toBe(true);
   });
 
   it('starts and stops listening with one big button in the same place, under what the mic hears', async () => {
