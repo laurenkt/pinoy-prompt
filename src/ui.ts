@@ -2,7 +2,9 @@
 // without pulling in a framework.
 
 import type { App } from './app';
+import type { Card } from './deck';
 import { STRENGTHS, strengthOf } from './memory';
+import { pictureOf } from './pictures';
 import { speaking } from './speech';
 import type { CardState } from './srs';
 
@@ -208,6 +210,18 @@ export function progressBar(value: number, max: number, label?: string): HTMLEle
     { class: 'bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': max, 'aria-valuenow': value, 'aria-label': label },
     h('div', { class: 'bar-fill', style: { width: `${pct}%` } }),
   );
+}
+
+/**
+ * What recall asks from: the card's English, or with `picture` (askWithPicture in pictures.ts) its picture, with the
+ * English under it once `named` (a flashcard turned over; an answer's feedback says it already).
+ */
+export function recallCue(card: Card, picture: boolean, named = false): (HTMLElement | false)[] {
+  const art = picture && pictureOf(card);
+  if (!art) return [h('p', { class: 'prompt-en' }, card.en)];
+  const frame = h('div', { class: 'prompt-picture', role: 'img', 'aria-label': card.en });
+  frame.innerHTML = art;
+  return [frame, named && h('p', { class: 'prompt-meaning' }, card.en)];
 }
 
 /** A card's memory hook, for the moments it helps: introduction and after a miss. */

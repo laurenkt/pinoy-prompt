@@ -35,6 +35,11 @@ export interface Card {
    * introduction, after a miss, and on request in review.
    */
   hook: string;
+  /**
+   * A picture that can only mean this card, named by its emoji (drawn from src/pictures/, see pictures.ts). Recall
+   * sometimes shows it in place of the English: the same card, asked another way round the same schedule.
+   */
+  picture?: string;
   /** What the speech voice reads instead of `tl`, when the spelling would mislead it. */
   say?: string;
   /** Other accepted pronunciations, as spelled, for when the learner says the card out loud. */
@@ -325,17 +330,17 @@ export const UNITS: Unit[] = [
     tlTitle: 'Mga Lugar',
     intro: '"Sa" marks a place: "sa bahay" is at home, "sa palengke" at the market. Most of town is one "sa" away.',
     cards: [
-      { id: 'bahay', tl: 'bahay', en: 'house / home', kind: 'word', hint: 'BAH-hai', hook: '"Bahay kubo" is the bamboo hut from the best-known Filipino folk song. Sounds like "bye, hi": the door you say both through.' },
+      { id: 'bahay', tl: 'bahay', en: 'house / home', kind: 'word', picture: '🏠', hint: 'BAH-hai', hook: '"Bahay kubo" is the bamboo hut from the best-known Filipino folk song. Sounds like "bye, hi": the door you say both through.' },
       { id: 'nasa-bahay-ako', tl: 'Nasa bahay ako.', en: "I'm at home.", kind: 'phrase', hint: 'NAH-sah BAH-hai ah-KOH', hook: '"Nasa" means "at, in": the "na" of "nasaan" plus the place word "sa". Swap in any place: "Nasa opisina ako".' },
       { id: 'palengke', tl: 'palengke', en: 'market', kind: 'word', hint: 'pah-LENG-keh', hook: 'From Spanish "palenque", a fenced enclosure where markets were held. Fresh fish, haggling and noise: the palengke.' },
-      { id: 'tindahan', tl: 'tindahan', en: 'shop / store', kind: 'word', hint: 'tin-DAH-hahn', note: 'A "sari-sari store" is the tiny corner shop on almost every street.', hook: 'Spanish "tienda" (shop) + "-han" (place). "Sari-sari" means "assorted": it sells a bit of everything.' },
-      { id: 'simbahan', tl: 'simbahan', en: 'church', kind: 'word', hint: 'sim-BAH-hahn', hook: '"Simba" means to go to Mass, and "-han" makes a place: where you go to Mass.' },
-      { id: 'ospital', tl: 'ospital', en: 'hospital', kind: 'word', hint: 'os-pee-TAHL', hook: 'Spanish "hospital", minus the silent h, with the stress at the end.' },
+      { id: 'tindahan', tl: 'tindahan', en: 'shop / store', kind: 'word', picture: '🏪', hint: 'tin-DAH-hahn', note: 'A "sari-sari store" is the tiny corner shop on almost every street.', hook: 'Spanish "tienda" (shop) + "-han" (place). "Sari-sari" means "assorted": it sells a bit of everything.' },
+      { id: 'simbahan', tl: 'simbahan', en: 'church', kind: 'word', picture: '⛪', hint: 'sim-BAH-hahn', hook: '"Simba" means to go to Mass, and "-han" makes a place: where you go to Mass.' },
+      { id: 'ospital', tl: 'ospital', en: 'hospital', kind: 'word', picture: '🏥', hint: 'os-pee-TAHL', hook: 'Spanish "hospital", minus the silent h, with the stress at the end.' },
       { id: 'botika', tl: 'botika', en: 'pharmacy', kind: 'word', hint: 'boh-TEE-kah', hook: 'Spanish "botica". Think "boutique" for medicine.' },
       { id: 'paaralan', tl: 'paaralan', en: 'school', kind: 'word', hint: 'pah-ah-RAH-lahn', hook: '"Aral" means study. Pa- + aral + -an: the place where you study.' },
       { id: 'opisina', tl: 'opisina', en: 'office', kind: 'word', hint: 'oh-pee-SEE-nah', hook: 'Spanish "oficina", with the f turned to p as usual.' },
       { id: 'kainan', tl: 'kainan', en: 'eatery / place to eat', kind: 'word', hint: 'kah-ee-NAHN', hook: '"Kain" (eat) + "-an" (place): an eating place. The same pattern as "paaralan".' },
-      { id: 'bangko', tl: 'bangko', en: 'bank', kind: 'word', hint: 'BAHNG-koh', hook: 'Spanish "banco", which also meant bench: the first bankers did business at benches. In Tagalog "bangko" is still a bench too.' },
+      { id: 'bangko', tl: 'bangko', en: 'bank', kind: 'word', picture: '🏦', hint: 'BAHNG-koh', hook: 'Spanish "banco", which also meant bench: the first bankers did business at benches. In Tagalog "bangko" is still a bench too.' },
       { id: 'kanto', tl: 'kanto', en: 'street corner', kind: 'word', hint: 'KAHN-toh', hook: 'Spanish "canto", an edge. "Sa kanto lang" (just at the corner) is how many directions start.' },
       { id: 'kalye', tl: 'kalye', en: 'street', kind: 'word', hint: 'KAHL-yeh', hook: 'Spanish "calle". Kids playing in the street are playing "sa kalye".' },
       { id: 'paliparan', tl: 'paliparan', en: 'airport', kind: 'word', hint: 'pah-lee-PAH-rahn', note: 'Most people just say "airport".', hook: '"Lipad" means fly. Pa- + lipad + -an, with the d softened to r: the flying place.' },
@@ -390,27 +395,27 @@ export const UNITS: Unit[] = [
     cards: [
       { id: 'kain-tayo', tl: 'Kain tayo!', en: "Let's eat!", kind: 'phrase', hint: 'kah-EEN tah-YOH', note: 'A friendly invitation you will hear even from people already eating.', hook: '"Kain" is eat and "tayo" is "all of us". "Tayo" sounds almost like "tayô", to stand: everybody up to the table.' },
       { id: 'gutom-na-ako', tl: 'Gutom na ako.', en: "I'm hungry now.", kind: 'phrase', hint: 'goo-TOM nah ah-KOH', hook: '"Gutom" sounds like "gut \'em": your gut is empty. "Na" means "now, already".' },
-      { id: 'masarap', tl: 'Masarap!', en: 'Delicious!', kind: 'word', hint: 'mah-sah-RAHP', hook: '"Sarap" is the root. On its own, "Sarap!" is the happy sigh for anything good, from food to a massage.' },
-      { id: 'kanin', tl: 'kanin', en: 'cooked rice', kind: 'word', hint: 'KAH-nin', note: 'Uncooked rice is "bigas". Rice is part of nearly every meal.', hook: 'From "kain" (eat) + "-in": literally "the thing that is eaten". In the Philippines, rice is the food.' },
-      { id: 'tubig', tl: 'tubig', en: 'water', kind: 'word', hint: 'TOO-big', hook: 'Sounds like "too big": a glass of water too big to finish.' },
-      { id: 'kape', tl: 'kape', en: 'coffee', kind: 'word', hint: 'kah-PEH', hook: 'From Spanish "café". The famously strong local coffee is "kapeng barako".' },
-      { id: 'tinapay', tl: 'tinapay', en: 'bread', kind: 'word', hint: 'tee-NAH-pai', hook: 'Think "tin of pie": a loaf baked in a tin.' },
-      { id: 'manok', tl: 'manok', en: 'chicken', kind: 'word', hint: 'mah-NOK', hook: 'Sounds like "man, OK". Picture a rooster at dawn yelling "Man, OK, wake up!"' },
-      { id: 'isda', tl: 'isda', en: 'fish', kind: 'word', hint: 'is-DAH', hook: 'Sounds like "is da": "Is da fish fresh?"' },
+      { id: 'masarap', tl: 'Masarap!', en: 'Delicious!', kind: 'word', picture: '😋', hint: 'mah-sah-RAHP', hook: '"Sarap" is the root. On its own, "Sarap!" is the happy sigh for anything good, from food to a massage.' },
+      { id: 'kanin', tl: 'kanin', en: 'cooked rice', kind: 'word', picture: '🍚', hint: 'KAH-nin', note: 'Uncooked rice is "bigas". Rice is part of nearly every meal.', hook: 'From "kain" (eat) + "-in": literally "the thing that is eaten". In the Philippines, rice is the food.' },
+      { id: 'tubig', tl: 'tubig', en: 'water', kind: 'word', picture: '💧', hint: 'TOO-big', hook: 'Sounds like "too big": a glass of water too big to finish.' },
+      { id: 'kape', tl: 'kape', en: 'coffee', kind: 'word', picture: '☕', hint: 'kah-PEH', hook: 'From Spanish "café". The famously strong local coffee is "kapeng barako".' },
+      { id: 'tinapay', tl: 'tinapay', en: 'bread', kind: 'word', picture: '🍞', hint: 'tee-NAH-pai', hook: 'Think "tin of pie": a loaf baked in a tin.' },
+      { id: 'manok', tl: 'manok', en: 'chicken', kind: 'word', picture: '🐔', hint: 'mah-NOK', hook: 'Sounds like "man, OK". Picture a rooster at dawn yelling "Man, OK, wake up!"' },
+      { id: 'isda', tl: 'isda', en: 'fish', kind: 'word', picture: '🐟', hint: 'is-DAH', hook: 'Sounds like "is da": "Is da fish fresh?"' },
       { id: 'busog-na-ako', tl: 'Busog na ako.', en: "I'm full.", kind: 'phrase', hint: 'boo-SOG nah ah-KOH', note: 'Handy when your host keeps refilling your plate.', hook: '"Busog" sounds like "bus full": no more room on the bus.' },
       { id: 'almusal', tl: 'almusal', en: 'breakfast', kind: 'word', hint: 'ahl-moo-SAHL', hook: 'From Spanish "almuerzo", a mid-morning meal, which settled on breakfast here.' },
       { id: 'tanghalian', tl: 'tanghalian', en: 'lunch', kind: 'word', hint: 'tahng-hah-LEE-ahn', hook: 'The meal at "tanghali", noon: the one that came free with "tanghali".' },
       { id: 'hapunan', tl: 'hapunan', en: 'dinner', kind: 'word', hint: 'hah-POO-nahn', hook: '"Hapon" (afternoon) + "-an": the meal as the afternoon ends.' },
-      { id: 'itlog', tl: 'itlog', en: 'egg', kind: 'word', hint: 'it-LOG', hook: 'The "-log" of every "silog" breakfast plate: "sinangag" (garlic fried rice) + "itlog".' },
-      { id: 'baboy', tl: 'baboy', en: 'pig / pork', kind: 'word', hint: 'BAH-boy', hook: 'The animal and the meat. A whole roast "baboy", "lechon", is the star of every big party.' },
+      { id: 'itlog', tl: 'itlog', en: 'egg', kind: 'word', picture: '🥚', hint: 'it-LOG', hook: 'The "-log" of every "silog" breakfast plate: "sinangag" (garlic fried rice) + "itlog".' },
+      { id: 'baboy', tl: 'baboy', en: 'pig / pork', kind: 'word', picture: '🐖', hint: 'BAH-boy', hook: 'The animal and the meat. A whole roast "baboy", "lechon", is the star of every big party.' },
       { id: 'karne-ng-baka', tl: 'karne ng baka', en: 'beef', kind: 'phrase', hint: 'KAHR-neh nahng BAH-kah', hook: '"Karne" (meat, Spanish "carne") + "ng" (of) + "baka", the cow that "baka" also means: meat of cow.' },
       { id: 'gulay', tl: 'gulay', en: 'vegetables', kind: 'word', hint: 'GOO-lai', hook: '"Bahay kubo", the folk song about the bamboo hut, is one long list of the "gulay" growing round it.' },
       { id: 'prutas', tl: 'prutas', en: 'fruit', kind: 'word', hint: 'PROO-tahs', hook: 'Spanish "frutas", with the f turned to p, as in "pamilya".' },
-      { id: 'saging', tl: 'saging', en: 'banana', kind: 'word', hint: 'SAH-ghing', hook: '"Banana cue" is a "saging" fried in brown sugar on a stick, sold on every corner.' },
-      { id: 'mangga', tl: 'mangga', en: 'mango', kind: 'word', hint: 'mahng-GAH', hook: 'Sounds like "mango", and comes from the same South Indian word. Philippine mangoes are famously sweet.' },
+      { id: 'saging', tl: 'saging', en: 'banana', kind: 'word', picture: '🍌', hint: 'SAH-ghing', hook: '"Banana cue" is a "saging" fried in brown sugar on a stick, sold on every corner.' },
+      { id: 'mangga', tl: 'mangga', en: 'mango', kind: 'word', picture: '🥭', hint: 'mahng-GAH', hook: 'Sounds like "mango", and comes from the same South Indian word. Philippine mangoes are famously sweet.' },
       { id: 'gatas', tl: 'gatas', en: 'milk', kind: 'word', hint: 'GAH-tahs', hook: 'Sounds like "got us": the baby got us up at night for "gatas".' },
       { id: 'asukal', tl: 'asukal', en: 'sugar', kind: 'word', hint: 'ah-SOO-kahl', hook: 'Spanish "azúcar". Filipino cooking loves it: even spaghetti here is sweet.' },
-      { id: 'asin', tl: 'asin', en: 'salt', kind: 'word', hint: 'ah-SIN', hook: 'Sounds like "a sin": too much "asin" is a sin.' },
+      { id: 'asin', tl: 'asin', en: 'salt', kind: 'word', picture: '🧂', hint: 'ah-SIN', hook: 'Sounds like "a sin": too much "asin" is a sin.' },
     ],
   },
   {
@@ -425,7 +430,7 @@ export const UNITS: Unit[] = [
       { id: 'maanghang', tl: 'maanghang', en: 'spicy', kind: 'word', hint: 'mah-ahng-HAHNG', hook: '"Anghang" is the heat in food, and "ma-" makes it a describing word, as in "masarap".' },
       { id: 'huwag-maanghang', tl: 'Huwag pong maanghang.', en: 'Not spicy, please.', kind: 'phrase', hint: 'hoo-WAG pong mah-ahng-HAHNG', hook: '"Huwag" means don\'t, and "po" joins on with "-ng": "don\'t make it spicy, please".' },
       { id: 'ulam', tl: 'ulam', en: 'dish eaten with rice', kind: 'word', hint: 'OO-lahm', hook: 'Anything you eat with rice is "ulam". "Anong ulam?" (what\'s for dinner?) is asked in every Filipino home.' },
-      { id: 'kutsara', tl: 'kutsara', en: 'spoon', kind: 'word', hint: 'koot-CHAH-rah', note: 'Filipinos eat with a spoon in the right hand and a fork in the left.', hook: 'Spanish "cuchara", with the ch written "ts".' },
+      { id: 'kutsara', tl: 'kutsara', en: 'spoon', kind: 'word', picture: '🥄', hint: 'koot-CHAH-rah', note: 'Filipinos eat with a spoon in the right hand and a fork in the left.', hook: 'Spanish "cuchara", with the ch written "ts".' },
       { id: 'tinidor', tl: 'tinidor', en: 'fork', kind: 'word', hint: 'tee-nee-DOR', hook: 'Spanish "tenedor". Here the fork just pushes food onto the spoon.' },
       { id: 'baso', tl: 'baso', en: 'glass (for drinking)', kind: 'word', hint: 'BAH-soh', hook: 'Spanish "vaso", with the v turned to b. Tagalog swaps Spanish v for b all the time.' },
       { id: 'bill-po', tl: 'Bill po.', en: 'The bill, please.', kind: 'phrase', hint: 'bil poh', note: 'You will also hear "Bill out po", or see people draw a rectangle in the air.', hook: 'English "bill" with "po" for politeness. Taglish at its most practical.' },
@@ -584,7 +589,7 @@ export const UNITS: Unit[] = [
       { id: 'kumain', tl: 'kumain', en: 'to eat', kind: 'word', hint: 'koo-mah-EEN', hook: '"Kain" (eat) from "Kain tayo!", with "-um-" slotted in: k-um-ain, the trick from "sumakay".' },
       { id: 'uminom', tl: 'uminom', en: 'to drink', kind: 'word', hint: 'oo-mee-NOM', hook: '"Inom" is drink. Before a vowel "-um-" goes at the front: um-inom. "Inuman" is a night of drinks with friends.' },
       { id: 'matulog', tl: 'matulog', en: 'to sleep', kind: 'word', hint: 'mah-TOO-log', hook: '"Tulog" is sleep, and "ma-" makes it a doing word. "Tulog na!" is "go to sleep!"' },
-      { id: 'maligo', tl: 'maligo', en: 'to take a bath / shower', kind: 'word', hint: 'mah-LEE-goh', hook: '"Ligo" is a wash. In the heat many Filipinos "maligo" twice a day, and "maligo sa dagat" is a swim in the sea.' },
+      { id: 'maligo', tl: 'maligo', en: 'to take a bath / shower', kind: 'word', picture: '🚿', hint: 'mah-LEE-goh', hook: '"Ligo" is a wash. In the heat many Filipinos "maligo" twice a day, and "maligo sa dagat" is a swim in the sea.' },
       { id: 'pumunta', tl: 'pumunta', en: 'to go (somewhere)', kind: 'word', hint: 'poo-MOON-tah', hook: 'The "punta" of "Papunta na ako", with "-um-": p-um-unta.' },
       { id: 'dumating', tl: 'dumating', en: 'to arrive', kind: 'word', hint: 'doo-mah-TING', hook: '"Dating" is arrival, with "-um-": d-um-ating. "Dumating na!" is "it\'s here!", for a delivery or a late jeepney.' },
       { id: 'maghintay', tl: 'maghintay', en: 'to wait', kind: 'word', hint: 'mahg-hin-TAI', hook: '"Hintay" from "Hintayin mo ako", with "mag-" in front: to wait. "Maghintay ka lang" is "just wait".' },
@@ -630,13 +635,13 @@ export const UNITS: Unit[] = [
     tlTitle: 'Mga Kulay',
     intro: 'Point and name it at a stall. Red, white, black and yellow are Tagalog words; blue and green come from Spanish.',
     cards: [
-      { id: 'kulay', tl: 'kulay', en: 'colour', kind: 'word', hint: 'KOO-lai', hook: '"Anong kulay?" asks what colour. "Makulay", colourful, describes every jeepney.' },
-      { id: 'pula', tl: 'pula', en: 'red', kind: 'word', hint: 'poo-LAH', hook: 'The red on the flag. Going red in the face is "namumula".' },
-      { id: 'puti', tl: 'puti', en: 'white', kind: 'word', hint: 'poo-TEE', hook: 'The white triangle on the flag, and the colour of a plate of "kanin".' },
-      { id: 'itim', tl: 'itim', en: 'black', kind: 'word', hint: 'ee-TIM', hook: 'Sounds like "item": a little black item, like a phone left on the table.' },
-      { id: 'asul', tl: 'asul', en: 'blue', kind: 'word', hint: 'ah-SOOL', hook: 'Spanish "azul". The blue stripe on the flag.' },
-      { id: 'berde', tl: 'berde', en: 'green', kind: 'word', hint: 'BER-deh', hook: 'Spanish "verde", with the v turned to b, as in "baso" and "Biyernes".' },
-      { id: 'dilaw', tl: 'dilaw', en: 'yellow', kind: 'word', hint: 'dee-LAOW', hook: 'The yellow of the sun and stars on the flag, and of a ripe "mangga".' },
+      { id: 'kulay', tl: 'kulay', en: 'colour', kind: 'word', picture: '🎨', hint: 'KOO-lai', hook: '"Anong kulay?" asks what colour. "Makulay", colourful, describes every jeepney.' },
+      { id: 'pula', tl: 'pula', en: 'red', kind: 'word', picture: '🟥', hint: 'poo-LAH', hook: 'The red on the flag. Going red in the face is "namumula".' },
+      { id: 'puti', tl: 'puti', en: 'white', kind: 'word', picture: '⬜', hint: 'poo-TEE', hook: 'The white triangle on the flag, and the colour of a plate of "kanin".' },
+      { id: 'itim', tl: 'itim', en: 'black', kind: 'word', picture: '⬛', hint: 'ee-TIM', hook: 'Sounds like "item": a little black item, like a phone left on the table.' },
+      { id: 'asul', tl: 'asul', en: 'blue', kind: 'word', picture: '🟦', hint: 'ah-SOOL', hook: 'Spanish "azul". The blue stripe on the flag.' },
+      { id: 'berde', tl: 'berde', en: 'green', kind: 'word', picture: '🟩', hint: 'BER-deh', hook: 'Spanish "verde", with the v turned to b, as in "baso" and "Biyernes".' },
+      { id: 'dilaw', tl: 'dilaw', en: 'yellow', kind: 'word', picture: '🟨', hint: 'dee-LAOW', hook: 'The yellow of the sun and stars on the flag, and of a ripe "mangga".' },
     ],
   },
   {
@@ -661,7 +666,7 @@ export const UNITS: Unit[] = [
     tlTitle: 'Sa Telepono',
     intro: 'Plans happen by text. Taglish is at home here: "I-text mo ako" is perfectly normal.',
     cards: [
-      { id: 'selpon', tl: 'selpon', en: 'mobile phone', kind: 'word', hint: 'SEL-pon', hook: 'English "cellphone", said the Tagalog way. Often just "CP".' },
+      { id: 'selpon', tl: 'selpon', en: 'mobile phone', kind: 'word', picture: '📱', hint: 'SEL-pon', hook: 'English "cellphone", said the Tagalog way. Often just "CP".' },
       { id: 'i-text-mo-ako', tl: 'I-text mo ako.', en: 'Text me.', kind: 'phrase', hint: 'ee-TEKST moh ah-KOH', hook: 'English "text" with "i-" to make it a Tagalog doing word, then "mo ako": you, me.' },
       { id: 'tawagan-mo-ako', tl: 'Tawagan mo ako.', en: 'Call me.', kind: 'phrase', hint: 'tah-WAH-gahn moh ah-KOH', hook: '"Tawag" (call), from "Tumawag ka ng pulis!", with "-an": call me up.' },
       { id: 'sino-ito', tl: 'Sino ito?', en: 'Who is this?', kind: 'phrase', hint: 'SEE-noh ee-TOH', hook: '"Sino" (who) + "ito" (this): the reply to a text from a number you don\'t know.' },
@@ -724,7 +729,7 @@ export const CLOSE_MEANINGS: readonly (readonly string[])[] = [
   ['kapatid', 'ate', 'kuya'], ['walang-problema', 'walang-anuman', 'wala-yon', 'ayos-lang'],
   ['saan', 'nasaan'], ['paano', 'gaano'], ['may', 'meron'], ['puwede', 'puwede-ba'], ['kailangan', 'kailangan-ko'], ['gusto', 'gusto-ko-ito'],
   ['sabihin', 'magsalita'], ['mauna-na-ako', 'aalis-na-ako'], ['uy', 'kumusta', 'ikaw-pala'], ['anong-meron', 'anong-balita'],
-  ['maghintay', 'teka'], ['tumulong', 'tulong'],
+  ['maghintay', 'teka'], ['tumulong', 'tulong'], ['prutas', 'saging', 'mangga'],
 ];
 
 /**

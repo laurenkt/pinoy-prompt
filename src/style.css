@@ -898,6 +898,28 @@ p {
   margin: 0;
 }
 
+/* A picture recall asks from in place of the English, on a cream tile in the middle; bigger on taller phones. */
+.prompt-picture {
+  width: clamp(76px, (var(--fill) - 640px) * 0.6 + 76px, 160px);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  background: var(--cream);
+  border: var(--outline);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.prompt-picture svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.prompt-picture + .prompt-meaning,
+.prompt:has(.prompt-picture) .eyebrow {
+  text-align: center;
+}
+
 .audio-group {
   display: flex;
   gap: 8px;
@@ -2649,7 +2671,8 @@ p {
   margin-bottom: 10px;
 }
 
-.key-form a {
+.key-form a,
+.credits a {
   color: var(--saffron);
 }
 
