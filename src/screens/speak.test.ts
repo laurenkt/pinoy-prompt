@@ -236,7 +236,7 @@ describe('an attempt', () => {
     expect(dial.querySelector('span')!.textContent).toBe('');
   });
 
-  it('says which syllable to lean on, apart from the score, when the attempt clearly leaned on the other', async () => {
+  it("fails a word leaned on the wrong syllable, however clear its sounds, and says which to lean on", async () => {
     heard = ['s', 'a', 'l', 'a', 'm', 'a', 't'];
     // Every sound right, but the last "a" higher and louder than the one before: "sa-la-MAT". The stand-in recogniser
     // hears sound i from 0.2 + 0.1i seconds.
@@ -252,10 +252,12 @@ describe('an attempt', () => {
     mic.events.onListening?.();
     mic.finish({ samples, speech: true });
     await flush();
-    expect(text('.feedback strong')).toBe('Tama!');
-    expect(onAttempt).toHaveBeenCalledWith(true, true);
+    expect(text('.feedback strong')).toBe('Close.');
+    expect(onAttempt).toHaveBeenCalledWith(false, true);
+    expect(panel.el.querySelector('.result-card.bad')).not.toBeNull();
     expect(panel.el.querySelector('.dial')!.getAttribute('aria-label')).toBe('100% of the way there');
     expect(text('.result-card .stress-tip')).toBe('Lean on LAH, not MAHT: higher and longer.');
+    expect(button('Try again')).toBeTruthy();
   });
 
   it("doesn't mention stress when it can't tell", async () => {

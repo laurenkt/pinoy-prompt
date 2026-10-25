@@ -118,7 +118,8 @@ export function coach(text: string, comparison: Comparison, max = 2): Tip[] {
 
 /**
  * A tip for a word said leaning on the other one of its last two syllables, in the hint's own spelling, or null when
- * it wasn't, or it isn't sure. Kept apart from the sound tips: stress never changes the score.
+ * it wasn't, or it isn't sure. Kept apart from the sound tips: stress never changes the score, though
+ * Speak fails a word that draws this tip.
  */
 export function stressTip(stress: Stress | null): string | null {
   if (!stress || leanAgainst(stress) <= SURE) return null;

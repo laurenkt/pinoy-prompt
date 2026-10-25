@@ -83,7 +83,7 @@ type State =
       text: string;
       comparison: Comparison;
       tips: Tip[];
-      /** Which syllable to lean on, when the attempt clearly leaned on the other. */
+      /** Which syllable to lean on, when the attempt clearly leaned on the other (it then fails). */
       stress?: string | null;
       heard: string[];
       recognition?: Recognition;
@@ -284,9 +284,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       const { text, comparison } = judge(texts, recognition);
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
-      options.onAttempt(isRight(comparison), sounds.length > 0);
       // Pitch takes a moment to find, so only the two vowels a judged card compares are measured.
       const stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
+      options.onAttempt(isRight(comparison) && !stress, sounds.length > 0);
       set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples });
     } catch (err) {
       if (stale()) return;
@@ -429,7 +429,8 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
 
   function resultView(result: Extract<State, { name: 'result' }>): HTMLElement[] {
     const { text, comparison, tips, stress, heard, recognition, samples } = result;
-    const right = isRight(comparison);
+    // A single word leaned on the wrong syllable doesn't pass, however clear its sounds.
+    const right = isRight(comparison) && !stress;
     const pct = Math.round(comparison.score * 100);
     const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
     const detail =
