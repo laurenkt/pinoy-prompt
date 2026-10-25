@@ -52,6 +52,15 @@ export const defaultDeps: SpeakDeps = {
 };
 let sharedPlayer: Player | null = null;
 
+/** The result's own sounds (the attempt, a sound held) stop the card's word, which may be playing by itself, so the two never overlap. */
+function silencing(player: Player, silence: () => void): Player {
+  return {
+    playSlice: (...args) => (silence(), player.playSlice(...args)),
+    hold: (...args) => (silence(), player.hold(...args)),
+    stop: () => player.stop(),
+  };
+}
+
 type Problem = RecordProblem | 'download' | 'start' | 'failed';
 
 /** What went wrong, in words; the recording ones are used by Drills' spoken meanings too. */
@@ -83,8 +92,10 @@ type State =
       text: string;
       comparison: Comparison;
       tips: Tip[];
-      /** Which syllable to lean on, when the attempt clearly leaned on the other. */
+      /** Which syllable to lean on, when the attempt clearly leaned on the other (it then fails). */
       stress?: string | null;
+      /** Whether it passed: its sounds did, and it wasn't leaned on the wrong syllable. */
+      right: boolean;
       heard: string[];
       recognition?: Recognition;
       samples?: Float32Array;
@@ -275,7 +286,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       if (stale()) return;
       recording = null;
       if (!take.speech) {
-        return set({ name: 'result', text: card.tl, comparison: compare(toPhones(card.tl), []), tips: [], heard: [] });
+        return set({ name: 'result', text: card.tl, comparison: compare(toPhones(card.tl), []), tips: [], heard: [], right: false });
       }
       set({ name: 'analysing' });
       const recognition = await model.recognise(take.samples);
@@ -284,10 +295,17 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
       const { text, comparison } = judge(texts, recognition);
       // Nothing recognised isn't an attempt at the word, so it doesn't give the word away.
       if (sounds.length > 0) judged = true;
-      options.onAttempt(isRight(comparison), sounds.length > 0);
       // Pitch takes a moment to find, so only the two vowels a judged card compares are measured.
-      const stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
-      set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples });
+      let stress: string | null = null;
+      try {
+        stress = stressTip(cardStress(card, text, comparison, measurer(take.samples, recognition.timing)));
+      } catch {
+        // Unmeasured, it's judged on its sounds alone.
+      }
+      // A single word leaned on the wrong syllable doesn't pass, however clear its sounds.
+      const right = isRight(comparison) && !stress;
+      options.onAttempt(right, sounds.length > 0);
+      set({ name: 'result', text, comparison, tips: coach(text, comparison), stress, heard: sounds, recognition, samples: take.samples, right });
     } catch (err) {
       if (stale()) return;
       recording = null;
@@ -428,10 +446,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   let breakdown: ResultView | null = null;
 
   function resultView(result: Extract<State, { name: 'result' }>): HTMLElement[] {
-    const { text, comparison, tips, stress, heard, recognition, samples } = result;
-    const right = isRight(comparison);
+    const { text, comparison, tips, stress, heard, recognition, samples, right } = result;
     const pct = Math.round(comparison.score * 100);
-    const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
+    const title = heard.length === 0 ? "Didn't catch that." : right ? 'Tama!' : stress && isRight(comparison) ? 'Wrong stress.' : comparison.score >= CLOSE ? 'Close.' : "Let's work on it.";
     const detail =
       heard.length === 0
         ? 'Speak a little louder or closer to the phone.'
@@ -442,7 +459,7 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
           : 'Letters in pink need work; yellow ones were nearly there.';
     breakdown =
       heard.length > 0 && recognition && samples
-        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: deps.player() })
+        ? soundResults({ text, comparison, tips, heard, timing: recognition.timing, features: recognition.features, samples }, { player: silencing(deps.player(), options.silence) })
         : null;
     if (breakdown) {
       // The breakdown takes the card's place: the word, coloured by how each sound came

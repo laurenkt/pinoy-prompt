@@ -302,10 +302,16 @@ export function practiceScreen(
             spokeWrong = true;
             noteHelp(q, true);
           }
-          if (!right || spokenRight) return;
-          spokenRight = true;
-          if (!spokeWrong) noteHelp(q, false);
-          void chime();
+          const first = right && !spokenRight;
+          if (first) {
+            spokenRight = true;
+            if (!spokeWrong) noteHelp(q, false);
+            void chime();
+          }
+          // The word said back after any attempt it was heard in, right or wrong, as a Listen answer is: after the
+          // chime, and before moving on, which waits for it.
+          if (heard) sayCard(q);
+          if (!first) return;
           // Pick what's next now, so its word loads while the coaching is up.
           settle(true);
           auto = countdown(root, () => {
@@ -480,8 +486,8 @@ export function practiceScreen(
   }
 
   /**
-   * The card's Tagalog (or an accepted spelling) the recording passes as, judged as Speak judges it, with every word
-   * said; null when it doesn't pass; UNCHECKED when it can't be heard on the device: the model is never downloaded for
+   * The card's Tagalog (or an accepted spelling) the recording passes as, judged as Speak judges its sounds, with every
+   * word said (not its stress, which only Speak fails on: recall asks for the word, not how well it's said); null when it doesn't pass; UNCHECKED when it can't be heard on the device: the model is never downloaded for
    * this, and checked for again in case the phone has cleared it since.
    */
   async function saidOnDevice(card: Card, samples: Float32Array): Promise<string | null | typeof UNCHECKED> {
