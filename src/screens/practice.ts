@@ -215,7 +215,7 @@ export function practiceScreen(
     if (!pick) return null;
     const { way: mode } = pick;
     // A phrase may be asked as a variant on its pattern: the same card, in other words.
-    const card = isVocab(pick.card) ? askAs(app.progress, pick.card) : pick.card;
+    const card = isVocab(pick.card) ? askAs(app.progress, pick.card, mode) : pick.card;
     recent = [...recent.slice(-DRILL_GAP), card.id];
     if (!isVocab(card)) {
       const format = guideFormats(card).find((f) => GUIDE_MODES[f] === mode)!;

@@ -2,7 +2,7 @@
 // says the same thing are right, a different meaning isn't.
 
 import { describe, expect, it, vi } from 'vitest';
-import { VOCAB, getCard, type Card } from './deck';
+import { ASKED_VOCAB, VOCAB, getCard, type Card } from './deck';
 import { canTypeMeaning, exactAnswer, judgeMeaning, matchesMeaning, matchesTagalog, meanings, leavesOutPo, repeatsTagalog, spellsTagalog, swapsTagalog, words } from './meaning';
 
 const card = (id: string) => getCard(id)!;
@@ -73,6 +73,14 @@ describe('matching a typed meaning on the device', () => {
 
   it("takes every card's own meaning, as written", () => {
     for (const c of VOCAB.filter(canTypeMeaning)) expect(matchesMeaning(c.en, c), c.en).toBe(true);
+  });
+
+  it("takes each of a phrase variant's meanings on its own, as written", () => {
+    const variants = ASKED_VOCAB.filter((c) => !VOCAB.includes(c) && canTypeMeaning(c));
+    for (const c of variants) for (const answer of c.en.split(' / ')) expect(matchesMeaning(answer, c), answer).toBe(true);
+    const siya = ASKED_VOCAB.find((c) => c.tl === 'Nasaan siya?')!;
+    expect(matchesMeaning('Where is she?', siya)).toBe(true);
+    expect(matchesMeaning('she', siya)).toBe(false);
   });
 
   it("never takes one card's meaning for another's", () => {

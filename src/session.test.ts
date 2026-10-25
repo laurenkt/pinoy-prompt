@@ -409,29 +409,43 @@ describe('requeue', () => {
 describe('askAs', () => {
   const now = Date.UTC(2026, 0, 1);
   const banyo = getCard('nasaan-banyo')!;
+  /** Progress with these cards met, and the phrase settled when read. */
   const met = (...ids: string[]) => {
     const progress = emptyProgress(now);
-    for (const id of ids) recordAnswer(progress, id, 'good', now);
+    for (const id of ['nasaan-banyo', ...ids]) recordAnswer(progress, id, 'good', now);
+    progress.cards['nasaan-banyo'] = { ...progress.cards['nasaan-banyo'], interval: 3, reps: 2 };
     return progress;
   };
 
-  it('sometimes asks a phrase as a variant whose words are all met', () => {
-    const progress = met('nasaan', 'ang', 'nasaan-banyo', 'kape');
-    expect(askAs(progress, banyo, () => 0).tl).toBe('Nasaan ang kape?');
-    expect(askAs(progress, banyo, () => 0).id).toBe('nasaan-banyo');
-    expect(askAs(progress, banyo, () => 0.99)).toBe(banyo);
+  it('sometimes asks a settled phrase as a variant whose words are all met', () => {
+    const progress = met('nasaan', 'ang', 'kape');
+    expect(askAs(progress, banyo, 'read', () => 0).tl).toBe('Nasaan ang kape?');
+    expect(askAs(progress, banyo, 'read', () => 0).id).toBe('nasaan-banyo');
+    expect(askAs(progress, banyo, 'read', () => 0.99)).toBe(banyo);
+    // Speak goes by reading's schedule.
+    expect(askAs(progress, banyo, 'speak', () => 0).tl).toBe('Nasaan ang kape?');
   });
 
   it('never asks a variant with a word not met yet', () => {
-    expect(askAs(met('nasaan', 'ang', 'nasaan-banyo'), banyo, () => 0)).toBe(banyo);
+    expect(askAs(met('nasaan', 'ang'), banyo, 'read', () => 0)).toBe(banyo);
     // "palengke" met but not "kape": only the market is asked.
-    const progress = met('nasaan', 'ang', 'nasaan-banyo', 'palengke');
-    expect(askAs(progress, banyo, () => 0).tl).toBe('Nasaan ang palengke?');
+    const progress = met('nasaan', 'ang', 'palengke');
+    expect(askAs(progress, banyo, 'read', () => 0).tl).toBe('Nasaan ang palengke?');
   });
 
-  it('asks a card without variants as itself', () => {
+  it('asks a phrase as itself until it has settled that way', () => {
+    const progress = met('nasaan', 'ang', 'kape');
+    expect(askAs(progress, banyo, 'listen', () => 0)).toBe(banyo);
+    recordAnswer(progress, 'nasaan-banyo', 'good', now);
+    progress.cards['nasaan-banyo'].reps = 1;
+    expect(askAs(progress, banyo, 'read', () => 0)).toBe(banyo);
+  });
+
+  it('asks a card without variants, or a variant, as itself', () => {
     const salamat = getCard('salamat')!;
-    expect(askAs(met('salamat'), salamat, () => 0)).toBe(salamat);
+    expect(askAs(met('salamat'), salamat, 'read', () => 0)).toBe(salamat);
+    const kape = askAs(met('nasaan', 'ang', 'kape'), banyo, 'read', () => 0);
+    expect(askAs(met('nasaan', 'ang', 'kape', 'palengke'), kape, 'read', () => 0)).toBe(kape);
   });
 });
 

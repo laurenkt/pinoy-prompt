@@ -9,7 +9,7 @@
 // answer has to be in the language asked for: saying the prompt back means the
 // same, but isn't an answer.
 
-import { VOCAB, type Card } from './deck';
+import { ASKED_VOCAB, VOCAB, type Card } from './deck';
 
 /** The language an answer is asked for in: the card's English meaning, or its Tagalog. */
 export type AnswerLanguage = 'en' | 'tl';
@@ -167,7 +167,7 @@ let deckWords: Set<string> | undefined;
 
 /** Every word the deck's meanings use. One of these is meant as written, not a typo for another. */
 function knownWords(): Set<string> {
-  deckWords ??= new Set(VOCAB.flatMap((card) => words(card.en)));
+  deckWords ??= new Set(ASKED_VOCAB.flatMap((card) => words(card.en)));
   return deckWords;
 }
 

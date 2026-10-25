@@ -218,7 +218,7 @@ export const UNITS: Unit[] = [
     intro: 'More questions for getting around: where someone is, where they are going, how many, which one, how long.',
     cards: [
       { id: 'nasaan-ka', tl: 'Nasaan ka?', en: 'Where are you?', kind: 'phrase', hint: 'nah-sah-AHN kah', hook: '"Nasaan" (where is) + "ka" (you): where are you right now? The text you send when someone is late.', variants: [
-        { tl: 'Nasaan siya?', en: 'Where is he / she?', hint: 'nah-sah-AHN shah' },
+        { tl: 'Nasaan siya?', en: 'Where is he? / Where is she?', hint: 'nah-sah-AHN shah' },
         { tl: 'Nasaan sila?', en: 'Where are they?', hint: 'nah-sah-AHN see-LAH' },
       ] },
       { id: 'saan-ka-pupunta', tl: 'Saan ka pupunta?', en: 'Where are you going?', kind: 'phrase', hint: 'sah-AHN kah poo-POON-tah', note: 'Also a friendly greeting in passing. "Diyan lang" ("just over there") is a fine vague answer.', hook: '"Punta" (go to) is from Spanish "punta", a point: the point you are heading for. Doubling the first syllable, pu-punta, makes it "will go".' },
@@ -342,7 +342,7 @@ export const UNITS: Unit[] = [
     cards: [
       { id: 'papunta-na-ako', tl: 'Papunta na ako.', en: "I'm on my way.", kind: 'phrase', hint: 'pah-POON-tah nah ah-KOH', hook: 'The "punta" (go to) from "Saan ka pupunta?", with "pa-" for heading towards: "heading there already, me".', variants: [
         { tl: 'Papunta na kami.', en: "We're on our way.", hint: 'pah-POON-tah nah kah-MEE' },
-        { tl: 'Papunta na siya.', en: "He's / She's on the way.", hint: 'pah-POON-tah nah shah' },
+        { tl: 'Papunta na siya.', en: "He's on the way. / She's on the way.", hint: 'pah-POON-tah nah shah' },
       ] },
       { id: 'malapit-na-ako', tl: 'Malapit na ako.', en: "I'm almost there.", kind: 'phrase', hint: 'mah-LAH-pit nah ah-KOH', hook: '"Lapit" means near: "near already, me". In Manila traffic it can mean anything up to an hour.' },
       { id: 'nandito-na-ako', tl: 'Nandito na ako.', en: "I'm here.", kind: 'phrase', hint: 'nahn-DEE-toh nah ah-KOH', hook: '"Dito" means here, and "nandito" means "is here". Swap "dito" for "diyan" or "doon" to say you are there.' },
@@ -734,7 +734,7 @@ export const UNITS: Unit[] = [
       { id: 'i-text-mo-ako', tl: 'I-text mo ako.', en: 'Text me.', kind: 'phrase', hint: 'ee-TEKST moh ah-KOH', hook: 'English "text" with "i-" to make it a Tagalog doing word, then "mo ako": you, me.' },
       { id: 'tawagan-mo-ako', tl: 'Tawagan mo ako.', en: 'Call me.', kind: 'phrase', hint: 'tah-WAH-gahn moh ah-KOH', hook: '"Tawag" (call), from "Tumawag ka ng pulis!", with "-an": call me up.' },
       { id: 'sino-ito', tl: 'Sino ito?', en: 'Who is this?', kind: 'phrase', hint: 'SEE-noh ee-TOH', hook: '"Sino" (who) + "ito" (this): the reply to a text from a number you don\'t know.', variants: [
-        { tl: 'Sino siya?', en: 'Who is he / she?', hint: 'SEE-noh shah' },
+        { tl: 'Sino siya?', en: 'Who is he? / Who is she?', hint: 'SEE-noh shah' },
         { tl: 'Sino iyan?', en: 'Who is that?', hint: 'SEE-noh ee-YAHN', accept: ['Sino yan?'] },
       ] },
       { id: 'ano-numero-mo', tl: 'Anong number mo?', accept: ['Ano ang numero mo?', 'Anong numero mo?', 'Anong namber mo?', 'Ano ang namber mo?'], en: "What's your number?", kind: 'phrase', hint: 'ah-NONG NUM-ber moh', note: 'Phone numbers are nearly always said in English, so the word is too.', hook: 'English "number" in the shape of "Anong pangalan mo?". Taglish at work.' },
@@ -916,15 +916,15 @@ export const LEARN_ORDER: readonly string[] = [
 
 const byId = new Map(ALL_CARDS.map((c) => [c.id, c]));
 
-const variantCards = new Map<string, Card[]>();
+const variantCards = new WeakMap<Card, Card[]>();
 
 /**
  * A phrase's variants, each as the card it's asked as: the phrase's id (so its answer goes to the phrase's schedule)
  * with the variant's words, and a hook pointing back to the phrase it's a variant of. Made once, so each is the same
- * object every time it's asked.
+ * object every time it's asked. A variant has none of its own.
  */
 export function variantsOf(card: Card): Card[] {
-  let found = variantCards.get(card.id);
+  let found = variantCards.get(card);
   if (!found) {
     found = (card.variants ?? []).map(({ tl, en, hint, say, accept }) => ({
       id: card.id,
@@ -936,7 +936,7 @@ export function variantsOf(card: Card): Card[] {
       accept,
       hook: patternHook(card, tl),
     }));
-    variantCards.set(card.id, found);
+    variantCards.set(card, found);
   }
   return found;
 }
@@ -945,8 +945,10 @@ export function variantsOf(card: Card): Card[] {
 function patternHook(card: Card, tl: string): string {
   const own = tagalogWords(card.tl);
   const words = tagalogWords(tl);
-  const added = words.filter((w) => !own.includes(w)).join(' ');
-  const dropped = own.filter((w) => !words.includes(w)).join(' ');
+  // As written, so a name keeps its capital ("sa Lunes").
+  const written = tl.split(/[^A-Za-z'-]+/).filter((w) => /[a-z]/i.test(w));
+  const added = written.filter((_, i) => !own.includes(words[i])).join(' ');
+  const dropped = card.tl.split(/[^A-Za-z'-]+/).filter((w) => /[a-z]/i.test(w)).filter((w) => !words.includes(w.toLowerCase())).join(' ');
   const change = dropped ? `"${added}" in place of "${dropped}"` : `"${added}" added`;
   return `The pattern of "${card.tl}" (${card.en}), with ${change}.`;
 }

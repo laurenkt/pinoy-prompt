@@ -171,8 +171,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       askGuide(c);
       return;
     }
-    // A review may ask a phrase as a variant on its pattern; a way still new asks the phrase itself.
-    if (s.kind === 'review') card = c = askAs(app.progress, c);
+    // A phrase settled this way may be asked as a variant on its pattern, whose clip loads now.
+    card = c = askAs(app.progress, c, s.way ?? 'read');
+    preload(c);
     pictured = (format === 'recall' || format === 'produce') && askWithPicture(c);
     if (format === 'remember' || format === 'hear' || format === 'produce') {
       phase = 'front';

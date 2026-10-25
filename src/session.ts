@@ -447,11 +447,13 @@ export function setDrillHelp(progress: Progress, cardId: string, way: Way, to: (
 export const VARIANT_CHANCE = 0.5;
 
 /**
- * The card as it's asked this time: itself, or now and then (VARIANT_CHANCE) one of its variants (variantsOf in
+ * The card as it's asked this time, `way`: itself, or now and then (VARIANT_CHANCE) one of its variants (variantsOf in
  * deck.ts), picked from those whose words the learner has all met, so a variant never brings a word they don't know.
- * Decided once per question, as askWithPicture is, so a redraw keeps it.
+ * Only once the phrase has settled that way (reading's schedule for Speak, which Study doesn't keep), so a phrase still
+ * being learned is asked as itself. Decided once per question, as askWithPicture is, so a redraw keeps it.
  */
-export function askAs(progress: Progress, card: Card, random: () => number = Math.random): Card {
+export function askAs(progress: Progress, card: Card, way: Way, random: () => number = Math.random): Card {
+  if (!settled(progress, cardKey(card.id, studyWays(card).includes(way) ? way : 'read'))) return card;
   const met = (word: string) => {
     const id = cardForWord(word);
     return !id || isIntroduced(progress, id);

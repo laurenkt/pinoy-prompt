@@ -146,7 +146,9 @@ describe('phrase variants', () => {
     expect(kape.hook).toBe('The pattern of "Nasaan ang banyo?" (Where is the bathroom?), with "kape" in place of "banyo".');
     expect(variantsOf(getCard('libre-ka-ba')!)[0].hook).toBe('The pattern of "Libre ka ba?" (Are you free?), with "bukas" added.');
     expect(variantsOf(getCard('nasaan-banyo')!)[0]).toBe(kape);
+    expect(variantsOf(getCard('kita-tayo-bukas')!)[1].hook).toBe('The pattern of "Kita tayo bukas." (See you tomorrow.), with "sa Lunes" in place of "bukas".');
     expect(variantsOf(getCard('salamat')!)).toEqual([]);
+    expect(variantsOf(kape)).toEqual([]);
   });
 });
 
