@@ -10,6 +10,7 @@ import type { MeaningJudge } from '../meaning';
 import type { RecorderEvents, Take } from '../recorder';
 import { recordAnswer } from '../store';
 import { DAY_MS } from '../srs';
+import { drillHelp } from '../session';
 import { button, drillScope, fakeApp, flush, noMic } from '../test/screen';
 import { practiceScreen, type MeaningHearer } from './practice';
 import type { SpeakDeps } from './speak';
@@ -212,6 +213,21 @@ describe('recalling words that have settled', () => {
     const choices = [...root.querySelectorAll('.choice')];
     expect(choices).toHaveLength(4);
     expect(choices.some((c) => c.textContent?.includes('Salamat'))).toBe(true);
+  });
+
+  it('asks a word picked from the choices again straight away, and keeps it needing help until it has come back a few times', async () => {
+    const app = learner(true);
+    const root = (last = recall(app));
+    button(root, 'Show choices').click();
+    [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((c) => c.textContent?.endsWith('Salamat'))!.click();
+    expect(drillHelp(app.progress.cards.salamat, 'recall')).toBe(1);
+    button(root, 'Next').click();
+    // The same word: its Tagalog is the right answer again.
+    type(root, 'salamat');
+    await flush();
+    expect(root.querySelector('.feedback')?.textContent).toContain('Tama!');
+    // Got right so soon after, it still counts as needing help.
+    expect(drillHelp(app.progress.cards.salamat, 'recall')).toBe(1);
   });
 
   it('has no microphone without a key or the pronunciation model', () => {

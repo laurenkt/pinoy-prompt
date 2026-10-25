@@ -4,6 +4,7 @@
 
 import { vi } from 'vitest';
 import type { App } from '../app';
+import { VOCAB } from '../deck';
 import type { SpeakDeps } from '../screens/speak';
 import { emptyProgress, recordAnswer, type Settings } from '../store';
 
@@ -51,4 +52,18 @@ export function drillScope(root: HTMLElement, modes: string[]): void {
   // Turn the wanted ones on first, so the last one left on is never one being turned off.
   set(true);
   set(false);
+}
+
+/**
+ * Pick the right choice on a word read or recalled from choices, found from what the prompt shows, so a drill round
+ * doesn't bring the word straight back as a miss. Falls back on the first choice for anything else.
+ */
+export function chooseRight(root: ParentNode): void {
+  const prompt = root.querySelector('.prompt');
+  const shown = `${prompt?.textContent ?? ''} ${[...(prompt?.querySelectorAll('img') ?? [])].map((i) => i.alt).join(' ')}`;
+  const choices = [...root.querySelectorAll<HTMLButtonElement>('.choice')];
+  // A choice reads as its number key, then its label.
+  const label = (b: HTMLButtonElement) => b.textContent!.replace(/^\d/, '');
+  const right = choices.find((b) => VOCAB.some((c) => (label(b) === c.en && shown.includes(c.tl)) || (label(b) === c.tl && shown.includes(c.en))));
+  (right ?? choices[0]).click();
 }

@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { practiceScreen } from './practice';
 import type { SpeakDeps } from './speak';
-import { button, drillScope, fakeApp, flush, noMic } from '../test/screen';
+import { button, chooseRight, drillScope, fakeApp, flush, noMic } from '../test/screen';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'hindi', 'paalam', 'kape'];
 
@@ -22,7 +22,7 @@ const kind = (root: HTMLElement) => {
 
 /** Answer the question showing and go on to the next. */
 function next(root: HTMLElement): void {
-  root.querySelector<HTMLButtonElement>('.choice')!.click();
+  chooseRight(root);
   button(root, 'Next').click();
 }
 

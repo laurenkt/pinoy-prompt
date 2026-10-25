@@ -112,18 +112,16 @@ describe('listening to words that have settled', () => {
     expect(has(root, 'I had it right')).toBe(false);
   });
 
-  it('looks back at a typed miss from the next question', async () => {
+  it('asks a typed miss again on the next question, with no answer to look back at', async () => {
     const root = listen(learner(true));
     type(root, 'good night');
     await flush();
-    button(root, 'Next').click();
-    button(root, 'Previous card').click();
-    expect(box(root)!.value).toBe('good night');
     expect(box(root)!.classList.contains('wrong')).toBe(true);
-    expect(root.querySelector('.feedback')?.textContent).toContain('Mali.');
-    expect(has(root, 'I had it right')).toBe(false);
-    button(root, 'Back to the current card').click();
+    vi.mocked(play).mockClear();
+    button(root, 'Next').click();
+    expect(vi.mocked(play).mock.lastCall?.[0].tl).toBe('Salamat');
     expect(box(root)!.value).toBe('');
+    expect(has(root, 'Previous card')).toBe(false);
   });
 
   it("doesn't take an empty box as an answer", async () => {
