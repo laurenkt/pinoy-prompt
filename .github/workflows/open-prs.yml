@@ -1,0 +1,45 @@
+# Every pull request is meant to be merged by the thread that opened it once CI
+# is green. One that conflicts with main never gets CI and wakes nobody, so it
+# can sit open unnoticed. Each hour this lists any open PR that conflicts with
+# main or has been open over three hours in one issue, "Pull requests left
+# open", and closes that issue once there are none. Draft PRs are left out.
+name: Open PRs
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TITLE: Pull requests left open
+    steps:
+      - name: List stuck pull requests
+        run: |
+          stuck=$(gh pr list --state open --json number,title,url,isDraft,mergeable,createdAt --jq '
+            map(select(.isDraft | not)
+              | .hours = ((now - (.createdAt | fromdateiso8601)) / 3600 | floor)
+              | select(.mergeable == "CONFLICTING" or .hours >= 3)
+              | "- [#\(.number)](\(.url)) \(.title): "
+                + (if .mergeable == "CONFLICTING" then "conflicts with main, so CI hasn'"'"'t run" else "open \(.hours) hours" end))
+            | join("\n")')
+          issue=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+            --jq "map(select(.title == \"$TITLE\")) | .[0].number // empty")
+          if [ -n "$stuck" ]; then
+            body=$(printf '%s\n\n%s\n\n%s' \
+              'These pull requests have not been merged. Each one needs main merged in, tests run, CI green and a merge, or closing if it was superseded. This issue is updated every hour and closes itself once none are left.' \
+              "$stuck" \
+              '_Checked by `.github/workflows/open-prs.yml`._')
+            echo "$stuck"
+            if [ -n "$issue" ]; then gh issue edit "$issue" --body "$body"; else gh issue create --title "$TITLE" --body "$body"; fi
+          elif [ -n "$issue" ]; then
+            gh issue close "$issue" --comment 'Every pull request is merged or closed now.'
+          fi
