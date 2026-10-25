@@ -44,6 +44,16 @@ const SHIPPED_IDS = [
   'uy', 'wala-yon', 'ikaw-pala', 'saan-ka-galing', 'diyan-lang', 'mauna-na-ako', 'anong-meron', 'tao-po', 'k-taglish',
   // Shipped later: more family.
   'tita', 'tito', 'pinsan', 'magulang', 'apo', 'pamangkin', 'panganay', 'bunso', 'ninang', 'ninong',
+  // Shipped later: the most common words.
+  'niya', 'natin', 'namin', 'nila', 'niyo', 'akin', 'iyo', 'umaga', 'gabi', 'kagabi', 'sandali', 'noon', 'dati',
+  'matagal', 'alam', 'kilala', 'sabi', 'gawin', 'nakita', 'tingnan', 'umalis', 'bumalik', 'kunin', 'ibigay',
+  'buksan', 'pumasok', 'nakalimutan', 'akala', 'maging', 'nangyari', 'halika', 'tao', 'buhay', 'mundo', 'bagay',
+  'lugar', 'pangalan', 'trabaho', 'kamay', 'puso', 'aso', 'kama', 'pinto', 'kuwarto', 'gamit', 'sarili', 'loob',
+  'labas', 'dahilan', 'paraan', 'beses', 'kasalanan', 'bansa', 'pare', 'pagkain', 'pakiusap', 'takot', 'totoo',
+  'mali', 'masama', 'magaling', 'malakas', 'tahimik', 'ay', 'kung', 'para', 'dahil', 'kaya', 'kahit', 'kapag',
+  'habang', 'hanggang', 'mula', 'tungkol', 'tulad', 'parang', 'kaysa', 'mas', 'tapos', 'pagkatapos', 'ulit', 'naman',
+  'pala', 'rin', 'daw', 'muna', 'siyempre', 'basta', 'di-ba', 'heto', 'ganito', 'masyado', 'medyo', 'halos', 'lahat',
+  'bawat', 'iba', 'pareho', 'dapat', 'huwag',
 ];
 
 describe('deck', () => {
@@ -84,8 +94,11 @@ describe('deck', () => {
     expect([...buildsOn(getCard('paano-sabihin')!)].sort()).toEqual(['ito', 'paano', 'sa', 'sabihin']);
     expect(buildsOn(getCard('walang-anuman')!)).toEqual(['wala']);
     expect([...buildsOn(getCard('ilang-taon-ka-na')!)].sort()).toEqual(['ilan', 'ka', 'na', 'taon']);
-    expect(buildsOn(getCard('magkano-lahat')!)).toEqual(['magkano']);
-    expect(buildsOn(getCard('mabuti')!)).toEqual([]);
+    expect(buildsOn(getCard('magkano-lahat')!)).toEqual(['magkano', 'lahat']);
+    expect(buildsOn(getCard('mabuti')!)).toEqual(['naman']);
+    expect(buildsOn(getCard('salamat-po')!)).toEqual(['salamat', 'po']);
+    // A word only spelled the same isn't built on: "Para po!" is "stop", not "for".
+    expect(buildsOn(getCard('para-po')!)).toEqual(['po']);
   });
 
   it('brings at most one new word with each phrase', () => {
