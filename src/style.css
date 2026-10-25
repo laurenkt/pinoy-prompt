@@ -1354,7 +1354,7 @@ p {
   /* A bar standing for several levels grows as they come in; merged bars glide into their slots. */
   transition:
     height 0.12s ease-out,
-    flex-basis 0.35s ease-out;
+    flex-basis 0.25s ease-out;
 }
 
 /* A new bar rises out of the middle line as it comes in. */
@@ -1403,7 +1403,8 @@ p {
     background: var(--magenta);
   }
 
-  .meaning-wave span {
+  .meaning-wave span,
+  .meaning-wave span.new {
     animation: none;
     transition: none;
   }

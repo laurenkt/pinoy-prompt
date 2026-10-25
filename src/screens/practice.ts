@@ -852,11 +852,9 @@ export function practiceScreen(
         'aria-hidden': 'true',
         style: `--bars: ${WAVE_BARS}${thinking ? `; --since: ${Date.now() - thinkingSince}ms` : ''}`,
       },
-      waveBars(levels),
+      levels.map(waveBar),
     );
   }
-
-  const waveBars = (levels: number[]) => levels.map(waveBar);
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
@@ -968,17 +966,20 @@ export function practiceScreen(
 const WAVE_BARS = 80;
 /** About how long each of the recorder's finer levels stands for, so the wave takes them in at the pace they're said. */
 const WAVE_PART_MS = 21;
-/** Levels more than this behind are let in faster, so the wave never lags what's said. */
+/** Levels more than this behind are let in faster, so the wave never lags far behind what's said. */
 const WAVE_LAG = 8;
+/** How long merged bars take to glide into their slots: `.meaning-wave span`'s flex-basis transition. */
+const WAVE_GLIDE_MS = 250;
 
 const waveBar = (level: number, i: number) => h('span', { style: `--level: ${level}; --i: ${i}` });
 
 /**
- * The wave of a meaning being said, kept in `levels` and drawn in the box `box` gives (none once the take is over).
- * The recorder's levels come four at a time; they're let in one by one at the pace they were said, a frame at a
- * time, each a little smoothed towards the one before, so the wave grows steadily rather than in jumps. Each new bar
- * eases in. Each bar is the loudest of `span` levels; once the box is full, neighbouring bars merge in pairs and span
- * doubles, so the whole of what was said stays in the box, the merged bars gliding from double width to their slots.
+ * The wave of a meaning being said, kept in `levels` and drawn in the box `box` gives (none once the take is over or
+ * dropped, which stops it). The recorder's levels come four at a time; they're let in one by one at the pace they
+ * were said, a frame at a time, each smoothed a little towards the one before, so the wave grows steadily rather than
+ * in jumps. Each new bar eases in. Each bar is the loudest of `span` smoothed levels; once the box is full,
+ * neighbouring bars merge in pairs and span doubles, so the whole of what was said stays in the box, the merged bars
+ * gliding from double width into their slots while new ones wait.
  */
 function liveWave(levels: number[], box: () => Element | null) {
   const pending: number[] = [];
@@ -988,10 +989,10 @@ function liveWave(levels: number[], box: () => Element | null) {
   let frame = 0;
   let then = 0;
   let due = 0;
-  const add = (part: number) => {
+  let glidingUntil = 0;
+  const add = (part: number, el: Element | null, now: number) => {
     smoothed = levels.length ? smoothed + (part - smoothed) * 0.6 : part;
     const level = smoothed;
-    const el = box();
     if (inLast > 0 && inLast < span) {
       levels[levels.length - 1] = Math.max(levels[levels.length - 1], level);
       inLast++;
@@ -1008,6 +1009,7 @@ function liveWave(levels: number[], box: () => Element | null) {
         // Laid out at double width first, so taking the class off glides them into their slots.
         void (el as HTMLElement).offsetWidth;
         merged.forEach((bar) => bar.classList.remove('merged'));
+        glidingUntil = now + WAVE_GLIDE_MS;
       }
     }
     levels.push(level);
@@ -1018,25 +1020,32 @@ function liveWave(levels: number[], box: () => Element | null) {
   };
   const tick = (now: number) => {
     frame = 0;
-    due = Math.min(due + (then ? now - then : 0) / WAVE_PART_MS, pending.length);
+    const el = box();
+    if (!el) return void pending.splice(0);
+    due = Math.min(due + (now - then) / WAVE_PART_MS, pending.length);
     then = now;
-    let count = Math.floor(due) + Math.max(0, pending.length - WAVE_LAG);
-    due -= Math.floor(due);
-    for (; count > 0 && pending.length; count--) add(pending.shift()!);
-    if (pending.length && box()) frame = requestAnimationFrame(tick);
-    else then = 0;
+    // While merged bars glide into their slots there's no room for new ones; they wait, then catch up gently.
+    if (now >= glidingUntil) {
+      let count = Math.floor(due) + Math.ceil(Math.max(0, pending.length - WAVE_LAG) / 4);
+      due -= Math.floor(due);
+      for (; count > 0 && pending.length; count--) add(pending.shift()!, el, now);
+    }
+    if (pending.length) frame = requestAnimationFrame(tick);
   };
   return {
     /** A block's finer levels, in order. */
     take(parts: number[]) {
       pending.push(...parts);
-      if (!frame) frame = requestAnimationFrame(tick);
+      if (frame) return;
+      then = performance.now();
+      frame = requestAnimationFrame(tick);
     },
     /** Put in whatever is still to come in, now. */
     flush() {
       cancelAnimationFrame(frame);
       frame = 0;
-      for (const part of pending.splice(0)) add(part);
+      const el = box();
+      for (const part of pending.splice(0)) add(part, el, 0);
     },
   };
 }
