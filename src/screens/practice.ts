@@ -393,12 +393,8 @@ export function practiceScreen(
     // The word playing would be recorded too.
     stop();
     q.unheard = undefined;
-    // Starts empty and grows from the left, a bar for each moment of speech, so silence draws nothing. Each bar is the
-    // loudest of `span` moments; once the box is full, neighbouring bars merge in pairs and span doubles, so the whole
-    // of what was said stays in the box, and a bar, once whole, stays as it is until the next squeeze.
-    const wave: number[] = (q.wave = []);
-    let span = 1;
-    let inLast = 0;
+    // Starts empty and grows from the left, a bar for each moment of speech, so silence draws nothing.
+    const wave = liveWave((q.wave = []), () => (listening === recording ? root.querySelector('.meaning-wave') : null));
     q.thinkingSince = undefined;
     micLive = false;
     const recording = deps.record({
@@ -411,22 +407,7 @@ export function practiceScreen(
         if (status) status.textContent = listeningText(q);
       },
       onLevel: (_level, speech, parts) => {
-        if (listening !== recording || !speech) return;
-        for (const part of parts) {
-          if (inLast > 0 && inLast < span) {
-            wave[wave.length - 1] = Math.max(wave[wave.length - 1], part);
-            inLast++;
-            continue;
-          }
-          if (wave.length === WAVE_BARS) {
-            wave.splice(0, WAVE_BARS, ...Array.from({ length: WAVE_BARS / 2 }, (_, i) => Math.max(wave[2 * i], wave[2 * i + 1])));
-            span *= 2;
-          }
-          wave.push(part);
-          inLast = 1;
-        }
-        // Redraw the bars in place rather than the round, a dozen times a second.
-        root.querySelector('.meaning-wave')?.replaceChildren(...waveBars(wave));
+        if (listening === recording && speech) wave.take(parts);
       },
     });
     listening = recording;
@@ -441,6 +422,8 @@ export function practiceScreen(
     recording.audio.then(
       async (take) => {
         if (listening !== recording) return;
+        // What's still to come in goes in at once, so the wave being checked is the whole of it.
+        wave.flush();
         listening = null;
         if (current !== q || !q.typed || !root.isConnected || picked !== null) return draw();
         if (!take.speech) return unheard("Didn't hear anything. Tap the microphone and say it again, or type it.");
@@ -873,7 +856,7 @@ export function practiceScreen(
     );
   }
 
-  const waveBars = (levels: number[]) => levels.map((level, i) => h('span', { style: `--level: ${level}; --i: ${i}` }));
+  const waveBars = (levels: number[]) => levels.map(waveBar);
 
   /**
    * A box to type the answer in: the meaning, or for recall the Tagalog. It keeps what was sent, marked right or
@@ -983,6 +966,80 @@ export function practiceScreen(
 
 /** Bars the box holds while a meaning is said, each a slot of its width: under two seconds of speech at about fifty levels a second, before they merge in pairs. Even, so they can. */
 const WAVE_BARS = 80;
+/** About how long each of the recorder's finer levels stands for, so the wave takes them in at the pace they're said. */
+const WAVE_PART_MS = 21;
+/** Levels more than this behind are let in faster, so the wave never lags what's said. */
+const WAVE_LAG = 8;
+
+const waveBar = (level: number, i: number) => h('span', { style: `--level: ${level}; --i: ${i}` });
+
+/**
+ * The wave of a meaning being said, kept in `levels` and drawn in the box `box` gives (none once the take is over).
+ * The recorder's levels come four at a time; they're let in one by one at the pace they were said, a frame at a
+ * time, each a little smoothed towards the one before, so the wave grows steadily rather than in jumps. Each new bar
+ * eases in. Each bar is the loudest of `span` levels; once the box is full, neighbouring bars merge in pairs and span
+ * doubles, so the whole of what was said stays in the box, the merged bars gliding from double width to their slots.
+ */
+function liveWave(levels: number[], box: () => Element | null) {
+  const pending: number[] = [];
+  let span = 1;
+  let inLast = 0;
+  let smoothed = 0;
+  let frame = 0;
+  let then = 0;
+  let due = 0;
+  const add = (part: number) => {
+    smoothed = levels.length ? smoothed + (part - smoothed) * 0.6 : part;
+    const level = smoothed;
+    const el = box();
+    if (inLast > 0 && inLast < span) {
+      levels[levels.length - 1] = Math.max(levels[levels.length - 1], level);
+      inLast++;
+      (el?.lastElementChild as HTMLElement | null)?.style.setProperty('--level', String(levels[levels.length - 1]));
+      return;
+    }
+    if (levels.length === WAVE_BARS) {
+      levels.splice(0, WAVE_BARS, ...Array.from({ length: WAVE_BARS / 2 }, (_, i) => Math.max(levels[2 * i], levels[2 * i + 1])));
+      span *= 2;
+      if (el) {
+        const merged = levels.map(waveBar);
+        merged.forEach((bar) => bar.classList.add('merged'));
+        el.replaceChildren(...merged);
+        // Laid out at double width first, so taking the class off glides them into their slots.
+        void (el as HTMLElement).offsetWidth;
+        merged.forEach((bar) => bar.classList.remove('merged'));
+      }
+    }
+    levels.push(level);
+    inLast = 1;
+    const bar = waveBar(level, levels.length - 1);
+    bar.classList.add('new');
+    el?.append(bar);
+  };
+  const tick = (now: number) => {
+    frame = 0;
+    due = Math.min(due + (then ? now - then : 0) / WAVE_PART_MS, pending.length);
+    then = now;
+    let count = Math.floor(due) + Math.max(0, pending.length - WAVE_LAG);
+    due -= Math.floor(due);
+    for (; count > 0 && pending.length; count--) add(pending.shift()!);
+    if (pending.length && box()) frame = requestAnimationFrame(tick);
+    else then = 0;
+  };
+  return {
+    /** A block's finer levels, in order. */
+    take(parts: number[]) {
+      pending.push(...parts);
+      if (!frame) frame = requestAnimationFrame(tick);
+    },
+    /** Put in whatever is still to come in, now. */
+    flush() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      for (const part of pending.splice(0)) add(part);
+    },
+  };
+}
 
 /** How long typing has to pause before a meaning the device can tell is right is taken without Check. */
 const TYPING_PAUSE_MS = 700;
