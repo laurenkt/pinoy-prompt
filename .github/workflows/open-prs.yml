@@ -3,9 +3,9 @@
 # thread can miss the event that says CI passed, so a PR can sit open unnoticed.
 # After every push to main (when a PR is most likely to start conflicting), and
 # hourly, this finds each open PR that conflicts with main or has been open two
-# hours or more (a missed CI signal, or CI left red). It comments on the PR, once per commit and reason, which wakes the thread
-# watching it, and lists them all in one issue, "Pull requests left open",
-# which closes itself once there are none. Draft PRs are left out.
+# hours or more (a missed CI signal, or CI left red). It comments on the PR,
+# once per commit and reason, which wakes the thread watching it and notifies
+# the PR's author. Draft PRs are left out.
 name: Open PRs
 
 on:
@@ -16,7 +16,6 @@ on:
   workflow_dispatch:
 
 permissions:
-  issues: write
   pull-requests: write
 
 concurrency:
@@ -28,7 +27,6 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      TITLE: Pull requests left open
     steps:
       - name: Flag stuck pull requests
         run: |
@@ -65,29 +63,3 @@ jobs:
               || echo "::warning::Couldn't comment on #$number"
           done
 
-          lines=$(echo "$stuck" | jq -r 'map("- [#\(.number)](\(.url)) \(.title): "
-            + (if .reason == "conflict" then "conflicts with main, so CI hasn'"'"'t run"
-               elif .reason == "failing" then "open \(.hours) hours, CI failing"
-               elif .mergeable == "UNKNOWN" then "open \(.hours) hours, and GitHub hasn'"'"'t said yet whether it conflicts"
-               else "open \(.hours) hours" end)) | join("\n")')
-          issue=$(gh issue list --state open --limit 500 --json number,title,body \
-            --jq "map(select(.title == \"$TITLE\")) | .[0] // empty")
-          if [ -n "$lines" ]; then
-            echo "$lines"
-            body=$(printf '%s\n\n%s\n\n%s' \
-              'These pull requests have not been merged. Each one needs main merged in, tests run, CI green and a merge, or closing if it was superseded. This issue is updated after every push to main and closes itself once none are left.' \
-              "$lines" \
-              '_Checked by `.github/workflows/open-prs.yml`._')
-            if [ -z "$issue" ]; then
-              gh issue create --title "$TITLE" --body "$body"
-            else
-              number=$(echo "$issue" | jq .number)
-              # Editing the body notifies nobody, so name any PR that has joined the list in a comment.
-              added=$(echo "$stuck" | jq -r --argjson issue "$issue" \
-                'map(select(.url as $u | $issue.body | contains("](\($u))") | not) | "#\(.number)") | join(", ")')
-              gh issue edit "$number" --body "$body"
-              if [ -n "$added" ]; then gh issue comment "$number" --body "Now also left open: $added."; fi
-            fi
-          elif [ -n "$issue" ]; then
-            gh issue close "$(echo "$issue" | jq .number)" --comment 'Every pull request is merged or closed now.'
-          fi
