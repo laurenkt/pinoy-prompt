@@ -3,7 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
-import { speaking, stop } from '../speech';
+import { setMuted, speaking, stop } from '../speech';
 import { toPhones } from '../phonetics';
 import type { RecorderEvents, Take } from '../recorder';
 import { ADVANCE_MS } from './auto-advance';
@@ -220,10 +220,54 @@ describe('the word before an attempt', () => {
     recorder.onListening?.();
     button("I'm done").click();
     await flush();
+    stop();
     button('▶ Target').click();
     expect(speaking()).toBe(true);
   });
+});
 
+describe('the word after an attempt', () => {
+  beforeEach(() => vi.stubGlobal('speechSynthesis', { getVoices: () => [], speak: () => {}, cancel: () => {}, addEventListener: () => {}, speaking: false, pending: false }));
+  afterEach(() => {
+    stop();
+    setMuted(false);
+    vi.unstubAllGlobals();
+  });
+
+  async function attempt(model: SpeakDeps): Promise<void> {
+    const root = practiceScreen(fakeApp(KNOWN), model);
+    document.body.replaceChildren(root);
+    await flush();
+    drillScope(root, ['speak']);
+    await flush();
+    stop();
+    button('Tap and speak').click();
+    recorder.onListening?.();
+    button("I'm done").click();
+    await flush();
+  }
+
+  it('is played by itself once said right, so the learner hears it said properly', async () => {
+    await attempt(deps());
+    expect(speaking()).toBe(true);
+  });
+
+  it('is played by itself after a miss too', async () => {
+    await attempt(deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition(['ʃ']) }) }));
+    expect(button('Try again')).toBeTruthy();
+    expect(speaking()).toBe(true);
+  });
+
+  it("isn't played when nothing of it was heard, which doesn't give it away", async () => {
+    await attempt(deps({ loadPhoneModel: async () => ({ recognise: async () => fakeRecognition([]) }) }));
+    expect(speaking()).toBe(false);
+  });
+
+  it("isn't played with the sound off", async () => {
+    setMuted(true);
+    await attempt(deps());
+    expect(speaking()).toBe(false);
+  });
 });
 
 describe('moving on after a right attempt', () => {
