@@ -191,7 +191,7 @@ export function settingsScreen(app: App): HTMLElement {
       ),
       h(
         'p',
-        { class: 'muted small' },
+        { class: 'muted small credits' },
         'Pictures by ',
         h('a', { href: 'https://openmoji.org', target: '_blank', rel: 'noopener' }, 'OpenMoji'),
         ', under ',

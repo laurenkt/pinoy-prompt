@@ -477,7 +477,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   function quizPrompt(c: Card, answered: boolean): HTMLElement {
     if (format === 'recall') {
-      return h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), ...recallCue(c, pictured));
+      return h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'How do you say…'), ...recallCue(c, pictured, answered && step?.kind === 'new'));
     }
     if (format === 'listen') {
       return h(

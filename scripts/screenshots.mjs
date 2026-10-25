@@ -185,6 +185,34 @@ const SCREENS = {
   'drills-picture-answered': (page) => pictureRecall(page, true),
   'drills-build': (page) => drillGuide(page, 'recall'),
   study: (page) => page.click('.hub-btn.big:not(.chat-btn)'),
+  // A word due to be recalled in Study, asked from its picture and turned over to rate.
+  'study-picture': async (page) => {
+    await page.evaluate(async () => {
+      const { load, recordAnswer, save } = await import('/src/store.ts');
+      const { cardKey } = await import('/src/deck.ts');
+      const progress = load(Date.now());
+      for (const state of Object.values(progress.cards)) state.due = Date.now() + 86_400_000;
+      progress.today.newCount = progress.settings.dailyNew;
+      // Remembered a few days apart, so recall is self-rated, and due now.
+      for (const id of ['kape', 'tubig', 'isda', 'saging', 'pula', 'bahay']) {
+        for (const key of [id, cardKey(id, 'recall')]) {
+          recordAnswer(progress, key, 'good', Date.now() - 6 * 86_400_000);
+          recordAnswer(progress, key, 'good', Date.now() - 4 * 86_400_000);
+          progress.cards[key].due = key.includes(':') ? Date.now() - 1 : Date.now() + 86_400_000;
+        }
+      }
+      save(progress, { replace: true });
+    });
+    await page.reload();
+    await page.waitForSelector('.home');
+    await page.click('.hub-btn.big:not(.chat-btn)');
+    for (let i = 0; i < 12 && !(await page.locator('.prompt-picture').count()); i++) {
+      await page.click('text=Show the Tagalog');
+      await page.click('.rate-good');
+    }
+    if (!(await page.locator('.prompt-picture').count())) throw new Error('Study asked nothing from a picture');
+    await page.click('text=Show the Tagalog');
+  },
   // Nothing due and today's new cards in: Study says so and points to Drills.
   'study-caught-up': async (page) => {
     await caughtUp(page, 24);
@@ -433,7 +461,8 @@ async function pictureRecall(page, answered = false) {
   await onlyAsk(page, 'recall');
   for (let i = 0; i < 60 && !(await page.locator('.prompt-picture').count()); i++) {
     await page.locator('.choice').first().click();
-    await page.click('button:has-text("Next")');
+    // A right answer moves on by itself, perhaps before Next is pressed.
+    await page.click('button:has-text("Next")', { timeout: 1000 }).catch(() => {});
   }
   if (!(await page.locator('.prompt-picture').count())) throw new Error('No question was asked from a picture');
   if (answered) {

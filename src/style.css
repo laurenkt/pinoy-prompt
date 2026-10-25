@@ -915,7 +915,8 @@ p {
   height: 100%;
 }
 
-.prompt-picture + .prompt-meaning {
+.prompt-picture + .prompt-meaning,
+.prompt:has(.prompt-picture) .eyebrow {
   text-align: center;
 }
 
@@ -2670,7 +2671,8 @@ p {
   margin-bottom: 10px;
 }
 
-.key-form a {
+.key-form a,
+.credits a {
   color: var(--saffron);
 }
 
