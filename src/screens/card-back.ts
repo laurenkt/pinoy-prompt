@@ -1,8 +1,8 @@
 // The back of a drill card: how well it's known, turned over by a tap on the card (see promptBlock in
 // guide-question.ts). A dial leads with the one number that matters, how likely it is to come to mind now; then three
-// pictures explain it, each titled with what it shows and a line on how to read it: the slope it slides down until
-// Study asks again, the stairs each way it's asked climbs as it holds longer, and the skyline of how long Study has
-// waited between asks over its life. Then a few counts. All read from saved progress; nothing here is stored.
+// pictures explain it, each under a plain title and a short line on how to read it: the slope a memory slides down
+// until Study asks again, the stairs each way it's asked climbs as it sticks for longer, and a skyline of the gaps
+// between reviews over its life. Then a few counts. All read from saved progress; nothing here is stored.
 
 import { studyWays, type Card, type Way } from '../deck';
 import { STRENGTHS, intervalSteps, lastSeen, recallChance, strengthOf, type Strength } from '../memory';
@@ -138,7 +138,7 @@ function slope(state: CardState, now: number): HTMLElement {
   const under = base - ball.y > 30;
   return figure(
     'Memories slide out of your mind',
-    'The ball is now. Study asks again at the flag.',
+    'The hill is the chance you’d remember it. The ball is today; the flag is when Study asks.',
     picture(
       'slope',
       H,
@@ -192,7 +192,7 @@ function stairs(progress: Progress, card: Card, asked: Way, ways: { id: Way; tit
     return [
       svg('rect', { class: `tag${cls}`, x: f(cx - tag.width / 2), y: f(y), width: tag.width, height: tag.height, rx: 10 }),
       text(`tag-name${cls}`, cx, y + 14, 'middle', title),
-      ...(cls ? [text('asked-label', cx, y - 6, anchorAt(cx, 30), 'asked now')] : []),
+      ...(cls ? [text('asked-label', cx, y - 6, 'middle', 'asked now')] : []),
     ];
   });
   const helped = placed.filter((p) => p.help);
@@ -202,7 +202,7 @@ function stairs(progress: Progress, card: Card, asked: Way, ways: { id: Way; tit
   return figure(
     'Learning is like climbing stairs',
     'Each way you’re asked climbs as it sticks for longer.',
-    picture('stairs', H, `${label}.`, ...steps, svg('line', { class: 'ground', x1: 0, x2: W, y1: base, y2: base }), ...names, ...tags),
+    picture('stairs', H, `${label}.`, svg('line', { class: 'ground', x1: 0, x2: W, y1: base, y2: base }), ...steps, ...names, ...tags),
     helped.length > 0 && h('p', { class: 'back-help' }, `Lately the drills had to help with ${list(helped.map((p) => `${p.title} ${times(p.help)}`))}.`),
   );
 }
@@ -253,19 +253,19 @@ function skyline(state: CardState, now: number): HTMLElement {
         svg('line', { class: 'grid', x1: GUTTER, x2: W, y1: f(y(days)), y2: f(y(days)) }),
         text('tick', GUTTER - 6, y(days) + 4, 'end', mark),
       ]),
-      ...buildings,
       svg('line', { class: 'ground', x1: GUTTER, x2: W, y1: base, y2: base }),
+      ...buildings,
     ),
     h(
       'div',
       { class: 'back-axis' },
       h('span', null, 'First seen'),
-      h('span', null, state.interval < 1 ? 'Today: still settling in' : `Today: a ${formatInterval(state.interval)} gap`),
+      h('span', null, state.interval < 1 ? 'Today: still settling in' : `Study waits ${formatInterval(state.interval)} now`),
     ),
   );
 }
 
-/** Big numbers, each under what it counts: reviews in Study, times forgotten there, how long it has been known. */
+/** Big numbers, each under the words saying what it counts: reviews in Study, times forgotten there, how long it has been known. */
 function counts(state: CardState, now: number): HTMLElement {
   const answers = answersOf(state);
   // A way only copied from reading's schedule carries reading's lapses too, not its own.

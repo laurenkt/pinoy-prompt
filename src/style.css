@@ -3129,7 +3129,7 @@ p {
   color: var(--cream);
 }
 
-/* Each picture: its title, how to read it, then the picture framed like Home's chart. */
+/* Each picture: its title, how to read it, then the picture, straight on the card. */
 .back-fig {
   margin: 14px 0 0;
 }
@@ -3239,7 +3239,7 @@ p {
   stroke-width: 3;
 }
 
-/* The stairs: a tag for each way, cream with its name, the way asked now dark. */
+/* The stairs: a tag for each way, cream with its name, the way asked now saffron and labelled. */
 .back-chart .tag {
   fill: var(--cream);
   stroke: var(--ink);
