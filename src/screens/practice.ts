@@ -4,7 +4,7 @@ import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type Me
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, drillOdds, pickDrillCard, setDrillHelp, settled, shuffle } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -736,7 +736,13 @@ export function practiceScreen(
    */
   function backOf(q: Question): CardBack {
     return {
-      back: () => cardBack(app.progress, q.card, q.mode, q.guide ? GUIDE_WAYS : MODES, app.now()),
+      // As this round would pick at that time: its misses so far and its kinds, without the cards sitting out.
+      back: () => {
+        const ways = modes();
+        return cardBack(app.progress, q.card, q.mode, q.guide ? GUIDE_WAYS : MODES, app.now(), (at) =>
+          drillOdds(app.progress, at, [], missed, (c) => modesFor(c).filter((m) => ways.includes(m))),
+        );
+      },
       turned: memoryFor === q,
       onTurn: (turned) => {
         memoryFor = turned ? q : null;

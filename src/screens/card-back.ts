@@ -7,7 +7,7 @@
 import { studyWays, type Card, type Way } from '../deck';
 import { STRENGTHS, intervalSteps, lastSeen, recallChance, strengthOf, type Strength } from '../memory';
 import type { Progress } from '../progress-schema';
-import { drillHelp, wayState } from '../session';
+import { drillHelp, wayState, type DrillOdds } from '../session';
 import { DAY_MS, MINUTE_MS, answersOf, formatInterval, formatWait, type CardState } from '../srs';
 import { h, svg } from '../ui';
 
@@ -27,9 +27,18 @@ const f = (n: number) => n.toFixed(1);
 
 /**
  * The back of `card`, asked `way` now, among `ways` (the ways Drills can ask it, with their names). A way Study
- * doesn't keep a schedule for (Speak, or one not started yet) is drawn from reading's, and says so.
+ * doesn't keep a schedule for (Speak, or one not started yet) is drawn from reading's, and says so. `drills` gives the
+ * chance of each question Drills could ask at a time (drillOdds, as this round would pick them), for how often it
+ * picks this card.
  */
-export function cardBack(progress: Progress, card: Card, way: Way, ways: { id: Way; title: string }[], now: number): HTMLElement {
+export function cardBack(
+  progress: Progress,
+  card: Card,
+  way: Way,
+  ways: { id: Way; title: string }[],
+  now: number,
+  drills?: (at: number) => DrillOdds[],
+): HTMLElement {
   // A way only copied from reading's schedule when the ways were split has no past of its own yet.
   const found = wayState(progress, card, way);
   const own = found && !found.split ? found : undefined;
@@ -42,6 +51,7 @@ export function cardBack(progress: Progress, card: Card, way: Way, ways: { id: W
     state && !own && h('p', { class: 'back-note' }, `Study ${studyWays(card).includes(way) ? `hasn’t asked ${shown} yet` : `doesn’t ask ${shown}`}, so these are ${read}’s numbers.`),
     state && hero(state, own ? shown : read, now),
     state && slope(state, now),
+    state && drills && picks(card, state, ways, now, drills),
     stairs(progress, card, way, ways),
     state && skyline(state, now),
     state && counts(state, now),
@@ -158,6 +168,65 @@ function slope(state: CardState, now: number): HTMLElement {
   );
 }
 
+/** A chance as a percent: to a tenth below 1%, so a small one doesn't read as none. */
+function percentOf(chance: number): string {
+  return chance < 0.01 ? `${(Math.round(chance * 1000) / 10).toFixed(1)}%` : `${Math.round(chance * 100)}%`;
+}
+
+/**
+ * How often Drills picks the card: the chance any one question is this card, any way (from drillOdds, the chances
+ * pickDrillCard draws by), from now on to a little past when Study asks again, if it isn't reviewed before then. As a
+ * line over a wash, with the chance now and at the end labelled, and how it splits between the ways asked under it.
+ */
+function picks(card: Card, state: CardState, ways: { id: Way; title: string }[], now: number, drills: (at: number) => DrillOdds[]): HTMLElement {
+  const H = 84;
+  const top = 18;
+  const base = H - 4;
+  const end = now + Math.min(Math.max((Math.max(state.due, now) - now) * 1.2, 7 * DAY_MS), 90 * DAY_MS);
+  const chanceAt = (at: number) => {
+    const odds = drills(at).filter((o) => o.pick.card.id === card.id);
+    return { all: odds.reduce((sum, o) => sum + o.chance, 0), odds };
+  };
+  const samples = Array.from({ length: 13 }, (_, i) => {
+    const at = now + ((end - now) * i) / 12;
+    return [at, chanceAt(at).all] as const;
+  });
+  const [, first] = samples[0];
+  const [, last] = samples[samples.length - 1];
+  const highest = Math.max(...samples.map(([, c]) => c), 0.001);
+  const x = (t: number) => GUTTER + ((t - now) / (end - now)) * (W - GUTTER);
+  const y = (c: number) => base - (c / (highest * 1.15)) * (base - top);
+  const points = samples.map(([at, c]) => `${f(x(at))},${f(y(c))}`);
+  const split = chanceAt(now)
+    .odds.filter((o) => o.chance > 0)
+    .sort((a, b) => b.chance - a.chance)
+    .map((o) => `${ways.find((w) => w.id === o.pick.way)?.title ?? o.pick.way} ${percentOf(o.chance)}`);
+  const later = formatWait(end - now);
+  const oneIn = (chance: number) => Math.round(1 / chance);
+  // Within a tenth either way reads as no change.
+  const trend =
+    first === 0 ? '' : Math.abs(last - first) <= first / 10 ? `, about the same in ${later}` : `, ${last > first ? 'rising' : 'falling'} to 1 in ${oneIn(last)} in ${later}`;
+  return figure(
+    'How often Drills picks it',
+    'The chance a drill question is this card, from now on if you don’t review it.',
+    picture(
+      'picks',
+      H,
+      `About ${percentOf(first)} of drill questions are this card now${split.length > 1 ? ` (${split.join(', ')})` : ''}; ${percentOf(last)} in ${later} if it isn't reviewed.`,
+      svg('line', { class: 'grid', x1: GUTTER, x2: W, y1: f(y(highest)), y2: f(y(highest)) }),
+      text('tick', GUTTER - 6, y(highest) + 4, 'end', percentOf(highest)),
+      svg('path', { class: 'hill picks-area', d: `M${GUTTER},${base} L${points.join(' L')} L${W},${base} Z` }),
+      svg('line', { class: 'ground', x1: GUTTER, x2: W, y1: base, y2: base }),
+      svg('circle', { class: 'ball', cx: f(x(now)), cy: f(y(first)), r: 6 }),
+      text('over-hill', x(now) + 10, y(first) - 10, 'start', `${percentOf(first)} now`),
+      text('over-hill', W - 2, y(last) - 10, 'end', `${percentOf(last)} in ${later}`),
+    ),
+    h('div', { class: 'back-axis' }, h('span', null, 'Today'), h('span', null, `In ${later}`)),
+    h('p', { class: 'back-help back-odds' }, first > 0 ? `About 1 in ${oneIn(first)} drill questions is this card now${trend}.` : 'This round’s drills don’t ask it.'),
+    split.length > 1 && h('p', { class: 'back-help back-split' }, `By way: ${split.join(' · ')}`),
+  );
+}
+
 /**
  * Every way the card is asked as a tag on a staircase of strengths: on the ground until Study has asked it, then a
  * step up for each strength it reaches, Just met to Long-term. The way asked now is in saffron, labelled. Then, in words,
@@ -203,7 +272,7 @@ function stairs(progress: Progress, card: Card, asked: Way, ways: { id: Way; tit
     'Learning is like climbing stairs',
     'Each way you’re asked climbs as it sticks for longer.',
     picture('stairs', H, `${label}.`, svg('line', { class: 'ground', x1: 0, x2: W, y1: base, y2: base }), ...steps, ...names, ...tags),
-    helped.length > 0 && h('p', { class: 'back-help' }, `Lately the drills had to help with ${list(helped.map((p) => `${p.title} ${times(p.help)}`))}.`),
+    helped.length > 0 && h('p', { class: 'back-help back-helped' }, `Lately the drills had to help with ${list(helped.map((p) => `${p.title} ${times(p.help)}`))}.`),
   );
 }
 
