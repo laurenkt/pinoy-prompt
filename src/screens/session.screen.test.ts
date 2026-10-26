@@ -146,6 +146,10 @@ describe('open-ended study', () => {
     button(root, 'Continue').click();
     expect(root.textContent).toContain("You're caught up");
     expect(root.querySelector('.session-count')?.textContent).toBe('0 left');
+    // Looking back from caught up leaves nothing to ask either.
+    button(root, 'Previous card').click();
+    expect(root.querySelector('.session-count')?.textContent).toBe('0 left');
+    button(root, 'Back to the current card').click();
     button(root, 'Stop').click();
     expect(root.textContent).toContain('Session finished');
   });

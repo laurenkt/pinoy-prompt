@@ -342,10 +342,11 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   function header(): HTMLElement {
     if (open) {
       // Counting down to caught up, as Study will see it: a new day brings new cards. Once it says it's caught up,
-      // nothing is left, even a way of the card just shown that it won't ask straight after it.
+      // nothing is left, even a way of the card just shown that it won't ask straight after it, and looking back
+      // from there doesn't change that.
       const now = app.now();
       const { reviews, fresh } = studyLeft(rollDay(app.progress, now), now, abilities(app.progress, canPlay()));
-      const left = phase === 'caught-up' ? 0 : reviews + fresh;
+      const left = (reviewing?.phase ?? phase) === 'caught-up' ? 0 : reviews + fresh;
       return h(
         'header',
         { class: 'session-header' },

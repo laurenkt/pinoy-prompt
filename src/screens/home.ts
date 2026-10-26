@@ -10,7 +10,7 @@ import {
   type MemorySummary,
   type Strength,
 } from '../memory';
-import { MAX_LEARNING, abilities, learningCount, nextStudyAt, studyLeft } from '../session';
+import { abilities, nextStudyAt, studyLeft } from '../session';
 import { canPlay } from '../speech';
 import { DAY_MS, MINUTE_MS, formatWait } from '../srs';
 import { rollDay } from '../store';
@@ -142,9 +142,7 @@ function studyButton(app: App, isFirstRun: boolean): { el: HTMLElement; changesI
   const progress = rollDay(app.progress, now);
   // The same checks Study makes for its next step, so the button never promises something else.
   const can = abilities(progress, canPlay());
-  const left = studyLeft(progress, now, can);
-  const reviews = left.reviews;
-  const fresh = learningCount(progress, can) < MAX_LEARNING ? left.fresh : 0;
+  const { reviews, fresh } = studyLeft(progress, now, can);
   const next = isFirstRun ? null : nextStudyAt(progress, now, can);
   let mode: { kind: string; icon: 'cards' | 'plus'; kicker: string; title: string };
   // A count changes once the next card falls due; a wait, each time the unit it's counted in runs out.
