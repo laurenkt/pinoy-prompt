@@ -15,7 +15,7 @@ import { cardStress, CLIP_MARGIN, leanAgainst, measureStress, stressVerdict, UNJ
 
 const CLIPS: Record<string, string[]> = clips;
 /** What Speak's recogniser hears in each clip file, as scripts/generate-audio.mjs listened to it. */
-const HEARD: Record<string, { sounds: string[]; runnersUp?: string[][]; odds?: string; prosody?: number[][] }> = clipSounds;
+const HEARD: Record<string, { sounds: string[]; runnersUp?: string[][]; odds?: string; start?: string; prosody?: number[][] }> = clipSounds;
 /** The clip files in public/audio, by name. */
 const onDisk = new Set(Object.keys(import.meta.glob('../public/audio/*')).map((path) => path.split('/').pop()));
 
@@ -76,10 +76,13 @@ describe('recorded clips, heard by Speak', () => {
     expect(failing).toEqual([]);
   });
 
-  it('starts every clip with its first sound, so "Kailan" never plays as "ailan"', () => {
+  it('starts every clip with its first sound, so "Kailan" never plays as "ailan", nor "Kailangan" as "pailangan"', () => {
     const lost = Object.keys(CLIPS).flatMap((text) =>
       files(text).flatMap((file) => {
-        const found = lostFirstSound(text, said(file).sounds);
+        const { odds, start } = HEARD[file] ?? {};
+        const kept = odds ?? start;
+        if (kept === undefined) return [`${file}: not listened to for its start (run \`npm run audio\`)`];
+        const found = lostFirstSound(text, said(file).sounds, unpackOdds(kept));
         return found ? [`${file}: "${found.letters}" heard as ${found.heard}`] : [];
       }),
     );
