@@ -134,6 +134,14 @@ describe('holding the microphone open for a drill round', () => {
     expect(opened).toHaveLength(2);
   });
 
+  it('lets go when a take ends with the app in the background, where iOS cuts it off anyway', async () => {
+    holdMicrophone(true);
+    const take = await getMicrophone();
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+    releaseMicrophone(take);
+    expect(opened[0].track.readyState).toBe('ended');
+  });
+
   it('lets go as the screen that held it is left', async () => {
     holdMicrophone(true);
     await askMicrophone();

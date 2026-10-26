@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeMicrophone, getMicrophone, REOPEN_QUIETLY_MS, releaseMicrophone } from './microphone';
+import { closeMicrophone, getMicrophone, holdMicrophone, REOPEN_QUIETLY_MS, releaseMicrophone } from './microphone';
 import { cancelRecording, record, RecordError, resample, SIGNAL_WAIT_MS, toWav, WARM_MS, warmRecorder } from './recorder';
 
 const sine = (hz: number, rate: number, seconds = 0.5) =>
@@ -137,6 +137,17 @@ describe('a microphone that gives no sound', () => {
     expect(opened).toHaveLength(2);
     // Closed, so the next tap starts on a new stream.
     expect(opened[1].track.readyState).toBe('ended');
+  });
+
+  it('closes a dead stream on a quick stop even while a round holds it, so the next take opens a fresh one', async () => {
+    holdMicrophone(true);
+    const recording = record();
+    await started();
+    FakeRecorderContext.last.feed(0);
+    recording.stop();
+    await recording.audio.catch(() => {});
+    expect(opened[0].track.readyState).toBe('ended');
+    holdMicrophone(false);
   });
 
   it("counts a stop over exact silence as a dead microphone, not as the learner saying nothing", async () => {

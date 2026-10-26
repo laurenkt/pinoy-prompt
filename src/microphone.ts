@@ -120,7 +120,7 @@ export async function getMicrophone(): Promise<MediaStream> {
 /**
  * Done with the stream from getMicrophone(). Call once per getMicrophone(). It's closed once nothing else is using it,
  * unless a round holds it open (holdMicrophone). `dead`: it gave nothing, so it's closed whatever holds it, and the next
- * getMicrophone() opens a fresh one.
+ * getMicrophone() opens a fresh one, and anything else sharing it loses it too (it gave nothing anyway).
  */
 export function releaseMicrophone(released: MediaStream, { dead = false } = {}): void {
   if (released !== stream) {
@@ -128,7 +128,9 @@ export function releaseMicrophone(released: MediaStream, { dead = false } = {}):
     return;
   }
   users = Math.max(0, users - 1);
-  if (dead || (users === 0 && !held)) closeMicrophone();
+  // Not kept in the background, where iOS cuts it off anyway: a take that outlasted the app being hidden lets it go here.
+  const hidden = globalThis.document?.visibilityState === 'hidden';
+  if (dead || (users === 0 && (!held || hidden))) closeMicrophone();
 }
 
 /**
@@ -143,8 +145,8 @@ export function holdMicrophone(hold: boolean): void {
 }
 
 /**
- * Ask for the microphone now, and close it again straight away, so takes over the next few minutes open it without
- * the browser asking (microphoneAllowed). Call from a tap: it may ask the learner. False if the screen that asked was
+ * Ask for the microphone now, and close it again straight away unless a round holds it (holdMicrophone), so takes over
+ * the next few minutes open it without the browser asking (microphoneAllowed). Call from a tap: it may ask the learner. False if the screen that asked was
  * left (endMicrophoneAsk) while the learner was being asked, whether or not they allowed it.
  */
 export async function askMicrophone(): Promise<boolean> {

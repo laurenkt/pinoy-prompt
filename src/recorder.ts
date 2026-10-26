@@ -300,10 +300,9 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
         end();
         // Stopped over a stream giving exact silence: it's dead, not a learner who said nothing.
         const dead = !signal && !cancelled;
-        const silent = dead && Date.now() - listeningSince >= DEAD_AFTER_MS;
         // Closed even when a round holds it, so a dead one isn't handed to the next take.
-        releaseMicrophone(stream, { dead: silent });
-        if (silent) return reject(new RecordError('silent'));
+        releaseMicrophone(stream, { dead });
+        if (dead && Date.now() - listeningSince >= DEAD_AFTER_MS) return reject(new RecordError('silent'));
         const total = chunks.reduce((n, c) => n + c.length, 0);
         const all = new Float32Array(total);
         let offset = 0;
