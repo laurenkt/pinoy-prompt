@@ -4176,3 +4176,22 @@ p {
     animation: none;
   }
 }
+
+/* Why a drill gives choices: a titled note under the dial, before the pictures. */
+.back-why {
+  margin: 14px 0 0;
+}
+
+.back-why .back-label {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.back-why .back-how {
+  margin: 0;
+}
+
+.back-why .back-help {
+  margin-top: 6px;
+  color: var(--cream);
+}
