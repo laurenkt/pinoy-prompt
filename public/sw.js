@@ -70,6 +70,10 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
+    // Only the app's own page is the offline copy; another page beside it (about.html) is left to the network.
+    const app = new URL('./', self.location.href).pathname;
+    const path = new URL(request.url).pathname;
+    if (path !== app && path !== `${app}index.html`) return;
     event.respondWith(
       fetch(request)
         .then((response) => {

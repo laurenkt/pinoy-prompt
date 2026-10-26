@@ -11,7 +11,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "audio": "node scripts/generate-audio.mjs",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "about-shots": "node scripts/about-shots.mjs"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.6",

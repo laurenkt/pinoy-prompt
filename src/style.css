@@ -3420,3 +3420,644 @@ p {
   line-height: 1.2;
   color: var(--muted);
 }
+
+/* About (about.html): the app's look as a web page, wide as well as phone-sized. Bands of solid colour, each with a
+   feature's words beside real screenshots in ink-outlined phones. */
+
+.about-wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
+}
+
+.about a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.about-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+  border-bottom: var(--outline);
+  padding-top: env(safe-area-inset-top);
+}
+
+.about-bar .btn {
+  white-space: nowrap;
+}
+
+.about-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-block: 10px;
+}
+
+.about-brand {
+  display: flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--cream);
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.about-brand img {
+  border-radius: 10px;
+}
+
+.about-hero {
+  padding-block: clamp(36px, 7vw, 96px);
+  /* The deck behind the phone may reach past the edge on a phone; it's cut there rather than scrolling sideways. */
+  overflow-x: clip;
+}
+
+.about-hero-grid {
+  display: grid;
+  gap: 48px;
+  align-items: center;
+}
+
+.about-hero-text {
+  min-width: 0;
+}
+
+.about-kicker {
+  color: var(--teal);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.about-title {
+  font-size: clamp(3.2rem, 12vw, 7.4rem);
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  margin: 0 0 24px;
+  text-wrap: balance;
+}
+
+.about-title span {
+  display: block;
+  color: var(--saffron);
+  text-shadow: 5px 5px 0 var(--ink);
+}
+
+.about-lead {
+  font-size: 1.2rem;
+  color: var(--muted);
+  max-width: 34em;
+}
+
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.about-actions .btn.big {
+  width: auto;
+  margin-top: 0;
+  padding-inline: 24px;
+}
+
+/* A phrase to hear, wherever the page has one: the app's speaker button (and slow one) beside the Tagalog and its English. */
+.about-say-list,
+.about-tiles,
+.about-voices,
+.about-common,
+.about-variant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+:is(.about-say-list, .about-tiles, .about-voices, .about-common, .about-variant-list) > li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 16px 8px 8px;
+  border: var(--outline);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+:is(.about-say-list, .about-tiles, .about-voices, .about-common, .about-variant-list) > li > .audio-btn {
+  grid-row: 1 / 3;
+}
+
+:is(.about-say-list, .about-tiles, .about-voices, .about-common, .about-variant-list) [data-say] {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+:is(.about-say-list, .about-tiles, .about-voices, .about-common, .about-variant-list) small {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.about-say-list {
+  margin-top: 32px;
+}
+
+/* The hero's phone sits on a little deck of cards in the four colours. */
+.about-hero-phone {
+  position: relative;
+  justify-self: center;
+  width: min(68vw, 330px);
+  margin-right: 10%;
+}
+
+.about-hero-phone::before,
+.about-hero-phone::after {
+  content: '';
+  position: absolute;
+  inset: 4% -6% 4% 6%;
+  border: var(--outline);
+  border-radius: 38px;
+  background: var(--magenta);
+  transform: rotate(7deg);
+}
+
+.about-hero-phone::after {
+  background: var(--teal);
+  transform: rotate(14deg);
+  inset: 8% -10% 2% 10%;
+  z-index: -1;
+}
+
+.about-hero-phone .about-phone {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: none;
+  transform: rotate(-3deg);
+}
+
+.about-hero-phone {
+  isolation: isolate;
+}
+
+.about-phone {
+  display: block;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 290px;
+  aspect-ratio: 390 / 844;
+  overflow: hidden;
+  border: 5px solid var(--ink);
+  border-radius: 36px;
+  background: var(--bg);
+  box-shadow: 9px 9px 0 var(--ink);
+  container-type: size;
+}
+
+.about-phone img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Phones side by side; on a phone, a row to swipe through, each big enough to read. */
+.about-phones {
+  display: flex;
+  justify-content: safe center;
+  align-items: flex-start;
+  gap: 20px;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* Room for the shadows, which the scrolling row would otherwise cut. */
+  padding: 4px 14px 14px 4px;
+  margin: -4px -14px -14px -4px;
+}
+
+.about-phones > .about-phone {
+  flex: 0 0 min(72vw, 290px);
+  scroll-snap-align: center;
+}
+
+/* One phone with a line under it. */
+.about-phones-stack {
+  flex-direction: column;
+  align-items: center;
+}
+
+.about-phones-stack > .about-phone {
+  flex: none;
+  width: min(72vw, 290px);
+}
+
+.about-promises {
+  background: var(--ink);
+  padding-block: 22px;
+}
+
+.about-promises ul {
+  list-style: none;
+  margin: 0 auto;
+  display: grid;
+  gap: 12px 32px;
+  color: var(--muted);
+}
+
+.about-promises strong {
+  color: var(--saffron);
+}
+
+.about-feature {
+  border-top: var(--outline);
+  padding-block: clamp(56px, 9vw, 120px);
+  color: var(--on-accent);
+}
+
+.band-saffron {
+  background: var(--saffron);
+}
+
+.band-magenta {
+  background: var(--magenta);
+}
+
+.band-teal {
+  background: var(--teal);
+}
+
+.band-cream {
+  background: var(--cream);
+}
+
+.band-indigo {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.about-feature-grid {
+  display: grid;
+  gap: 44px;
+  align-items: center;
+}
+
+.about-copy {
+  min-width: 0;
+}
+
+.about-copy p {
+  font-size: 1.08rem;
+  max-width: 34em;
+}
+
+.about-feature h2 {
+  font-size: clamp(2.1rem, 5vw, 3.5rem);
+  line-height: 1.02;
+  letter-spacing: -0.025em;
+  margin: 16px 0 20px;
+  text-wrap: balance;
+}
+
+.about-eyebrow {
+  display: inline-block;
+  margin: 0;
+  padding: 5px 12px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.band-indigo .about-eyebrow {
+  background: var(--teal);
+  color: var(--on-accent);
+}
+
+/* Missed in Drills: back on the next question, then after one other, three, six. In order, as it happens. */
+.about-comeback {
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.about-comeback li {
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--ink);
+  color: var(--cream);
+  font-weight: 600;
+}
+
+.about-comeback b {
+  color: var(--saffron);
+  font-weight: 800;
+}
+
+.about-tiles {
+  margin-top: 24px;
+}
+
+.about-tiles > li {
+  background: var(--cream);
+  color: var(--on-accent);
+}
+
+.about-tiles small {
+  color: var(--on-accent);
+  opacity: 0.75;
+}
+
+/* Variations: the phrase as learned, on a prompt card, and the ways it's asked later hanging off it. */
+.about-variants {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 480px;
+  justify-self: center;
+}
+
+.about-variant-card {
+  position: relative;
+  overflow: hidden;
+  padding: 18px 20px 30px;
+  border: var(--outline);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow-big);
+}
+
+.about-variant-card::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 14px;
+  background:
+    repeating-linear-gradient(45deg, var(--teal) 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(-45deg, var(--saffron) 0 6px, transparent 6px 12px);
+  opacity: 0.6;
+}
+
+.about-variant-card p {
+  margin: 0;
+}
+
+.about-variant-label {
+  color: var(--teal);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.about-variant-tl {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.about-variant-en {
+  color: var(--muted);
+}
+
+.about-variant-list {
+  flex-direction: column;
+  margin-left: 28px;
+}
+
+.about-variant-list > li {
+  background: var(--cream);
+  color: var(--on-accent);
+}
+
+.about-variant-list small {
+  color: var(--on-accent);
+  opacity: 0.75;
+}
+
+.about-variant-list mark {
+  background: var(--magenta);
+  color: var(--on-accent);
+  border-radius: 6px;
+  padding: 0 4px;
+}
+
+.about-voices {
+  flex-direction: column;
+  width: 100%;
+  max-width: 480px;
+  justify-self: center;
+}
+
+.about-voices > li {
+  grid-template-columns: auto auto 1fr;
+}
+
+.about-voices > li > .audio-btn {
+  grid-row: 1 / 3;
+}
+
+.about-common {
+  justify-content: center;
+}
+
+/* The drill card turns over, as in Drills: its front, then its back scrolling slowly by. */
+.about-flip {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 36px;
+}
+
+.about-flip-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+  backface-visibility: hidden;
+  transition: transform 0.7s cubic-bezier(0.5, 0, 0.2, 1);
+  transform: perspective(1400px) rotateY(0deg);
+  container-type: size;
+}
+
+.about-flip-face.back {
+  transform: perspective(1400px) rotateY(180deg);
+}
+
+.about-flip[aria-pressed='true'] .about-flip-face {
+  transform: perspective(1400px) rotateY(-180deg);
+}
+
+.about-flip[aria-pressed='true'] .about-flip-face.back {
+  transform: perspective(1400px) rotateY(0deg);
+}
+
+.about-flip[aria-pressed='true'] .back img,
+.about-scroll img {
+  animation: about-scroll 9s ease-in-out 0.8s infinite alternate;
+}
+
+.about-scroll img {
+  animation-duration: 14s;
+}
+
+@keyframes about-scroll {
+  0%,
+  12% {
+    transform: translateY(0);
+  }
+  88%,
+  100% {
+    transform: translateY(calc(-100% + 100cqh));
+  }
+}
+
+.about-hint {
+  text-align: center;
+  font-weight: 700;
+}
+
+.about-end {
+  border-top: var(--outline);
+  padding-block: clamp(64px, 10vw, 128px);
+  text-align: center;
+}
+
+.about-end-inner {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+}
+
+.about-end h2 {
+  font-size: clamp(4rem, 16vw, 10rem);
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  margin: 0;
+  color: var(--saffron);
+  text-shadow: 6px 6px 0 var(--ink);
+}
+
+.about-end .btn.big {
+  width: auto;
+  padding-inline: 32px;
+}
+
+/* Adding it to the Home Screen: three steps, in order. */
+.about-install {
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.about-install li {
+  counter-increment: step;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 10px 10px;
+  border: var(--outline);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+
+.about-install li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--teal);
+  color: var(--on-accent);
+  font-weight: 800;
+}
+
+.about-foot {
+  border-top: var(--outline);
+  padding-block: 28px calc(28px + env(safe-area-inset-bottom));
+  color: var(--faint);
+  font-size: 0.9rem;
+}
+
+.about-foot a {
+  color: var(--saffron);
+}
+
+@media (min-width: 760px) {
+  .about-promises ul {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .about-hero-grid {
+    grid-template-columns: 1.25fr 0.75fr;
+  }
+
+  .about-feature-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 72px;
+  }
+
+  .flip-side .about-copy {
+    order: 2;
+  }
+
+  .about-phones {
+    overflow: visible;
+  }
+
+  .about-phones:not(.about-phones-stack) > .about-phone {
+    flex: 1 1 0;
+  }
+
+  .about-phones > .about-phone:nth-child(2) {
+    margin-top: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-flip-face {
+    transition: none;
+  }
+
+  .about-flip[aria-pressed='true'] .back img,
+  .about-scroll img {
+    animation: none;
+  }
+}
