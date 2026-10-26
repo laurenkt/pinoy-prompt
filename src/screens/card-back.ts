@@ -126,17 +126,23 @@ function choices(progress: Progress, card: Card, way: Way, shown: string, read: 
   const { typed, left, due, readFirst } = typing(progress, card, way);
   if (typed) return false;
   const why = (how: string, more?: string) =>
-    h('div', { class: 'back-why' }, h('strong', { class: 'back-label' }, 'Why it’s multiple choice'), h('p', { class: 'back-how' }, how), more && h('p', { class: 'back-help' }, more));
+    h(
+      'figure',
+      { class: 'back-fig back-why' },
+      h('figcaption', null, h('strong', { class: 'back-label' }, 'Why it’s multiple choice'), h('span', { class: 'back-how' }, how)),
+      more && h('p', { class: 'back-help' }, more),
+    );
   if (left === undefined) {
     return why(way === 'read' ? `${shown} always gives choices: you see the Tagalog and pick what it means.` : `Its meaning is a note, not words to type, so ${shown} always gives choices.`);
   }
   const rule = `${shown} drills give choices until you’ve remembered it in Study a day after learning it. Then they ask you to type it.`;
   if (due === undefined) {
-    const starts = readFirst ? `once ${read} has settled, after ${answers(readFirst)} there` : 'next time you study';
-    return why(rule, `Study hasn’t started ${shown} yet. It starts ${starts}. Then it needs two right answers in ${shown}, a day apart.`);
+    // The note at the top already says Study hasn't asked it this way.
+    const starts = readFirst ? `once ${read} has settled, after ${answers(readFirst)} there` : `now that ${read} has settled, when it has room for it`;
+    return why(rule, `Study starts ${shown} ${starts}. Then it needs two right answers in ${shown}, a day apart.`);
   }
   const when = due <= now ? 'now' : `in ${formatWait(due - now)}`;
-  return why(rule, left === 1 ? `One more right answer in Study to go. Study asks it again ${when}.` : `Two more right answers in Study to go: one ${when}, then one a day or more later.`);
+  return why(rule, left === 1 ? `One more right answer in Study to go. Study asks it again ${when}.` : `Two more right answers in Study to go: one ${when}, then one at least a day later.`);
 }
 
 function answers(n: number): string {

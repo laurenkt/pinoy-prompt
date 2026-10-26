@@ -112,7 +112,7 @@ describe("how well the card is known, on its back", () => {
     card(root).click();
     // Just met: reading hasn't settled, so Study hasn't started recalling it.
     expect(why(root)).toContain('Why it’s multiple choice');
-    expect(why(root)).toContain('Study hasn’t started Recall yet. It starts once Read has settled, after one more right answer there.');
+    expect(why(root)).toContain('Study starts Recall once Read has settled, after one more right answer there.');
     // Started, remembered once, and asked again tomorrow.
     recordAnswer(app.progress, cardKey('salamat', 'recall'), 'good', app.now());
     root = last = recall(app);

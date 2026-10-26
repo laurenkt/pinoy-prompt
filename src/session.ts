@@ -71,8 +71,7 @@ export function guideEvery(met: number): number {
  * met. A card forgotten later and relearned still counts: it was remembered once.
  */
 export function settled(progress: Progress, id: string): boolean {
-  const state = progress.cards[id];
-  return !!state && state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
+  return leftToSettle(progress.cards[id]) === 0;
 }
 
 /** Right answers in Study a card asked one way still needs to settle (see settled): a day after the first, if it hasn't been remembered yet. */
