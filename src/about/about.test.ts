@@ -17,3 +17,12 @@ it('shows only screenshots that exist', () => {
   expect(shots.length).toBeGreaterThan(0);
   expect(shots.filter((path) => !files.includes(path))).toEqual([]);
 });
+
+it("shows the coach judging the same take of the app's voice that it plays", async () => {
+  // about.ts plays the first voice's "Salamat"; scripts/screenshots.mjs plays it to the coach for coach-tuned.
+  const harness = (await import('../../scripts/screenshots.mjs?raw')).default;
+  expect(harness).toContain(`coachTake(page, 'public/audio/${clips.Salamat[0]}.mp3')`);
+  expect(harness).toContain(`coachTake(page, 'src/about/salamat-plain.mp3')`);
+  const script = (await import('./about.ts?raw')).default;
+  expect(script).toContain(`clipUrl({ tl: 'Salamat' }, false, 0)`);
+});
