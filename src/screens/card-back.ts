@@ -4,10 +4,10 @@
 // until Study asks again, the stairs each way it's asked climbs as it sticks for longer, and a skyline of the gaps
 // between reviews over its life. Then a few counts. All read from saved progress; nothing here is stored.
 
-import { studyWays, type Card, type Way } from '../deck';
+import { isVocab, studyWays, type Card, type Way } from '../deck';
 import { STRENGTHS, intervalSteps, lastSeen, recallChance, strengthOf, type Strength } from '../memory';
 import type { Progress } from '../progress-schema';
-import { DRILL_GAP, drillHelp, wayState, type DrillOdds } from '../session';
+import { DRILL_GAP, drillHelp, typing, wayState, type DrillOdds } from '../session';
 import { DAY_MS, MINUTE_MS, answersOf, formatInterval, formatWait, type CardState } from '../srs';
 import { h, svg } from '../ui';
 
@@ -50,6 +50,7 @@ export function cardBack(
     { class: 'card-back' },
     state && !own && h('p', { class: 'back-note' }, `Study ${studyWays(card).includes(way) ? `hasn’t asked ${shown} yet` : `doesn’t ask ${shown}`}, so these are ${read}’s numbers.`),
     state && hero(state, own ? shown : read, now),
+    choices(progress, card, way, shown, read, now),
     state && slope(state, now),
     state && drills && picks(card, state, ways, now, drills),
     stairs(progress, card, way, ways),
@@ -114,6 +115,38 @@ function hero(state: CardState, title: string, now: number): HTMLElement {
       h('span', null, state.due <= now ? 'Study asks it again now.' : `Study asks it again in ${formatWait(state.due - now)}.`),
     ),
   );
+}
+
+/**
+ * Why a drill asked `way` gives choices rather than asking it typed, and what Study still needs before it does (see
+ * typing). Nothing for a question that's typed, or never has choices (Speak, a guide's).
+ */
+function choices(progress: Progress, card: Card, way: Way, shown: string, read: string, now: number): HTMLElement | false {
+  if (!isVocab(card) || way === 'speak') return false;
+  const { typed, left, due, readFirst } = typing(progress, card, way);
+  if (typed) return false;
+  const why = (how: string, more?: string) =>
+    h(
+      'figure',
+      { class: 'back-fig back-why' },
+      h('figcaption', null, h('strong', { class: 'back-label' }, 'Why it’s multiple choice'), h('span', { class: 'back-how' }, how)),
+      more && h('p', { class: 'back-help' }, more),
+    );
+  if (left === undefined) {
+    return why(way === 'read' ? `${shown} always gives choices: you see the Tagalog and pick what it means.` : `Its meaning is a note, not words to type, so ${shown} always gives choices.`);
+  }
+  const rule = `${shown} drills give choices until you’ve remembered it in Study a day after learning it. Then they ask you to type it.`;
+  if (due === undefined) {
+    // The note at the top already says Study hasn't asked it this way.
+    const starts = readFirst ? `once ${read} has settled, after ${answers(readFirst)} there` : `now that ${read} has settled, when it has room for it`;
+    return why(rule, `Study starts ${shown} ${starts}. Then it needs two right answers in ${shown}, a day apart.`);
+  }
+  const when = due <= now ? 'now' : `in ${formatWait(due - now)}`;
+  return why(rule, left === 1 ? `One more right answer in Study to go. Study asks it again ${when}.` : `Two more right answers in Study to go: one ${when}, then one at least a day later.`);
+}
+
+function answers(n: number): string {
+  return n === 1 ? 'one more right answer' : `${n === 2 ? 'two' : n} more right answers`;
 }
 
 /**

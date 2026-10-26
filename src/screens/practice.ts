@@ -1,11 +1,11 @@
 import type { App } from '../app';
-import { VOCAB, cardKey, getCard, isVocab, type Card, type Drill, type Way } from '../deck';
-import { canTypeMeaning, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
+import { VOCAB, getCard, isVocab, type Card, type Drill, type Way } from '../deck';
+import { exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
 import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { askWithPicture } from '../pictures';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, askAs, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, drillOdds, pickDrillCard, setDrillHelp, settled, shuffle, type DrillRepeat } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, askAs, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, drillOdds, pickDrillCard, setDrillHelp, shuffle, typing, type DrillRepeat } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -238,8 +238,7 @@ export function practiceScreen(
     }
     const field = languageOf(mode);
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
-    // Typed once that way of studying it has settled in Study.
-    const typed = settled(app.progress, cardKey(card.id, mode)) && (mode === 'recall' || (mode === 'listen' && canTypeMeaning(card)));
+    const { typed } = typing(app.progress, card, mode);
     return { card, mode, choices, typed, picture: mode === 'recall' && askWithPicture(card) };
   }
 
