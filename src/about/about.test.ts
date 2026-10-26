@@ -19,10 +19,10 @@ it('shows only screenshots that exist', () => {
 });
 
 it("shows the coach judging the same take of the app's voice that it plays", async () => {
-  // about.ts plays the first voice's "Salamat"; scripts/screenshots.mjs plays it to the coach for coach-tuned.
+  // about.ts plays the first voice's "Walang anuman"; scripts/screenshots.mjs plays it to the coach for coach-right.
   const harness = (await import('../../scripts/screenshots.mjs?raw')).default;
-  expect(harness).toContain(`coachTake(page, 'public/audio/${clips.Salamat[0]}.mp3')`);
-  expect(harness).toContain(`coachTake(page, 'src/about/salamat-plain.mp3')`);
+  expect(harness).toContain(`coachTake(page, 'Walang anuman', 'public/audio/${clips['Walang anuman'][0]}.mp3')`);
+  expect(harness).toContain(`coachTake(page, 'Walang anuman', 'src/about/walang-anuman-english.mp3')`);
   const script = (await import('./about.ts?raw')).default;
-  expect(script).toContain(`clipUrl({ tl: 'Salamat' }, false, 0)`);
+  expect(script).toContain(`clipUrl({ tl: 'Walang anuman' }, false, 0)`);
 });

@@ -13,8 +13,8 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 
 const SEASONED = ['home', 'drills', 'drills-memory', 'chat-call'];
-/** The coach-* ones run the real speech model on src/about/salamat-plain.mp3 and on the app's own clip. */
-const BEGINNER = ['drills-picture-answered', 'coach-plain', 'coach-tuned'];
+/** The coach-* ones run the real speech model on src/about/walang-anuman-english.mp3 and on the app's own clip. */
+const BEGINNER = ['drills-picture-answered', 'coach-wrong', 'coach-right'];
 /** Shown scrolling inside the phone, so kept this tall (in the screenshot's pixels, twice the phone's points). */
 const TALL = { 'drills-memory': 3400 };
 const SIZE = '390x844';

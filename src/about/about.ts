@@ -4,7 +4,7 @@ import '@fontsource-variable/bricolage-grotesque';
 import '../style.css';
 import { clipUrl, play, playUrl } from '../speech';
 import { audioButton } from '../ui';
-import plainTake from './salamat-plain.mp3';
+import englishTake from './walang-anuman-english.mp3';
 
 // Each phrase marked data-say gets the app's own speaker button (and a slow one with data-slow), playing its clips.
 for (const phrase of document.querySelectorAll<HTMLElement>('[data-say]')) {
@@ -15,12 +15,13 @@ for (const phrase of document.querySelectorAll<HTMLElement>('[data-say]')) {
 }
 
 /**
- * The two recordings of "Salamat" the coach is shown judging: a plain text-to-speech voice (made once with OpenAI's
- * tts-1, voice alloy, with no instructions) and the app's own first voice, as scripts/screenshots.mjs plays them to it.
+ * The two recordings of "Walang anuman" the coach is shown judging: said the English way (made once with OpenAI's
+ * tts-1, voice alloy, reading "Wuh-lang uh-NOO-mun") and the app's own first voice, as scripts/screenshots.mjs plays
+ * them to it.
  */
 const TAKES: Record<string, [url: string, label: string]> = {
-  plain: [plainTake, 'Hear the plain voice'],
-  tuned: [clipUrl({ tl: 'Salamat' }, false, 0)!, "Hear the app's voice"],
+  wrong: [englishTake, 'Hear it said the English way'],
+  right: [clipUrl({ tl: 'Walang anuman' }, false, 0)!, 'Hear it said the Tagalog way'],
 };
 for (const slot of document.querySelectorAll<HTMLElement>('[data-take]')) {
   const [url, label] = TAKES[slot.dataset.take!];
