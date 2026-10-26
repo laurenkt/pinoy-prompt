@@ -1,12 +1,16 @@
-// One microphone stream shared by speaking drills and Talk, open only while
-// something is listening: a take, a warm-up for one, or a call.
+// One microphone stream shared by speaking drills and Talk, open while
+// something is listening (a take, a warm-up for one, or a call), and for a
+// whole drill round that may ask to speak (holdMicrophone), so no take waits
+// for it to open.
 //
 // While a stream is open, even with its tracks switched off, iOS puts the
 // whole page in a call (WebKit's PlayAndRecord category in VideoChat mode,
-// see MediaSessionManagerCocoa): playback goes through voice processing,
-// much quieter, on a volume of its own that the side buttons only reach
-// while it's in a call. So the stream is closed as soon as nothing is using
-// it, and every sound between takes plays as media, at the phone's volume.
+// see MediaSessionManagerCocoa; a page can't choose otherwise): playback goes
+// through voice processing, much quieter, on a volume of its own that the
+// side buttons only reach while it's in a call. So outside a held round the
+// stream is closed as soon as nothing is using it, and sounds play as media,
+// at the phone's volume; in a held round they all play at the call's volume,
+// which stays the same from card to card because the stream never closes.
 //
 // What WebKit remembers (UserMediaPermissionRequestManagerProxy): an "Allow"
 // lasts for the page while a stream is open, and for 10 minutes after the
@@ -27,6 +31,8 @@ const CONSTRAINTS: MediaStreamConstraints = {
 let stream: MediaStream | null = null;
 let opening: Promise<MediaStream> | null = null;
 let users = 0;
+/** A drill round that may ask to speak is keeping the stream open between takes (holdMicrophone). */
+let held = false;
 /** Counts each stream opening and closing, so the shared audio context can tell the hardware's rate may have changed since it was made. */
 let changes = 0;
 /** Bumped as each screen that asked is left, so an answer that comes after isn't taken as the screen's. */
@@ -111,14 +117,29 @@ export async function getMicrophone(): Promise<MediaStream> {
   return stream;
 }
 
-/** Done with the stream from getMicrophone(). Call once per getMicrophone(). It's closed once nothing else is using it. */
-export function releaseMicrophone(released: MediaStream): void {
+/**
+ * Done with the stream from getMicrophone(). Call once per getMicrophone(). It's closed once nothing else is using it,
+ * unless a round holds it open (holdMicrophone). `dead`: it gave nothing, so it's closed whatever holds it, and the next
+ * getMicrophone() opens a fresh one.
+ */
+export function releaseMicrophone(released: MediaStream, { dead = false } = {}): void {
   if (released !== stream) {
     released.getTracks().forEach((t) => t.stop());
     return;
   }
   users = Math.max(0, users - 1);
-  if (users === 0) closeMicrophone();
+  if (dead || (users === 0 && !held)) closeMicrophone();
+}
+
+/**
+ * Keep the stream open between takes (a drill round that may ask to speak), or stop keeping it. Holding doesn't open
+ * it: the round's ask or the next warm-up or take does, and it then stays open until the hold ends, the screen is
+ * left (endMicrophoneAsk) or the app is hidden, when iOS cuts it off anyway. A stream closed that way is opened again,
+ * and held again, by the next one that needs it.
+ */
+export function holdMicrophone(hold: boolean): void {
+  held = hold;
+  if (!held && users === 0) closeMicrophone();
 }
 
 /**
@@ -143,6 +164,7 @@ export async function askMicrophone(): Promise<boolean> {
 /** The screen that asked has gone (app.navigate calls it), so an answer still to come isn't its. */
 export function endMicrophoneAsk(): void {
   asks++;
+  holdMicrophone(false);
 }
 
 /** Stop the stream now. The next getMicrophone() opens a new one. */

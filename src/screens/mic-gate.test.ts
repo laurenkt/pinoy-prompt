@@ -258,6 +258,33 @@ describe('asking for the microphone in Drills', () => {
   });
 });
 
+describe('holding the microphone open for a round', () => {
+  it('holds it from the round opening, and lets it go when the mic goes off or the phone refuses', async () => {
+    const holdMicrophone = vi.fn();
+    const mic = micNotYet({ holdMicrophone });
+    const root = practiceScreen(fakeApp(), mic.deps);
+    document.body.append(root);
+    expect(holdMicrophone).toHaveBeenLastCalledWith(true);
+    mic.answer(true);
+    await flush();
+    root.querySelector<HTMLButtonElement>('[aria-label="Mic off"]')!.click();
+    expect(holdMicrophone).toHaveBeenLastCalledWith(false);
+
+    const refusing = micNotYet({ holdMicrophone });
+    practiceScreen(fakeApp(), refusing.deps);
+    expect(holdMicrophone).toHaveBeenLastCalledWith(true);
+    refusing.answer(false);
+    await flush();
+    expect(holdMicrophone).toHaveBeenLastCalledWith(false);
+  });
+
+  it("doesn't hold it for a round that can't ask to speak", () => {
+    const holdMicrophone = vi.fn();
+    practiceScreen(fakeApp(true), micNotYet({ holdMicrophone }).deps);
+    expect(holdMicrophone).not.toHaveBeenCalledWith(true);
+  });
+});
+
 describe('asking for the microphone around a typed meaning', () => {
   /** Words settled in Study, so a listening question asks for the meaning typed; the mic off, so its going on asks. */
   function typedRound(judge: () => Promise<boolean | null>) {

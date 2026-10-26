@@ -262,7 +262,10 @@ export function practiceScreen(
    */
   function askForMicrophoneIfNeeded(): void {
     const speaks = modes().includes('speak') || (modelFound && chosen().includes('speak'));
-    if (waiting || !canSpeak || !current || !speaks) return;
+    if (!canSpeak || !current || !speaks) return deps.holdMicrophone?.(false);
+    if (waiting) return;
+    // Kept open for the round from here, so no take waits for it (microphone.ts says what that costs on an iPhone).
+    deps.holdMicrophone?.(true);
     // While WebKit still remembers the Allow it goes straight through, with no holding screen. Asked anyway, as that
     // starts its ten minutes again. Once it has lapsed (ten minutes without a take), the phone asks again.
     const asks = needsMicrophone(deps);
@@ -276,6 +279,7 @@ export function practiceScreen(
       const shown = waiting;
       waiting = false;
       speakSkipped = answer === 'refused';
+      if (speakSkipped) deps.holdMicrophone?.(false);
       // Nothing was covered up, so there's nothing to show again.
       if (!shown && !speakSkipped) return;
       if (current && picked === null && !modes().includes(current.mode)) {
@@ -656,6 +660,8 @@ export function practiceScreen(
     // With the mic off nothing listens, not even warming up for Speak.
     if (!app.progress.settings.mic) stopListening();
     speak?.setWarm(app.progress.settings.mic);
+    // Nothing left to say this round (the mic went off, Speak left the scope): the microphone needn't stay open.
+    if (!chosen().includes('speak')) deps.holdMicrophone?.(false);
     // Only a tap that may let the round ask to speak asks for the microphone, and only that one taps first (quiet.ts).
     if (mayAsk) askForMicrophoneIfNeeded();
     if (waiting) return draw();

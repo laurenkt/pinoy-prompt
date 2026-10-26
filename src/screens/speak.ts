@@ -2,7 +2,7 @@
 // on the device, and coach them sound by sound.
 
 import { coach, type Tip } from '../coach';
-import { askMicrophone, microphoneAllowed } from '../microphone';
+import { askMicrophone, holdMicrophone, microphoneAllowed } from '../microphone';
 import { DownloadError, modelDownloaded, modelKnownDownloaded } from '../model-cache';
 import type { Card } from '../deck';
 import type { PhoneModel, Recognition } from '../phone-model';
@@ -36,6 +36,8 @@ export interface SpeakDeps {
   askMicrophone?(): Promise<boolean>;
   /** Get the microphone going ahead of a take, its sound thrown away until then; null if it couldn't without the browser asking. */
   warmRecorder?(): Warmth | null;
+  /** Keep the microphone open between takes, for a round that may ask to speak, or stop keeping it (microphone.ts). */
+  holdMicrophone?(hold: boolean): void;
 }
 
 export const defaultDeps: SpeakDeps = {
@@ -49,6 +51,7 @@ export const defaultDeps: SpeakDeps = {
   microphoneAllowed,
   askMicrophone,
   warmRecorder,
+  holdMicrophone,
 };
 let sharedPlayer: Player | null = null;
 
@@ -199,8 +202,9 @@ export function speakPanel(card: Card, options: SpeakOptions): SpeakPanel {
   /**
    * The microphone warmed for this question. It's warmed from the tap that brought the question up (or, once
    * the model is ready, as it can be without one) and while ready to listen, so a take starts with sound already
-   * flowing; anything else (a result, a problem, the question going) lets it go, which closes the microphone, so
-   * the word said back plays at the phone's own volume rather than a call's (microphone.ts).
+   * flowing; anything else (a result, a problem, the question going) lets it go, which closes the microphone unless
+   * the round holds it open (microphone.ts), so outside one the word said back plays at the phone's own volume rather
+   * than a call's.
    */
   let warmth: Warmth | null = null;
   let mayWarm = true;
