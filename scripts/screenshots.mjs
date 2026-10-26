@@ -423,8 +423,9 @@ const [outDir, ...wanted] = args.filter((a) => !a.startsWith('--'));
 const sizes = options.filter((o) => o.startsWith('--size=')).map((o) => o.slice('--size='.length));
 for (const size of sizes) if (!SIZES.some((s) => s.name === size)) throw new Error(`No size called "${size}"`);
 const seasoned = options.includes('--seasoned');
+for (const option of options) if (option !== '--seasoned' && !option.startsWith('--size=')) throw new Error(`No option called "${option}"`);
 if (!outDir) {
-  console.error(`Usage: npm run screenshots -- <out-dir> [${Object.keys(SCREENS).join(' | ')} ...]`);
+  console.error(`Usage: npm run screenshots -- <out-dir> [--size=<${SIZES.map((s) => s.name).join(' | ')}> ...] [--seasoned] [${Object.keys(SCREENS).join(' | ')} ...]`);
   process.exit(1);
 }
 // Home always, for REVIEW.md's check that it fits one screen.
@@ -464,6 +465,7 @@ try {
         console.log(`COULDN'T REACH: ${name} at ${size.name}: ${e.message.split('\n')[0]}`);
         process.exitCode = 1;
         await page.close();
+        await context.clearPermissions();
         continue;
       }
       await page.evaluate(() => document.fonts.ready);
@@ -553,7 +555,9 @@ async function pictureRecall(page, answered = false) {
 async function pickRecallAnswer(page) {
   const tl = await page.evaluate(recallAnswer);
   const choices = page.locator('.choice');
-  await choices.nth((await choices.allInnerTexts()).findIndex((t) => t.trim() === tl)).click();
+  const at = (await choices.allInnerTexts()).findIndex((t) => t.trim() === tl);
+  if (at < 0) throw new Error(`"${tl}" isn't one of the choices`);
+  await choices.nth(at).click();
 }
 
 /** In the page: the Tagalog a recall question on screen asks for, from its English or its picture. */

@@ -32,12 +32,12 @@ function runWorker() {
   const caches = { open: async () => ({ put }), match: async () => undefined };
   const fetch = async () => new Response('page');
   new Function('self', 'caches', 'fetch', worker)(self, caches, fetch);
-  /** Navigate to `url`: whether the worker answered, once it has finished with it. */
-  const navigate = async (url: string) => {
+  /** Ask for `url` (by navigating, or from the page `referrer`): whether the worker answered, once it has finished. */
+  const ask = async (url: string, referrer?: string) => {
     const waits: Promise<unknown>[] = [];
     let answered = false;
     listeners.fetch({
-      request: { method: 'GET', mode: 'navigate', url },
+      request: { method: 'GET', mode: referrer === undefined ? 'navigate' : 'no-cors', url, referrer: referrer ?? '' },
       respondWith: (p: Promise<unknown>) => ((answered = true), waits.push(p)),
       waitUntil: (p: Promise<unknown>) => waits.push(p),
     });
@@ -45,7 +45,7 @@ function runWorker() {
     await Promise.all(waits);
     return answered;
   };
-  return { navigate, put };
+  return { navigate: (url: string) => ask(url), fetchFrom: (referrer: string, url: string) => ask(url, referrer), put };
 }
 
 it("keeps only the app's own page as its offline copy, not the About page beside it", async () => {
@@ -55,4 +55,13 @@ it("keeps only the app's own page as its offline copy, not the About page beside
   expect(sw.put).not.toHaveBeenCalled();
   expect(await sw.navigate('https://example.test/app/')).toBe(true);
   expect(sw.put).toHaveBeenCalledWith('./', expect.any(Response));
+});
+
+it('leaves what the About page asks for out of the cache, but keeps what the app asks for', async () => {
+  const sw = runWorker();
+  expect(await sw.fetchFrom('https://example.test/app/about', 'https://example.test/app/assets/home-1234.webp')).toBe(false);
+  expect(sw.put).not.toHaveBeenCalled();
+  expect(await sw.fetchFrom('https://example.test/app/', 'https://example.test/app/assets/main-1234.js')).toBe(true);
+  expect(await sw.fetchFrom('https://example.test/app/assets/ui-1234.css', 'https://example.test/app/assets/font.woff2')).toBe(true);
+  expect(sw.put).toHaveBeenCalledTimes(2);
 });

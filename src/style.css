@@ -3509,7 +3509,7 @@ p {
 .about-title span {
   display: block;
   color: var(--saffron);
-  text-shadow: 5px 5px 0 var(--ink);
+  text-shadow: 4px 4px 0 var(--ink);
 }
 
 .about-lead {
@@ -3585,6 +3585,8 @@ p {
   justify-self: center;
   width: min(68vw, 330px);
   margin-right: 10%;
+  /* Keeps the deck's back card (z-index -1) in front of the band. */
+  isolation: isolate;
 }
 
 .about-hero-phone::before,
@@ -3593,7 +3595,7 @@ p {
   position: absolute;
   inset: 4% -6% 4% 6%;
   border: var(--outline);
-  border-radius: 38px;
+  border-radius: 36px;
   background: var(--magenta);
   transform: rotate(7deg);
 }
@@ -3613,10 +3615,6 @@ p {
   transform: rotate(-3deg);
 }
 
-.about-hero-phone {
-  isolation: isolate;
-}
-
 .about-phone {
   display: block;
   position: relative;
@@ -3626,10 +3624,10 @@ p {
   max-width: 290px;
   aspect-ratio: 390 / 844;
   overflow: hidden;
-  border: 5px solid var(--ink);
+  border: var(--outline);
   border-radius: 36px;
   background: var(--bg);
-  box-shadow: 9px 9px 0 var(--ink);
+  box-shadow: var(--shadow-big);
   container-type: size;
 }
 
@@ -3918,13 +3916,14 @@ p {
   transform: perspective(1400px) rotateY(0deg);
 }
 
+/* Scrolled down and back once while on screen (about.ts adds .moving), so the motion ends by itself. */
 .about-flip[aria-pressed='true'] .back img,
-.about-scroll img {
-  animation: about-scroll 9s ease-in-out 0.8s infinite alternate;
+.about-scroll.moving img {
+  animation: about-scroll 9s ease-in-out 0.8s 2 alternate;
 }
 
-.about-scroll img {
-  animation-duration: 14s;
+.about-scroll.moving img {
+  animation-duration: 12s;
 }
 
 @keyframes about-scroll {
@@ -4057,7 +4056,7 @@ p {
   }
 
   .about-flip[aria-pressed='true'] .back img,
-  .about-scroll img {
+  .about-scroll.moving img {
     animation: none;
   }
 }
