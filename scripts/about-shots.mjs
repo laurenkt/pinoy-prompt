@@ -5,6 +5,8 @@
 //
 // Most are of a learner four months in (--seasoned), so the charts have something to show; the rest are flows written
 // for the harness's usual learner of a dozen words.
+//
+// The coach-* ones run the real speech model, so its verdicts can change: check the About page's captions still match.
 
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
