@@ -81,7 +81,8 @@ describe('recorded clips, heard by Speak', () => {
       files(text).flatMap((file) => {
         const { odds, start } = HEARD[file] ?? {};
         const kept = odds ?? start;
-        const found = lostFirstSound(text, said(file).sounds, kept === undefined ? undefined : unpackOdds(kept));
+        if (kept === undefined) return [`${file}: not listened to for its start (run \`npm run audio\`)`];
+        const found = lostFirstSound(text, said(file).sounds, unpackOdds(kept));
         return found ? [`${file}: "${found.letters}" heard as ${found.heard}`] : [];
       }),
     );

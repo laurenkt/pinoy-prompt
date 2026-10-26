@@ -401,10 +401,10 @@ await Promise.all(
 );
 await rm(work, { recursive: true });
 
-// Clips made before what they sound like was kept (or, for what Speak asks, how each sound was stressed), or kept by
-// hand: listened to here, with no key needed.
+// Clips made before what they sound like was kept (or, for what Speak asks, how each sound was stressed, and for the
+// rest, their odds at the start), or kept by hand: listened to here, with no key needed.
 const unheard = Object.entries(manifest).flatMap(([text, names]) =>
-  texts.includes(text) && Array.isArray(names) ? names.filter((name) => name && (!clipSounds[name] || (speakAs.has(text) && !clipSounds[name].prosody))).map((name) => ({ text, name })) : [],
+  texts.includes(text) && Array.isArray(names) ? names.filter((name) => name && (!clipSounds[name] || (speakAs.has(text) ? !clipSounds[name].prosody : clipSounds[name].start === undefined))).map((name) => ({ text, name })) : [],
 );
 if (unheard.length) console.log(`Listening to ${unheard.length} clips not heard yet...`);
 for (const { text, name } of unheard) {
