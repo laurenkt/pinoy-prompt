@@ -5,7 +5,7 @@ import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../open
 import { everyWordSaid, judge } from '../phonetics';
 import { askWithPicture } from '../pictures';
 import { RecordError, toWav, type Recording } from '../recorder';
-import { DRILL_GAP, DRILL_MIN_WORDS, askAs, canDrill, distractors, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, drillOdds, pickDrillCard, setDrillHelp, shuffle, typing, type DrillRepeat } from '../session';
+import { DRILL_GAP, DRILL_MIN_WORDS, askAs, canDrill, distractors, afterDrillAnswer, drillKey, drillNote, noteDrillAnswer, noteDrillRepeat, drillOdds, pickDrillCard, setDrillNote, shuffle, typing, type DrillNote, type DrillRepeat } from '../session';
 import { canPlay, chime, play, preload, stop } from '../speech';
 import { audioButton, audioPair, choiceList, chip, h, hookView, icon, iconButton, pageHeader, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
@@ -51,8 +51,8 @@ interface Question {
   picture?: boolean;
   /** "Show choices" was tapped on a typed question, so an answer to it was picked rather than recalled. */
   hinted?: boolean;
-  /** How many answers asked this way had needed help before this one, to go back to if "I had it right". */
-  helpBefore?: number;
+  /** What the drills had noted asked this way before this answer (help needed, right in a row), to go back to if "I had it right". */
+  noteBefore?: DrillNote;
   /** Where this way stood in coming back on its own (see noteDrillRepeat) before this answer, likewise. */
   repeatBefore?: DrillRepeat;
   /** How it went has been noted for the round (see settle), so moving on doesn't note it again. */
@@ -350,7 +350,7 @@ export function practiceScreen(
           if (!right && heard && !spokeWrong && !spokenRight) {
             spokeWrong = true;
             missNoted = true;
-            q.helpBefore = drillHelp(app.progress.cards[q.card.id], q.mode);
+            q.noteBefore = drillNote(app.progress.cards[q.card.id], q.mode);
             noteHelp(q, true);
           }
           spoken(right, heard);
@@ -359,7 +359,7 @@ export function practiceScreen(
           // Its stress measured wrong, as the learner says: if that miss was the first, it's taken back, as "I had it
           // right" takes back a typed one, and it goes on as said right. A miss said before it still stands.
           if (missNoted) {
-            if (setDrillHelp(app.progress, q.card.id, q.mode, () => q.helpBefore ?? 0, app.now())) app.commit();
+            if (q.noteBefore && setDrillNote(app.progress, q.card.id, q.mode, () => q.noteBefore!, app.now())) app.commit();
             spokeWrong = false;
           }
           missNoted = false;
@@ -563,7 +563,7 @@ export function practiceScreen(
     settle(q.failure !== undefined && !right ? null : right && !q.hinted);
     // Got wrong, or from the choices, it comes up more asked this way in later rounds too, until it's got right unaided.
     // Not when the check itself failed (offline, say): the answer may well have been right.
-    q.helpBefore = drillHelp(app.progress.cards[q.card.id], q.mode);
+    q.noteBefore = drillNote(app.progress.cards[q.card.id], q.mode);
     if (q.failure === undefined || right) noteHelp(q, q.hinted || !right);
     // From the choices it waits for Next, as a miss does, so the hook can be read.
     if (right && !q.hinted)
@@ -588,10 +588,10 @@ export function practiceScreen(
     recent = recentBeforeUpcoming;
     upcoming = nextQuestion(done + 1);
     load(upcoming);
-    // And on the card: back to before the miss, less one for a right answer that doesn't leave it coming back (see noteHelp).
-    const before = q.helpBefore ?? 0;
-    const after = repeats.has(key) ? before : Math.max(before - 1, 0);
-    if (setDrillHelp(app.progress, q.card.id, q.mode, () => after, app.now())) app.commit();
+    // And on the card: back to before the miss, then noted right unless it's left coming back (see noteHelp).
+    const before = q.noteBefore ?? drillNote(undefined, q.mode);
+    const after = repeats.has(key) ? before : afterDrillAnswer(before, false);
+    if (setDrillNote(app.progress, q.card.id, q.mode, () => after, app.now())) app.commit();
     draw();
   }
 

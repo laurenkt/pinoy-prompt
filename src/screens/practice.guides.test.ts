@@ -58,7 +58,7 @@ describe('guides in a drill round', () => {
     expect(feedback).toContain(getCard('p-gusto')!.note);
     // The schedule is left alone; only the drills' own count of the miss, asked that way, is kept.
     expect(a.progress.cards['p-gusto'].help).toEqual({ read: 1 });
-    const schedules = (cards: typeof before) => Object.values(cards).map(({ help: _help, helpAt: _at, ...schedule }) => schedule);
+    const schedules = (cards: typeof before) => Object.values(cards).map(({ help: _help, streak: _streak, helpAt: _at, ...schedule }) => schedule);
     expect(schedules(a.progress.cards)).toEqual(schedules(before));
     drillScope(root, ['listen', 'read', 'recall', 'speak']);
   });

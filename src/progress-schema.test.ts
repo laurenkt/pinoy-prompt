@@ -126,6 +126,15 @@ describe("a card's count of drill answers needing help", () => {
     expect(sanitizeCard({ ...card, helpAt: NOW }, NOW)).toEqual({ ...card, helpAt: NOW });
   });
 
+  it('keeps right answers in a row beside it, up to the streak that has drills ask it typed', () => {
+    const read = sanitizeCard({ ...card, streak: { recall: 9, listen: 0, read: 'x' }, helpAt: NOW }, NOW)!;
+    expect(read.streak).toEqual({ recall: 3 });
+    expect(read.help).toBeUndefined();
+    expect(read.helpAt).toBe(NOW);
+    expect(sanitizeCard({ ...card, streak: { recall: 1 } }, NOW)!.helpAt).toBe(card.introduced);
+    expect(sanitizeCard({ ...card, streak: 'long' }, NOW)).toEqual(card);
+  });
+
   it("reads a whole-card count from October 24's builds as needing help typing the meaning and the Tagalog", () => {
     // Half each, so the card isn't asked more than it was; dated as old as can be, so any count kept since wins in a merge.
     const read = sanitizeCard({ ...card, hinted: 3 }, NOW)!;
@@ -386,10 +395,11 @@ describe('merging two copies', () => {
     const b = emptyProgress(NOW);
     // Reviewed in Study on one copy, drilled later on the other.
     a.cards.isa = review(newCardState(NOW), 'good', NOW + 5000);
-    b.cards.isa = { ...review(newCardState(NOW), 'good', NOW), help: { speak: 2 }, helpAt: NOW + 9000 };
+    b.cards.isa = { ...review(newCardState(NOW), 'good', NOW), help: { speak: 2 }, streak: { recall: 2 }, helpAt: NOW + 9000 };
     expect(mergeInto(a, b)).toBe(1);
     expect(a.cards.isa.reviewed).toBe(NOW + 5000);
     expect(a.cards.isa.help).toEqual({ speak: 2 });
+    expect(a.cards.isa.streak).toEqual({ recall: 2 });
     // Drilled on this copy after the other's newer review: the review comes in, the counts stay.
     a.cards.dalawa = { ...review(newCardState(NOW), 'good', NOW), help: { read: 1 }, helpAt: NOW + 9000 };
     b.cards.dalawa = review(newCardState(NOW), 'again', NOW + 5000);

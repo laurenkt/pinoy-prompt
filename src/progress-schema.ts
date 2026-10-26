@@ -15,7 +15,7 @@
 // under src/test/fixtures/. The tests fail until both exist.
 
 import { WAYS, cardKey, getCard, studyWays, type Way } from './deck';
-import { DAY_MS, MAX_HELP, MIN_EASE, START_EASE, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, DRILL_STREAK, MAX_HELP, MIN_EASE, START_EASE, startOfDayAfter, type CardState } from './srs';
 
 export interface Settings {
   /** New cards introduced per day. */
@@ -286,13 +286,11 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
   if (log.length) card.log = log;
   else delete card.log;
   if (value.split !== true) delete card.split;
-  // Ways a newer build added are kept as they are; the ways this build asks are checked.
-  const help: Partial<Record<Way, number>> = isObject(value.help) ? { ...value.help } : {};
-  for (const way of WAYS) {
-    const count = help[way];
-    if (isCount(count) && count > 0) help[way] = Math.min(count, MAX_HELP);
-    else delete help[way];
-  }
+  // Drill counts for each way, help needed and right in a row.
+  const help = wayCounts(value.help, MAX_HELP);
+  const streak = wayCounts(value.streak, DRILL_STREAK);
+  if (Object.keys(streak).length) card.streak = streak;
+  else delete card.streak;
   let helpAt = time(value.helpAt);
   // Builds of October 24 2026 kept one count for the whole card (`hinted`), only ever from a typed meaning or a typed
   // Tagalog: half of it is read as each until this build has counted anything itself (`helpAt`). It's dated as old
@@ -302,8 +300,9 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
     help.listen = help.recall = Math.ceil(Math.min(value.hinted, MAX_HELP) / 2);
     helpAt = 0;
   }
-  if (Object.keys(help).length) {
-    card.help = help;
+  if (Object.keys(help).length || card.streak) {
+    if (Object.keys(help).length) card.help = help;
+    else delete card.help;
     card.helpAt = helpAt ?? changedAt(card);
   } else {
     delete card.help;
@@ -313,9 +312,20 @@ export function sanitizeCard(value: unknown, now: number): CardState | null {
   return card;
 }
 
-/** A card's drill help, with its time; a copy without any still has these keys, so spreading it clears the other's. */
-function helpOf(card: CardState): Pick<CardState, 'help' | 'helpAt'> {
-  return { help: card.help, helpAt: card.helpAt };
+/** Counts kept for each way a card is asked, up to `most`: ways a newer build added are kept as they are, the ways this build asks are checked. */
+function wayCounts(value: unknown, most: number): Partial<Record<Way, number>> {
+  const counts: Partial<Record<Way, number>> = isObject(value) ? { ...value } : {};
+  for (const way of WAYS) {
+    const count = counts[way];
+    if (isCount(count) && count > 0) counts[way] = Math.min(count, most);
+    else delete counts[way];
+  }
+  return counts;
+}
+
+/** A card's drill help and streaks, with their time; a copy without any still has these keys, so spreading it clears the other's. */
+function helpOf(card: CardState): Pick<CardState, 'help' | 'streak' | 'helpAt'> {
+  return { help: card.help, streak: card.streak, helpAt: card.helpAt };
 }
 
 /**

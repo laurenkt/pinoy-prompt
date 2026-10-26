@@ -4,7 +4,7 @@
 import { LEARN_ORDER, VOCAB, buildsOn, cardForWord, cardKey, closeInMeaning, getCard, isVocab, keyed, studyWays, tagalogWords, variantsOf, type Card, type CardKind, type Drill, type Way } from './deck';
 import { canTypeMeaning } from './meaning';
 import { recallChance } from './memory';
-import { DAY_MS, MAX_HELP, START_EASE, isDue, newCardState, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, DRILL_STREAK, MAX_HELP, START_EASE, isDue, newCardState, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
 
 export type StepKind = 'new' | 'review';
@@ -82,28 +82,29 @@ function leftToSettle(state: CardState | undefined): number {
   return state.lapses > 0 ? 1 : 2;
 }
 
-/** Whether a drill asks a card one way typed, rather than picked from choices, and what Study still needs before it does. */
+/** Whether a drill asks a card one way typed, rather than picked from choices, and what Drills or Study still need before it does. */
 export interface Typing {
   typed: boolean;
+  /** Right answers in a row Drills still need this way (DRILL_STREAK in all); missing when this way is never typed. */
+  inARow?: number;
   /** Right answers Study still needs this way; missing when this way is never typed (Read, Speak, a meaning that's only a note). */
   left?: number;
   /** When Study next asks it this way; missing until Study has started this way. */
   due?: number;
-  /** Right answers reading still needs before Study starts this way (see upcomingWays), when it hasn't started. */
-  readFirst?: number;
 }
 
 /**
- * How a drill asks a word card `way`: typed once that way of studying it has settled in Study (Recall, and Listen when
- * its meaning can be typed), from choices until then. Guides have drills of their own.
+ * How a drill asks a word card `way` (Recall, and Listen when its meaning can be typed): typed once it has been got
+ * right DRILL_STREAK times in a row that way in Drills, or that way of studying it has settled in Study, whichever
+ * comes first; from choices until then. Guides have drills of their own.
  */
 export function typing(progress: Progress, card: Card, way: Way): Typing {
   if (!(way === 'recall' || (way === 'listen' && canTypeMeaning(card)))) return { typed: false };
+  const inARow = DRILL_STREAK - drillNote(progress.cards[card.id], way).streak;
   const state = progress.cards[cardKey(card.id, way)];
   const left = leftToSettle(state);
-  if (!left) return { typed: true };
-  if (state) return { typed: false, left, due: state.due };
-  return { typed: false, left, readFirst: leftToSettle(progress.cards[card.id]) };
+  if (!left || inARow <= 0) return { typed: true };
+  return { typed: false, inARow, left, due: state?.due };
 }
 
 /** How many cards in the deck the learner hasn't met, guides that aren't ready yet included. */
@@ -384,6 +385,16 @@ export function drillHelp(state: CardState | undefined, way: Way): number {
   return state?.help?.[way] ?? 0;
 }
 
+/** What the drills have noted on a card (its read key) asked one way: answers needing help, and right in a row. */
+export interface DrillNote {
+  help: number;
+  streak: number;
+}
+
+export function drillNote(state: CardState | undefined, way: Way): DrillNote {
+  return { help: drillHelp(state, way), streak: state?.streak?.[way] ?? 0 };
+}
+
 /** Whether a card's schedule puts it in the focus part of a drill round: still being learned, or met in the last few days and not yet held. */
 function settlingIn(state: CardState, now: number): boolean {
   return state.interval < 1 || (!held(state) && now - state.introduced < SETTLING_MS);
@@ -549,29 +560,45 @@ export function drillOdds(
 }
 
 /**
- * Note how a drill question asked one way went, for pickDrillCard: helped (got wrong, or picked from the choices
- * after "Show choices") adds one, up to MAX_HELP; right unaided takes one off. Only `help` changes, never the
- * schedule. Whether progress changed, to be saved.
+ * Note how a drill question asked one way went, for pickDrillCard and typing: helped (got wrong, or picked from the
+ * choices after "Show choices") adds one, up to MAX_HELP, and ends its run of right answers; right unaided takes one
+ * off and adds one to the run, up to DRILL_STREAK. Never the schedule. Whether progress changed, to be saved.
  */
 export function noteDrillAnswer(progress: Progress, cardId: string, way: Way, helped: boolean, now: number): boolean {
-  return setDrillHelp(progress, cardId, way, (n) => (helped ? Math.min(n + 1, MAX_HELP) : Math.max(n - 1, 0)), now);
+  return setDrillNote(progress, cardId, way, (n) => afterDrillAnswer(n, helped), now);
 }
 
-/** Set how many answers asked this way needed help, from what it was. Whether that changed it. */
-export function setDrillHelp(progress: Progress, cardId: string, way: Way, to: (before: number) => number, now: number): boolean {
+/** What a drill answer makes of a card's drill note asked that way (see noteDrillAnswer). */
+export function afterDrillAnswer(note: DrillNote, helped: boolean): DrillNote {
+  return helped
+    ? { help: Math.min(note.help + 1, MAX_HELP), streak: 0 }
+    : { help: Math.max(note.help - 1, 0), streak: Math.min(note.streak + 1, DRILL_STREAK) };
+}
+
+/** Set a card's drill note asked one way, from what it was. Whether that changed it. */
+export function setDrillNote(progress: Progress, cardId: string, way: Way, to: (before: DrillNote) => DrillNote, now: number): boolean {
   const state = progress.cards[cardId];
   if (!state) return false;
-  const before = drillHelp(state, way);
+  const before = drillNote(state, way);
   const after = to(before);
-  if (after === before) return false;
-  const help = { ...state.help };
-  if (after) help[way] = after;
-  else delete help[way];
-  if (Object.keys(help).length) state.help = help;
+  if (after.help === before.help && after.streak === before.streak) return false;
+  const help = withCount(state.help, way, after.help);
+  if (help) state.help = help;
   else delete state.help;
-  // Kept even once it's back to none, so a sync keeps the clearing too.
+  const streak = withCount(state.streak, way, after.streak);
+  if (streak) state.streak = streak;
+  else delete state.streak;
+  // Kept even once they're back to none, so a sync keeps the clearing too.
   state.helpAt = now;
   return true;
+}
+
+/** Counts for each way with `way`'s set to `n` (none at 0); undefined when that leaves none. */
+function withCount(counts: Partial<Record<Way, number>> | undefined, way: Way, n: number): Partial<Record<Way, number>> | undefined {
+  const next = { ...counts };
+  if (n) next[way] = n;
+  else delete next[way];
+  return Object.keys(next).length ? next : undefined;
 }
 
 /** How often a phrase with variants the learner can be asked is asked as one of them, rather than as itself. */

@@ -27,14 +27,14 @@ import {
   noteDrillRepeat,
   DRILL_REPEATS,
   type DrillRepeat,
-  setDrillHelp,
+  setDrillNote,
   pickFormat,
   requeue,
   studyQueue,
   typing,
   upcomingNewCards,
 } from './session';
-import { DAY_MS, newCardState, startOfDayAfter } from './srs';
+import { DAY_MS, DRILL_STREAK, newCardState, startOfDayAfter } from './srs';
 import { emptyProgress, recordAnswer } from './store';
 
 const NOW = Date.UTC(2026, 0, 1, 12);
@@ -816,11 +816,14 @@ describe('picking the next card to drill', () => {
     expect(drillHelp(progress.cards.kape, 'read')).toBe(0);
     helpWith(progress, 'kape', 'recall', false);
     expect(helpWith(progress, 'kape', 'recall', false)).toBe(true);
-    const { help, helpAt, ...after } = progress.cards.kape;
+    const { help, helpAt, streak, ...after } = progress.cards.kape;
     expect(after).toEqual(schedule);
     expect(help).toBeUndefined();
+    expect(streak).toEqual({ recall: 2 });
     // Kept, so a sync knows the count was cleared after the copy that still has it.
     expect(helpAt).toBe(LATER);
+    // Right in a row counts up to DRILL_STREAK, then nothing more changes.
+    expect(helpWith(progress, 'kape', 'recall', false)).toBe(true);
     expect(helpWith(progress, 'kape', 'recall', false)).toBe(false);
     expect(tallies(progress).byWay).toEqual(plain);
   });
@@ -831,7 +834,7 @@ describe('picking the next card to drill', () => {
     expect(drillHelp(progress.cards.kape, 'speak')).toBe(3);
     expect(helpWith(progress, 'unmet')).toBe(false);
     expect(progress.cards.unmet).toBeUndefined();
-    expect(setDrillHelp(progress, 'kape', 'speak', () => 3, LATER)).toBe(false);
+    expect(setDrillNote(progress, 'kape', 'speak', (n) => ({ ...n, help: 3 }), LATER)).toBe(false);
   });
 
   it('gives a card the drills had to help with its own share of the round in a big deck', () => {
@@ -895,19 +898,37 @@ describe('typing', () => {
 
   it('types Recall once Study has remembered it a day after it was met, counting the right answers still to go', () => {
     const progress = emptyProgress(NOW);
-    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 2, readFirst: 2 });
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, inARow: DRILL_STREAK, left: 2, due: undefined });
     recordAnswer(progress, 'salamat', 'good', NOW);
-    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 2, readFirst: 1 });
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, inARow: DRILL_STREAK, left: 2, due: undefined });
     const key = cardKey('salamat', 'recall');
     progress.cards[key] = newCardState(NOW);
-    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 2, due: NOW });
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, inARow: DRILL_STREAK, left: 2, due: NOW });
     recordAnswer(progress, key, 'good', NOW);
-    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 1, due: NOW + DAY_MS });
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, inARow: DRILL_STREAK, left: 1, due: NOW + DAY_MS });
     recordAnswer(progress, key, 'good', NOW + DAY_MS);
     expect(typing(progress, card, 'recall')).toEqual({ typed: true });
     // Forgotten, it gives choices again until it's remembered once more.
     recordAnswer(progress, key, 'again', NOW + 5 * DAY_MS);
     expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, left: 1 });
+  });
+
+  it('types it once Drills have had it right three times in a row, whatever Study has seen, until it needs help again', () => {
+    const progress = emptyProgress(NOW);
+    recordAnswer(progress, 'salamat', 'good', NOW);
+    expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, inARow: DRILL_STREAK });
+    noteDrillAnswer(progress, 'salamat', 'recall', false, NOW);
+    noteDrillAnswer(progress, 'salamat', 'recall', true, NOW);
+    noteDrillAnswer(progress, 'salamat', 'recall', false, NOW);
+    noteDrillAnswer(progress, 'salamat', 'recall', false, NOW);
+    expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, inARow: 1 });
+    // Each way on its own.
+    noteDrillAnswer(progress, 'salamat', 'listen', false, NOW);
+    expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, inARow: 1 });
+    noteDrillAnswer(progress, 'salamat', 'recall', false, NOW);
+    expect(typing(progress, card, 'recall')).toEqual({ typed: true });
+    noteDrillAnswer(progress, 'salamat', 'recall', true, NOW);
+    expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, inARow: DRILL_STREAK });
   });
 
   it('never types Read, Speak, or Listen for a meaning that is only a note', () => {

@@ -59,6 +59,8 @@ export function drillScope(root: HTMLElement, modes: string[]): void {
  * doesn't bring the word straight back as a miss. Falls back on the first choice for anything else.
  */
 export function chooseRight(root: ParentNode): void {
+  // A typed question (after a run of right answers, say) is answered from its choices too.
+  if (!root.querySelector('.choice')) [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === 'Show choices')?.click();
   const prompt = root.querySelector('.prompt');
   const shown = `${prompt?.textContent ?? ''} ${[...(prompt?.querySelectorAll('img') ?? [])].map((i) => i.alt).join(' ')}`;
   const choices = [...root.querySelectorAll<HTMLButtonElement>('.choice')];
