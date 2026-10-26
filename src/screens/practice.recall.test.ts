@@ -105,6 +105,26 @@ describe("how well the card is known, on its back", () => {
     expect(back(root).hidden).toBe(true);
   });
 
+  it('says why it gives choices, and what Study still needs before it asks it typed', () => {
+    const why = (root: HTMLElement) => root.querySelector('.back-why')?.textContent;
+    const app = learner(false);
+    let root = (last = recall(app));
+    card(root).click();
+    // Just met: reading hasn't settled, so Study hasn't started recalling it.
+    expect(why(root)).toContain('Why it’s multiple choice');
+    expect(why(root)).toContain('Study starts Recall once Read has settled, after one more right answer there.');
+    // Started, remembered once, and asked again tomorrow.
+    recordAnswer(app.progress, cardKey('salamat', 'recall'), 'good', app.now());
+    root = last = recall(app);
+    card(root).click();
+    expect(why(root)).toContain('One more right answer in Study to go. Study asks it again in 1d.');
+    // Settled: it's typed, with nothing to explain.
+    root = last = recall(learner(true));
+    card(root).click();
+    expect(root.querySelector('.card-back')).not.toBeNull();
+    expect(why(root)).toBeUndefined();
+  });
+
   it("doesn't turn for a tap on one of the card's own controls", () => {
     const app = learner(true);
     const root = (last = practiceScreen(app, noMic));

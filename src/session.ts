@@ -2,6 +2,7 @@
 // Kept free of DOM code so it can be unit tested.
 
 import { LEARN_ORDER, VOCAB, buildsOn, cardForWord, cardKey, closeInMeaning, getCard, isVocab, keyed, studyWays, tagalogWords, variantsOf, type Card, type CardKind, type Drill, type Way } from './deck';
+import { canTypeMeaning } from './meaning';
 import { recallChance } from './memory';
 import { DAY_MS, MAX_HELP, START_EASE, isDue, newCardState, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
@@ -70,8 +71,39 @@ export function guideEvery(met: number): number {
  * met. A card forgotten later and relearned still counts: it was remembered once.
  */
 export function settled(progress: Progress, id: string): boolean {
-  const state = progress.cards[id];
-  return !!state && state.interval >= 1 && (state.reps >= 2 || state.lapses > 0);
+  return leftToSettle(progress.cards[id]) === 0;
+}
+
+/** Right answers in Study a card asked one way still needs to settle (see settled): a day after the first, if it hasn't been remembered yet. */
+function leftToSettle(state: CardState | undefined): number {
+  if (!state) return 2;
+  if (state.interval >= 1) return state.reps >= 2 || state.lapses > 0 ? 0 : 1;
+  // Still being learned: forgotten once, it was remembered before, so a right answer now settles it.
+  return state.lapses > 0 ? 1 : 2;
+}
+
+/** Whether a drill asks a card one way typed, rather than picked from choices, and what Study still needs before it does. */
+export interface Typing {
+  typed: boolean;
+  /** Right answers Study still needs this way; missing when this way is never typed (Read, Speak, a meaning that's only a note). */
+  left?: number;
+  /** When Study next asks it this way; missing until Study has started this way. */
+  due?: number;
+  /** Right answers reading still needs before Study starts this way (see upcomingWays), when it hasn't started. */
+  readFirst?: number;
+}
+
+/**
+ * How a drill asks a word card `way`: typed once that way of studying it has settled in Study (Recall, and Listen when
+ * its meaning can be typed), from choices until then. Guides have drills of their own.
+ */
+export function typing(progress: Progress, card: Card, way: Way): Typing {
+  if (!(way === 'recall' || (way === 'listen' && canTypeMeaning(card)))) return { typed: false };
+  const state = progress.cards[cardKey(card.id, way)];
+  const left = leftToSettle(state);
+  if (!left) return { typed: true };
+  if (state) return { typed: false, left, due: state.due };
+  return { typed: false, left, readFirst: leftToSettle(progress.cards[card.id]) };
 }
 
 /** How many cards in the deck the learner hasn't met, guides that aren't ready yet included. */

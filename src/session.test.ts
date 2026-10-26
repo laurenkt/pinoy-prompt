@@ -31,6 +31,7 @@ import {
   pickFormat,
   requeue,
   studyQueue,
+  typing,
   upcomingNewCards,
 } from './session';
 import { DAY_MS, newCardState, startOfDayAfter } from './srs';
@@ -886,5 +887,37 @@ describe('picking the next card to drill', () => {
       const card = pick(progress, LATER, [], new Map(), (c) => (isVocab(c) ? WAYS : []), () => i / 50)!;
       expect(isVocab(card)).toBe(true);
     }
+  });
+});
+
+describe('typing', () => {
+  const card = getCard('salamat')!;
+
+  it('types Recall once Study has remembered it a day after it was met, counting the right answers still to go', () => {
+    const progress = emptyProgress(NOW);
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 2, readFirst: 2 });
+    recordAnswer(progress, 'salamat', 'good', NOW);
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 2, readFirst: 1 });
+    const key = cardKey('salamat', 'recall');
+    progress.cards[key] = newCardState(NOW);
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 2, due: NOW });
+    recordAnswer(progress, key, 'good', NOW);
+    expect(typing(progress, card, 'recall')).toEqual({ typed: false, left: 1, due: NOW + DAY_MS });
+    recordAnswer(progress, key, 'good', NOW + DAY_MS);
+    expect(typing(progress, card, 'recall')).toEqual({ typed: true });
+    // Forgotten, it gives choices again until it's remembered once more.
+    recordAnswer(progress, key, 'again', NOW + 5 * DAY_MS);
+    expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, left: 1 });
+  });
+
+  it('never types Read, Speak, or Listen for a meaning that is only a note', () => {
+    const progress = emptyProgress(NOW);
+    learn(progress, ['salamat'], 3, true);
+    expect(typing(progress, card, 'listen')).toEqual({ typed: true });
+    expect(typing(progress, card, 'read')).toEqual({ typed: false });
+    expect(typing(progress, card, 'speak')).toEqual({ typed: false });
+    learn(progress, ['mga'], 3, true);
+    expect(typing(progress, getCard('mga')!, 'listen')).toEqual({ typed: false });
+    expect(typing(progress, getCard('mga')!, 'recall')).toEqual({ typed: true });
   });
 });
