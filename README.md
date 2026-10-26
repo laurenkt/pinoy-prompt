@@ -2,7 +2,7 @@
 
 A small, phone-first web app for learning beginner Tagalog with spaced repetition. Install it to your home screen and it works offline.
 
-**Try it:** https://laurenkt.github.io/pinoy-prompt/ (open on your phone, then "Add to Home Screen").
+**Try it:** https://laurenkt.github.io/pinoy-prompt/ (open on your phone, then "Add to Home Screen"). What it does, with pictures: https://laurenkt.github.io/pinoy-prompt/about.
 
 ## How it works
 

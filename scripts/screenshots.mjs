@@ -1,11 +1,13 @@
 // Screenshots of the app on phone-sized screens, for checking a layout change
 // against REVIEW.md the same way every time (docs/ARCHITECTURE.md).
 //
-//   npm run screenshots -- <out-dir> [screen ...]
+//   npm run screenshots -- <out-dir> [--size=<name> ...] [--seasoned] [screen ...]
 //
 // Screens: the keys of SCREENS below (all of them by default). Each is taken at
-// every size, on a learner who knows a dozen words (or, for the first-* ones,
-// none yet), with randomness seeded so before and after match.
+// every size (or only those named by --size), on a learner who knows a dozen
+// words (or, for the first-* ones, none yet; with --seasoned, a learner four
+// months in, as the About page shows), with randomness seeded so before and
+// after match.
 // Prints Home's scroll height at each size, how far any other screen scrolls,
 // and any screen wider than the phone.
 
@@ -339,6 +341,68 @@ const SCREENS = {
     await page.click('[aria-label="Settings"]');
   },
   chat: (page) => page.click('.chat-btn'),
+  // A call going, with stand-ins for OpenAI and WebRTC: a hum for each voice, so the backdrop moves, and a few lines said.
+  'chat-call': async (page) => {
+    await page.evaluate(async () => {
+      (await import('/src/openai.ts')).setApiKey('sk-proj-screenshotsonly0123456789');
+      const { defaultTalkDeps } = await import('/src/screens/talk.ts');
+      const context = new AudioContext();
+      const voice = (hz) => {
+        const hum = new OscillatorNode(context, { type: 'sawtooth', frequency: hz });
+        const swell = new OscillatorNode(context, { frequency: 3 });
+        const depth = new GainNode(context, { gain: 0.3 });
+        const level = new GainNode(context, { gain: 0.3 });
+        const out = context.createMediaStreamDestination();
+        swell.connect(depth).connect(level.gain);
+        hum.connect(level).connect(out);
+        hum.start();
+        swell.start();
+        return out.stream;
+      };
+      let channel;
+      const peer = {
+        connectionState: 'connected',
+        addTrack() {},
+        createDataChannel: () => (channel = { readyState: 'open', send() {}, onmessage: null }),
+        createOffer: async () => ({ type: 'offer', sdp: 'offer' }),
+        setLocalDescription: async () => {},
+        setRemoteDescription: async () => {
+          setTimeout(() => {
+            const ai = voice(190);
+            peer.ontrack?.({ streams: [ai], track: ai.getAudioTracks()[0] });
+            const send = (event) => channel.onmessage({ data: JSON.stringify(event) });
+            send({ type: 'session.started' });
+            const lines = [
+              ['ai', 'Kumusta! Did you have a good weekend?'],
+              ['you', 'Oo! I went to the palengke with my kaibigan.'],
+              ['ai', 'Ang saya! What did you buy? Masarap ba ang food there?'],
+              ['you', 'Masarap! Magkano ang mangga… mura lang.'],
+            ];
+            for (const [who, text] of lines) send({ type: who === 'ai' ? 'session.output_transcript.delta' : 'session.input_transcript.delta', delta: `${text} ` });
+            send({ type: 'session.usage.updated', usage: { seconds: 94 } });
+          }, 50);
+        },
+        close() {},
+      };
+      defaultTalkDeps.callSupported = () => true;
+      defaultTalkDeps.call = {
+        fetch: async () => new Response(JSON.stringify({ session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }), { status: 201 }),
+        getMicrophone: async () => voice(140),
+        createPeer: () => peer,
+        createSpeaker: () => ({ srcObject: null, play: async () => {} }),
+      };
+    });
+    await page.click('.chat-btn');
+    await page.waitForSelector('.bubble');
+    await page.waitForTimeout(600);
+  },
+  // The About page (about.html), at /about as GitHub Pages serves it: the whole page, with reduced motion so its
+  // drill card rests on its front.
+  about: async (page) => {
+    await page.goto(new URL('about', url).href);
+    await page.waitForSelector('.about-say .audio-btn');
+    await page.evaluate(() => Promise.all([...document.images].map((i) => ((i.loading = 'eager'), i.decode().catch(() => {})))));
+  },
   // A new learner's first Study: the topic's introduction, then the first word's.
   'first-study': (page) => page.click('.hub-btn.big:not(.chat-btn)'),
   'first-study-next': async (page) => {
@@ -353,9 +417,15 @@ const SCREENS = {
   },
 };
 
-const [outDir, ...wanted] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const options = args.filter((a) => a.startsWith('--'));
+const [outDir, ...wanted] = args.filter((a) => !a.startsWith('--'));
+const sizes = options.filter((o) => o.startsWith('--size=')).map((o) => o.slice('--size='.length));
+for (const size of sizes) if (!SIZES.some((s) => s.name === size)) throw new Error(`No size called "${size}"`);
+const seasoned = options.includes('--seasoned');
+for (const option of options) if (option !== '--seasoned' && !option.startsWith('--size=')) throw new Error(`No option called "${option}"`);
 if (!outDir) {
-  console.error(`Usage: npm run screenshots -- <out-dir> [${Object.keys(SCREENS).join(' | ')} ...]`);
+  console.error(`Usage: npm run screenshots -- <out-dir> [--size=<${SIZES.map((s) => s.name).join(' | ')}> ...] [--seasoned] [${Object.keys(SCREENS).join(' | ')} ...]`);
   process.exit(1);
 }
 // Home always, for REVIEW.md's check that it fits one screen.
@@ -370,7 +440,7 @@ const url = server.resolvedUrls.local[0];
 const browser = await chromium.launch();
 
 try {
-  for (const size of SIZES) {
+  for (const size of SIZES.filter((s) => !sizes.length || sizes.includes(s.name))) {
     const context = await browser.newContext({
       viewport: { width: size.width, height: size.height },
       deviceScaleFactor: 2,
@@ -387,8 +457,17 @@ try {
       const page = await context.newPage();
       const cdp = await context.newCDPSession(page);
       await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: size.top, bottom: size.bottom, left: 0, right: 0 } });
-      await seed(page, name.startsWith('first-') ? 0 : 12);
-      await SCREENS[name](page);
+      await seed(page, name.startsWith('first-') ? 0 : seasoned ? 'seasoned' : 12);
+      try {
+        await SCREENS[name](page);
+      } catch (e) {
+        // One screen out of reach (a flow written for another learner) leaves the rest to be taken.
+        console.log(`COULDN'T REACH: ${name} at ${size.name}: ${e.message.split('\n')[0]}`);
+        process.exitCode = 1;
+        await page.close();
+        await context.clearPermissions();
+        continue;
+      }
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(150);
       await page.screenshot({ path: join(outDir, `${name}-${size.name}.png`), fullPage: true });
@@ -461,15 +540,24 @@ async function pictureRecall(page, answered = false) {
   await page.click('.drills-btn');
   await onlyAsk(page, 'recall');
   for (let i = 0; i < 60 && !(await page.locator('.prompt-picture').count()); i++) {
-    await page.locator('.choice').first().click();
+    // A settled word is typed, so ask for its choices.
+    if (await page.locator('.meaning-input').count()) await page.click('text=Show choices');
+    // Answered right, as a missed card comes straight back (noteDrillRepeat) and would hold the others off.
+    await pickRecallAnswer(page);
     // A right answer moves on by itself, perhaps before Next is pressed.
     await page.click('button:has-text("Next")', { timeout: 1000 }).catch(() => {});
   }
   if (!(await page.locator('.prompt-picture').count())) throw new Error('No question was asked from a picture');
-  if (answered) {
-    const tl = await page.evaluate(recallAnswer);
-    await page.click(`.choice:has-text("${tl}")`);
-  }
+  if (answered) await pickRecallAnswer(page);
+}
+
+/** Pick the right Tagalog for the recall question on screen (not one it only starts, as "Salamat" does "Salamat po"). */
+async function pickRecallAnswer(page) {
+  const tl = await page.evaluate(recallAnswer);
+  const choices = page.locator('.choice');
+  const at = (await choices.allInnerTexts()).findIndex((t) => t.trim() === tl);
+  if (at < 0) throw new Error(`"${tl}" isn't one of the choices`);
+  await choices.nth(at).click();
 }
 
 /** In the page: the Tagalog a recall question on screen asks for, from its English or its picture. */
@@ -634,7 +722,11 @@ async function speakOnly(page) {
   await page.waitForSelector('.speak.ready', { timeout: 60_000 });
 }
 
-/** A learner who has met `words` words, built and saved by the app's own code, then Home. */
+/**
+ * A learner who has met `words` words, built and saved by the app's own code, then Home. A `seasoned` learner started
+ * four months ago and has kept up since: 160 cards met a few a day, each reviewed whenever it came due, now and then
+ * forgotten, so their memory spans just met to long-term.
+ */
 async function seed(page, words) {
   await page.goto(url);
   await page.evaluate(async (words) => {
@@ -646,9 +738,27 @@ async function seed(page, words) {
     const { emptyProgress, recordAnswer, save } = await import('/src/store.ts');
     const { LEARN_ORDER } = await import('/src/deck.ts');
     const now = Date.now();
-    const progress = emptyProgress(now - 3 * 86_400_000);
+    const progress = emptyProgress(now - (words === 'seasoned' ? 120 : 3) * 86_400_000);
     Object.assign(progress.settings, { autoplay: false });
-    for (const id of LEARN_ORDER.slice(0, words)) recordAnswer(progress, id, 'good', now - 3 * 86_400_000);
+    if (words === 'seasoned') {
+      const { ALL_CARDS, cardKey, studyWays } = await import('/src/deck.ts');
+      const day = 86_400_000;
+      let seed = 7;
+      const random = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      LEARN_ORDER.slice(0, 160).forEach((id, i) => {
+        const card = ALL_CARDS.find((c) => c.id === id);
+        studyWays(card).forEach((way, w) => {
+          const key = cardKey(id, way);
+          // Met in learning order a few a day; its other ways start once its reading has settled.
+          for (let at = now - (115 - i * 0.7 - w * 2) * day; at < now; ) {
+            recordAnswer(progress, key, random() < 0.12 ? 'again' : 'good', at);
+            at = Math.max(progress.cards[key].due, at + 600_000) + random() * day * 0.4;
+          }
+        });
+      });
+    } else {
+      for (const id of LEARN_ORDER.slice(0, words)) recordAnswer(progress, id, 'good', now - 3 * 86_400_000);
+    }
     save(progress, { replace: true });
   }, words);
   await page.reload();

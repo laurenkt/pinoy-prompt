@@ -65,11 +65,19 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/** Whether a path is the app's own page, where the worker sits (not another page beside it). */
+function isAppPage(path) {
+  const app = new URL('./', self.location.href).pathname;
+  return path === app || path === `${app}index.html`;
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
+    // Only the app's own page is the offline copy; another page beside it (about.html) is left to the network.
+    if (!isAppPage(new URL(request.url).pathname)) return;
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -99,6 +107,11 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
+
+  // What another page beside the app asks for (the About page's screenshots) is left to the network too, so it
+  // never fills the shell's cache. Fonts are asked for by a stylesheet in assets/, which counts as the app's.
+  const from = request.referrer ? new URL(request.referrer).pathname : null;
+  if (from !== null && !from.includes('/assets/') && !isAppPage(from)) return;
 
   // ignoreVary: module scripts send an Origin header that a cached "Vary: Origin" entry would otherwise miss.
   const cached = caches.match(request, { ignoreVary: true });
