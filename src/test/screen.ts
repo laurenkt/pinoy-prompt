@@ -56,9 +56,12 @@ export function drillScope(root: HTMLElement, modes: string[]): void {
 
 /**
  * Pick the right choice on a word read or recalled from choices, found from what the prompt shows, so a drill round
- * doesn't bring the word straight back as a miss. Falls back on the first choice for anything else.
+ * doesn't bring the word straight back as a miss. Falls back on the first choice for anything else. A typed question
+ * has its choices shown first, which counts as needing help, as it would for the learner.
  */
 export function chooseRight(root: ParentNode): void {
+  // A typed question (after a run of right answers, say) is answered from its choices too.
+  if (!root.querySelector('.choice')) [...root.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === 'Show choices')?.click();
   const prompt = root.querySelector('.prompt');
   const shown = `${prompt?.textContent ?? ''} ${[...(prompt?.querySelectorAll('img') ?? [])].map((i) => i.alt).join(' ')}`;
   const choices = [...root.querySelectorAll<HTMLButtonElement>('.choice')];

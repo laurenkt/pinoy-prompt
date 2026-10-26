@@ -70,6 +70,26 @@ describe('recalling words still being learned', () => {
     expect(root.querySelectorAll('.choice')).toHaveLength(4);
     expect(box(root)).toBeNull();
   });
+
+  it('counts right answers in a row, and has it typed after three, Study or not', async () => {
+    const app = learner(false);
+    let root = (last = recall(app));
+    const right = getCard('salamat')!.tl;
+    [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((c) => c.textContent?.endsWith(right))!.click();
+    expect(app.progress.cards.salamat.streak).toEqual({ recall: 1 });
+    app.progress.cards.salamat.streak = { recall: 3 };
+    root = last = recall(app);
+    expect(box(root)).not.toBeNull();
+    expect(button(root, 'Show choices')).toBeTruthy();
+    // Got wrong, it comes straight back with its choices, the count started again.
+    type(root, 'salamt');
+    await flush();
+    expect(app.progress.cards.salamat.streak).toBeUndefined();
+    button(root, 'Next').click();
+    expect(root.querySelector('.prompt')?.textContent).toContain(getCard('salamat')!.en);
+    expect(box(root)).toBeNull();
+    expect(root.querySelectorAll('.choice')).toHaveLength(4);
+  });
 });
 
 describe("how well the card is known, on its back", () => {
@@ -112,12 +132,12 @@ describe("how well the card is known, on its back", () => {
     card(root).click();
     // Just met: reading hasn't settled, so Study hasn't started recalling it.
     expect(why(root)).toContain('Why it’s multiple choice');
-    expect(why(root)).toContain('Study starts Recall once Read has settled, after one more right answer there.');
+    expect(why(root)).toContain('Three more right answers in a row here to go. A miss starts the count again.');
     // Started, remembered once, and asked again tomorrow.
     recordAnswer(app.progress, cardKey('salamat', 'recall'), 'good', app.now());
     root = last = recall(app);
     card(root).click();
-    expect(why(root)).toContain('One more right answer in Study to go. Study asks it again in 1d.');
+    expect(why(root)).toContain('Three more right answers in a row here to go, or one more right answer in Study, which asks it again in 1d.');
     // Settled: it's typed, with nothing to explain.
     root = last = recall(learner(true));
     card(root).click();

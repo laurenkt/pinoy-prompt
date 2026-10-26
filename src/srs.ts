@@ -46,7 +46,12 @@ export interface CardState {
    * so each way is counted, and drilled, on its own (see pickDrillCard). Missing ways, or a missing `help`, mean none.
    */
   help?: Partial<Record<Way, number>>;
-  /** When `help` last changed, so a copy synced from elsewhere keeps the later count (see mergeInto). */
+  /**
+   * Drills only, kept beside `help`: for each way it's asked, how many answers in a row were got right unaided
+   * (DRILL_STREAK at most). That many switch a drill to asking it typed, whatever Study has seen (see typing).
+   */
+  streak?: Partial<Record<Way, number>>;
+  /** When `help` or `streak` last changed, so a copy synced from elsewhere keeps the later counts (see mergeInto). */
   helpAt?: number;
   /**
    * Started from reading's schedule when Study's ways were split (schema 4), and not answered this way since. Any
@@ -57,6 +62,8 @@ export interface CardState {
 
 /** Most answers needing help one way of asking a card holds, so a few right answers are enough to clear it. */
 export const MAX_HELP = 3;
+/** Right answers in a row in Drills, asked one way, that switch it to typing the answer there. */
+export const DRILL_STREAK = 3;
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const MIN_EASE = 1.3;
