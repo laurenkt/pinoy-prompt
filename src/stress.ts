@@ -37,7 +37,7 @@ export const UNJUDGED = new Set<string>([
   'akala', 'akin', 'ako', 'anak', 'anim', 'apatnapu', 'apo', 'araw', 'aso', 'asukal', 'ate', 'ayoko', 'babae',
   'baboy', 'bagay', 'bagyo', 'bakit', 'bangko', 'bansa', 'barya', 'baso', 'basta', 'bawat', 'beses', 'biyernes',
   'buhay', 'buksan', 'bumaba', 'bumalik', 'bumili', 'dahil', 'dahilan', 'dalawampu', 'dilaw', 'dito', 'dumating', 'gamot',
-  'gatas', 'gulay', 'gusto', 'habang', 'hatinggabi', 'heto', 'hindi', 'ingat', 'isa', 'isda', 'iyo', 'kahapon',
+  'gatas', 'gulay', 'gusto', 'habang', 'hatinggabi', 'heto', 'hindi', 'ingat', 'isa', 'isda', 'iyo', 'kagabi', 'kahapon',
   'kahit', 'kaibigan', 'kailangan', 'kainan', 'kalahati', 'kaliwa', 'kanan', 'kanin', 'kasalanan', 'kasi', 'kaya',
   'kayo', 'kaysa', 'kilala', 'kulay', 'kumain', 'kumusta', 'kunin', 'kutsara', 'labindalawa', 'labing-isa',
   'labinlima', 'lalaki', 'lima', 'limampu', 'linggo', 'loob', 'lugar', 'lunes', 'maaraw', 'mabagal', 'mabaho',

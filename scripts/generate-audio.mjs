@@ -32,8 +32,9 @@
 //
 // The voice model sometimes starts or stops a take mid-sound (a word that
 // starts with a vowel often comes already sounding), and often starts a take a
-// moment into its first word, so "Kailan" comes out "ailan" (lostFirstSound in
-// src/phonetics.ts, as the recogniser hears it); a take like either is made
+// moment into its first word, so "Kailan" comes out "ailan", or keeps only a
+// faint click of a first stop (k, p, t...), so "Kailangan" comes out "pailangan"
+// (lostFirstSound in src/phonetics.ts, as the recogniser hears it); a take like either is made
 // again as well. Each clip keeps a little silence before and after its
 // sound (scripts/clip-edges.mjs), so soft starts and fading ends are heard
 // whole; `--check` also remakes clips made before that, which start right on their first sound.
@@ -86,7 +87,7 @@ const key = process.env.OPENAI_API_KEY;
 const vite = await createServer({ root: ROOT, server: { middlewareMode: true }, appType: 'custom', logLevel: 'silent' });
 const { allSpoken, spokenText } = await vite.ssrLoadModule('/src/spoken.ts');
 const { ASKED_VOCAB } = await vite.ssrLoadModule('/src/deck.ts');
-const { englishReadings, judge, lostFirstSound, packOdds, passes, unpackOdds } = await vite.ssrLoadModule('/src/phonetics.ts');
+const { englishReadings, judge, lostFirstSound, packOdds, passes, startOdds, unpackOdds } = await vite.ssrLoadModule('/src/phonetics.ts');
 const { recognise } = await vite.ssrLoadModule('/src/phone-model.ts');
 const { measurer } = await vite.ssrLoadModule('/src/prosody.ts');
 const { MODEL_URL } = await vite.ssrLoadModule('/src/model-cache.ts');
@@ -122,8 +123,9 @@ async function samplesOf(file, rate) {
 
 /**
  * What Speak's recogniser hears in a clip file, as src/clip-sounds.json keeps it: its sounds and the ones it nearly
- * wrote instead (if any). For a text Speak asks (`asked`), also its odds at each moment (packed into a line of text)
- * and how long (ms), high (Hz) and loud (dB) each sound was, for judging stress (src/stress.ts).
+ * wrote instead (if any), and its odds (packed into a line of text) until its first vowel. For a text Speak asks
+ * (`asked`), its odds at every moment instead, and how long (ms), high (Hz) and loud (dB) each sound was, for
+ * judging stress (src/stress.ts).
  */
 async function listen(file, asked) {
   const samples = await samplesOf(file, 16000);
@@ -131,7 +133,8 @@ async function listen(file, asked) {
   listening = heard.catch(() => {});
   const { sounds, runnersUp, odds, timing } = await heard;
   const found = { sounds, ...(runnersUp.some((r) => r.length) && { runnersUp }) };
-  if (!asked) return found;
+  // Its odds up to its first vowel, for lostFirstSound: a clip Speak asks keeps them all.
+  if (!asked) return { ...found, start: packOdds(startOdds(odds)) };
   const measure = measurer(samples, timing);
   const prosody = sounds.map((_, i) => measure(i)).map((p) => [Math.round(p.length * 1000), Math.round(p.pitch), Math.round(p.level)]);
   return { ...found, odds: packOdds(odds), prosody };
@@ -143,7 +146,7 @@ for (const card of ASKED_VOCAB) speakAs.set(spokenText(card), [...(speakAs.get(s
 
 /** What's wrong with a clip of the text, as Speak hears it: a first sound gone, letters said the English way, or a card it wouldn't pass as. */
 function soundProblems(text, heard) {
-  const lost = lostFirstSound(text, heard.sounds);
+  const lost = lostFirstSound(text, heard.sounds, unpackOdds(heard.odds ?? heard.start));
   const found = [...(lost ? [`first "${lost.letters}" heard as ${lost.heard}`] : []), ...englishReadings(text, heard.sounds).map((f) => `"${f.letters}" said ${f.heard}`)];
   if (!heard.odds) return found;
   for (const spellings of speakAs.get(text) ?? []) {

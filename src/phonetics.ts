@@ -749,20 +749,48 @@ export function englishReadings(text: string, heard: string[]): { letters: strin
 }
 
 /**
+ * How sure the recogniser must be, at its surest, of a stop that starts a recording. A stop is one short burst,
+ * and a take that starts partway into it keeps only a faint click, heard as some stop or other: "Kailangan" came
+ * out "pailangan", with the k 25% likely at best, where a clear one is 60 to 95%.
+ */
+export const CLEAR_START = 0.4;
+/** Stops, which a take started late cuts to a click. Other consonants last, so a late start leaves them whole or loses them. */
+const STOPS = new Set(['p', 't', 'k', 'b', 'd', 'ɡ']);
+
+/**
+ * The recogniser's odds at the start of a recording, up to the first moment it's sure of a vowel: all that
+ * `lostFirstSound` needs of them, as src/clip-sounds.json keeps them for every clip.
+ */
+export function startOdds(odds: Odds): Odds {
+  const vowel = odds.findIndex((moment) => moment.some(([sound, p]) => p > 0.5 && isVowelSound(sound)));
+  return vowel < 0 ? odds : odds.slice(0, vowel);
+}
+
+/**
  * The first sound of a recording's text, if the recording doesn't start with it, for scripts/generate-audio.mjs to
  * reject a take: the voice model often starts a take a moment into its first word, so "Kailan" comes out "ailan"
  * and "Pabili" "abili", the consonant gone. A vowel at the start is left to the take's own check for that
- * (`cut` in scripts/clip-edges.mjs), and a first sound heard as a near one (k as g) still counts as said.
+ * (`cut` in scripts/clip-edges.mjs), and a first sound heard as a near one (k as g) still counts as said. Given
+ * the recording's odds (only those up to its first vowel count), a first stop heard but never clearly is lost too
+ * (CLEAR_START).
  */
-export function lostFirstSound(text: string, heard: string[]): { letters: string; heard: string } | null {
+export function lostFirstSound(text: string, heard: string[], odds?: Odds): { letters: string; heard: string } | null {
   const spelled = text.toLowerCase().normalize('NFC');
   // The catch before a first vowel is optional, so a text starting with a vowel starts at the vowel.
   const sounds = compare(toPhones(spelled), heard).sounds.filter((s) => !s.phone.optional);
   const [first, second] = sounds;
-  if (!first || isVowelSound(first.phone.ipa) || first.verdict === 'good' || first.verdict === 'close') return null;
-  // A p before an s that was heard is barely sounded at all; a t before r ("Trapik") is.
-  if (first.verdict === 'missing' && second?.phone.ipa === 's' && second.verdict !== 'missing') return null;
+  if (!first || isVowelSound(first.phone.ipa)) return null;
   // A first word with no vowel ("Psst!") is a hiss, not speech: the voice barely sounds it, and the recogniser rarely hears it.
   if (!/[aeiou]/.test(spelled.match(/[\p{L}]+/u)?.[0] ?? '')) return null;
-  return { letters: text.normalize('NFC').slice(first.phone.from, first.phone.to), heard: first.heard ?? 'nothing' };
+  const letters = text.normalize('NFC').slice(first.phone.from, first.phone.to);
+  if (first.verdict === 'good' || first.verdict === 'close') {
+    const stop = baseSound(first.phone.ipa);
+    if (!odds || !STOPS.has(stop)) return null;
+    // The stop or its voiced or voiceless twin (k or g), which still counts as said.
+    const sure = Math.max(0, ...startOdds(odds).map((moment) => moment.filter(([s]) => soundDistance(stop, s) <= 0.4).reduce((sum, [, p]) => sum + p, 0)));
+    return sure < CLEAR_START ? { letters, heard: `a faint ${stop} (${Math.round(sure * 100)}% sure)` } : null;
+  }
+  // A p before an s that was heard is barely sounded at all; a t before r ("Trapik") is.
+  if (first.verdict === 'missing' && second?.phone.ipa === 's' && second.verdict !== 'missing') return null;
+  return { letters, heard: first.heard ?? 'nothing' };
 }

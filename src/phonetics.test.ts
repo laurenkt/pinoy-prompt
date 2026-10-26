@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { coach } from './coach';
 import { ALL_CARDS } from './deck';
-import { compare, englishReadings, everyWordSaid, groupTokens, lostFirstSound, judge, likelihood, packOdds, passes, soundDistance, toPhones, unpackOdds, type Odds } from './phonetics';
+import { compare, englishReadings, everyWordSaid, groupTokens, lostFirstSound, judge, likelihood, packOdds, passes, soundDistance, startOdds, toPhones, unpackOdds, type Odds } from './phonetics';
 
 /** The required sounds, joined, for compact assertions. */
 const sounds = (text: string) =>
@@ -264,6 +264,25 @@ describe('lostFirstSound', () => {
 
   it('leaves out a hiss, which the voice barely sounds', () => {
     expect(lostFirstSound('Psst! Kuya!', ['k', 'u', 'j', 'a'])).toBeNull();
+  });
+
+  it('finds a first stop heard only faintly, as a take that starts partway into it keeps just a click', () => {
+    const said = ['k', 'a', 'i', 'l', 'a', 'ŋ', 'a', 'n', 'k', 'o', 'i', 't', 'o'];
+    // The odds at the start of two takes of "Kailangan ko ito.": one heard as "pailangan", one clear.
+    const faint = unpackOdds('|k110 p150 t70|k240 p180 t100|a140 k140 p100 t70|a650');
+    const clear = unpackOdds('|ɡ120 k770|ɡ90 k530|a930');
+    expect(lostFirstSound('Kailangan ko ito.', said, faint)).toEqual({ letters: 'K', heard: 'a faint k (24% sure)' });
+    expect(lostFirstSound('Kailangan ko ito.', said, clear)).toBeNull();
+    // Only up to the first vowel: the k of "ko" is a different k.
+    expect(lostFirstSound('Kailangan ko ito.', said, [...faint, ...unpackOdds('k950|a900')])).not.toBeNull();
+    // Its voiced twin counts, as it does when heard: k or g.
+    expect(lostFirstSound('kanan', ['ɡ', 'a', 'n', 'a', 'n'], unpackOdds('|ɡ670 k120|a570'))).toBeNull();
+    // Only stops: other consonants last, so a late start leaves them whole or loses them.
+    expect(lostFirstSound('Salamat', ['s', 'a', 'l', 'a', 'm', 'a', 't'], unpackOdds('|s200|a900'))).toBeNull();
+  });
+
+  it('keeps the odds up to the first vowel the recogniser is sure of', () => {
+    expect(startOdds(unpackOdds('|k240 p180|a490 k140|a650|n900'))).toEqual(unpackOdds('|k240 p180|a490 k140'));
   });
 
   it('leaves a first vowel to the check for a take cut off', () => {
