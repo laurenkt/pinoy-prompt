@@ -5,6 +5,8 @@
 //
 // Most are of a learner four months in (--seasoned), so the charts have something to show; the rest are flows written
 // for the harness's usual learner of a dozen words.
+//
+// The coach-* ones run the real speech model, so its verdicts can change: check the About page's captions still match.
 
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -13,8 +15,8 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 
 const SEASONED = ['home', 'drills', 'drills-memory', 'chat-call'];
-/** The coach-* ones run the real speech model on src/about/salamat-plain.mp3 and on the app's own clip. */
-const BEGINNER = ['drills-picture-answered', 'coach-plain', 'coach-tuned'];
+/** The coach-* ones run the real speech model on src/about/walang-anuman-english.mp3 and on the app's own clip. */
+const BEGINNER = ['drills-picture-answered', 'coach-wrong', 'coach-right'];
 /** Shown scrolling inside the phone, so kept this tall (in the screenshot's pixels, twice the phone's points). */
 const TALL = { 'drills-memory': 3400 };
 const SIZE = '390x844';
