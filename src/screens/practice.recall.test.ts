@@ -71,7 +71,7 @@ describe('recalling words still being learned', () => {
     expect(box(root)).toBeNull();
   });
 
-  it('counts right answers in a row, and has it typed after three, Study or not', () => {
+  it('counts right answers in a row, and has it typed after three, Study or not', async () => {
     const app = learner(false);
     let root = (last = recall(app));
     const right = getCard('salamat')!.tl;
@@ -81,6 +81,14 @@ describe('recalling words still being learned', () => {
     root = last = recall(app);
     expect(box(root)).not.toBeNull();
     expect(button(root, 'Show choices')).toBeTruthy();
+    // Got wrong, it comes straight back with its choices, the count started again.
+    type(root, 'salamt');
+    await flush();
+    expect(app.progress.cards.salamat.streak).toBeUndefined();
+    button(root, 'Next').click();
+    expect(root.querySelector('.prompt')?.textContent).toContain(getCard('salamat')!.en);
+    expect(box(root)).toBeNull();
+    expect(root.querySelectorAll('.choice')).toHaveLength(4);
   });
 });
 

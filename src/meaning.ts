@@ -17,7 +17,7 @@ export type AnswerLanguage = 'en' | 'tl';
 /** Asks whether `answer` says the card in `language`, or null when it can't be asked. Tagalog that was `typed` has to be spelled right. */
 export type MeaningJudge = (answer: string, card: Card, language: AnswerLanguage, typed: boolean) => Promise<boolean | null>;
 
-const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+export const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 
 /** Same meaning, said another way. Applied to whole words, before splitting. */
 const SAME: [RegExp, string][] = [

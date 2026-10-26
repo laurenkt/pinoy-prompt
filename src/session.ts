@@ -93,13 +93,16 @@ export interface Typing {
   due?: number;
 }
 
+/** The ways a drill can ask typed, as it goes (see typing). */
+const TYPED_WAYS: readonly Way[] = ['recall', 'listen'];
+
 /**
  * How a drill asks a word card `way` (Recall, and Listen when its meaning can be typed): typed once it has been got
  * right DRILL_STREAK times in a row that way in Drills, or that way of studying it has settled in Study, whichever
  * comes first; from choices until then. Guides have drills of their own.
  */
 export function typing(progress: Progress, card: Card, way: Way): Typing {
-  if (!(way === 'recall' || (way === 'listen' && canTypeMeaning(card)))) return { typed: false };
+  if (!TYPED_WAYS.includes(way) || (way === 'listen' && !canTypeMeaning(card))) return { typed: false };
   const inARow = DRILL_STREAK - drillNote(progress.cards[card.id], way).streak;
   const state = progress.cards[cardKey(card.id, way)];
   const left = leftToSettle(state);
@@ -565,14 +568,16 @@ export function drillOdds(
  * off and adds one to the run, up to DRILL_STREAK. Never the schedule. Whether progress changed, to be saved.
  */
 export function noteDrillAnswer(progress: Progress, cardId: string, way: Way, helped: boolean, now: number): boolean {
-  return setDrillNote(progress, cardId, way, (n) => afterDrillAnswer(n, helped), now);
+  return setDrillNote(progress, cardId, way, (n) => afterDrillAnswer(n, way, helped), now);
 }
 
-/** What a drill answer makes of a card's drill note asked that way (see noteDrillAnswer). */
-export function afterDrillAnswer(note: DrillNote, helped: boolean): DrillNote {
-  return helped
-    ? { help: Math.min(note.help + 1, MAX_HELP), streak: 0 }
-    : { help: Math.max(note.help - 1, 0), streak: Math.min(note.streak + 1, DRILL_STREAK) };
+/**
+ * What a drill answer asked `way` makes of a card's drill note (see noteDrillAnswer). Right answers in a row are only
+ * counted for the ways a drill can ask typed (see typing), so a right answer elsewhere changes nothing to sync.
+ */
+export function afterDrillAnswer(note: DrillNote, way: Way, helped: boolean): DrillNote {
+  if (helped) return { help: Math.min(note.help + 1, MAX_HELP), streak: 0 };
+  return { help: Math.max(note.help - 1, 0), streak: TYPED_WAYS.includes(way) ? Math.min(note.streak + 1, DRILL_STREAK) : note.streak };
 }
 
 /** Set a card's drill note asked one way, from what it was. Whether that changed it. */

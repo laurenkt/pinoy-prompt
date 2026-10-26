@@ -5,6 +5,7 @@
 // between reviews over its life. Then a few counts. All read from saved progress; nothing here is stored.
 
 import { isVocab, studyWays, type Card, type Way } from '../deck';
+import { NUMBERS } from '../meaning';
 import { STRENGTHS, intervalSteps, lastSeen, recallChance, strengthOf, type Strength } from '../memory';
 import type { Progress } from '../progress-schema';
 import { DRILL_GAP, drillHelp, typing, wayState, type DrillOdds } from '../session';
@@ -117,8 +118,8 @@ function hero(state: CardState, title: string, now: number): HTMLElement {
   );
 }
 
-const NUMBERS = ['no', 'one', 'two', 'three', 'four', 'five'];
 const capitalise = (words: string) => words[0].toUpperCase() + words.slice(1);
+const inWords = (n: number) => NUMBERS[n] ?? String(n);
 
 /**
  * Why a drill asked `way` gives choices rather than asking it typed, and what Drills or Study still need before it does
@@ -138,8 +139,8 @@ function choices(progress: Progress, card: Card, way: Way, shown: string, now: n
   if (left === undefined || inARow === undefined) {
     return why(way === 'read' ? `${shown} always gives choices: you see the Tagalog and pick what it means.` : `Its meaning is a note, not words to type, so ${shown} always gives choices.`);
   }
-  const rule = `${shown} drills give choices until you get it right ${NUMBERS[DRILL_STREAK]} times in a row here, or remember it in Study a day after learning it. Then they ask you to type it, and you can still show the choices.`;
-  const drills = inARow === 1 ? 'One more right answer here' : `${capitalise(NUMBERS[inARow])} more right answers in a row here`;
+  const rule = `${shown} drills give choices until you get it right ${inWords(DRILL_STREAK)} times in a row here, or remember it in Study a day after learning it. Then they ask you to type it, and you can still show the choices.`;
+  const drills = inARow === 1 ? 'One more right answer here' : `${capitalise(inWords(inARow))} more right answers in a row here`;
   // Study not started this way, the note at the top already says so.
   if (due === undefined) return why(rule, `${drills} to go. A miss starts the count again.`);
   const when = due <= now ? 'now' : `in ${formatWait(due - now)}`;

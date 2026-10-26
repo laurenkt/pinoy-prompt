@@ -928,7 +928,9 @@ describe('typing', () => {
     noteDrillAnswer(progress, 'salamat', 'recall', false, NOW);
     expect(typing(progress, card, 'recall')).toEqual({ typed: true });
     noteDrillAnswer(progress, 'salamat', 'recall', true, NOW);
-    expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, inARow: DRILL_STREAK });
+    expect(typing(progress, card, 'recall')).toMatchObject({ typed: false, inARow: DRILL_STREAK });    // Only counted for the ways a drill can ask typed.
+    expect(noteDrillAnswer(progress, 'salamat', 'read', false, NOW)).toBe(false);
+    expect(progress.cards.salamat.streak).toEqual({ listen: 1 });
   });
 
   it('never types Read, Speak, or Listen for a meaning that is only a note', () => {

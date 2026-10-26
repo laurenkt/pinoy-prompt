@@ -590,8 +590,9 @@ export function practiceScreen(
     load(upcoming);
     // And on the card: back to before the miss, then noted right unless it's left coming back (see noteHelp).
     const before = q.noteBefore ?? drillNote(undefined, q.mode);
-    const after = repeats.has(key) ? before : afterDrillAnswer(before, false);
+    const after = repeats.has(key) ? before : afterDrillAnswer(before, q.mode, false);
     if (setDrillNote(app.progress, q.card.id, q.mode, () => after, app.now())) app.commit();
+    retype();
     draw();
   }
 
@@ -602,6 +603,15 @@ export function practiceScreen(
   function noteHelp(q: Question, helped: boolean): void {
     if (!helped && repeats.has(drillKey(q.card.id, q.mode))) return;
     if (noteDrillAnswer(app.progress, q.card.id, q.mode, helped, app.now())) app.commit();
+    retype();
+  }
+
+  /**
+   * The next question was picked before this answer was noted on the card (see settle), so if it asks a word whether
+   * it's typed may have changed: a miss brought straight back has its choices again, as the card back says.
+   */
+  function retype(): void {
+    if (upcoming && !upcoming.guide && !upcoming.hinted) upcoming.typed = typing(app.progress, upcoming.card, upcoming.mode).typed;
   }
 
   /** Not sure enough to type it, or tired of waiting for the check: pick from choices instead. */
