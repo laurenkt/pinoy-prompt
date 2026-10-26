@@ -23,4 +23,6 @@ it("shows the coach judging the same take of the app's voice that it plays", asy
   const harness = (await import('../../scripts/screenshots.mjs?raw')).default;
   expect(harness).toContain(`coachTake(page, 'public/audio/${clips.Salamat[0]}.mp3')`);
   expect(harness).toContain(`coachTake(page, 'src/about/salamat-plain.mp3')`);
+  const script = (await import('./about.ts?raw')).default;
+  expect(script).toContain(`clipUrl({ tl: 'Salamat' }, false, 0)`);
 });

@@ -2,8 +2,7 @@
 // is shown judging, and a drill card that turns over. It keeps no progress.
 import '@fontsource-variable/bricolage-grotesque';
 import '../style.css';
-import { audioContext, loadClip, playBuffer } from '../audio-engine';
-import { clipUrl, play, stop } from '../speech';
+import { clipUrl, play, playUrl } from '../speech';
 import { audioButton } from '../ui';
 import plainTake from './salamat-plain.mp3';
 
@@ -19,17 +18,13 @@ for (const phrase of document.querySelectorAll<HTMLElement>('[data-say]')) {
  * The two recordings of "Salamat" the coach is shown judging: a plain text-to-speech voice (made once with OpenAI's
  * tts-1, voice alloy, with no instructions) and the app's own first voice, as scripts/screenshots.mjs plays them to it.
  */
-const TAKES: Record<string, string> = { plain: plainTake, tuned: clipUrl({ tl: 'Salamat' }, false, 0)! };
+const TAKES: Record<string, [url: string, label: string]> = {
+  plain: [plainTake, 'Hear the plain voice'],
+  tuned: [clipUrl({ tl: 'Salamat' }, false, 0)!, "Hear the app's voice"],
+};
 for (const slot of document.querySelectorAll<HTMLElement>('[data-take]')) {
-  const url = TAKES[slot.dataset.take!];
-  slot.replaceWith(
-    audioButton(() => {
-      stop();
-      // Started inside the tap, as iOS needs.
-      audioContext();
-      void loadClip(url).then((buffer) => playBuffer(buffer));
-    }, 'Hear this take'),
-  );
+  const [url, label] = TAKES[slot.dataset.take!];
+  slot.replaceWith(audioButton(() => void playUrl(url), label));
 }
 
 // The drill card turns over with a tap, as in Drills. Once on screen it turns over by itself, and back, then rests.

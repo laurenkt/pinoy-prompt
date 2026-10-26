@@ -141,6 +141,44 @@ export async function play(card: Pick<Card, 'tl' | 'say'>, slow = false): Promis
   }
 }
 
+/** Play one recording given by its URL, as play() plays a card's clip, but with no voice to fall back on. */
+export async function playUrl(url: string): Promise<void> {
+  stop();
+  started = new Promise((resolve) => (reportStart = resolve));
+  const report = reportStart;
+  if (muted || !clipsSupported()) return report(null);
+  const tapped = performance.now();
+  const mine = generation;
+  try {
+    if (!(await playClip(url, mine, tapped, report)) && mine === generation) report(null);
+  } finally {
+    if (loading === mine) loading = null;
+  }
+}
+
+/** Play a clip unless stop() came first: whether it played, false if it couldn't load or start. */
+async function playClip(url: string, mine: number, tapped: number, report: (ms: number | null) => void): Promise<boolean> {
+  // Made or resumed now, inside the tap, as the clip may only be ready after it.
+  audioContext();
+  // Counted as playing until the word starts, so a screen (or a lit button) waits for it.
+  loading = mine;
+  try {
+    const buffer = await loadClip(url);
+    if (mine !== generation) return true;
+    // A context iOS won't start (outside a tap) plays nothing, so it counts as not played (play() has the voice read it).
+    if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
+    if (mine !== generation) return true;
+    const sound = (currentClip = playBuffer(buffer, { at: afterChime() }));
+    void sound.done.then(() => {
+      if (currentClip === sound) currentClip = null;
+    });
+    report(performance.now() - tapped + msUntilHeard(sound.startsAt));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: number, tapped: number, report: (ms: number | null) => void): Promise<void> {
   const text = card.say ?? card.tl;
   const urls = clipsSupported() ? clipUrls(card, slow) : [];
@@ -149,28 +187,8 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
   const take = slow && last !== undefined && last < urls.length ? last : Math.floor(Math.random() * urls.length);
   if (urls.length) lastVoice.set(text, take);
   const url = urls[take];
-  if (url) {
-    // Made or resumed now, inside the tap, as the clip may only be ready after it.
-    audioContext();
-    // Counted as playing until the word starts, so a screen (or a lit button) waits for it.
-    loading = mine;
-    try {
-      const buffer = await loadClip(url);
-      if (mine !== generation) return;
-      // A context iOS won't start (outside a tap) plays nothing, so the voice reads it instead.
-      if (!(await audioRunning(audioContext()))) throw new Error('audio suspended');
-      if (mine !== generation) return;
-      const sound = (currentClip = playBuffer(buffer, { at: afterChime() }));
-      void sound.done.then(() => {
-        if (currentClip === sound) currentClip = null;
-      });
-      report(performance.now() - tapped + msUntilHeard(sound.startsAt));
-      return;
-    } catch {
-      // Fall through to speech if the clip can't play.
-      if (mine !== generation) return;
-    }
-  }
+  if (url && (await playClip(url, mine, tapped, report))) return;
+  if (mine !== generation) return;
   if (!speechSupported()) return report(null);
   loading = mine;
   await initVoices();

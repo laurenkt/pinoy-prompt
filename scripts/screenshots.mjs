@@ -693,17 +693,19 @@ async function typedOnly(page, mode, live = true) {
 }
 
 /**
- * Speak, with the real speech model, hearing `file` (an MP3) said for "Salamat". Other cards come first are said with
- * their own clip, so they pass and move on rather than coming straight back.
+ * Speak, with the real speech model, hearing `file` (an MP3) said for "Salamat". Any other card Speak asks first is said
+ * with its own clip, so it passes and moves on rather than coming straight back.
  */
 async function coachTake(page, file) {
   await speakOnly(page);
   const mp3 = (await readFile(file)).toString('base64');
   await page.evaluate(async (mp3) => {
     const { clipUrl } = await import('/src/speech.ts');
+    const { VOCAB } = await import('/src/deck.ts');
+    const decoder = new AudioContext();
     /** An MP3 as the recorder gives a take: mono at 16 kHz. */
     const samplesOf = async (bytes) => {
-      const decoded = await new AudioContext().decodeAudioData(bytes);
+      const decoded = await decoder.decodeAudioData(bytes);
       const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
       const source = new AudioBufferSourceNode(offline, { buffer: decoded });
       source.connect(offline.destination);
@@ -716,7 +718,11 @@ async function coachTake(page, file) {
     defaultDeps.record = ({ onListening } = {}) => {
       setTimeout(() => onListening?.());
       const tl = document.querySelector('.prompt .tl').textContent.trim();
-      const bytes = tl === 'Salamat' ? Promise.resolve(take.slice(0)) : fetch(clipUrl({ tl })).then((r) => r.arrayBuffer());
+      // Found in the deck, as a clip is filed under what the card says (its `say`), which can differ from what it shows.
+      const card = VOCAB.find((c) => c.tl === tl);
+      const url = card && clipUrl(card);
+      if (tl !== 'Salamat' && !url) throw new Error(`No clip to say "${tl}" with`);
+      const bytes = tl === 'Salamat' ? Promise.resolve(take.slice(0)) : fetch(url).then((r) => r.arrayBuffer());
       return { audio: bytes.then(samplesOf).then((samples) => ({ samples, speech: true })), stop() {}, cancel() {} };
     };
   }, mp3);
