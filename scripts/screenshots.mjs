@@ -400,9 +400,13 @@ const SCREENS = {
   // drill card rests on its front.
   about: async (page) => {
     await page.goto(new URL('about', url).href);
-    await page.waitForSelector('.about-say .audio-btn');
+    await page.waitForSelector('.about-say-list .audio-btn');
     await page.evaluate(() => Promise.all([...document.images].map((i) => ((i.loading = 'eager'), i.decode().catch(() => {})))));
   },
+  // Speak judging a real recording of "Salamat" rather than the microphone, with the real speech model: the About
+  // page's coach, on a plain text-to-speech voice and on the app's own clip (scripts/about-shots.mjs).
+  'coach-plain': (page) => coachTake(page, 'src/about/salamat-plain.mp3'),
+  'coach-tuned': (page) => coachTake(page, 'public/audio/salamat-e0739249.mp3'),
   // A new learner's first Study: the topic's introduction, then the first word's.
   'first-study': (page) => page.click('.hub-btn.big:not(.chat-btn)'),
   'first-study-next': async (page) => {
@@ -686,6 +690,45 @@ async function typedOnly(page, mode, live = true) {
   }, live);
   await page.click('.drills-btn');
   await onlyAsk(page, mode);
+}
+
+/**
+ * Speak, with the real speech model, hearing `file` (an MP3) said for "Salamat". Other cards come first are said with
+ * their own clip, so they pass and move on rather than coming straight back.
+ */
+async function coachTake(page, file) {
+  await speakOnly(page);
+  const mp3 = (await readFile(file)).toString('base64');
+  await page.evaluate(async (mp3) => {
+    const { clipUrl } = await import('/src/speech.ts');
+    /** An MP3 as the recorder gives a take: mono at 16 kHz. */
+    const samplesOf = async (bytes) => {
+      const decoded = await new AudioContext().decodeAudioData(bytes);
+      const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+      const source = new AudioBufferSourceNode(offline, { buffer: decoded });
+      source.connect(offline.destination);
+      source.start();
+      return (await offline.startRendering()).getChannelData(0);
+    };
+    const take = Uint8Array.from(atob(mp3), (c) => c.charCodeAt(0)).buffer;
+    const { defaultDeps } = await import('/src/screens/speak.ts');
+    defaultDeps.warmRecorder = () => null;
+    defaultDeps.record = ({ onListening } = {}) => {
+      setTimeout(() => onListening?.());
+      const tl = document.querySelector('.prompt .tl').textContent.trim();
+      const bytes = tl === 'Salamat' ? Promise.resolve(take.slice(0)) : fetch(clipUrl({ tl })).then((r) => r.arrayBuffer());
+      return { audio: bytes.then(samplesOf).then((samples) => ({ samples, speech: true })), stop() {}, cancel() {} };
+    };
+  }, mp3);
+  for (let tries = 0; (await page.locator('.prompt .tl').first().innerText()).trim() !== 'Salamat'; tries++) {
+    if (tries === 30) throw new Error('Speak never asked for "Salamat"');
+    await page.click('.speak .btn.mic');
+    await page.waitForSelector('.sound-results');
+    await page.click('.result-actions .btn');
+    await page.waitForSelector('.speak.ready');
+  }
+  await page.click('.speak .btn.mic');
+  await page.waitForSelector('.sound-results');
 }
 
 /** Drills, asking only Speak, ready to listen. */
