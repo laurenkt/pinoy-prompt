@@ -51,7 +51,8 @@ describe('open-ended study', () => {
     app.progress.settings.dailyNew = 0;
     for (const id of Object.keys(app.progress.cards)) app.progress.cards[id].due = app.now() - 1;
     const root = sessionScreen(app, null);
-    expect(root.textContent).toContain('0 done');
+    // Counting down what's left: missed words aren't done, so it stays put.
+    expect(root.querySelector('.session-count')?.textContent).toBe('4 left');
     const shown: string[] = [];
     // Answer every question wrong: missed words keep coming round.
     for (let i = 0; i < 8; i++) {
@@ -70,10 +71,33 @@ describe('open-ended study', () => {
         if (root.textContent?.includes('Coming back shortly')) button(root, 'Continue').click();
       }
     }
-    expect(root.textContent).toContain('8 done');
+    expect(root.querySelector('.session-count')?.textContent).toBe('4 left');
     // Never the same word twice running.
     expect(shown.some((id, i) => id === shown[i - 1])).toBe(false);
     expect(root.textContent).not.toContain('caught up');
+  });
+
+  it('counts down the cards left as each one is known', () => {
+    const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
+    app.progress.settings.dailyNew = 0;
+    // Every other way already started and not due, so knowing a word's reading doesn't start one.
+    for (const id of Object.keys(app.progress.cards)) {
+      for (const way of studyWays(getCard(id)!)) {
+        app.progress.cards[cardKey(id, way)] ??= { ...app.progress.cards[id], interval: 3, due: app.now() + DAY_MS };
+      }
+      app.progress.cards[id].due = app.now() - 1;
+    }
+    const root = sessionScreen(app, null);
+    expect(root.querySelector('.session-count')?.textContent).toBe('4 left');
+    const prompt = root.querySelector('.prompt')?.textContent ?? '';
+    const card = ['salamat', 'kumusta', 'oo', 'paalam'].map((id) => getCard(id)!).find((c) => prompt.includes(c.tl) || prompt.includes(c.en))!;
+    const choices = [...root.querySelectorAll<HTMLButtonElement>('.choice')];
+    if (choices.length) choices.find((b) => b.textContent!.includes(card.en) || b.textContent!.includes(card.tl))!.click();
+    else {
+      button(root, 'Show').click();
+      button(root, 'Good').click();
+    }
+    expect(root.querySelector('.session-count')?.textContent).toBe('3 left');
   });
 
   it('says when it is caught up, and points to Drills for more practice, or new words', () => {
@@ -121,7 +145,7 @@ describe('open-ended study', () => {
     [...root.querySelectorAll<HTMLButtonElement>('.choice')].find((b) => b.textContent?.includes(getCard('salamat')!.en))!.click();
     button(root, 'Continue').click();
     expect(root.textContent).toContain("You're caught up");
-    expect(root.textContent).toContain('1 done');
+    expect(root.querySelector('.session-count')?.textContent).toBe('0 left');
     button(root, 'Stop').click();
     expect(root.textContent).toContain('Session finished');
   });

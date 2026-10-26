@@ -219,6 +219,18 @@ export function upcomingWays(progress: Progress, can: Abilities = { listen: true
 }
 
 /**
+ * What open-ended study has left to ask before it's caught up: the cards to study now (see studyQueue), and the
+ * cards still to start today, ways of words already met (see upcomingWays) and new words the daily rate allows.
+ * Fresh ones count even while too many cards are being learned to start them: that only holds them back a little.
+ */
+export function studyLeft(progress: Progress, now: number, can: Abilities = { listen: true }): { reviews: number; fresh: number } {
+  return {
+    reviews: studyQueue(progress, now, can).length,
+    fresh: upcomingWays(progress, can).length + Math.min(newCardsLeftToday(progress), upcomingNewCards(progress, Infinity).length),
+  };
+}
+
+/**
  * When Study next has something to ask, once it's caught up: the next review
  * falling due, or tomorrow's new cards if today's rate is what holds them back.
  * Null when nothing ever comes back (no cards met, and none left to meet).
