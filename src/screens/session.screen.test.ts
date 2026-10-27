@@ -47,14 +47,16 @@ describe('memory hooks in a session', () => {
 
 describe('open-ended study', () => {
   it('brings a missed word back after a short gap, without a fixed end', () => {
-    const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
+    const words = ['salamat', 'kumusta', 'oo', 'paalam'];
+    const app = fakeApp(words);
     app.progress.settings.dailyNew = 0;
     for (const id of Object.keys(app.progress.cards)) app.progress.cards[id].due = app.now() - 1;
     const root = sessionScreen(app, null);
     // Counting down what's left: the four words, and the ways knowing each would start. Missed words aren't done, so it stays put.
-    const left = root.querySelector('.session-count')?.textContent;
-    expect(left).toMatch(/^\d+ left$/);
-    expect(parseInt(left!)).toBeGreaterThan(4);
+    // Listening waits here: there's no voice to play it.
+    const ways = words.flatMap((id) => studyWays(getCard(id)!).filter((way) => way !== 'read' && way !== 'listen'));
+    const left = `${words.length + ways.length} left`;
+    expect(root.querySelector('.session-count')?.textContent).toBe(left);
     const shown: string[] = [];
     // Answer every question wrong: missed words keep coming round.
     for (let i = 0; i < 8; i++) {

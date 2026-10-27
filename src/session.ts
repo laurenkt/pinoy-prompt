@@ -266,7 +266,7 @@ export function upcomingWays(progress: Progress, can: Abilities = { listen: true
  */
 export function studyLeft(progress: Progress, now: number, can: Abilities = { listen: true }): { reviews: number; fresh: number } {
   const queue = studyQueue(progress, now, can);
-  const ahead: Progress = { ...progress, cards: { ...progress.cards } };
+  const ahead: Progress = queue.length ? { ...progress, cards: { ...progress.cards } } : progress;
   for (const key of queue) ahead.cards[key] = review(progress.cards[key], 'good', now);
   return {
     reviews: queue.length,
