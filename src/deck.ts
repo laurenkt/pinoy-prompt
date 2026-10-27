@@ -130,7 +130,7 @@ export const UNITS: Unit[] = [
       { id: 'ikaw-pala', tl: 'Ikaw pala!', en: "Oh, it's you!", kind: 'phrase', hint: 'ee-KAW pah-LAH', note: 'When you spot someone you know. "Pala" adds a little surprise, something you\'ve just realised.', hook: '"Pala" is the light-bulb word: "oh, so it\'s you!". You\'ll hear it all the time: "Ganun pala!", oh, so that\'s how it is!' },
       { id: 'saan-ka-galing', tl: 'Saan ka galing?', accept: ['San ka galing?'], en: 'Where have you been?', kind: 'phrase', hint: 'sah-AHN kah GAH-ling', note: 'A friendly hello as much as a question, so nobody expects a full answer. Said fast, it\'s "San ka galing?".', hook: '"Galing" means "came from". The same "saan ka" as "Saan ka pupunta?", where are you going, which is a greeting too.' },
       { id: 'diyan-lang', tl: 'Diyan lang.', accept: ['Dyan lang.'], en: 'Just over there. / Nowhere special.', kind: 'phrase', hint: 'dyahn lahng', note: 'The easy answer to "Saan ka galing?" or "Saan ka pupunta?" when there\'s nothing to tell.', hook: '"Diyan" (there) + "lang" (just): "just there". Vague on purpose, and that\'s fine.' },
-      { id: 'mauna-na-ako', tl: 'Mauna na ako.', accept: ['Una na ako.', "Una na 'ko."], en: "I'll head off first.", kind: 'phrase', hint: 'mah-OO-nah nah ah-KOH', note: 'The polite way to leave before everyone else, at work or with friends. Said fast, it\'s "Una na \'ko!".', hook: '"Una" means first, as in "Ikaw muna", you first. You\'re the first to go.' },
+      { id: 'mauna-na-ako', tl: 'Mauna na ako.', accept: ['Una na ako.', "Una na 'ko."], en: "I'll head off first.", kind: 'phrase', hint: 'mah-OO-nah nah ah-KOH', note: 'The polite way to leave before everyone else, at work or with friends. Said fast, it\'s "Una na \'ko!".', hook: '"Una" means first, as in "unang araw", the first day. You\'re the first to go.' },
       { id: 'anong-meron', tl: 'Anong meron?', accept: ['Anong mayroon?'], en: "What's going on?", kind: 'phrase', hint: 'ah-NONG MEH-ron', note: 'Asked when something\'s up: a crowd, a party, a friend dressed up. Also a casual "what\'s up?".', hook: '"Ano" (what) + "meron" (there is), the "Meron" that answers "May kape ba?": "what is there?"' },
     ],
   },
@@ -205,7 +205,7 @@ export const UNITS: Unit[] = [
       { id: 'kailan', tl: 'Kailan?', en: 'When?', kind: 'word', hint: 'kah-ee-LAHN', hook: 'Think "Kay, land?": when does Kay\'s plane land? It is the time question.' },
       { id: 'bakit', tl: 'Bakit?', en: 'Why?', kind: 'word', hint: 'BAH-kit', hook: 'Sounds like "bucket". Why is there a bucket on your head?' },
       { id: 'paano', tl: 'Paano?', en: 'How?', kind: 'word', hint: 'pah-AH-noh', hook: '"Ano" (what) is hiding inside "pa-ano": by what way? How?' },
-      { id: 'nasaan', tl: 'Nasaan?', en: 'Where is it?', kind: 'word', hint: 'nah-sah-AHN', note: '"Saan" asks where to or where from; "nasaan" asks where someone or something is right now. Put the thing after it: "Nasaan ang ...?".', hook: '"Na" (at) + "saan" (where): where-at? Its answers are "dito" (here), "diyan" (there by you) and "doon" (over there).' },
+      { id: 'nasaan', tl: 'Nasaan?', en: 'Where is it?', kind: 'word', hint: 'nah-sah-AHN', note: '"Saan" asks where to or where from; "nasaan" asks where someone or something is right now. Put the thing after it: "Nasaan ang ...?".', hook: '"Nasa" (is at, as in "nasa bahay") + "saan" (where): "nasa saan", squeezed into one word. Answer with "dito" (here), "diyan" (there by you) or "doon" (over there).' },
       { id: 'gaano', tl: 'Gaano?', en: 'How (long, far, big)?', kind: 'word', hint: 'gah-AH-noh', note: 'It comes before a describing word with "ka-": "gaano katagal?", how long; "gaano kalayo?", how far.', hook: '"Paano" asks how, by what way; "gaano" asks how much of something. They differ by one letter.' },
       { id: 'ano-ito', tl: 'Ano ito?', en: 'What is this?', kind: 'phrase', hint: 'ah-NOH ee-TOH', hook: '"Ano" (what) + "ito" (this). "Ito" sounds like "it, oh": what is it?', variants: [
         { tl: 'Ano iyan?', en: 'What is that?', hint: 'ah-NOH ee-YAHN', accept: ['Ano yan?'] },
@@ -303,7 +303,7 @@ export const UNITS: Unit[] = [
     cards: [
       { id: 'ay', tl: 'ay', en: 'is / are (in careful speech)', kind: 'word', hint: 'ai', note: 'In books and speeches the who or what comes first, then "ay": "Ako ay guro", I am a teacher. Everyday talk turns it round and drops it: "Guro ako". Also an "oh!" of surprise: "Ay, sorry!"', hook: 'Think of "ay" as an equals sign: "Ako ay guro" is I = teacher.' },
       { id: 'kung', tl: 'kung', en: 'if / whether', kind: 'word', hint: 'koong', note: '"Kung gusto mo" is "if you want". "Hindi ko alam kung..." is "I don\'t know whether...".', hook: 'Picture a kung fu master: if you attack, he\'ll block.' },
-      { id: 'para', tl: 'para', en: 'for / in order to', kind: 'word', hint: 'PAH-rah', note: '"Para sa iyo" is "for you". The "Para po!" that stops a jeepney is a different word, from Spanish "parar", to stop.', hook: 'Spanish "para", for: "para ti", for you, became "para sa iyo".' },
+      { id: 'para', tl: 'para', en: 'for / in order to', kind: 'word', hint: 'PAH-rah', note: '"Para sa iyo" is "for you". The "Para po!" that stops a jeepney is a different word, from Spanish "parar", to stop.', hook: 'Borrowed from Spanish "para", for, and used the same way: "para sa iyo", for you.' },
       { id: 'dahil', tl: 'dahil', en: 'because of / since', kind: 'word', hint: 'dah-HIL', note: 'A little more careful than "kasi": "dahil sa ulan", because of the rain.', hook: 'Its own word for the reason, "dahilan", is "dahil" with "-an".' },
       { id: 'kaya', tl: 'kaya', en: "so / that's why", kind: 'word', hint: 'kah-YAH', note: '"Pagod ako, kaya uuwi na ako" is "I\'m tired, so I\'m heading home". Stressed the other way, "KAH-yah", it means "can manage": "Kaya mo \'yan!", you can do it!', hook: 'Think "kayak": I had a kayak, so I went paddling.' },
       { id: 'kahit', tl: 'kahit', en: 'even / even if', kind: 'word', hint: 'kah-HIT', note: '"Kahit ano" is "anything at all", the answer to "what do you want to eat?". "Kahit saan" is "anywhere".', hook: 'Sounds like "car hit": even if a car hit it, it would still run.' },
@@ -442,7 +442,7 @@ export const UNITS: Unit[] = [
     intro: '"Sa" marks a place: "sa bahay" is at home, "sa palengke" at the market. Most of town is one "sa" away.',
     cards: [
       { id: 'bahay', tl: 'bahay', en: 'house / home', kind: 'word', picture: '🏠', hint: 'BAH-hai', hook: '"Bahay kubo" is the bamboo hut from the best-known Filipino folk song. Sounds like "bye, hi": the door you say both through.' },
-      { id: 'nasa-bahay-ako', tl: 'Nasa bahay ako.', en: "I'm at home.", kind: 'phrase', hint: 'NAH-sah BAH-hai ah-KOH', hook: '"Nasa" means "at, in": the "na" of "nasaan" plus the place word "sa". Swap in any place: "Nasa opisina ako".', variants: [
+      { id: 'nasa-bahay-ako', tl: 'Nasa bahay ako.', en: "I'm at home.", kind: 'phrase', hint: 'NAH-sah BAH-hai ah-KOH', hook: '"Nasa" means "is at, is in", and it is the start of "nasaan" (where is it?). Swap in any place: "Nasa opisina ako".', variants: [
         { tl: 'Nasa opisina ako.', en: "I'm at the office.", hint: 'NAH-sah oh-pee-SEE-nah ah-KOH' },
         { tl: 'Nasa palengke ako.', en: "I'm at the market.", hint: 'NAH-sah pah-LENG-keh ah-KOH' },
       ] },
@@ -481,7 +481,7 @@ export const UNITS: Unit[] = [
       { id: 'malapit', tl: 'malapit', en: 'near', kind: 'word', hint: 'mah-LAH-pit', hook: '"Lapit" is closeness. Ma- turns it into a describing word, like ma-ganda and ma-buti.' },
       { id: 'malayo', tl: 'malayo', en: 'far', kind: 'word', hint: 'mah-LAH-yoh', hook: '"Layo" is distance. "Malayo pa?" (still far?) is the backseat question of every road trip.' },
       { id: 'katabi', tl: 'katabi', en: 'next to', kind: 'word', hint: 'kah-tah-BEE', hook: '"Tabi" is side, so "katabi" is the one at your side: the person beside you, the shop next door.' },
-      { id: 'sa-harap', tl: 'sa harap', en: 'in front', kind: 'phrase', hint: 'sah HAH-rahp', hook: '"Harap" is the face, the front of you. In front is where your face points.' },
+      { id: 'sa-harap', tl: 'sa harap', en: 'in front', kind: 'phrase', hint: 'sah HAH-rahp', hook: '"Harap" is the front, the way you face. In front is where your face points.' },
       { id: 'sa-likod', tl: 'sa likod', en: 'behind', kind: 'phrase', hint: 'sah lee-KOD', hook: '"Likod" is also your back. Behind is where your back is.' },
     ],
   },
@@ -691,7 +691,7 @@ export const UNITS: Unit[] = [
       { id: 'hindi-naman', tl: 'Hindi naman.', en: 'Not really.', kind: 'phrase', hint: 'hin-DEE nah-MAHN', hook: '"Naman" softens again, as in "Mabuti naman". A gentle no.' },
       { id: 'ano-ulit', tl: 'Ano ulit?', en: 'Come again?', kind: 'phrase', hint: 'ah-NOH OO-lit', hook: '"Ano" (what) + "ulit" (again), the "ulit" from "Pakiulit po". The quick, casual version.' },
       { id: 'sayang', tl: 'Sayang!', en: 'What a waste! / Too bad!', kind: 'word', hint: 'sah-YAHNG', hook: 'For a missed chance: the bus just leaving, food left on the plate. Say it with a sigh, "sigh-yang".' },
-      { id: 'naku', tl: 'Naku!', en: 'Oh no! / Oh my!', kind: 'word', hint: 'nah-KOO', hook: 'Short for "Ina ko!", "my mother!". The Filipino "oh my goodness".' },
+      { id: 'naku', tl: 'Naku!', en: 'Oh no! / Oh my!', kind: 'word', hint: 'nah-KOO', hook: 'Usually said to be "Ina ko!", "my mother!", worn down. The Filipino "oh my goodness".' },
       { id: 'bahala-na', tl: 'Bahala na.', en: 'Come what may.', kind: 'phrase', hint: 'bah-HAH-lah nah', hook: 'Often traced to "Bathala", the old Tagalog supreme god: "leave it to God". A whole attitude in two words.' },
       { id: 'hindi-pa', tl: 'Hindi pa.', en: 'Not yet.', kind: 'phrase', hint: 'hin-DEE pah', hook: '"Hindi" (not) + "pa" (still): still not. Answer "Kumain ka na ba?" with it and expect to be fed.' },
       { id: 'walang-problema', tl: 'Walang problema.', en: 'No problem.', kind: 'phrase', hint: 'wah-LAHNG proh-BLEH-mah', hook: '"Wala" (none) + "-ng" + Spanish "problema", built just like "Walang anuman".' },
@@ -752,7 +752,7 @@ export const UNITS: Unit[] = [
       { id: 'tingnan', tl: 'tingnan', accept: ['tignan'], en: 'to look at / to check', kind: 'word', hint: 'ting-NAHN', note: '"Tingnan mo!" is "look!", and "Tingnan natin" is "let\'s see". Often said "tignan".', hook: '"Tingin" is a look; squeeze it and add "-an": ting-nan, take a look.' },
       { id: 'umalis', tl: 'umalis', en: 'to leave / left', kind: 'word', hint: 'oo-mah-LIS', note: '"Umalis na siya" is "she has left". "Aalis na ako" is "I\'m off".', hook: '"Alis" is leaving, with "-um-" in front like "uminom". "Alis!" on its own is a blunt "go away!"' },
       { id: 'bumalik', tl: 'bumalik', en: 'to come back', kind: 'word', hint: 'boo-mah-LIK', note: '"Babalik ako" is "I\'ll be back"; a shop sign might say "Babalik agad", back soon.', hook: '"Balik" is a return, with "-um-": b-um-alik. "Balikbayan" is a Filipino coming home from abroad, back to the country.' },
-      { id: 'kunin', tl: 'kunin', en: 'to get / to take (it)', kind: 'word', hint: 'KOO-nin', note: '"Kunin mo" is "take it" or "go and get it". "Kukunin ko" is "I\'ll take it", handy at a stall.', hook: '"Kuha" (get) with "-in", the h dropped: kuha-in, kunin. "Kuha ka" is "help yourself".' },
+      { id: 'kunin', tl: 'kunin', en: 'to get / to take (it)', kind: 'word', hint: 'KOO-nin', note: '"Kunin mo" is "take it" or "go and get it". "Kukunin ko" is "I\'ll take it", handy at a stall.', hook: '"Kuha" (get) with "-in": "kuhanin", worn down to "kunin". "Kuha ka" is "help yourself".' },
       { id: 'ibigay', tl: 'ibigay', en: 'to give', kind: 'word', hint: 'ee-bee-GAI', note: '"Ibigay mo sa kanya" is "give it to her". "Bigyan mo ako" is "give me some".', hook: '"Bigay" is a gift: "bigay ko", a gift from me. "I-" makes it a doing word: to hand it over.' },
       { id: 'buksan', tl: 'buksan', en: 'to open', kind: 'word', hint: 'book-SAHN', note: '"Pakibuksan po" is "please open it": a door, a window, a jar.', hook: '"Bukas" means open (and tomorrow) and "buksan" is to open it. Tomorrow is the day that opens next.' },
       { id: 'pumasok', tl: 'pumasok', en: 'to go in / to go to work (or school)', kind: 'word', hint: 'poo-MAH-sok', note: 'Going in a door, and going in to work or class: "Pumasok ka ba?", did you go in today?', hook: '"Pasok" is going in, with "-um-". "Pasok!" on its own is "come in!", and on the radio it means "you got through".' },
