@@ -4,7 +4,7 @@
 import { LEARN_ORDER, VOCAB, buildsOn, cardForWord, cardKey, closeInMeaning, getCard, isVocab, keyed, studyWays, tagalogWords, variantsOf, type Card, type CardKind, type Drill, type Way } from './deck';
 import { canTypeMeaning } from './meaning';
 import { recallChance } from './memory';
-import { DAY_MS, DRILL_STREAK, MAX_HELP, START_EASE, isDue, newCardState, startOfDayAfter, type CardState } from './srs';
+import { DAY_MS, DRILL_STREAK, MAX_HELP, START_EASE, isDue, newCardState, review, startOfDayAfter, type CardState } from './srs';
 import type { Progress } from './store';
 
 export type StepKind = 'new' | 'review';
@@ -259,11 +259,18 @@ export function upcomingWays(progress: Progress, can: Abilities = { listen: true
  * cards still to start today, ways of words already met (see upcomingWays) and new words the daily rate allows.
  * Fresh ones count even while too many cards are being learned to start them (see MAX_LEARNING): those cards are
  * in studyQueue, so there are reviews to do first anyway.
+ *
+ * Fresh ones are counted as if every card to study now were answered right, since a right answer can settle a word
+ * (see settled), which starts its other ways and can let in a phrase built on it. So a right answer never adds to
+ * what's left, and a wrong one doesn't either: a word forgotten still settles on its next right answer.
  */
 export function studyLeft(progress: Progress, now: number, can: Abilities = { listen: true }): { reviews: number; fresh: number } {
+  const queue = studyQueue(progress, now, can);
+  const ahead: Progress = { ...progress, cards: { ...progress.cards } };
+  for (const key of queue) ahead.cards[key] = review(progress.cards[key], 'good', now);
   return {
-    reviews: studyQueue(progress, now, can).length,
-    fresh: upcomingWays(progress, can).length + upcomingNewCards(progress, newCardsLeftToday(progress)).length,
+    reviews: queue.length,
+    fresh: upcomingWays(ahead, can).length + upcomingNewCards(ahead, newCardsLeftToday(progress)).length,
   };
 }
 

@@ -51,8 +51,10 @@ describe('open-ended study', () => {
     app.progress.settings.dailyNew = 0;
     for (const id of Object.keys(app.progress.cards)) app.progress.cards[id].due = app.now() - 1;
     const root = sessionScreen(app, null);
-    // Counting down what's left: missed words aren't done, so it stays put.
-    expect(root.querySelector('.session-count')?.textContent).toBe('4 left');
+    // Counting down what's left: the four words, and the ways knowing each would start. Missed words aren't done, so it stays put.
+    const left = root.querySelector('.session-count')?.textContent;
+    expect(left).toMatch(/^\d+ left$/);
+    expect(parseInt(left!)).toBeGreaterThan(4);
     const shown: string[] = [];
     // Answer every question wrong: missed words keep coming round.
     for (let i = 0; i < 8; i++) {
@@ -71,7 +73,7 @@ describe('open-ended study', () => {
         if (root.textContent?.includes('Coming back shortly')) button(root, 'Continue').click();
       }
     }
-    expect(root.querySelector('.session-count')?.textContent).toBe('4 left');
+    expect(root.querySelector('.session-count')?.textContent).toBe(left);
     // Never the same word twice running.
     expect(shown.some((id, i) => id === shown[i - 1])).toBe(false);
     expect(root.textContent).not.toContain('caught up');
