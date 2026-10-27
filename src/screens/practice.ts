@@ -255,14 +255,25 @@ export function practiceScreen(
     }
   }
 
+  /** Whether the round may ask to speak, now or once the microphone has been asked for (a model found late). */
+  const maySpeak = () => modes().includes('speak') || (modelFound && chosen().includes('speak'));
+
+  /**
+   * Keep the microphone open for as long as the round may ask to speak, so no take waits for it (microphone.ts says what
+   * that costs on an iPhone). Holding doesn't open it; the ask, a warm-up or a take does.
+   */
+  function syncHold(): void {
+    deps.holdMicrophone?.(canSpeak && current !== null && maySpeak());
+  }
+
   /**
    * From a tap that may let the round ask to speak (opening Drills, the Speak chip, the mic going on): the
    * microphone is asked for now, so the phone doesn't ask over a speaking question. If the browser
    * would ask, it asks now, over a holding screen.
    */
   function askForMicrophoneIfNeeded(): void {
-    const speaks = modes().includes('speak') || (modelFound && chosen().includes('speak'));
-    if (waiting || !canSpeak || !current || !speaks) return;
+    syncHold();
+    if (waiting || !canSpeak || !current || !maySpeak()) return;
     // While WebKit still remembers the Allow it goes straight through, with no holding screen. Asked anyway, as that
     // starts its ten minutes again. Once it has lapsed (ten minutes without a take), the phone asks again.
     const asks = needsMicrophone(deps);
@@ -276,6 +287,7 @@ export function practiceScreen(
       const shown = waiting;
       waiting = false;
       speakSkipped = answer === 'refused';
+      syncHold();
       // Nothing was covered up, so there's nothing to show again.
       if (!shown && !speakSkipped) return;
       if (current && picked === null && !modes().includes(current.mode)) {
@@ -643,6 +655,8 @@ export function practiceScreen(
     // Ten minutes without a take and WebKit has forgotten the Allow: the phone asks now, over the holding screen, rather
     // than at the question's own tap.
     if (current?.mode === 'speak') askForMicrophoneIfNeeded();
+    // The mic may have gone off in another tab, which doesn't rescope this round.
+    else syncHold();
     ask();
   }
 
@@ -656,6 +670,7 @@ export function practiceScreen(
     // With the mic off nothing listens, not even warming up for Speak.
     if (!app.progress.settings.mic) stopListening();
     speak?.setWarm(app.progress.settings.mic);
+    syncHold();
     // Only a tap that may let the round ask to speak asks for the microphone, and only that one taps first (quiet.ts).
     if (mayAsk) askForMicrophoneIfNeeded();
     if (waiting) return draw();

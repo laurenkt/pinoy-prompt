@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALLOW_KEPT_MS, askMicrophone, closeMicrophone, endMicrophoneAsk, getMicrophone, microphoneAllowed, microphoneOpen, microphoneOpensQuietly, releaseMicrophone, REOPEN_QUIETLY_MS } from './microphone';
+import { ALLOW_KEPT_MS, askMicrophone, closeMicrophone, endMicrophoneAsk, getMicrophone, holdMicrophone, microphoneAllowed, microphoneOpen, microphoneOpensQuietly, releaseMicrophone, REOPEN_QUIETLY_MS } from './microphone';
 
 function fakeStream() {
   const track = {
@@ -102,6 +102,52 @@ describe('asking for the microphone as a screen opens', () => {
     endMicrophoneAsk();
     expect(await asking).toBe(false);
     expect(opened[0].track.readyState).toBe('ended');
+  });
+});
+
+describe('holding the microphone open for a drill round', () => {
+  it('keeps the stream open between takes while held, and closes it once the hold ends', async () => {
+    holdMicrophone(true);
+    expect(await askMicrophone()).toBe(true);
+    expect(opened[0].track.readyState).toBe('live');
+    releaseMicrophone(await getMicrophone());
+    expect(opened).toHaveLength(1);
+    expect(opened[0].track.readyState).toBe('live');
+    holdMicrophone(false);
+    expect(opened[0].track.readyState).toBe('ended');
+  });
+
+  it('keeps it open while a take still uses it as the hold ends', async () => {
+    holdMicrophone(true);
+    const take = await getMicrophone();
+    holdMicrophone(false);
+    expect(opened[0].track.readyState).toBe('live');
+    releaseMicrophone(take);
+    expect(opened[0].track.readyState).toBe('ended');
+  });
+
+  it('closes a dead stream whatever holds it, so the next take opens a fresh one', async () => {
+    holdMicrophone(true);
+    releaseMicrophone(await getMicrophone(), { dead: true });
+    expect(opened[0].track.readyState).toBe('ended');
+    await getMicrophone();
+    expect(opened).toHaveLength(2);
+  });
+
+  it('lets go when a take ends with the app in the background, where iOS cuts it off anyway', async () => {
+    holdMicrophone(true);
+    const take = await getMicrophone();
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+    releaseMicrophone(take);
+    expect(opened[0].track.readyState).toBe('ended');
+  });
+
+  it('lets go as the screen that held it is left', async () => {
+    holdMicrophone(true);
+    await askMicrophone();
+    endMicrophoneAsk();
+    expect(opened[0].track.readyState).toBe('ended');
+    expect(microphoneOpen()).toBe(false);
   });
 });
 
