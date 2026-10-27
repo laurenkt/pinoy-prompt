@@ -47,12 +47,16 @@ describe('memory hooks in a session', () => {
 
 describe('open-ended study', () => {
   it('brings a missed word back after a short gap, without a fixed end', () => {
-    const app = fakeApp(['salamat', 'kumusta', 'oo', 'paalam']);
+    const words = ['salamat', 'kumusta', 'oo', 'paalam'];
+    const app = fakeApp(words);
     app.progress.settings.dailyNew = 0;
     for (const id of Object.keys(app.progress.cards)) app.progress.cards[id].due = app.now() - 1;
     const root = sessionScreen(app, null);
-    // Counting down what's left: missed words aren't done, so it stays put.
-    expect(root.querySelector('.session-count')?.textContent).toBe('4 left');
+    // Counting down what's left: the four words, and the ways knowing each would start. Missed words aren't done, so it stays put.
+    // Listening waits here: there's no voice to play it.
+    const ways = words.flatMap((id) => studyWays(getCard(id)!).filter((way) => way !== 'read' && way !== 'listen'));
+    const left = `${words.length + ways.length} left`;
+    expect(root.querySelector('.session-count')?.textContent).toBe(left);
     const shown: string[] = [];
     // Answer every question wrong: missed words keep coming round.
     for (let i = 0; i < 8; i++) {
@@ -71,7 +75,7 @@ describe('open-ended study', () => {
         if (root.textContent?.includes('Coming back shortly')) button(root, 'Continue').click();
       }
     }
-    expect(root.querySelector('.session-count')?.textContent).toBe('4 left');
+    expect(root.querySelector('.session-count')?.textContent).toBe(left);
     // Never the same word twice running.
     expect(shown.some((id, i) => id === shown[i - 1])).toBe(false);
     expect(root.textContent).not.toContain('caught up');

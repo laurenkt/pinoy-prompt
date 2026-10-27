@@ -30,7 +30,9 @@ import {
   setDrillNote,
   pickFormat,
   requeue,
+  studyLeft,
   studyQueue,
+  stepKey,
   typing,
   upcomingNewCards,
 } from './session';
@@ -220,6 +222,54 @@ describe('nextStudyAt', () => {
     const progress = emptyProgress(NOW);
     progress.settings.dailyNew = 0;
     expect(nextStudyAt(progress, NOW)).toBeNull();
+  });
+});
+
+describe('studyLeft', () => {
+  /** Words remembered once, a day ago, and due again now: a right answer settles each, which starts its other ways. */
+  function dueOnce(ids: string[], dailyNew: number) {
+    const progress = emptyProgress(NOW);
+    progress.settings.dailyNew = dailyNew;
+    for (const id of ids) {
+      recordAnswer(progress, id, 'good', NOW - DAY_MS);
+      progress.cards[id] = { ...progress.cards[id], due: NOW - 1 };
+    }
+    progress.today = { day: 'x', newCount: 0, reviewCount: 0 };
+    return progress;
+  }
+  const total = (progress: ReturnType<typeof emptyProgress>) => {
+    const { reviews, fresh } = studyLeft(progress, NOW, CAN);
+    return reviews + fresh;
+  };
+
+  it('counts the ways a right answer will start, so the count never goes up for one', () => {
+    const ids = VOCAB_ORDER.filter(standsAlone).slice(0, 4);
+    for (const dailyNew of [0, 3]) {
+      const progress = dueOnce(ids, dailyNew);
+      const recent: string[] = [];
+      let left = total(progress);
+      let steps = 0;
+      for (let step = nextStudyStep(progress, NOW, recent, CAN); step; step = nextStudyStep(progress, NOW, recent, CAN)) {
+        recordAnswer(progress, stepKey(step), 'good', NOW);
+        recent.push(stepKey(step));
+        steps++;
+        const now = total(progress);
+        expect(now).toBe(left - 1);
+        left = now;
+      }
+      // The count up front was the whole of it.
+      expect(left).toBe(0);
+      expect(steps).toBeGreaterThan(ids.length);
+    }
+  });
+
+  it("doesn't change for a wrong answer to a word that would settle", () => {
+    const [id] = VOCAB_ORDER.filter(standsAlone);
+    const progress = dueOnce([id], 0);
+    const before = total(progress);
+    expect(before).toBe(studyWays(getCard(id)!).length);
+    recordAnswer(progress, id, 'again', NOW);
+    expect(total(progress)).toBe(before);
   });
 });
 
