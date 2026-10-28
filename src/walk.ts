@@ -8,9 +8,9 @@
 // recorded clips with the answer judged on the phone (screens/walk-clips.ts), and
 // GPT-Live asking the questions with the app as its backend (screens/walk-live.ts).
 
-import { isVocab, type Card, type Way } from './deck';
+import { ASKED_VOCAB, isVocab, type Card, type Way } from './deck';
 import { answerLanguageOf, type AnswerLanguage } from './meaning';
-import { DRILL_GAP, askAs, drillKey, noteDrillAnswer, noteDrillRepeat, pickDrillCard, type DrillRepeat } from './session';
+import { DRILL_GAP, askAs, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, pickDrillCard, type DrillRepeat } from './session';
 import type { Progress } from './progress-schema';
 
 /** How a walk and talk round is run: recorded clips judged on the phone, or GPT-Live. */
@@ -38,6 +38,17 @@ export function spokenMeaning(card: Card): string {
   return card.en.split('/')[0].trim();
 }
 
+/** The English lines the recorded version says, besides its questions. Each has a recorded clip (scripts/generate-prompts.mjs). */
+export const WALK_LINES = { start: "Okay, let's go!", miss: "Not quite. It's…", again: 'Once more.' } as const;
+
+/** The recorded version's question for a card, as its clip says it. */
+export const questionLine = (card: Card): string => `How do you say "${spokenMeaning(card).replace(/[.!?…]+$/, '')}"?`;
+
+/** Every English line the recorded version can say: what scripts/generate-prompts.mjs records, and what walk.test.ts checks has a clip. */
+export function walkLines(): string[] {
+  return [...new Set([...Object.values(WALK_LINES), ...ASKED_VOCAB.map(questionLine)])];
+}
+
 export interface WalkRound {
   /** The next question; null with nothing to ask. */
   next(): WalkQuestion | null;
@@ -45,6 +56,8 @@ export interface WalkRound {
   note(q: WalkQuestion, outcome: WalkOutcome): boolean;
   /** Questions moved past so far. */
   readonly done: number;
+  /** How many answers asked this way the drills have had to help with lately (drillHelp). */
+  help(q: WalkQuestion): number;
 }
 
 /** A round asking `ways`, picked and noted as a drill round's are. */
@@ -57,6 +70,7 @@ export function walkRound(progress: Progress, now: () => number, ways: readonly 
     get done() {
       return done;
     },
+    help: (q) => drillHelp(progress.cards[q.card.id], q.way),
     next() {
       const pick = pickDrillCard(progress, now(), recent, repeats, done, askable);
       if (!pick) return null;
@@ -106,44 +120,65 @@ export const COMMAND_SOUNDS: Record<'skip' | 'dont-know', string[]> = {
   'dont-know': ['ay dont now', 'ay downt now', 'dont now', 'hindi ko alam', 'di ko alam', 'ewan'],
 };
 
-/** A card as the live voice is told about it: its Tagalog, its meaning, and the stress guide if it has one. */
-function described(card: Card): string {
-  return `"${card.tl}" (${spokenMeaning(card)})${card.hint ? `, said ${card.hint}` : ''}`;
+/** What the live voice is told about a card: its Tagalog, its meaning, other right answers, how it's said and its memory hook. */
+function facts(card: Card): string {
+  const also = [...(card.accept ?? [])];
+  return [
+    `Tagalog "${card.tl}"${card.hint ? ` (said ${card.hint})` : ''}, meaning "${card.en}"`,
+    also.length ? `also right: ${also.map((a) => `"${a}"`).join(', ')}` : '',
+    card.note ? `note: ${card.note}` : '',
+    `memory hook: ${card.hook}`,
+  ]
+    .filter(Boolean)
+    .join('; ');
 }
 
-/** What the live voice is told to ask, in its own words. */
-export function askText(q: WalkQuestion): string {
-  return q.way === 'recall'
-    ? `Ask the learner how to say "${spokenMeaning(q.card)}" in Tagalog. Don't say the Tagalog. (The answer, which you must not say yet, is ${described(q.card)}.)`
-    : `Say the Tagalog "${q.card.tl}"${q.card.hint ? ` (said ${q.card.hint})` : ''} slowly and clearly, and ask the learner what it means in English. Don't say the meaning.`;
+/** A question as the live voice is told it, to ask in its own words: what to ask, the answer, and how often it has needed help lately. */
+export function questionBrief(q: WalkQuestion, help: number): string {
+  const ask =
+    q.way === 'recall'
+      ? `ask how to say "${spokenMeaning(q.card)}" in Tagalog (don't give the Tagalog away)`
+      : `say the Tagalog "${q.card.tl}" clearly and ask what it means (don't give the meaning away)`;
+  const missed = help > 0 ? ` They've needed help with it ${help === 1 ? 'once' : `${help} times`} lately, so on a miss give the memory hook.` : '';
+  return `${ask}. ${facts(q.card)}.${missed}`;
 }
 
-/**
- * What the live voice is told after an answer: how it went, the answer, and the next question, all in one short turn.
- * `unchecked`: OpenAI couldn't be asked about it, so it's neither right nor wrong.
- */
-export function verdictText(q: WalkQuestion, outcome: WalkOutcome, next: WalkQuestion | null, unchecked = false): string {
-  const answer = `${described(q.card)}`;
-  const said = unchecked ? `The app couldn't check that answer. Say so briefly, and say the answer slowly: ${answer}.` : {
-    right: `They got it right: briefly say "Tama!" and say the answer, ${answer}.`,
-    wrong: `They got it wrong. Kindly say it's not quite, and say the right answer slowly: ${answer}.`,
-    'dont-know': `They don't know it. Say the answer slowly: ${answer}.`,
-    skip: `They want to skip it. Just say "okay" and move on, without the answer.`,
-  }[outcome];
-  return `${said} Then, straight away: ${next ? askText(next) : 'say there are no more questions.'}`;
+/** How an answer went, as the app's check tells the live voice. */
+export function checkText(q: WalkQuestion, said: string, outcome: WalkOutcome, unchecked = false): string {
+  const about = `Their answer to "${q.way === 'recall' ? spokenMeaning(q.card) : q.card.tl}" was "${said}"`;
+  if (unchecked) return `${about}; the app couldn't check it.`;
+  return `${about}: ${{ right: 'right', wrong: 'wrong', 'dont-know': "they don't know it", skip: 'they skipped it' }[outcome]}.`;
+}
+
+/** The live voice's background for the next stretch of the round: how the last answer went, the question now, and the one after. */
+export function roundUpdate(now: string | null, next: string | null, checked?: string): string {
+  return [
+    checked ? `The app's check: ${checked} If you said otherwise, put it right in a few words.` : '',
+    now ? `The question now: ${now}` : 'There are no more questions: wrap up in a sentence.',
+    now && next ? `The question after it, once this one is done: ${next}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 /** The live voice's instructions for a round, laid out as OpenAI's GPT-Live prompting guide recommends (see talk.ts). */
 export function walkInstructions(): string {
   return [
-    'You are a friendly Filipino tutor from Manila running a spoken Tagalog drill for an English-speaking beginner. They are out walking with headphones in, and cannot see a screen.',
+    'You are a warm, easy-going Filipino friend from Manila quizzing an English-speaking beginner on Tagalog words while they are out walking with headphones in. They cannot see a screen.',
     '',
     'Accent: keep a natural Filipino accent the whole time. Say every Tagalog word as a native Manila speaker would: pure vowels, ng as one sound, a light tapped r, and the stress a guide shows in capitals. Never say the guides themselves.',
     '',
-    'How the drill goes: the app decides every question and judges every answer; you only speak. Ask exactly the question the app gives you, in one short sentence, then stop and wait.',
-    'Be patient. They are walking, and may pause, say "um", or start again partway. Wait for them to finish; never hurry them or fill a pause.',
-    'Never judge an answer yourself, never say whether it is right, and never say the answer before the app tells you to. When the app tells you how it went, say that, the answer it gives, and then the next question, in a few short sentences.',
-    'Keep it brief: no small talk, no scores, no streaks, no praise beyond a short "Tama!".',
+    'The questions: the app picks them. Its notes tell you the question now and the one after it, each with its answer, other right answers and a memory hook. Ask them in that order, one at a time, and no others. Put each in your own words, a little differently each time, in one short sentence, then wait.',
+    'Be patient. They are walking, and may pause, say "um", or start again. Wait for them to finish; never hurry them or fill a pause.',
+    '',
+    'Answers: judge them yourself, straight away; you know the answer. What they say is transcribed, so Tagalog may come out spelled oddly or as English-looking words: judge what they meant to say, and be generous with sound-alikes. Then react like a friend would, briefly and never the same way twice:',
+    '- Right: a quick, warm acknowledgement, and on to the next question.',
+    '- Wrong: say kindly that it is not quite. If what they said is a real word, say what it actually means. Give the right answer clearly, and the memory hook if the notes say they keep missing it or it would help. Then move on.',
+    '- "I don\'t know", "hindi ko alam" or "tell me": give the answer, with the hook if it helps, and move on.',
+    '- "Skip", "pass" or "next": move on to the next question without the answer.',
+    '- A question from them ("what does that mean?", "say it again"): just answer it, then carry on.',
+    'Say a Tagalog word or phrase at most twice in a turn. Never repeat a word or phrase over and over.',
+    'No scores, no streaks, no long praise, no lectures.',
     '',
     'Backchannel policy: None. Stay quiet while they think.',
     '',
@@ -151,19 +186,18 @@ export function walkInstructions(): string {
     '',
     'Delegation policy:',
     'Backend tools:',
-    '- The drill app: it hears what the learner answered, judges it, and gives you how it went, the answer and the next question.',
+    '- The drill app: it checks an answer you are unsure of, against the card and with a second opinion, and tells you whether it is right.',
     '',
     'Generate <|SpawnThinking|> when:',
-    '- The learner has finished answering the question you asked.',
-    '- The learner says "pass", "skip", "next", "I don\'t know", "hindi ko alam", or asks for the answer.',
+    '- You genuinely cannot tell whether their answer is right: it is close, or the transcript is unclear. First say a few words out loud, like "hmm, let me check that", then generate it, and wait for the app.',
     '',
     'Do not generate <|SpawnThinking|> when:',
-    '- They are still speaking, or have paused partway through an answer.',
-    '- You are asking a question or saying an answer the app gave you.',
+    '- The answer is clearly right or clearly wrong, or they asked for the answer or to skip: react yourself, straight away.',
+    '- You are asking a question.',
   ].join('\n');
 }
 
 /** What the live voice opens with: a short hello, then the first question. */
-export function walkGreeting(first: WalkQuestion): string {
-  return `Say a short hello in English and that you'll ask some words. Then: ${askText(first)}`;
+export function walkGreeting(first: string, next: string | null): string {
+  return `${roundUpdate(first, next)}\nSay a short, friendly hello in English, then ask the question now.`;
 }

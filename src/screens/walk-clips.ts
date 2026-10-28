@@ -1,6 +1,7 @@
-// Walk and talk with recorded clips: the English said in the built-in voice, the
-// Tagalog answer judged on the phone by Speak's recogniser and judge, and the
-// answer said back in a recorded voice. No network once the speech model is on
+// Walk and talk with recorded clips: the English question in a recorded voice
+// (sayEnglish, scripts/generate-prompts.mjs), the Tagalog answer judged on the
+// phone by Speak's recogniser and judge, and the answer said back in a recorded
+// voice. No network once the speech model is on
 // the phone.
 
 import { DownloadError } from '../model-cache';
@@ -8,7 +9,7 @@ import { everyWordSaid, judge, passes } from '../phonetics';
 import type { PhoneModel } from '../phone-model';
 import { RecordError, type Recording } from '../recorder';
 import { chime, play, sayEnglish, stop, untilQuiet } from '../speech';
-import { COMMAND_SOUNDS, spokenMeaning, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import { COMMAND_SOUNDS, questionLine, WALK_LINES, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import { PROBLEMS, targets, type SpeakDeps } from './speak';
 import type { WalkRun, WalkView } from './walk';
 
@@ -37,7 +38,7 @@ export function startClipsWalk(round: WalkRound, view: WalkView, deps: SpeakDeps
   let stopped = false;
   let take: Recording | null = null;
   // Said inside the tap: iOS lets the page speak only once a tap has started it.
-  const hello = sayEnglish("Let's go.");
+  const hello = sayEnglish(WALK_LINES.start);
   deps.holdMicrophone?.(true);
   const asking = deps.askMicrophone?.() ?? Promise.resolve(true);
 
@@ -71,8 +72,8 @@ export function startClipsWalk(round: WalkRound, view: WalkView, deps: SpeakDeps
       // Nothing said, it's asked once more; still nothing, the answer is said.
       for (let tries = 0; outcome === null && !stopped; tries++) {
         view.status('Asking…');
-        await sayEnglish(tries === 0 ? `How do you say: ${spokenMeaning(q.card)}?` : `Again: ${spokenMeaning(q.card)}?`);
-        await untilQuiet();
+        if (tries > 0) await sayEnglish(WALK_LINES.again);
+        await sayEnglish(questionLine(q.card));
         if (stopped) return;
         view.status('Getting the mic ready…');
         const heard = await listen();
@@ -89,7 +90,7 @@ export function startClipsWalk(round: WalkRound, view: WalkView, deps: SpeakDeps
       view.answered(q, outcome, round.note(q, outcome));
       // The answer is always said after a response, apart from a skip.
       if (outcome === 'right') await chime();
-      else if (outcome === 'wrong') await sayEnglish('Not quite. It is:');
+      else if (outcome === 'wrong') await sayEnglish(WALK_LINES.miss);
       if (outcome !== 'skip') {
         view.status('The answer');
         await play(q.card);

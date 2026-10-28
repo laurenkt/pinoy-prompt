@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { getCard } from './deck';
 import { drillNote } from './session';
 import { emptyProgress, recordAnswer } from './store';
-import { askText, heardCommand, verdictText, walkInstructions, walkRound, type WalkQuestion } from './walk';
+import prompts from './prompt-clips.json';
+import { checkText, heardCommand, questionBrief, roundUpdate, walkInstructions, walkLines, walkRound, type WalkQuestion } from './walk';
 
 const KNOWN = ['salamat', 'kumusta', 'oo', 'kape', 'paalam'];
 
@@ -80,22 +81,40 @@ describe('what the live voice is told', () => {
   const recall: WalkQuestion = { card: getCard('salamat')!, way: 'recall' };
   const listen: WalkQuestion = { card: getCard('kape')!, way: 'listen' };
 
-  it('follows the GPT-Live prompting guide, and delegates once an answer is finished', () => {
+  it('follows the GPT-Live prompting guide, judging answers itself and asking the app only when unsure', () => {
     const text = walkInstructions();
     for (const heading of ['Backchannel policy:', 'Interruption policy:', 'Delegation policy:', 'Backend tools:', 'Generate <|SpawnThinking|> when:', 'Do not generate <|SpawnThinking|> when:']) {
       expect(text).toContain(heading);
     }
-    expect(text).toMatch(/pause/);
+    expect(text).toMatch(/judge them yourself/);
+    expect(text).toMatch(/let me check/);
+    expect(text).toMatch(/Never repeat a word or phrase over and over/);
   });
 
-  it('asks recall in English and listen in Tagalog', () => {
-    expect(askText(recall)).toContain('how to say "Thank you"');
-    expect(askText(listen)).toContain('"kape"');
+  it('briefs a question with its answer and hook, asking recall in English and listen in Tagalog', () => {
+    expect(questionBrief(recall, 0)).toContain('how to say "Thank you"');
+    expect(questionBrief(recall, 0)).toContain('"Salamat"');
+    expect(questionBrief(recall, 0)).toContain(getCard('salamat')!.hook);
+    expect(questionBrief(listen, 0)).toContain('say the Tagalog "kape"');
+    expect(questionBrief(recall, 0)).not.toContain('needed help');
+    expect(questionBrief(recall, 2)).toContain('needed help with it 2 times');
   });
 
-  it('always gives the answer after a response, except a skip, then the next question', () => {
-    for (const outcome of ['right', 'wrong', 'dont-know'] as const) expect(verdictText(recall, outcome, listen)).toContain('"Salamat"');
-    expect(verdictText(recall, 'skip', listen)).not.toContain('"Salamat"');
-    expect(verdictText(recall, 'right', listen)).toContain(askText(listen));
+  it('keeps the voice a question ahead, with how the last answer went', () => {
+    const update = roundUpdate('Q now', 'Q next', checkText(recall, 'salamat', 'right'));
+    expect(update).toContain('"salamat": right');
+    expect(update.indexOf('Q now')).toBeLessThan(update.indexOf('Q next'));
+    expect(roundUpdate(null, null)).toContain('no more questions');
+    expect(checkText(recall, 'salam', 'wrong', true)).toContain("couldn't check");
+  });
+});
+
+describe("the recorded version's English lines", () => {
+  const onDisk = new Set(Object.keys(import.meta.glob('../public/audio/en-*')).map((path) => path.split('/').pop()));
+  const clips: Record<string, string> = prompts;
+
+  it('has a recorded clip for every line it can say (npm run prompts makes any missing)', () => {
+    const missing = walkLines().filter((line) => !clips[line] || !onDisk.has(`${clips[line]}.mp3`));
+    expect(missing).toEqual([]);
   });
 });

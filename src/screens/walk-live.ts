@@ -1,24 +1,46 @@
-// Walk and talk with the live voice: GPT-Live asks the questions and says the
-// answers, and the app is its backend (client delegation, see startCall). When
-// the learner has answered, the voice asks the app, which judges what the
-// learner said (from the call's transcript, with Drills' judgeMeaning), notes it,
-// and hands back how it went, the answer and the next question to say.
+// Walk and talk with the live voice: GPT-Live asks the questions, judges the
+// answers and reacts to them itself, as a friend quizzing you would. The app
+// picks the questions and keeps the voice a step ahead, telling it in the
+// background (thinking appends) the question now and the one after, so it
+// never waits on the app to move on. As the voice answers each reply, the app
+// checks what the learner said (from the call's transcript, with Drills'
+// judgeMeaning) to note it as Drills does, and tells the voice how it went. Only
+// when the voice can't tell does it say it's checking and ask the app (client
+// delegation, see startCall), which says the verdict aloud.
 
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call } from '../openai';
 import { stop } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
-import { askText, heardCommand, verdictText, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import { checkText, heardCommand, questionBrief, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
 
-/** Waited after the voice asks, so the end of what the learner said reaches the transcript. */
+/** Waited once the voice starts its reply, so the end of what the learner said reaches the transcript. */
 const TRANSCRIPT_SETTLE_MS = 600;
-/** Quiet this long after the learner said something, and the voice hasn't asked, the app judges it anyway. */
-const ANSWER_FALLBACK_MS = 7000;
+/** A check this recent, with nothing said since, is the one the voice means when it asks the app. */
+const RECENT_CHECK_MS = 15_000;
 /** How long an answer stays on the screen before the next question shows. */
-const SHOW_ANSWER_MS = 4000;
+const SHOW_ANSWER_MS = 3000;
+/** Time for the voice to say its last reaction and goodbye before the call ends. */
+const WRAP_UP_MS = 8000;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Something said that asks rather than answers ("what does it mean?", "say it again"), or only fills a pause: the question stays. Only taken
+ * so once the answer hasn't passed as the card, as some cards are questions ("How are you?").
+ */
+const ASKS =
+  /^(?:um+\s+|uh+\s+|sorry\s+|oh\s+)*(?:what does (?:it|that) mean|what was (?:it|that)|what did you say|say (?:it|that) again|(?:can|could) you (?:say|repeat)|repeat|one more time|again|wait|hold on|sorry)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|right)[\s.!]*$/i;
+
+/** An answer checked by the app: how it went, and whether it could be told at all. */
+interface Check {
+  q: WalkQuestion;
+  said: string;
+  outcome: WalkOutcome;
+  /** OpenAI couldn't be asked, so it's noted nowhere. */
+  unchecked: boolean;
+}
 
 /** Run a round on a call until it's stopped. Called from the tap that starts it, so the call's audio may start. */
 export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps): WalkRun {
@@ -27,85 +49,110 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   const abort = new AbortController();
   let stopped = false;
   let call: Call | null = null;
+  /** The question being asked, and the one after it, which the voice already knows about. */
   let current: WalkQuestion | null = round.next();
+  let upcoming: WalkQuestion | null = current && round.next();
   /** The call's transcript, in turns. */
   const turns: SpokenTurn[] = [];
-  /** When the voice last stopped speaking, in ms from the start of the call: what the learner said before it isn't an answer. */
-  let answerFrom = 0;
-  /** An answer is being judged, so another ask for the same one waits for it. */
-  let judging = false;
-  /** The voice asked while an answer was already being judged: the verdict goes to it. */
-  let waiting: string | null = null;
-  let fallback: ReturnType<typeof setTimeout> | undefined;
+  /** Where what the learner has said is taken up to, in ms from the start of the call: what ends after it is still to check. */
+  let takenTo = 0;
+  /** When the voice last started saying something. */
+  let voiceAt = -1;
+  /** The check running, if one is. */
+  let checking: Promise<Check | null> | null = null;
+  /** The last answer checked, and when, for the voice to ask about just after. */
+  let lastCheck: { result: Check; at: number } | null = null;
   let showNext: ReturnType<typeof setTimeout> | undefined;
+  let wrapUp: ReturnType<typeof setTimeout> | undefined;
 
   const end = (problem?: string) => {
     if (!stopped) view.ended(problem);
   };
+  const brief = (q: WalkQuestion | null) => (q ? questionBrief(q, round.help(q)) : null);
 
-  /** What the learner has said since the voice last spoke, which is their answer. */
-  const heard = () =>
-    turns
-      .filter((t) => t.who === 'you' && t.start >= answerFrom)
-      .map((t) => t.text.trim())
-      .join(' ')
-      .trim();
+  /** What the learner has said that's still to check, before a moment of the call. */
+  const untaken = (before: number) => turns.filter((t) => t.who === 'you' && t.end > takenTo && t.start < before);
 
-  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. */
-  async function judged(said: string, q: WalkQuestion): Promise<{ outcome: WalkOutcome; unchecked: boolean }> {
+  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. Null for a question to the voice. */
+  async function judged(answer: string, q: WalkQuestion): Promise<Check | null> {
     const language = walkLanguage(q);
-    if ((await judgeMeaning(said, q.card, null, language, false)).right) return { outcome: 'right', unchecked: false };
-    const command = heardCommand(said);
-    if (command) return { outcome: command, unchecked: false };
-    const { right, failure } = await judgeMeaning(said, q.card, deps.askMeaning, language, false);
+    if ((await judgeMeaning(answer, q.card, null, language, false)).right) return { q, said: answer, outcome: 'right', unchecked: false };
+    if (ASKS.test(answer)) return null;
+    const command = heardCommand(answer);
+    if (command) return { q, said: answer, outcome: command, unchecked: false };
+    const { right, failure } = await judgeMeaning(answer, q.card, deps.askMeaning, language, false);
     // OpenAI couldn't be asked: it may well have been right, so it isn't counted.
-    return { outcome: right ? 'right' : 'wrong', unchecked: !right && failure !== undefined };
+    return { q, said: answer, outcome: right ? 'right' : 'wrong', unchecked: !right && failure !== undefined };
   }
 
-  /** The voice asked the app how the answer went (`id`), or it has gone quiet without asking (null). */
-  async function judgeAnswer(id: string | null): Promise<void> {
-    clearTimeout(fallback);
+  /**
+   * The voice has replied to what the learner said before `before`: check it, note it, and move the round on a
+   * question, telling the voice how it went and what's now next. Null when it wasn't an answer.
+   */
+  async function check(before: number): Promise<Check | null> {
     const q = current;
-    // Not before the voice has said the verdict and the next question: nothing said meanwhile answers it.
-    if (!call || !q || stopped || (answerFrom === Infinity && !judging)) {
-      if (id) call?.append('commentary', 'Carry on with what the app gave you.', id);
-      return;
-    }
-    // Nothing to say while the app works: the answer comes back in a moment.
-    if (id) call.append('thinking', '', id);
-    if (judging) {
-      waiting = id ?? waiting;
-      return;
-    }
-    judging = true;
+    await wait(TRANSCRIPT_SETTLE_MS);
+    const heard = untaken(before);
+    if (stopped || !q || !heard.length) return null;
+    takenTo = Math.max(takenTo, ...heard.map((t) => t.end));
+    const answer = heard.map((t) => t.text.trim()).join(' ').trim();
+    if (!answer) return null;
     view.status('Checking…');
-    try {
-      await wait(TRANSCRIPT_SETTLE_MS);
-      const said = heard();
-      if (stopped || !call) return;
-      if (!said) {
-        call.append('commentary', `The app didn't hear an answer. Ask the same question again: ${askText(q)}`, id ?? waiting);
-        return view.status('Listening. Answer out loud.');
-      }
-      const { outcome, unchecked } = await judged(said, q);
-      if (stopped || !call || current !== q) return;
-      view.answered(q, outcome, round.note(q, unchecked ? 'skip' : outcome), said);
-      const next = round.next();
-      current = next;
-      // Anything said from here, before the voice has given the verdict, is about this question, not the next.
-      answerFrom = Infinity;
-      call.append('commentary', verdictText(q, outcome, next, unchecked), id ?? waiting);
-      if (!next) return end('There was nothing more to ask.');
-      clearTimeout(showNext);
+    const result = await judged(answer, q);
+    if (stopped || current !== q) return null;
+    if (!result) {
+      view.status('Listening. Answer out loud.');
+      return null;
+    }
+    view.answered(q, result.outcome, round.note(q, result.unchecked ? 'skip' : result.outcome), answer);
+    current = upcoming;
+    upcoming = current && round.next();
+    call?.append('thinking', roundUpdate(brief(current), brief(upcoming), checkText(q, answer, result.outcome, result.unchecked)), null);
+    clearTimeout(showNext);
+    const next = current;
+    if (!next) wrapUp = setTimeout(() => end('There was nothing more to ask.'), WRAP_UP_MS);
+    else
       showNext = setTimeout(() => {
         if (stopped || current !== next) return;
         view.asked(next);
         view.status('Listening. Answer out loud.');
       }, SHOW_ANSWER_MS);
-    } finally {
-      judging = false;
-      waiting = null;
-    }
+    return result;
+  }
+
+  /** Check what the learner said before `before`, one check at a time, then anything said while it ran. */
+  function startCheck(before: number): Promise<Check | null> {
+    const pending = (checking = check(before));
+    void pending.then((result) => {
+      if (checking === pending) checking = null;
+      if (result) lastCheck = { result, at: Date.now() };
+      settle();
+    });
+    return pending;
+  }
+
+  /** Once the voice has spoken after something the learner said, that's its reply: check what they said. */
+  function settle(): void {
+    if (!checking && current && untaken(voiceAt).length) void startCheck(voiceAt);
+  }
+
+  /** The voice couldn't tell and said it's checking: say the app's verdict aloud under its delegation. */
+  async function delegated(id: string): Promise<void> {
+    // It has said it's checking already; nothing more until the verdict.
+    call?.append('thinking', '', id);
+    while (checking) await checking;
+    // Asked before its own words reached the transcript, what the learner said is checked now.
+    // With nothing said since, it means the answer just checked.
+    const recent = lastCheck && Date.now() - lastCheck.at < RECENT_CHECK_MS ? lastCheck.result : null;
+    const result = untaken(Infinity).length ? await startCheck(Infinity) : recent;
+    if (stopped || !call) return;
+    call.append(
+      'commentary',
+      result
+        ? `The app checked: ${checkText(result.q, result.said, result.outcome, result.unchecked)} Say so in a few words, with the answer if they missed it, then carry on.`
+        : "The app didn't hear an answer to check. Carry on with the question.",
+      id,
+    );
   }
 
   const key = getApiKey();
@@ -117,23 +164,17 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     view.status('Connecting…');
     void startCall(
       key,
-      { instructions: walkInstructions(), greeting: walkGreeting(current), signal: abort.signal, delegate: true },
+      { instructions: walkInstructions(), greeting: walkGreeting(brief(current)!, brief(upcoming)), signal: abort.signal, delegate: true },
       {
         onStarted: () => !stopped && view.status('Listening. Answer out loud.'),
-        onTranscript: (who, text, start, end) => {
+        onTranscript: (who, text, start, endMs) => {
           if (stopped) return;
-          addPiece(turns, who, text, start, end);
-          clearTimeout(fallback);
-          if (who === 'ai') {
-            // The voice is speaking: an answer starts once it stops.
-            answerFrom = answerFrom === Infinity ? end : Math.max(answerFrom, end);
-            return;
-          }
-          // Tolerant of pauses, but not stuck if the voice never asks.
-          fallback = setTimeout(() => void judgeAnswer(null), ANSWER_FALLBACK_MS);
+          addPiece(turns, who, text, start, endMs);
+          if (who === 'ai') voiceAt = Math.max(voiceAt, start);
+          settle();
         },
         onUsage: () => {},
-        onDelegation: (id) => void judgeAnswer(id),
+        onDelegation: (id) => void delegated(id),
         onEnded: (e) => end(e ? errorText(e) : 'The call ended.'),
       },
       deps.call,
@@ -149,8 +190,8 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   return {
     stop() {
       stopped = true;
-      clearTimeout(fallback);
       clearTimeout(showNext);
+      clearTimeout(wrapUp);
       abort.abort();
       call?.hangUp();
       call = null;
