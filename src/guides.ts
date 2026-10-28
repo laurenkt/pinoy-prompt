@@ -530,4 +530,24 @@ export const GUIDES: Card[] = [
       { q: 'Mixing English words into Tagalog is…', answer: 'normal: most people do it', wrong: ['rude', 'only for tourists'] },
     ],
   },
+  {
+    id: 'k-baliktad',
+    kind: 'knowhow',
+    tl: 'Sogbu!',
+    en: 'Flipping words for fun',
+    note: 'Among friends, people flip words around for fun. It\'s called baliktad, "flipped": swap the halves and "busog" (full) becomes "sogbu", "gutom" (hungry) becomes "tomguts", often with an "s" added. English gets flipped too: "idol" is "lodi", "power" is "werpa" (everywhere a few years back, a bit jokey now). Some flips are old enough to be everyday words: "astig" (cool) is "tigas" (tough) flipped. It\'s playful, so save it for friends. If a word sounds back to front, flip it back.',
+    hook: '"Baliktad" is what you call a shirt worn inside out. The word is still there, just turned round.',
+    examples: [
+      { tl: 'Sogbu!', en: 'Full! (busog, flipped)' },
+      { tl: 'Werpa, lodi!', en: 'Power to you, idol!' },
+      { tl: 'Petmalu!', en: 'Awesome! (malupet, flipped)' },
+    ],
+    needs: ['busog-na-ako', 'gutom-na-ako'],
+    drills: [
+      { q: 'Flip "busog" (full) the baliktad way and you get…', answer: '"sogbu"', wrong: ['"bosug"', '"gubos"'] },
+      { q: 'A friend groans "Tomguts na ako!". They\'re…', answer: 'hungry', wrong: ['full', 'sleepy'] },
+      { q: 'A friend calls you "lodi". That\'s…', answer: '"idol", flipped', wrong: ['"old", flipped', '"lady", flipped'] },
+      { q: 'Flipped words like "sogbu" are for…', answer: 'joking around with friends', wrong: ['talking to elders', 'a job interview'] },
+    ],
+  },
 ];
