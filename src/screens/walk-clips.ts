@@ -56,8 +56,9 @@ export function startClipsWalk(round: WalkRound, view: WalkView, deps: SpeakDeps
   async function run(): Promise<void> {
     try {
       if (!(await asking)) return;
-    } catch {
-      return view.ended(PROBLEMS.denied);
+    } catch (e) {
+      const name = e instanceof DOMException ? e.name : '';
+      return view.ended(PROBLEMS[name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic']);
     }
     if (!(await deps.modelDownloaded())) view.status('Downloading the speech model…');
     const model = await deps.loadPhoneModel((fraction) => !stopped && view.status(`Downloading the speech model… ${Math.round(fraction * 100)}%`));
@@ -85,8 +86,7 @@ export function startClipsWalk(round: WalkRound, view: WalkView, deps: SpeakDeps
         if (outcome === null && tries > 0) outcome = 'wrong';
       }
       if (stopped || !outcome) return;
-      round.note(q, outcome);
-      view.answered(q, outcome);
+      view.answered(q, outcome, round.note(q, outcome));
       // The answer is always said after a response, apart from a skip.
       if (outcome === 'right') await chime();
       else if (outcome === 'wrong') await sayEnglish('Not quite. It is:');

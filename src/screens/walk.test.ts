@@ -13,7 +13,9 @@ import { fakeRecognition } from '../test/fake-speech';
 import { button, fakeApp, flush } from '../test/screen';
 import type { SpeakDeps } from './speak';
 import { settingsScreen } from './settings';
-import { endWalk, walkScreen, type WalkDeps } from './walk';
+import { endWalk, walkScreen, type WalkDeps, type WalkView } from './walk';
+import { startLiveWalk } from './walk-live';
+import type { WalkOutcome, WalkQuestion, WalkRound } from '../walk';
 
 const KEY = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123';
 const KNOWN = ['salamat', 'kumusta', 'oo', 'kape', 'paalam'];
@@ -231,5 +233,72 @@ describe('walk and talk live', () => {
     await until(() => f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_2'));
     expect(f.sent.find((e) => e.delegation_id === 'item_2' && e.type === 'session.commentary.append')!.content).toContain(`"${card.tl}"`);
     expect(drillNote(app.progress.cards[card.id], way).help).toBe(1);
+  });
+});
+
+describe('the live engine', () => {
+  /** A round that asks these questions in turn, keeping what it was told. */
+  function fixedRound(qs: WalkQuestion[]) {
+    const noted: WalkOutcome[] = [];
+    const round: WalkRound = { next: () => qs.shift() ?? null, note: (_q, o) => (noted.push(o), true), done: 0 };
+    const view: WalkView = { status() {}, asked() {}, answered() {}, ended() {} };
+    return { round, view, noted };
+  }
+  const recall = (id: string): WalkQuestion => ({ card: getCard(id)!, way: 'recall' });
+
+  async function started(qs: WalkQuestion[]) {
+    setApiKey(KEY);
+    const f = liveDeps();
+    const r = fixedRound(qs);
+    const run = startLiveWalk(r.round, r.view, f.deps);
+    await until(() => f.fetch.mock.calls.length > 0);
+    await flush();
+    f.send({ type: 'session.started', session: {} });
+    const verdicts = () => f.sent.filter((e) => e.type === 'session.commentary.append' && e.delegation_id !== null);
+    return { ...f, ...r, run, verdicts };
+  }
+
+  it('takes "Hindi ko alam" as the answer to the card that is "Hindi ko alam", not as not knowing', async () => {
+    const f = await started([recall('hindi-ko-alam'), recall('salamat')]);
+    f.send({ type: 'session.input_transcript.delta', delta: 'Hindi ko alam', start_ms: 0, end_ms: 800 });
+    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
+    await until(() => f.verdicts().length > 0);
+    expect(f.noted).toEqual(['right']);
+    f.run.stop();
+  });
+
+  it('only counts what was said after the voice stopped speaking, with its pieces joined', async () => {
+    const f = await started([recall('salamat'), recall('kumusta'), recall('oo')]);
+    f.send({ type: 'session.input_transcript.delta', delta: 'Salamat', start_ms: 0, end_ms: 500 });
+    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
+    await until(() => f.verdicts().length === 1);
+    // Said along with the verdict, before the voice asks the next one: not an answer to it.
+    f.send({ type: 'session.input_transcript.delta', delta: 'salamat', start_ms: 1000, end_ms: 1400 });
+    f.send({ type: 'session.output_transcript.delta', delta: 'Tama! How do you say how are you?', start_ms: 900, end_ms: 3000 });
+    f.send({ type: 'session.input_transcript.delta', delta: 'Kumus', start_ms: 3500, end_ms: 3900 });
+    f.send({ type: 'session.input_transcript.delta', delta: 'ta', start_ms: 3900, end_ms: 4100 });
+    f.send({ type: 'session.delegation.created', delegation: { id: 'item_2' } });
+    await until(() => f.verdicts().length === 2);
+    expect(f.noted).toEqual(['right', 'right']);
+    f.run.stop();
+  });
+
+  it("doesn't count an answer it couldn't check with OpenAI", async () => {
+    setApiKey(KEY);
+    const f = liveDeps();
+    f.deps.askMeaning = async () => {
+      throw new Error('offline');
+    };
+    const r = fixedRound([recall('salamat'), recall('oo')]);
+    const run = startLiveWalk(r.round, r.view, f.deps);
+    await until(() => f.fetch.mock.calls.length > 0);
+    await flush();
+    f.send({ type: 'session.started', session: {} });
+    f.send({ type: 'session.input_transcript.delta', delta: 'many thanks friend', start_ms: 0, end_ms: 500 });
+    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
+    await until(() => f.sent.some((e) => e.delegation_id === 'item_1' && e.type === 'session.commentary.append'));
+    expect(r.noted).toEqual(['skip']);
+    expect(f.sent.find((e) => e.delegation_id === 'item_1' && e.type === 'session.commentary.append')!.content).toContain("couldn't check");
+    run.stop();
   });
 });

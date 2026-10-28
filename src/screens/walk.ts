@@ -1,5 +1,5 @@
 import type { App } from '../app';
-import { browserCallDeps, callSupported, checkMeaning, getApiKey, CENTS_PER_MINUTE, type CallDeps } from '../openai';
+import { askOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps } from '../openai';
 import type { MeaningJudge } from '../meaning';
 import { canDrill, DRILL_MIN_WORDS } from '../session';
 import { spokenMeaning, WALK_WAYS, walkRound, type WalkEngine, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
@@ -15,8 +15,8 @@ export interface WalkView {
   status(text: string): void;
   /** A question is being asked. */
   asked(q: WalkQuestion): void;
-  /** How the answer to it went, and what was heard, if it's known. */
-  answered(q: WalkQuestion, outcome: WalkOutcome, heard?: string): void;
+  /** How the answer to it went, whether noting it changed progress (to be saved), and what was heard, if it's known. */
+  answered(q: WalkQuestion, outcome: WalkOutcome, changed: boolean, heard?: string): void;
   /** It stopped by itself; why, if it broke. */
   ended(problem?: string): void;
 }
@@ -33,11 +33,6 @@ export interface WalkDeps {
   /** Judges a spoken answer the device can't match, with OpenAI (see judgeMeaning); null without a key. */
   askMeaning: MeaningJudge | null;
 }
-
-const askOpenAi: MeaningJudge = async (answer, card, language, typed) => {
-  const key = getApiKey();
-  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language, typed }) : null;
-};
 
 export const defaultWalkDeps: WalkDeps = { speak: defaultDeps, call: browserCallDeps, callSupported, askMeaning: askOpenAi };
 
@@ -58,6 +53,28 @@ const ENGINES: Record<WalkEngine, { title: string; about: string; start: (round:
 let active: WalkRun | null = null;
 /** Keeps the screen on while a round runs: a phone that locks cuts off the microphone. */
 let wakeLock: { release(): Promise<void> } | null = null;
+
+type WakeLocks = { request(type: 'screen'): Promise<{ release(): Promise<void> }> };
+
+/** Keep the screen on for the round running now; the phone drops the lock when the app is hidden, so it's asked again on return. */
+function keepAwake(): void {
+  const run = active;
+  void (navigator as { wakeLock?: WakeLocks }).wakeLock
+    ?.request('screen')
+    .then((lock) => {
+      if (active === run && run) {
+        void wakeLock?.release().catch(() => {});
+        wakeLock = lock;
+      } else void lock.release().catch(() => {});
+    })
+    .catch(() => {});
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && active) keepAwake();
+  });
+}
 
 /** Stop a round that's going. Leaving the screen by any route comes here through `app.navigate`. */
 export function endWalk(): void {
@@ -111,9 +128,9 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
       shown = { q };
       draw();
     },
-    answered(q, outcome, heard) {
+    answered(q, outcome, changed, heard) {
       shown = { q, outcome, heard };
-      app.commit();
+      if (changed) app.commit();
       draw();
     },
     ended(problem) {
@@ -133,13 +150,7 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
     draw();
     // Inside the tap: the engine starts its audio and microphone from here.
     active = about.start(round, view, deps);
-    void (navigator as { wakeLock?: { request(type: 'screen'): Promise<{ release(): Promise<void> }> } }).wakeLock
-      ?.request('screen')
-      .then((lock) => {
-        if (state.name === 'running') wakeLock = lock;
-        else void lock.release().catch(() => {});
-      })
-      .catch(() => {});
+    keepAwake();
   }
 
   function stop(): void {

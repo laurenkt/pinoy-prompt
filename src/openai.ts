@@ -3,7 +3,7 @@
 // sent only to api.openai.com. There is no server of ours in between.
 
 import { getMicrophone, releaseMicrophone } from './microphone';
-import type { AnswerLanguage } from './meaning';
+import type { AnswerLanguage, MeaningJudge } from './meaning';
 import { dayKey } from './progress-schema';
 
 const KEY_STORAGE = 'pinoy-prompt:openai-key';
@@ -326,6 +326,12 @@ export async function checkMeaning(
   }
   throw new AiError('other', 'OpenAI answered without a verdict.');
 }
+
+/** judgeMeaning's ask, with the learner's key: OpenAI checks an answer the device couldn't match, or null without a key. */
+export const askOpenAi: MeaningJudge = async (answer, card, language, typed) => {
+  const key = getApiKey();
+  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language, typed }) : null;
+};
 
 /** Turns a spoken answer in Drills into text. */
 export const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';

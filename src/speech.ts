@@ -219,9 +219,15 @@ export async function sayEnglish(text: string): Promise<void> {
   if (english) utterance.voice = english;
   utterance.lang = english?.lang ?? 'en-US';
   // Ended by stop() too: some browsers never report a cancelled one.
-  const said = new Promise<void>((resolve) => (endSaying = utterance.onend = utterance.onerror = () => resolve()));
+  // iOS sometimes never says it has finished, so it's given up after about as long as it could take.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const said = new Promise<void>((resolve) => {
+    endSaying = utterance.onend = utterance.onerror = () => resolve();
+    timer = setTimeout(resolve, 3000 + text.length * 120);
+  });
   speechSynthesis.speak(utterance);
   await said;
+  clearTimeout(timer);
 }
 
 /** Ends the wait for English being said, when stop() cancels it. */

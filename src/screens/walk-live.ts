@@ -7,6 +7,7 @@
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call } from '../openai';
 import { stop } from '../speech';
+import { addPiece, type SpokenTurn } from '../talk';
 import { askText, heardCommand, verdictText, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
 
@@ -27,10 +28,14 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   let stopped = false;
   let call: Call | null = null;
   let current: WalkQuestion | null = round.next();
-  /** What the learner has said since the question was asked, from the transcript. */
-  let heard = '';
+  /** The call's transcript, in turns. */
+  const turns: SpokenTurn[] = [];
+  /** When the voice last stopped speaking, in ms from the start of the call: what the learner said before it isn't an answer. */
+  let answerFrom = 0;
   /** An answer is being judged, so another ask for the same one waits for it. */
   let judging = false;
+  /** The voice asked while an answer was already being judged: the verdict goes to it. */
+  let waiting: string | null = null;
   let fallback: ReturnType<typeof setTimeout> | undefined;
   let showNext: ReturnType<typeof setTimeout> | undefined;
 
@@ -38,32 +43,58 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     if (!stopped) view.ended(problem);
   };
 
+  /** What the learner has said since the voice last spoke, which is their answer. */
+  const heard = () =>
+    turns
+      .filter((t) => t.who === 'you' && t.start >= answerFrom)
+      .map((t) => t.text.trim())
+      .join(' ')
+      .trim();
+
+  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. */
+  async function judged(said: string, q: WalkQuestion): Promise<{ outcome: WalkOutcome; unchecked: boolean }> {
+    const language = walkLanguage(q);
+    if ((await judgeMeaning(said, q.card, null, language, false)).right) return { outcome: 'right', unchecked: false };
+    const command = heardCommand(said);
+    if (command) return { outcome: command, unchecked: false };
+    const { right, failure } = await judgeMeaning(said, q.card, deps.askMeaning, language, false);
+    // OpenAI couldn't be asked: it may well have been right, so it isn't counted.
+    return { outcome: right ? 'right' : 'wrong', unchecked: !right && failure !== undefined };
+  }
+
   /** The voice asked the app how the answer went (`id`), or it has gone quiet without asking (null). */
   async function judgeAnswer(id: string | null): Promise<void> {
     clearTimeout(fallback);
     const q = current;
-    if (!call || !q || judging || stopped) return;
+    // Not before the voice has said the verdict and the next question: nothing said meanwhile answers it.
+    if (!call || !q || stopped || (answerFrom === Infinity && !judging)) {
+      if (id) call?.append('commentary', 'Carry on with what the app gave you.', id);
+      return;
+    }
     // Nothing to say while the app works: the answer comes back in a moment.
     if (id) call.append('thinking', '', id);
+    if (judging) {
+      waiting = id ?? waiting;
+      return;
+    }
     judging = true;
     view.status('Checking…');
     try {
       await wait(TRANSCRIPT_SETTLE_MS);
-      const said = heard.trim();
-      if (stopped) return;
+      const said = heard();
+      if (stopped || !call) return;
       if (!said) {
-        call.append('commentary', `The app didn't hear an answer. Ask the same question again: ${askText(q)}`, id);
+        call.append('commentary', `The app didn't hear an answer. Ask the same question again: ${askText(q)}`, id ?? waiting);
         return view.status('Listening. Answer out loud.');
       }
-      const outcome: WalkOutcome =
-        heardCommand(said) ?? ((await judgeMeaning(said, q.card, deps.askMeaning, walkLanguage(q), false)).right ? 'right' : 'wrong');
-      if (stopped || current !== q) return;
-      round.note(q, outcome);
-      view.answered(q, outcome, said);
+      const { outcome, unchecked } = await judged(said, q);
+      if (stopped || !call || current !== q) return;
+      view.answered(q, outcome, round.note(q, unchecked ? 'skip' : outcome), said);
       const next = round.next();
       current = next;
-      heard = '';
-      call.append('commentary', verdictText(q, outcome, next), id);
+      // Anything said from here, before the voice has given the verdict, is about this question, not the next.
+      answerFrom = Infinity;
+      call.append('commentary', verdictText(q, outcome, next, unchecked), id ?? waiting);
       if (!next) return end('There was nothing more to ask.');
       clearTimeout(showNext);
       showNext = setTimeout(() => {
@@ -73,6 +104,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
       }, SHOW_ANSWER_MS);
     } finally {
       judging = false;
+      waiting = null;
     }
   }
 
@@ -88,11 +120,16 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
       { instructions: walkInstructions(), greeting: walkGreeting(current), signal: abort.signal, delegate: true },
       {
         onStarted: () => !stopped && view.status('Listening. Answer out loud.'),
-        onTranscript: (who, text) => {
-          if (who !== 'you' || stopped) return;
-          heard += text;
-          // Tolerant of pauses, but not stuck if the voice never asks.
+        onTranscript: (who, text, start, end) => {
+          if (stopped) return;
+          addPiece(turns, who, text, start, end);
           clearTimeout(fallback);
+          if (who === 'ai') {
+            // The voice is speaking: an answer starts once it stops.
+            answerFrom = answerFrom === Infinity ? end : Math.max(answerFrom, end);
+            return;
+          }
+          // Tolerant of pauses, but not stuck if the voice never asks.
           fallback = setTimeout(() => void judgeAnswer(null), ANSWER_FALLBACK_MS);
         },
         onUsage: () => {},

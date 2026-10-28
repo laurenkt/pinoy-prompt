@@ -9,7 +9,7 @@
 // GPT-Live asking the questions with the app as its backend (screens/walk-live.ts).
 
 import { isVocab, type Card, type Way } from './deck';
-import type { AnswerLanguage } from './meaning';
+import { answerLanguageOf, type AnswerLanguage } from './meaning';
 import { DRILL_GAP, askAs, drillKey, noteDrillAnswer, noteDrillRepeat, pickDrillCard, type DrillRepeat } from './session';
 import type { Progress } from './progress-schema';
 
@@ -31,7 +31,7 @@ export interface WalkQuestion {
 export type WalkOutcome = 'right' | 'wrong' | 'dont-know' | 'skip';
 
 /** What the learner answers in: the Tagalog for recall, the meaning for listen. */
-export const walkLanguage = (q: WalkQuestion): AnswerLanguage => (q.way === 'recall' ? 'tl' : 'en');
+export const walkLanguage = (q: WalkQuestion): AnswerLanguage => answerLanguageOf(q.way);
 
 /** A card's first English meaning, as it's said: no slashes or alternatives for a voice to read out. */
 export function spokenMeaning(card: Card): string {
@@ -118,10 +118,13 @@ export function askText(q: WalkQuestion): string {
     : `Say the Tagalog "${q.card.tl}"${q.card.hint ? ` (said ${q.card.hint})` : ''} slowly and clearly, and ask the learner what it means in English. Don't say the meaning.`;
 }
 
-/** What the live voice is told after an answer: how it went, the answer, and the next question, all in one short turn. */
-export function verdictText(q: WalkQuestion, outcome: WalkOutcome, next: WalkQuestion | null): string {
+/**
+ * What the live voice is told after an answer: how it went, the answer, and the next question, all in one short turn.
+ * `unchecked`: OpenAI couldn't be asked about it, so it's neither right nor wrong.
+ */
+export function verdictText(q: WalkQuestion, outcome: WalkOutcome, next: WalkQuestion | null, unchecked = false): string {
   const answer = `${described(q.card)}`;
-  const said = {
+  const said = unchecked ? `The app couldn't check that answer. Say so briefly, and say the answer slowly: ${answer}.` : {
     right: `They got it right: briefly say "Tama!" and say the answer, ${answer}.`,
     wrong: `They got it wrong. Kindly say it's not quite, and say the right answer slowly: ${answer}.`,
     'dont-know': `They don't know it. Say the answer slowly: ${answer}.`,
