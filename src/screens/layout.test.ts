@@ -9,6 +9,7 @@ import { homeScreen } from './home';
 import { practiceScreen } from './practice';
 import { sessionScreen } from './session';
 import { talkScreen } from './talk';
+import { walkScreen } from './walk';
 import { setApiKey } from '../openai';
 import css from '../style.css?raw';
 import { settingsScreen } from './settings';
@@ -112,6 +113,7 @@ describe('filling the screen', () => {
     // A message with a way forward sits in the middle, the same on every screen.
     ['a finished study session', () => sessionScreen(fakeApp(KNOWN), []), '.panel.center'],
     ['Drills before there are words to drill', () => practiceScreen(fakeApp(['salamat'])), '.panel.center'],
+    ['walk and talk before it starts', () => walkScreen(fakeApp(KNOWN), 'clips'), '.panel.center'],
     [
       'Chat before there are words to chat with',
       () => {

@@ -8,6 +8,7 @@ import { practiceScreen } from './screens/practice';
 import { sessionScreen } from './screens/session';
 import { settingsScreen } from './screens/settings';
 import { hangUpTalk, talkScreen } from './screens/talk';
+import { endWalk, walkScreen } from './screens/walk';
 import { wordsScreen } from './screens/words';
 import { forgetRetiredVoiceChoice } from './openai';
 import { applyAudioMode } from './screens/quiet';
@@ -49,6 +50,7 @@ const app: App = {
     stop();
     cancelRecording();
     hangUpTalk();
+    endWalk();
     endMicrophoneAsk();
     keyHandler = null;
     backHandler = null;
@@ -104,6 +106,9 @@ function render(route: Route): void {
       break;
     case 'settings':
       screen = settingsScreen(app);
+      break;
+    case 'walk':
+      screen = walkScreen(app, route.engine);
       break;
   }
   // Each screen draws its own top: a page its back arrow, a session its close button (docs/ARCHITECTURE.md).

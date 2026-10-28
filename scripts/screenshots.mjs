@@ -341,6 +341,16 @@ const SCREENS = {
     await page.click('[aria-label="Settings"]');
   },
   chat: (page) => page.click('.chat-btn'),
+  // Walk and talk, from Settings' Experimental section, before a round starts.
+  walk: async (page) => {
+    await page.click('[aria-label="Settings"]');
+    await page.click('button:text-is("Walk and talk")');
+  },
+  'walk-live': async (page) => {
+    await page.evaluate(async () => (await import('/src/openai.ts')).setApiKey('sk-screenshot-0000000000000000000000'));
+    await page.click('[aria-label="Settings"]');
+    await page.click('button:text-is("Walk and talk live")');
+  },
   // A call going, with stand-ins for OpenAI and WebRTC: a hum for each voice, so the backdrop moves, and a few lines said.
   'chat-call': async (page) => {
     await page.evaluate(async () => {

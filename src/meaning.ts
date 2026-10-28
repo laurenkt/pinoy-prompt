@@ -9,12 +9,15 @@
 // answer has to be in the language asked for: saying the prompt back means the
 // same, but isn't an answer.
 
-import { ASKED_VOCAB, VOCAB, type Card } from './deck';
+import { ASKED_VOCAB, VOCAB, type Card, type Way } from './deck';
 
 /** The language an answer is asked for in: the card's English meaning, or its Tagalog. */
 export type AnswerLanguage = 'en' | 'tl';
 
 /** Asks whether `answer` says the card in `language`, or null when it can't be asked. Tagalog that was `typed` has to be spelled right. */
+/** What an answer to a question asked `way` is given in: the Tagalog when recalling, the meaning otherwise. */
+export const answerLanguageOf = (way: Way): AnswerLanguage => (way === 'recall' ? 'tl' : 'en');
+
 export type MeaningJudge = (answer: string, card: Card, language: AnswerLanguage, typed: boolean) => Promise<boolean | null>;
 
 export const NUMBERS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];

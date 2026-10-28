@@ -3,7 +3,7 @@
 // sent only to api.openai.com. There is no server of ours in between.
 
 import { getMicrophone, releaseMicrophone } from './microphone';
-import type { AnswerLanguage } from './meaning';
+import type { AnswerLanguage, MeaningJudge } from './meaning';
 import { dayKey } from './progress-schema';
 
 const KEY_STORAGE = 'pinoy-prompt:openai-key';
@@ -327,6 +327,12 @@ export async function checkMeaning(
   throw new AiError('other', 'OpenAI answered without a verdict.');
 }
 
+/** judgeMeaning's ask, with the learner's key: OpenAI checks an answer the device couldn't match, or null without a key. */
+export const askOpenAi: MeaningJudge = async (answer, card, language, typed) => {
+  const key = getApiKey();
+  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language, typed }) : null;
+};
+
 /** Turns a spoken answer in Drills into text. */
 export const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
 /** Longer than a check: a few seconds of audio go up first, over a phone's connection. */
@@ -385,11 +391,21 @@ export interface CallEvents {
   onEnded(error?: AiError): void;
   /** Audio to show as it plays: the learner's microphone once the call is set up, and the AI's voice once it arrives. */
   onAudio?(who: ChatTurn['who'], stream: MediaStream): void;
+  /**
+   * For a call started with `delegate`: the AI has asked the app for help (it generated <|SpawnThinking|>), and waits
+   * for what it's given back with `append` under this id. Nothing says what it wants: that's in the transcript.
+   */
+  onDelegation?(id: string): void;
 }
+
+/** How the app adds to what the AI knows mid-call: something to say aloud, to know without saying, or an instruction. */
+export type CallAppend = 'commentary' | 'thinking' | 'instructions';
 
 export interface Call {
   setMuted(muted: boolean): void;
   hangUp(): void;
+  /** Give the AI something, for a delegation it asked for (its id) or for the call in general (null). */
+  append(kind: CallAppend, content: string, delegationId: string | null): void;
 }
 
 export interface CallDeps {
@@ -418,6 +434,9 @@ export function callSupported(): boolean {
   return typeof RTCPeerConnection !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 }
 
+/** How long a delegating call waits before the AI says it's checking: time for the app to tell it not to. */
+const DELEGATION_ACK_DELAY_MS = 800;
+
 /** Why a call given up while it was still connecting failed. Nobody is shown it. */
 const ABANDONED = 'The call was abandoned while connecting.';
 
@@ -430,10 +449,14 @@ const ABANDONED = 'The call was abandoned while connecting.';
  * then: the request is cancelled, the connection closed and the microphone
  * handed back, so nothing of it is left running when the next call starts.
  * Once connected, a call is ended with `hangUp`.
+ *
+ * With `delegate`, the app is the AI's backend (GPT-Live's client delegation): when the AI asks for help, onDelegation
+ * says so, and the app answers with `append`. The pause before the AI says it's checking is long enough for the app
+ * to tell it not to (an empty thinking append).
  */
 export async function startCall(
   key: string,
-  { instructions, greeting, signal }: { instructions: string; greeting: string; signal?: AbortSignal },
+  { instructions, greeting, signal, delegate = false }: { instructions: string; greeting: string; signal?: AbortSignal; delegate?: boolean },
   events: CallEvents,
   deps: CallDeps = browserCallDeps,
 ): Promise<Call> {
@@ -450,6 +473,8 @@ export async function startCall(
   let channel: RTCDataChannel | null = null;
   let ended = false;
   let greeted = false;
+  /** Appends sent, for their event ids. */
+  let appended = 0;
   /** Seconds of the call already added to the spend estimate. */
   let charged = 0;
   /** When the call started listening, to count the time after OpenAI's last usage report. */
@@ -537,6 +562,7 @@ export async function startCall(
         model: VOICE_MODEL,
         instructions,
         audio: { output: { voice: TALK_VOICE } },
+        ...(delegate && { delegation: { type: 'client', acknowledgement_delay_ms: DELEGATION_ACK_DELAY_MS } }),
         // OpenAI's guide: greeting instructions as a developer message at startup, then again once started.
         input: [{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: greeting }] }],
       },
@@ -559,7 +585,15 @@ export async function startCall(
   }
 
   function onEvent(data: string): void {
-    let event: { type?: string; delta?: string; start_ms?: number; end_ms?: number; usage?: { seconds?: number }; error?: { message?: string } };
+    let event: {
+      type?: string;
+      delta?: string;
+      start_ms?: number;
+      end_ms?: number;
+      usage?: { seconds?: number };
+      error?: { message?: string };
+      delegation?: { id?: string; target?: string };
+    };
     try {
       event = JSON.parse(data);
     } catch {
@@ -593,6 +627,9 @@ export async function startCall(
           events.onUsage(event.usage.seconds);
         }
         break;
+      case 'session.delegation.created':
+        if (event.delegation?.id) events.onDelegation?.(event.delegation.id);
+        break;
       case 'session.closed':
         finish();
         break;
@@ -609,5 +646,13 @@ export async function startCall(
       for (const track of mic.getAudioTracks()) track.enabled = !muted;
     },
     hangUp: () => finish(),
+    append(kind, content, delegationId) {
+      if (ended || channel?.readyState !== 'open') return;
+      try {
+        channel.send(JSON.stringify({ type: `session.${kind}.append`, event_id: `app_${++appended}`, delegation_id: delegationId, content }));
+      } catch {
+        // The channel is closing; the call ends with it.
+      }
+    },
   };
 }

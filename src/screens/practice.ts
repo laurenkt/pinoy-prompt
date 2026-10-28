@@ -1,7 +1,7 @@
 import type { App } from '../app';
 import { VOCAB, getCard, isVocab, type Card, type Drill, type Way } from '../deck';
-import { exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
-import { AiError, checkMeaning, errorText, getApiKey, transcribe } from '../openai';
+import { answerLanguageOf, exactAnswer, judgeMeaning, type AnswerLanguage, type MeaningJudge } from '../meaning';
+import { AiError, askOpenAi, errorText, getApiKey, transcribe } from '../openai';
 import { everyWordSaid, judge } from '../phonetics';
 import { askWithPicture } from '../pictures';
 import { RecordError, toWav, type Recording } from '../recorder';
@@ -90,15 +90,8 @@ const UNCHECKED = Symbol('unchecked');
 /** What `picked` holds for a typed meaning that wasn't right. */
 const MISSED = '';
 
-/** Asks OpenAI, when the learner has given a key for Chat. */
-const askOpenAi: MeaningJudge = async (answer, card, language, typed) => {
-  const key = getApiKey();
-  return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language, typed }) : null;
-};
-
 /** What a typed answer to the question is given in: the meaning when listening, the Tagalog when recalling. */
-const languageOf = (mode: Way): AnswerLanguage => (mode === 'recall' ? 'tl' : 'en');
-const answerLanguage = (q: Question): AnswerLanguage => languageOf(q.mode);
+const answerLanguage = (q: Question): AnswerLanguage => answerLanguageOf(q.mode);
 
 /** The kinds of question a card can be asked as. */
 function modesFor(card: Card): Way[] {
@@ -236,7 +229,7 @@ export function practiceScreen(
       lastDrill.set(card.id, guide.drill);
       return { card, mode, guide, choices: [], typed: false };
     }
-    const field = languageOf(mode);
+    const field = answerLanguageOf(mode);
     const choices = mode === 'speak' ? [] : shuffle([card, ...distractors(card, field, 3, distractorPool)]);
     const { typed } = typing(app.progress, card, mode);
     return { card, mode, choices, typed, picture: mode === 'recall' && askWithPicture(card) };

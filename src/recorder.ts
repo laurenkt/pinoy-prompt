@@ -220,8 +220,20 @@ function closeRecorder(): void {
   kept = null;
 }
 
+/**
+ * How long a take may run, for a screen that waits longer than a question with a button to tap does (walk and talk,
+ * listening with nothing to press): trailing silence before it stops, and the time limit.
+ */
+export interface RecordLimits {
+  trailingSilenceMs?: number;
+  maxMs?: number;
+}
+
 /** Start recording. Asks for the microphone if it hasn't been allowed yet. */
-export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEvents = {}): Recording {
+export function record(
+  { onLevel, onListening, onSpeech, onRestart }: RecorderEvents = {},
+  { trailingSilenceMs = TRAILING_SILENCE_MS, maxMs = MAX_RECORDING_MS }: RecordLimits = {},
+): Recording {
   let finish: () => void = () => {};
   let cancelled = false;
   // stop() can come before the microphone is open (e.g. during the permission prompt).
@@ -285,7 +297,7 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
       // The time limit runs on a timer too, in case the audio never starts flowing.
       const startLimit = () => {
         clearTimeout(limit);
-        limit = setTimeout(() => finish(), MAX_RECORDING_MS + 500);
+        limit = setTimeout(() => finish(), maxMs + 500);
       };
       const end = () => {
         done = true;
@@ -378,7 +390,7 @@ export function record({ onLevel, onListening, onSpeech, onRestart }: RecorderEv
         } else if (heardSpeech) {
           silentMs += blockMs;
         }
-        if ((heardSpeech && silentMs >= TRAILING_SILENCE_MS) || elapsedMs >= MAX_RECORDING_MS) finish();
+        if ((heardSpeech && silentMs >= trailingSilenceMs) || elapsedMs >= maxMs) finish();
       };
       source.connect(processor);
       // Some browsers only run the processor while it's connected to an output.
