@@ -54,6 +54,8 @@ const SHIPPED_IDS = [
   'habang', 'hanggang', 'mula', 'tungkol', 'tulad', 'parang', 'kaysa', 'mas', 'tapos', 'pagkatapos', 'ulit', 'naman',
   'pala', 'rin', 'daw', 'muna', 'siyempre', 'basta', 'di-ba', 'heto', 'ganito', 'masyado', 'medyo', 'halos', 'lahat',
   'bawat', 'iba', 'pareho', 'dapat', 'huwag',
+  // Shipped later: flipped slang.
+  'k-baliktad',
 ];
 
 describe('deck', () => {
