@@ -218,11 +218,17 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
  */
 export async function sayEnglish(text: string): Promise<void> {
   const name = PROMPTS[text];
-  if (name && clipsSupported()) {
-    await playUrl(clipFile(name, false));
-    return untilQuiet();
-  }
   stop();
+  if (name && clipsSupported() && !muted) {
+    const mine = generation;
+    try {
+      if (await playClip(clipFile(name, false), mine, performance.now(), () => {})) return untilQuiet();
+    } finally {
+      if (loading === mine) loading = null;
+    }
+    // Stopped while it loaded; otherwise it couldn't play, so the built-in voice says it.
+    if (mine !== generation) return;
+  }
   if (muted || !speechSupported()) return;
   const utterance = new SpeechSynthesisUtterance(text);
   const english = speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith('en'));

@@ -7,14 +7,14 @@
 //
 //   OPENAI_API_KEY=sk-... npm run prompts
 //
-// Only lines without a clip are made. Each is one take in one voice, trimmed
+// Only lines without a clip (or whose clip file has gone) are made. Each is one take in one voice, trimmed
 // and encoded as generate-audio.mjs encodes the Tagalog (clip-edges.mjs), into
 // public/audio/en-<name>.mp3, listed in src/prompt-clips.json by line. Needs
 // ffmpeg.
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,7 +40,10 @@ await vite.close();
 
 const manifest = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
 const lines = walkLines();
-const todo = lines.filter((line) => !manifest[line]);
+// A line whose listed file has gone is made again.
+const onDisk = (name) => access(join(AUDIO_DIR, `${name}.mp3`)).then(() => true, () => false);
+const todo = [];
+for (const line of lines) if (!manifest[line] || !(await onDisk(manifest[line]))) todo.push(line);
 console.log(`${lines.length} lines, ${todo.length} to record.`);
 
 async function speak(line) {
@@ -83,18 +86,25 @@ async function record(line) {
   manifest[line] = name;
 }
 
+/** Kept in walkLines' order, without lines no card says any more (their files are left for phones that still have them cached). */
+let saving = Promise.resolve();
+function save() {
+  // Saved after every clip, one write at a time, so a run cut short lists what it made.
+  const kept = () => Object.fromEntries(lines.filter((line) => manifest[line]).map((line) => [line, manifest[line]]));
+  return (saving = saving.then(() => writeFile(MANIFEST, `${JSON.stringify(kept(), null, 2)}\n`)));
+}
+
 let done = 0;
 const queue = [...todo];
 await Promise.all(
   Array.from({ length: PARALLEL }, async () => {
     for (let line = queue.shift(); line !== undefined; line = queue.shift()) {
       await record(line);
+      await save();
       if (++done % 25 === 0) console.log(`${done}/${todo.length}`);
     }
   }),
 );
 await rm(work, { recursive: true });
-// Kept in walkLines' order, without lines no card says any more (their files are left for phones that still have them cached).
-const kept = Object.fromEntries(lines.filter((line) => manifest[line]).map((line) => [line, manifest[line]]));
-await writeFile(MANIFEST, `${JSON.stringify(kept, null, 2)}\n`);
+await save();
 console.log(`Recorded ${done}.`);

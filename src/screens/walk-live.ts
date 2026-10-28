@@ -17,15 +17,21 @@ import type { WalkDeps, WalkRun, WalkView } from './walk';
 
 /** Waited once the voice starts its reply, so the end of what the learner said reaches the transcript. */
 const TRANSCRIPT_SETTLE_MS = 600;
-/** A check this recent is the one the voice means when it asks the app. */
+/** A check this recent, with nothing said since, is the one the voice means when it asks the app. */
 const RECENT_CHECK_MS = 15_000;
 /** How long an answer stays on the screen before the next question shows. */
 const SHOW_ANSWER_MS = 3000;
+/** Time for the voice to say its last reaction and goodbye before the call ends. */
+const WRAP_UP_MS = 8000;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Something said that asks rather than answers ("what does it mean?", "say it again"): the question stays. */
-const ASKS = /\?\s*$|^(?:um+\s+|uh+\s+|sorry\s+)?(?:what|how|can you|could you|say (?:it|that) again|again|repeat|wait|hold on)\b/i;
+/**
+ * Something said that asks rather than answers ("what does it mean?", "say it again"), or only fills a pause: the question stays. Only taken
+ * so once the answer hasn't passed as the card, as some cards are questions ("How are you?").
+ */
+const ASKS =
+  /^(?:um+\s+|uh+\s+|sorry\s+|oh\s+)*(?:what does (?:it|that) mean|what was (?:it|that)|what did you say|say (?:it|that) again|(?:can|could) you (?:say|repeat)|repeat|one more time|again|wait|hold on|sorry)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|right)[\s.!]*$/i;
 
 /** An answer checked by the app: how it went, and whether it could be told at all. */
 interface Check {
@@ -48,31 +54,30 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   let upcoming: WalkQuestion | null = current && round.next();
   /** The call's transcript, in turns. */
   const turns: SpokenTurn[] = [];
-  /** When the voice last stopped speaking, in ms from the start of the call: what the learner says after it is their reply. */
-  let answerFrom = 0;
-  /** The answer to the current question being checked, once the voice has started its reply to it. */
+  /** Where what the learner has said is taken up to, in ms from the start of the call: what ends after it is still to check. */
+  let takenTo = 0;
+  /** When the voice last started saying something. */
+  let voiceAt = -1;
+  /** The check running, if one is. */
   let checking: Promise<Check | null> | null = null;
   /** The last answer checked, and when, for the voice to ask about just after. */
   let lastCheck: { result: Check; at: number } | null = null;
   let showNext: ReturnType<typeof setTimeout> | undefined;
+  let wrapUp: ReturnType<typeof setTimeout> | undefined;
 
   const end = (problem?: string) => {
     if (!stopped) view.ended(problem);
   };
   const brief = (q: WalkQuestion | null) => (q ? questionBrief(q, round.help(q)) : null);
 
-  /** What the learner said between two moments of the call. */
-  const said = (from: number, to: number) =>
-    turns
-      .filter((t) => t.who === 'you' && t.start >= from && t.start < to)
-      .map((t) => t.text.trim())
-      .join(' ')
-      .trim();
+  /** What the learner has said that's still to check, before a moment of the call. */
+  const untaken = (before: number) => turns.filter((t) => t.who === 'you' && t.end > takenTo && t.start < before);
 
-  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. */
-  async function judged(answer: string, q: WalkQuestion): Promise<Check> {
+  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. Null for a question to the voice. */
+  async function judged(answer: string, q: WalkQuestion): Promise<Check | null> {
     const language = walkLanguage(q);
     if ((await judgeMeaning(answer, q.card, null, language, false)).right) return { q, said: answer, outcome: 'right', unchecked: false };
+    if (ASKS.test(answer)) return null;
     const command = heardCommand(answer);
     if (command) return { q, said: answer, outcome: command, unchecked: false };
     const { right, failure } = await judgeMeaning(answer, q.card, deps.askMeaning, language, false);
@@ -81,24 +86,31 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   }
 
   /**
-   * The voice has started replying (at `replyAt`) to what the learner said since `from`: check it, note it, and move
-   * the round on a question, telling the voice how it went and what's now next. Null when nothing was an answer.
+   * The voice has replied to what the learner said before `before`: check it, note it, and move the round on a
+   * question, telling the voice how it went and what's now next. Null when it wasn't an answer.
    */
-  async function check(from: number, replyAt: number): Promise<Check | null> {
+  async function check(before: number): Promise<Check | null> {
     const q = current;
     await wait(TRANSCRIPT_SETTLE_MS);
-    const answer = said(from, replyAt);
-    if (stopped || !q || !answer || ASKS.test(answer)) return null;
+    const heard = untaken(before);
+    if (stopped || !q || !heard.length) return null;
+    takenTo = Math.max(takenTo, ...heard.map((t) => t.end));
+    const answer = heard.map((t) => t.text.trim()).join(' ').trim();
+    if (!answer) return null;
     view.status('Checking…');
     const result = await judged(answer, q);
     if (stopped || current !== q) return null;
+    if (!result) {
+      view.status('Listening. Answer out loud.');
+      return null;
+    }
     view.answered(q, result.outcome, round.note(q, result.unchecked ? 'skip' : result.outcome), answer);
     current = upcoming;
     upcoming = current && round.next();
     call?.append('thinking', roundUpdate(brief(current), brief(upcoming), checkText(q, answer, result.outcome, result.unchecked)), null);
     clearTimeout(showNext);
     const next = current;
-    if (!next) end('There was nothing more to ask.');
+    if (!next) wrapUp = setTimeout(() => end('There was nothing more to ask.'), WRAP_UP_MS);
     else
       showNext = setTimeout(() => {
         if (stopped || current !== next) return;
@@ -108,12 +120,31 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     return result;
   }
 
+  /** Check what the learner said before `before`, one check at a time, then anything said while it ran. */
+  function startCheck(before: number): Promise<Check | null> {
+    const pending = (checking = check(before));
+    void pending.then((result) => {
+      if (checking === pending) checking = null;
+      if (result) lastCheck = { result, at: Date.now() };
+      settle();
+    });
+    return pending;
+  }
+
+  /** Once the voice has spoken after something the learner said, that's its reply: check what they said. */
+  function settle(): void {
+    if (!checking && current && untaken(voiceAt).length) void startCheck(voiceAt);
+  }
+
   /** The voice couldn't tell and said it's checking: say the app's verdict aloud under its delegation. */
   async function delegated(id: string): Promise<void> {
     // It has said it's checking already; nothing more until the verdict.
     call?.append('thinking', '', id);
+    while (checking) await checking;
+    // Asked before its own words reached the transcript, what the learner said is checked now.
+    // With nothing said since, it means the answer just checked.
     const recent = lastCheck && Date.now() - lastCheck.at < RECENT_CHECK_MS ? lastCheck.result : null;
-    const result = (await checking) ?? recent ?? (await check(answerFrom, Infinity));
+    const result = untaken(Infinity).length ? await startCheck(Infinity) : recent;
     if (stopped || !call) return;
     call.append(
       'commentary',
@@ -122,31 +153,6 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
         : "The app didn't hear an answer to check. Carry on with the question.",
       id,
     );
-  }
-
-  /** A reply the voice started while an earlier one was still being checked, to check once that's done. */
-  let waiting: { from: number; at: number } | null = null;
-
-  /** Check what the learner said between `from` and the voice's reply at `at`, keeping it for the voice to ask about. */
-  function startCheck(from: number, at: number): void {
-    const pending = (checking = check(from, at));
-    void pending.then((result) => {
-      if (checking === pending) checking = null;
-      if (result) lastCheck = { result, at: Date.now() };
-      const next = waiting;
-      waiting = null;
-      if (next && !checking) startCheck(next.from, next.at);
-    });
-  }
-
-  /** A piece of what the voice said: the start of a new turn is its reply to whatever the learner said since it last spoke. */
-  function voiceSpoke(start: number, endMs: number, newTurn: boolean): void {
-    if (newTurn && current && start >= answerFrom) {
-      // Checked a moment later whatever has arrived by then: the learner's last words can reach the transcript after the voice's first.
-      if (checking) waiting = { from: answerFrom, at: start };
-      else startCheck(answerFrom, start);
-    }
-    answerFrom = Math.max(answerFrom, endMs);
   }
 
   const key = getApiKey();
@@ -163,8 +169,9 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
         onStarted: () => !stopped && view.status('Listening. Answer out loud.'),
         onTranscript: (who, text, start, endMs) => {
           if (stopped) return;
-          const { added } = addPiece(turns, who, text, start, endMs);
-          if (who === 'ai') voiceSpoke(start, endMs, added);
+          addPiece(turns, who, text, start, endMs);
+          if (who === 'ai') voiceAt = Math.max(voiceAt, start);
+          settle();
         },
         onUsage: () => {},
         onDelegation: (id) => void delegated(id),
@@ -184,6 +191,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     stop() {
       stopped = true;
       clearTimeout(showNext);
+      clearTimeout(wrapUp);
       abort.abort();
       call?.hangUp();
       call = null;

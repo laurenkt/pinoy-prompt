@@ -266,6 +266,36 @@ describe('the live engine', () => {
     f.run.stop();
   });
 
+  it('takes an answer that is itself a question, when it is the card', async () => {
+    const f = await started([{ card: getCard('kumusta')!, way: 'listen' }, recall('salamat')]);
+    f.said('you', 'How are you?', 2000, 2600);
+    f.said('ai', 'Yes!', 3000, 3500);
+    await until(() => f.noted.length > 0);
+    expect(f.noted).toEqual(['right']);
+    f.run.stop();
+  });
+
+  it('checks an answer that reaches the transcript after the voice has replied', async () => {
+    const f = await started([recall('salamat'), recall('oo')]);
+    f.said('ai', 'Tama!', 3000, 3500);
+    await new Promise((r) => setTimeout(r, 700));
+    f.said('you', 'Salamat', 2000, 2500);
+    await until(() => f.noted.length > 0);
+    expect(f.noted).toEqual(['right']);
+    f.run.stop();
+  });
+
+  it('checks the answer once, when the voice asks the app before its reply reaches the transcript', async () => {
+    const f = await started([recall('salamat'), recall('oo'), recall('kumusta')]);
+    f.said('you', 'salamaat po', 2000, 2500);
+    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
+    f.said('ai', 'Hmm, let me check that.', 3000, 4000);
+    await until(() => f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_1'));
+    await new Promise((r) => setTimeout(r, 800));
+    expect(f.noted).toHaveLength(1);
+    f.run.stop();
+  });
+
   it("doesn't take a question from the learner for an answer", async () => {
     const f = await started([recall('salamat'), recall('oo')]);
     f.said('you', 'What does that mean?', 2000, 2500);
