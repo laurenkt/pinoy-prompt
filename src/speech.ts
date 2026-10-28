@@ -10,6 +10,7 @@
 
 import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, runningContext, type Sound } from './audio-engine';
 import clips from './clips.json';
+import prompts from './prompt-clips.json';
 import thockFile from './sounds/tap-thock.mp3?inline';
 import { hapticTick } from './haptics';
 import { microphoneInUse } from './microphone';
@@ -69,6 +70,8 @@ export function voiceQuality(): VoiceQuality {
 
 /** Clip files by the text they say, one take per voice: `<name>.mp3`, and `<name>-slow.mp3` said slowly. */
 const CLIPS: Record<string, string[]> = clips;
+/** Recorded English lines by their text (walk and talk's, made by scripts/generate-prompts.mjs). */
+const PROMPTS: Record<string, string> = prompts;
 
 /** Which voice each text last played in, so its slow version is the same voice slowed down. */
 const lastVoice = new Map<string, number>();
@@ -89,7 +92,8 @@ function clipFile(name: string, slow: boolean): string {
 
 /** Every clip file, to keep offline. */
 export function allClipUrls(): string[] {
-  return Object.values(CLIPS).flatMap((names) => names.flatMap((name) => [clipFile(name, false), clipFile(name, true)]));
+  const words = Object.values(CLIPS).flatMap((names) => names.flatMap((name) => [clipFile(name, false), clipFile(name, true)]));
+  return [...words, ...Object.values(PROMPTS).map((name) => clipFile(name, false))];
 }
 
 /** Load a word's clips ahead, in every voice as either may play, so a tap only has to start one. Plays nothing. */
@@ -207,11 +211,17 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
 }
 
 /**
- * Say English out loud in the built-in voice: walk and talk's questions, which have no recorded clip. The first one
- * must be said inside a tap, as iOS only lets a page speak once a tap has started it. Muted with the words, and stopped
- * by stop(). Resolves once it has been said (or couldn't be).
+ * Say an English line out loud: its recorded clip, through the shared context like every clip, or without one the
+ * built-in voice, which an iPhone keeps silent while the microphone is open. The first sound must come inside a tap,
+ * as iOS only lets a page play once a tap has started it. Muted with the words, and stopped by stop(). Resolves once
+ * it has been said (or couldn't be).
  */
 export async function sayEnglish(text: string): Promise<void> {
+  const name = PROMPTS[text];
+  if (name && clipsSupported()) {
+    await playUrl(clipFile(name, false));
+    return untilQuiet();
+  }
   stop();
   if (muted || !speechSupported()) return;
   const utterance = new SpeechSynthesisUtterance(text);
@@ -233,9 +243,13 @@ export async function sayEnglish(text: string): Promise<void> {
 /** Ends the wait for English being said, when stop() cancels it. */
 let endSaying: (() => void) | null = null;
 
-/** Resolves once no word is being heard, for a screen that plays one sound after another. */
-export async function untilQuiet(): Promise<void> {
-  while (speaking()) await new Promise((resolve) => setTimeout(resolve, 100));
+/**
+ * Resolves once no word is being heard, for a screen that plays one sound after another, or after `limitMs` anyway:
+ * the built-in voice can report it's speaking long after it has stopped, or without making a sound.
+ */
+export async function untilQuiet(limitMs = 15_000): Promise<void> {
+  const until = Date.now() + limitMs;
+  while (speaking() && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
 /**

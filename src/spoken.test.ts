@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import clips from './clips.json';
 import clipSounds from './clip-sounds.json';
+import prompts from './prompt-clips.json';
 import { ASKED_VOCAB, VOCAB, type Card } from './deck';
 import { GUIDES } from './guides';
 import { drillSentence } from './session';
@@ -42,9 +43,9 @@ describe('recorded clips', () => {
     expect(Object.keys(CLIPS).filter((t) => CLIPS[t].length !== 2)).toEqual([]);
   });
 
-  it('has both files of every clip, and nothing else, so all of them can be kept offline', () => {
+  it('has both files of every clip, and the English prompts, and nothing else, so all of them can be kept offline', () => {
     const files = allClipUrls().map((url) => url.split('/').pop());
-    expect(files).toHaveLength(2 * Object.values(CLIPS).flat().length);
+    expect(files).toHaveLength(2 * Object.values(CLIPS).flat().length + Object.keys(prompts).length);
     expect(files.filter((f) => !onDisk.has(f))).toEqual([]);
     expect(onDisk.size).toBe(files.length);
   });

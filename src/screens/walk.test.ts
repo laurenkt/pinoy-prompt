@@ -190,49 +190,18 @@ function liveDeps() {
 }
 
 describe('walk and talk live', () => {
-  it('judges the answer when the voice asks, and gives it the verdict, the answer and the next question', async () => {
+  it('starts a call that delegates, opening with the first question and the one after', async () => {
     setApiKey(KEY);
     const f = liveDeps();
-    const app = fakeApp(KNOWN);
-    const root = walkScreen(app, 'live', f.deps);
+    const root = walkScreen(fakeApp(KNOWN), 'live', f.deps);
     document.body.append(root);
     button(root, 'Start').click();
     await until(() => f.fetch.mock.calls.length > 0);
-    await flush();
     const body = JSON.parse(String((f.fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body));
     expect(body.session.delegation.type).toBe('client');
-    f.send({ type: 'session.started', session: {} });
-    const card = asked();
-    const answer = document.querySelector('.prompt-en') ? card.tl : card.en.split('/')[0];
-    f.send({ type: 'session.input_transcript.delta', delta: answer, start_ms: 0, end_ms: 500 });
-    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1', type: 'delegation', target: 'client' } });
-    // Told at once not to say it's checking.
-    expect(f.sent).toContainEqual(expect.objectContaining({ type: 'session.thinking.append', delegation_id: 'item_1', content: '' }));
-    await until(() => f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_1'));
-    const verdict = f.sent.find((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_1')!.content!;
-    expect(verdict).toContain('Tama!');
-    expect(verdict).toContain(`"${card.tl}"`);
-    expect(verdict).toMatch(/Then, straight away: (Ask|Say)/);
-    expect(root.querySelector('.feedback strong')?.textContent).toBe('Tama!');
-  });
-
-  it('gives the answer to "I don\'t know", noted as needing help', async () => {
-    setApiKey(KEY);
-    const f = liveDeps();
-    const app = fakeApp(KNOWN);
-    const root = walkScreen(app, 'live', f.deps);
-    document.body.append(root);
-    button(root, 'Start').click();
-    await until(() => f.fetch.mock.calls.length > 0);
-    await flush();
-    f.send({ type: 'session.started', session: {} });
-    const card = asked();
-    const way = document.querySelector('.prompt-en') ? 'recall' : 'listen';
-    f.send({ type: 'session.input_transcript.delta', delta: "Um, I don't know.", start_ms: 0, end_ms: 500 });
-    f.send({ type: 'session.delegation.created', delegation: { id: 'item_2', type: 'delegation', target: 'client' } });
-    await until(() => f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_2'));
-    expect(f.sent.find((e) => e.delegation_id === 'item_2' && e.type === 'session.commentary.append')!.content).toContain(`"${card.tl}"`);
-    expect(drillNote(app.progress.cards[card.id], way).help).toBe(1);
+    const greeting = body.session.input[0].content[0].text as string;
+    expect(greeting).toContain('The question now:');
+    expect(greeting).toContain('The question after it');
   });
 });
 
@@ -240,65 +209,83 @@ describe('the live engine', () => {
   /** A round that asks these questions in turn, keeping what it was told. */
   function fixedRound(qs: WalkQuestion[]) {
     const noted: WalkOutcome[] = [];
-    const round: WalkRound = { next: () => qs.shift() ?? null, note: (_q, o) => (noted.push(o), true), done: 0 };
+    const round: WalkRound = { next: () => qs.shift() ?? null, note: (_q, o) => (noted.push(o), true), done: 0, help: () => 0 };
     const view: WalkView = { status() {}, asked() {}, answered() {}, ended() {} };
     return { round, view, noted };
   }
   const recall = (id: string): WalkQuestion => ({ card: getCard(id)!, way: 'recall' });
 
-  async function started(qs: WalkQuestion[]) {
+  async function started(qs: WalkQuestion[], setup: (deps: WalkDeps) => void = () => {}) {
     setApiKey(KEY);
     const f = liveDeps();
+    setup(f.deps);
     const r = fixedRound(qs);
     const run = startLiveWalk(r.round, r.view, f.deps);
     await until(() => f.fetch.mock.calls.length > 0);
     await flush();
     f.send({ type: 'session.started', session: {} });
-    const verdicts = () => f.sent.filter((e) => e.type === 'session.commentary.append' && e.delegation_id !== null);
-    return { ...f, ...r, run, verdicts };
+    const updates = () => f.sent.filter((e) => e.type === 'session.thinking.append' && e.content);
+    const said = (who: 'ai' | 'you', delta: string, start_ms: number, end_ms: number) =>
+      f.send({ type: who === 'ai' ? 'session.output_transcript.delta' : 'session.input_transcript.delta', delta, start_ms, end_ms });
+    return { ...f, ...r, run, updates, said };
   }
+
+  it('lets the voice react itself, and checks the answer behind it, telling the voice how it went and what is next', async () => {
+    const f = await started([recall('salamat'), recall('kumusta'), recall('oo')]);
+    f.said('ai', 'How do you say thank you?', 0, 1500);
+    f.said('you', 'Salamat', 3000, 3500);
+    f.said('ai', 'Tama! Now, how would you say how are you?', 4000, 6000);
+    await until(() => f.updates().length > 0);
+    expect(f.noted).toEqual(['right']);
+    const update = f.updates()[0].content!;
+    expect(update).toContain('"Salamat": right');
+    expect(update).toContain('The question now: ask how to say "How are you?"');
+    expect(update).toContain('The question after it');
+    // Nothing for the voice to say: it has already reacted.
+    expect(f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id !== null)).toBe(false);
+    f.run.stop();
+  });
 
   it('takes "Hindi ko alam" as the answer to the card that is "Hindi ko alam", not as not knowing', async () => {
     const f = await started([recall('hindi-ko-alam'), recall('salamat')]);
-    f.send({ type: 'session.input_transcript.delta', delta: 'Hindi ko alam', start_ms: 0, end_ms: 800 });
-    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
-    await until(() => f.verdicts().length > 0);
+    f.said('you', 'Hindi ko alam', 2000, 2800);
+    f.said('ai', 'Ayos!', 3000, 3500);
+    await until(() => f.noted.length > 0);
     expect(f.noted).toEqual(['right']);
     f.run.stop();
   });
 
-  it('only counts what was said after the voice stopped speaking, with its pieces joined', async () => {
-    const f = await started([recall('salamat'), recall('kumusta'), recall('oo')]);
-    f.send({ type: 'session.input_transcript.delta', delta: 'Salamat', start_ms: 0, end_ms: 500 });
+  it('gives the verdict aloud when the voice asks the app', async () => {
+    const f = await started([recall('salamat'), recall('oo')]);
+    f.said('you', 'salamaat', 2000, 2500);
+    f.said('ai', 'Hmm, let me check that.', 3000, 4000);
     f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
-    await until(() => f.verdicts().length === 1);
-    // Said along with the verdict, before the voice asks the next one: not an answer to it.
-    f.send({ type: 'session.input_transcript.delta', delta: 'salamat', start_ms: 1000, end_ms: 1400 });
-    f.send({ type: 'session.output_transcript.delta', delta: 'Tama! How do you say how are you?', start_ms: 900, end_ms: 3000 });
-    f.send({ type: 'session.input_transcript.delta', delta: 'Kumus', start_ms: 3500, end_ms: 3900 });
-    f.send({ type: 'session.input_transcript.delta', delta: 'ta', start_ms: 3900, end_ms: 4100 });
-    f.send({ type: 'session.delegation.created', delegation: { id: 'item_2' } });
-    await until(() => f.verdicts().length === 2);
-    expect(f.noted).toEqual(['right', 'right']);
+    expect(f.sent).toContainEqual(expect.objectContaining({ type: 'session.thinking.append', delegation_id: 'item_1', content: '' }));
+    await until(() => f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_1'));
+    expect(f.sent.find((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_1')!.content).toContain('The app checked');
+    f.run.stop();
+  });
+
+  it("doesn't take a question from the learner for an answer", async () => {
+    const f = await started([recall('salamat'), recall('oo')]);
+    f.said('you', 'What does that mean?', 2000, 2500);
+    f.said('ai', 'It means thank you!', 3000, 4000);
+    await new Promise((r) => setTimeout(r, 800));
+    expect(f.noted).toEqual([]);
     f.run.stop();
   });
 
   it("doesn't count an answer it couldn't check with OpenAI", async () => {
-    setApiKey(KEY);
-    const f = liveDeps();
-    f.deps.askMeaning = async () => {
-      throw new Error('offline');
-    };
-    const r = fixedRound([recall('salamat'), recall('oo')]);
-    const run = startLiveWalk(r.round, r.view, f.deps);
-    await until(() => f.fetch.mock.calls.length > 0);
-    await flush();
-    f.send({ type: 'session.started', session: {} });
-    f.send({ type: 'session.input_transcript.delta', delta: 'many thanks friend', start_ms: 0, end_ms: 500 });
-    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
-    await until(() => f.sent.some((e) => e.delegation_id === 'item_1' && e.type === 'session.commentary.append'));
-    expect(r.noted).toEqual(['skip']);
-    expect(f.sent.find((e) => e.delegation_id === 'item_1' && e.type === 'session.commentary.append')!.content).toContain("couldn't check");
-    run.stop();
+    const f = await started([recall('salamat'), recall('oo')], (deps) => {
+      deps.askMeaning = async () => {
+        throw new Error('offline');
+      };
+    });
+    f.said('you', 'many thanks friend', 2000, 2500);
+    f.said('ai', 'Hmm.', 3000, 3200);
+    await until(() => f.updates().length > 0);
+    expect(f.noted).toEqual(['skip']);
+    expect(f.updates()[0].content).toContain("couldn't check");
+    f.run.stop();
   });
 });
