@@ -178,6 +178,32 @@ describe('startCall', () => {
     expect(f.events.onEnded).toHaveBeenCalledOnce();
   });
 
+  it('lets the app be the backend: says when the AI asks, and sends back what the app gives it', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    const onDelegation = vi.fn();
+    const call = await startCall(KEY, { ...PROMPT, delegate: true }, { ...f.events, onDelegation }, f.deps);
+    const body = JSON.parse(String(f.fetchFn.mock.calls[0][1]!.body));
+    expect(body.session.delegation).toEqual({ type: 'client', acknowledgement_delay_ms: 800 });
+    f.peer.channel.emit({ type: 'session.started', session: {} });
+    f.peer.channel.emit({ type: 'session.delegation.created', offset_ms: 1000, delegation: { id: 'item_1', type: 'delegation', target: 'client' } });
+    expect(onDelegation).toHaveBeenCalledWith('item_1');
+    call.append('thinking', '', 'item_1');
+    call.append('commentary', 'Tama!', 'item_1');
+    expect(f.peer.channel.sent.slice(1)).toEqual([
+      { type: 'session.thinking.append', event_id: 'app_1', delegation_id: 'item_1', content: '' },
+      { type: 'session.commentary.append', event_id: 'app_2', delegation_id: 'item_1', content: 'Tama!' },
+    ]);
+    call.hangUp();
+    call.append('commentary', 'Too late.', null);
+    expect(f.peer.channel.sent.at(-1)).toEqual({ type: 'session.close' });
+  });
+
+  it('starts an ordinary call without a backend', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    await startCall(KEY, PROMPT, f.events, f.deps);
+    expect(JSON.parse(String(f.fetchFn.mock.calls[0][1]!.body)).session.delegation).toBeUndefined();
+  });
+
   it('hands over the microphone and the AI voice to show', async () => {
     const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
     const onAudio = vi.fn();

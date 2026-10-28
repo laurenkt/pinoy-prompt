@@ -207,6 +207,32 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
 }
 
 /**
+ * Say English out loud in the built-in voice: walk and talk's questions, which have no recorded clip. The first one
+ * must be said inside a tap, as iOS only lets a page speak once a tap has started it. Muted with the words, and stopped
+ * by stop(). Resolves once it has been said (or couldn't be).
+ */
+export async function sayEnglish(text: string): Promise<void> {
+  stop();
+  if (muted || !speechSupported()) return;
+  const utterance = new SpeechSynthesisUtterance(text);
+  const english = speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith('en'));
+  if (english) utterance.voice = english;
+  utterance.lang = english?.lang ?? 'en-US';
+  // Ended by stop() too: some browsers never report a cancelled one.
+  const said = new Promise<void>((resolve) => (endSaying = utterance.onend = utterance.onerror = () => resolve()));
+  speechSynthesis.speak(utterance);
+  await said;
+}
+
+/** Ends the wait for English being said, when stop() cancels it. */
+let endSaying: (() => void) | null = null;
+
+/** Resolves once no word is being heard, for a screen that plays one sound after another. */
+export async function untilQuiet(): Promise<void> {
+  while (speaking()) await new Promise((resolve) => setTimeout(resolve, 100));
+}
+
+/**
  * A soft two-note chime for a right answer. It's short and quiet, as praise
  * should stay small, and goes quiet with the words while the sound is off. A word
  * played with it (the answer, said back) starts once it's done, not over it.
@@ -518,6 +544,8 @@ if (typeof document !== 'undefined') {
 /** Stop any word playing. */
 export function stop(): void {
   generation++;
+  endSaying?.();
+  endSaying = null;
   reportStart(null);
   currentClip?.stop();
   currentClip = null;
