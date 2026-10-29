@@ -181,6 +181,7 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
       );
     } else {
       const again = state.name === 'stopped';
+      const rough = state.name === 'stopped' && roughConnection(state.quality);
       body = h(
         'section',
         { class: 'panel center' },
@@ -189,7 +190,7 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
         h('p', null, ABOUT),
         h('p', { class: 'muted small' }, 'Put your headphones in. The screen stays on while it runs; locking the phone stops it.'),
         state.name === 'stopped' && state.problem && h('div', { class: 'feedback bad', role: 'alert' }, state.problem),
-        state.name === 'stopped' && roughConnection(state.quality) && h('p', { class: 'muted small walk-connection' }, roughConnection(state.quality)),
+        rough && h('p', { class: 'muted small walk-connection' }, rough),
         h('button', { class: 'btn primary big', 'data-tap': 'before', onclick: start }, again ? 'Start again' : 'Start'),
       );
     }
@@ -203,5 +204,5 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
 /** What to say about a call whose connection lost enough of the voice to be heard, if it did. */
 function roughConnection(quality: CallQuality | null | undefined): string | null {
   if (!quality || quality.concealed < ROUGH_CONNECTION) return null;
-  return `The connection dropped some of the voice: ${Math.round(quality.concealed * 100) || 1}% of it was patched over, which sounds like stutter.`;
+  return `The connection dropped some of the voice: ${Math.round(quality.concealed * 100)}% of it was patched over, which sounds like stutter.`;
 }

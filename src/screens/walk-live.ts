@@ -87,8 +87,10 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
 
   const end = (problem?: string) => {
     stopWaiting();
+    // Once stopped, the hold was let go already, and may now be the next round's.
+    if (stopped) return;
     holdAudio(false);
-    if (!stopped) view.ended(problem);
+    view.ended(problem);
   };
   const brief = (q: WalkQuestion | null) => (q ? questionBrief(q, round.help(q)) : null);
 

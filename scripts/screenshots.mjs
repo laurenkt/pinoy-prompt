@@ -432,7 +432,7 @@ const SCREENS = {
     });
     await page.click('.walk-btn');
     await page.click('button:text-is("Start")');
-    await page.waitForTimeout(5600);
+    await page.waitForTimeout(3000);
     await page.click('.walk-stop');
     await page.waitForSelector('.walk-connection');
   },

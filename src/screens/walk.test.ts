@@ -179,10 +179,10 @@ describe('walk and talk', () => {
     await flush();
     f.send({ type: 'session.started', session: {} });
     f.stats.push({ type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 100_000, concealedSamples: 4_000, packetsReceived: 97, packetsLost: 3 });
-    await new Promise((r) => setTimeout(r, 5100));
+    await new Promise((r) => setTimeout(r, 2200));
     button(root, 'Stop').click();
     expect(root.querySelector('.walk-connection')?.textContent).toContain('4% of it was patched over');
-  }, 10_000);
+  }, 6000);
 
   it('says nothing of a clean connection', async () => {
     setApiKey(KEY);
@@ -194,10 +194,10 @@ describe('walk and talk', () => {
     await flush();
     f.send({ type: 'session.started', session: {} });
     f.stats.push({ type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 100_000, concealedSamples: 200, packetsReceived: 100, packetsLost: 0 });
-    await new Promise((r) => setTimeout(r, 5100));
+    await new Promise((r) => setTimeout(r, 2200));
     button(root, 'Stop').click();
     expect(root.querySelector('.walk-connection')).toBeNull();
-  }, 10_000);
+  }, 6000);
 
   it('shows how the round is going rather than the question, with a big Stop, and the tally once stopped', async () => {
     setApiKey(KEY);
@@ -373,7 +373,7 @@ describe('the live engine', () => {
     expect(f.noted).toEqual(['right']);
     expect(f.updates()[0].content).toContain('The question now: ask how to say "Yes');
     f.run.stop();
-  }, 10_000);
+  }, 6000);
 
   it("gives OpenAI the voice's whole reply, when the learner's words reach the transcript after it", async () => {
     const asks: { asked: string; reply: string }[] = [];
@@ -388,7 +388,7 @@ describe('the live engine', () => {
     expect(asks[0].asked).toBe('How do you say right?');
     expect(asks[0].reply).toBe('Yes, I mean correct.');
     f.run.stop();
-  }, 10_000);
+  }, 6000);
 
   it("takes what was said as an answer, without waiting on the reply, once the voice asks the app", async () => {
     const asks: unknown[] = [];
@@ -416,7 +416,7 @@ describe('the live engine', () => {
     await until(() => f.noted.length > 0, 5000);
     expect(f.noted).toEqual(['right']);
     f.run.stop();
-  }, 10_000);
+  }, 6000);
 
   it('follows the voice when it has gone on to the next question without the app', async () => {
     const f = await started([recall('salamat'), recall('kumusta'), recall('oo')]);
@@ -463,7 +463,7 @@ describe('the live engine', () => {
     await until(() => f.noted.length > 0, 5000);
     expect(f.noted).toEqual(['skip']);
     f.run.stop();
-  }, 10_000);
+  }, 6000);
 
   it("doesn't take a question from the learner for an answer", async () => {
     const f = await started([recall('salamat'), recall('oo')]);

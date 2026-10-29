@@ -487,21 +487,26 @@ export interface CallQuality {
 }
 
 /** How often a call's receiving stats are read (onQuality). */
-const QUALITY_EVERY_MS = 5000;
+const QUALITY_EVERY_MS = 2000;
 
 /** The voice's quality from a peer's stats, or null before any of it has arrived. */
 export function callQuality(report: RTCStatsReport): CallQuality | null {
-  let quality: CallQuality | null = null;
+  let samples = 0;
+  let concealed = 0;
+  let received = 0;
+  let lost = 0;
+  // Summed over every incoming audio stream, in case the voice's changes partway.
   report.forEach((s: Record<string, unknown>) => {
     if (s.type !== 'inbound-rtp' || s.kind !== 'audio') return;
     const n = (key: string) => (typeof s[key] === 'number' ? (s[key] as number) : 0);
-    const samples = n('totalSamplesReceived');
-    const packets = n('packetsReceived') + n('packetsLost');
-    if (!samples) return;
+    samples += n('totalSamplesReceived');
     // Silence made up while the voice sent none (between its turns) can't be heard, so isn't counted.
-    quality = { concealed: Math.max(0, n('concealedSamples') - n('silentConcealedSamples')) / samples, lost: packets ? n('packetsLost') / packets : 0 };
+    concealed += Math.max(0, n('concealedSamples') - n('silentConcealedSamples'));
+    received += n('packetsReceived');
+    lost += n('packetsLost');
   });
-  return quality;
+  if (!samples) return null;
+  return { concealed: concealed / samples, lost: received + lost ? lost / (received + lost) : 0 };
 }
 
 /** How the app adds to what the AI knows mid-call: something to say aloud, to know without saying, or an instruction. */
@@ -575,7 +580,11 @@ export async function startCall(
   } catch {
     throw new AiError('other', 'Chat needs the microphone. Allow it for this site and try again.');
   }
-  if (!signal?.aborted) events.onMicrophone?.();
+  try {
+    if (!signal?.aborted) events.onMicrophone?.();
+  } catch {
+    // A sound that couldn't start mustn't keep the microphone from the call, or leave it open without one.
+  }
   let peer: RTCPeerConnection | null = null;
   let channel: RTCDataChannel | null = null;
   let ended = false;

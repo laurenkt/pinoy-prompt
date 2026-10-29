@@ -211,7 +211,7 @@ describe('startCall', () => {
     expect(onMicrophone).toHaveBeenCalledOnce();
   });
 
-  it('reports how the voice is coming through every few seconds, until the call ends', async () => {
+  it('reports how the voice is coming through every couple of seconds, until the call ends', async () => {
     vi.useFakeTimers();
     try {
       const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
@@ -221,7 +221,7 @@ describe('startCall', () => {
         { type: 'outbound-rtp', kind: 'audio', packetsSent: 500 },
         { type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 480_000, concealedSamples: 48_000, silentConcealedSamples: 24_000, packetsReceived: 490, packetsLost: 10 },
       ];
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(2000);
       expect(onQuality).toHaveBeenCalledWith({ concealed: 0.05, lost: 0.02 });
       call.hangUp();
       await vi.advanceTimersByTimeAsync(10_000);
