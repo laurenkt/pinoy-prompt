@@ -90,7 +90,9 @@ describe('opening walk and talk', () => {
 function liveDeps() {
   let channel: { onmessage: ((e: { data: string }) => void) | null; readyState: string; send: (d: string) => void } | null = null;
   const sent: { type: string; content?: string; delegation_id?: string | null }[] = [];
+  const stats: Record<string, unknown>[] = [];
   const peer = {
+    getStats: async () => new Map(stats.map((s, i) => [String(i), s])),
     ontrack: null,
     onconnectionstatechange: null,
     connectionState: 'connected',
@@ -115,7 +117,7 @@ function liveDeps() {
   };
   const send = (event: object) => channel!.onmessage!({ data: JSON.stringify(event) });
   const deps: WalkDeps = { call, callSupported: () => true, askMeaning: null, askTurn: null };
-  return { deps, sent, send, fetch };
+  return { deps, sent, send, fetch, stats };
 }
 
 describe('walk and talk', () => {
@@ -150,6 +152,52 @@ describe('walk and talk', () => {
     await new Promise((r) => setTimeout(r, 1300));
     expect(ticks.count).toBe(waiting);
   });
+
+  it('waits for the microphone before sounding, so the sounds start in the call\'s audio', async () => {
+    setApiKey(KEY);
+    const f = liveDeps();
+    let open = (_: MediaStream) => {};
+    const mic = f.deps.call.getMicrophone;
+    f.deps.call.getMicrophone = () => mic().then((m) => new Promise<MediaStream>((r) => (open = () => r(m))));
+    const root = walkScreen(fakeApp(KNOWN), f.deps);
+    document.body.append(root);
+    button(root, 'Start').click();
+    await flush();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ticks.count).toBe(0);
+    open(null as unknown as MediaStream);
+    await until(() => ticks.count > 0);
+  });
+
+  it('says so once stopped when the connection lost enough of the voice to hear', async () => {
+    setApiKey(KEY);
+    const f = liveDeps();
+    const root = walkScreen(fakeApp(KNOWN), f.deps);
+    document.body.append(root);
+    button(root, 'Start').click();
+    await until(() => f.fetch.mock.calls.length > 0);
+    await flush();
+    f.send({ type: 'session.started', session: {} });
+    f.stats.push({ type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 100_000, concealedSamples: 4_000, packetsReceived: 97, packetsLost: 3 });
+    await new Promise((r) => setTimeout(r, 5100));
+    button(root, 'Stop').click();
+    expect(root.querySelector('.walk-connection')?.textContent).toContain('4% of it was patched over');
+  }, 10_000);
+
+  it('says nothing of a clean connection', async () => {
+    setApiKey(KEY);
+    const f = liveDeps();
+    const root = walkScreen(fakeApp(KNOWN), f.deps);
+    document.body.append(root);
+    button(root, 'Start').click();
+    await until(() => f.fetch.mock.calls.length > 0);
+    await flush();
+    f.send({ type: 'session.started', session: {} });
+    f.stats.push({ type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 100_000, concealedSamples: 200, packetsReceived: 100, packetsLost: 0 });
+    await new Promise((r) => setTimeout(r, 5100));
+    button(root, 'Stop').click();
+    expect(root.querySelector('.walk-connection')).toBeNull();
+  }, 10_000);
 
   it('shows how the round is going rather than the question, with a big Stop, and the tally once stopped', async () => {
     setApiKey(KEY);

@@ -9,10 +9,12 @@
 // delegation, see startCall), which says the verdict aloud. A right answer gets
 // Drills' chime, as soon as the app's check finds it. While the call connects a
 // soft note sounds every so often, and a rising one once it's ready, for someone
-// not looking at the screen.
+// not looking at the screen. These play through the shared context, held running
+// for the whole call (holdAudio) so it doesn't stop and start beside the voice.
 
+import { holdAudio } from '../audio-engine';
 import { judgeMeaning } from '../meaning';
-import { errorText, getApiKey, startCall, type Call } from '../openai';
+import { errorText, getApiKey, startCall, type Call, type CallQuality } from '../openai';
 import { chime, readySound, stop, waitingSound } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
 import { checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
@@ -78,9 +80,14 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   /** Stops the sound that says the call is still connecting. */
   let stopWaiting = () => {};
   let wrapUp: ReturnType<typeof setTimeout> | undefined;
+  /** How the voice has come through so far. */
+  let quality: CallQuality | null = null;
+  /** The call is connected, so the waiting sound mustn't start. */
+  let connected = false;
 
   const end = (problem?: string) => {
     stopWaiting();
+    holdAudio(false);
     if (!stopped) view.ended(problem);
   };
   const brief = (q: WalkQuestion | null) => (q ? questionBrief(q, round.help(q)) : null);
@@ -261,13 +268,18 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     queueMicrotask(() => end(current ? 'Chat needs an OpenAI key.' : 'There was nothing to ask.'));
   } else {
     view.status('Connecting…');
-    // Started inside the tap, so the audio may start.
-    stopWaiting = waitingSound();
+    holdAudio(true);
     void startCall(
       key,
       { instructions: walkInstructions(), greeting: walkGreeting(brief(current)!, brief(upcoming)), signal: abort.signal, delegate: true },
       {
+        // Not from the tap: the microphone opening changes the phone's audio, which would replace a context made before
+        // it, mid-call. Once it's open the context may start by itself.
+        onMicrophone: () => {
+          if (!stopped && !connected) stopWaiting = waitingSound();
+        },
         onStarted: () => {
+          connected = true;
           stopWaiting();
           if (stopped) return;
           void readySound();
@@ -284,6 +296,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
         },
         onUsage: () => {},
         onDelegation: (id) => void delegated(id),
+        onQuality: (q) => (quality = q),
         onEnded: (e) => end(e ? errorText(e) : 'The call ended.'),
       },
       deps.call,
@@ -297,9 +310,11 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   }
 
   return {
+    quality: () => quality,
     stop() {
       stopped = true;
       stopWaiting();
+      holdAudio(false);
       clearTimeout(wrapUp);
       abort.abort();
       call?.hangUp();
