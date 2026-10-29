@@ -8,19 +8,19 @@
 // when the voice can't tell does it say it's checking and ask the app (client
 // delegation, see startCall), which says the verdict aloud. A right answer gets
 // Drills' chime, as soon as the app's check finds it. While the call connects a
-// soft note sounds every so often, and a rising one once it's ready, for someone
-// not looking at the screen. These play through the shared context, held running
-// for the whole call (holdAudio) so it doesn't stop and start beside the voice.
-// With Settings' "Chimes during walk and talk" off (callSounds), there's no ready
-// sound or chime, and the shared context is let go as the voice starts, to find
-// whether Web Audio beside the call is what makes it stutter on iPhone.
+// soft note sounds every so often, for someone not looking at the screen; the
+// voice's greeting says it's ready. These play through the shared context, closed
+// as the round starts and made afresh once the microphone is open, so the phone's
+// switch into a call and the context's making are both over before the voice
+// starts, and held running for the whole call (holdAudio) so it doesn't stop and
+// start beside the voice.
 
-import { holdAudio, suspendAudio } from '../audio-engine';
+import { closeAudio, holdAudio } from '../audio-engine';
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call, type CallQuality } from '../openai';
-import { chime, readySound, stop, waitingSound } from '../speech';
+import { chime, stop, waitingSound } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
-import { callSounds, checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import { checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
 
 /** Waited once the voice starts its reply, so the end of what the learner said reaches the transcript. */
@@ -87,8 +87,6 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   let quality: CallQuality | null = null;
   /** The call is connected, so the waiting sound mustn't start. */
   let connected = false;
-  /** Whether the app plays its own sounds beside the voice (callSounds), fixed for the round. */
-  const sounds = callSounds();
 
   const end = (problem?: string) => {
     stopWaiting();
@@ -220,7 +218,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
       return null;
     }
     // Drills' chime for a right answer, played by the app as it knows: asking the voice to would hold it up.
-    if (result.outcome === 'right' && sounds) void chime();
+    if (result.outcome === 'right') void chime();
     // One OpenAI couldn't check is noted, and counted, as moved past.
     const outcome = result.unchecked ? 'skip' : result.outcome;
     view.answered(q, outcome, round.note(q, outcome));
@@ -275,13 +273,15 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     queueMicrotask(() => end(current ? 'Chat needs an OpenAI key.' : 'There was nothing to ask.'));
   } else {
     view.status('Connecting…');
-    if (sounds) holdAudio(true);
+    // Made before the microphone opens (the taps that got here), the context would be replaced on the first connecting
+    // note, just as the call connects. Let go now, it's made once the microphone is open.
+    closeAudio();
+    holdAudio(true);
     void startCall(
       key,
       { instructions: walkInstructions(), greeting: walkGreeting(brief(current)!, brief(upcoming)), signal: abort.signal, delegate: true },
       {
-        // Not from the tap: the microphone opening changes the phone's audio, which would replace a context made before
-        // it, mid-call. Once it's open the context may start by itself.
+        // Not from the tap: once the microphone is open the context may start by itself, made under the call's audio.
         onMicrophone: () => {
           if (!stopped && !connected) stopWaiting = waitingSound();
         },
@@ -289,9 +289,8 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
           connected = true;
           stopWaiting();
           if (stopped) return;
-          // Without sounds of its own beside the voice, the shared context is let go as the voice starts.
-          if (sounds) void readySound();
-          else suspendAudio();
+          // No sound here: the voice starts its greeting now, and a sound of the app's over its first moments is what
+          // a call on an iPhone can stutter under.
           view.status('Listening. Answer out loud.');
         },
         onTranscript: (who, text, start, endMs) => {

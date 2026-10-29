@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
+import { audioContext, closeAudio } from '../audio-engine';
 import { setApiKey, forgetApiKey, type CallDeps } from '../openai';
 import { FakeAudioContext, chimes, ticks } from '../test/fake-audio';
 import { button, fakeApp, flush } from '../test/screen';
@@ -10,7 +11,7 @@ import { homeScreen } from './home';
 import { settingsScreen } from './settings';
 import { endWalk, walkScreen, type WalkDeps, type WalkView } from './walk';
 import { startLiveWalk } from './walk-live';
-import { callSounds, setCallSounds, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import type { WalkOutcome, WalkQuestion, WalkRound } from '../walk';
 
 const KEY = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123';
 const KNOWN = ['salamat', 'kumusta', 'oo', 'kape', 'paalam'];
@@ -32,7 +33,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   endWalk();
-  setCallSounds(true);
   forgetApiKey();
   vi.unstubAllGlobals();
 });
@@ -136,7 +136,7 @@ describe('walk and talk', () => {
     expect(greeting).toContain('The question after it');
   });
 
-  it('sounds while it connects, and again once it is ready', async () => {
+  it('sounds while it connects, and stops without a sound of its own once the voice starts', async () => {
     setApiKey(KEY);
     const f = liveDeps();
     const root = walkScreen(fakeApp(KNOWN), f.deps);
@@ -148,32 +148,49 @@ describe('walk and talk', () => {
     expect(waiting).toBeGreaterThan(0);
     expect(chimes.count).toBe(0);
     f.send({ type: 'session.started', session: {} });
-    await until(() => chimes.count === 1);
-    // The waiting sound has stopped.
+    // The waiting sound has stopped, and nothing plays over the voice's greeting.
     await new Promise((r) => setTimeout(r, 1300));
     expect(ticks.count).toBe(waiting);
+    expect(chimes.count).toBe(0);
   });
 
-  it('plays no ready sound or chime with chimes during walk and talk off in Settings', async () => {
-    const settings = settingsScreen(fakeApp(KNOWN));
-    const toggle = [...settings.querySelectorAll('label.toggle')].find((l) => l.textContent === 'Chimes during walk and talk')!.querySelector('input')!;
-    expect(toggle.checked).toBe(true);
-    toggle.checked = false;
-    toggle.dispatchEvent(new Event('change'));
-    expect(callSounds()).toBe(false);
+  it('lets go of the audio made before Start, and makes it afresh once the microphone is open', async () => {
+    const made: { closed: boolean }[] = [];
+    vi.stubGlobal(
+      'AudioContext',
+      class extends FakeAudioContext {
+        closed = false;
+        constructor() {
+          super();
+          made.push(this);
+          this.close = async () => void (this.closed = true);
+        }
+      },
+    );
+    // The taps that got here made one.
+    closeAudio();
+    audioContext();
+    expect(made).toHaveLength(1);
     setApiKey(KEY);
     const f = liveDeps();
+    let open = (_: MediaStream) => {};
+    const mic = f.deps.call.getMicrophone;
+    f.deps.call.getMicrophone = () => mic().then((m) => new Promise<MediaStream>((r) => (open = () => r(m))));
     const root = walkScreen(fakeApp(KNOWN), f.deps);
     document.body.append(root);
+    expect(button(root, 'Start').hasAttribute('data-no-tap')).toBe(true);
     button(root, 'Start').click();
-    await until(() => f.fetch.mock.calls.length > 0);
     await flush();
+    expect(made[0].closed).toBe(true);
+    expect(made).toHaveLength(1);
+    open(null as unknown as MediaStream);
+    await until(() => ticks.count > 0);
+    await until(() => f.fetch.mock.calls.length > 0);
     f.send({ type: 'session.started', session: {} });
-    f.send({ type: 'session.input_transcript.delta', delta: 'salamat', start_ms: 2000, end_ms: 2400 });
-    f.send({ type: 'session.output_transcript.delta', delta: 'Tama!', start_ms: 3000, end_ms: 3500 });
-    await until(() => tally(root).asked === '1');
-    await new Promise((r) => setTimeout(r, 300));
-    expect(chimes.count).toBe(0);
+    await new Promise((r) => setTimeout(r, 1300));
+    // One made under the call, and kept.
+    expect(made).toHaveLength(2);
+    expect(made[1].closed).toBe(false);
   });
 
   it('waits for the microphone before sounding, so the sounds start in the call\'s audio', async () => {
@@ -278,8 +295,8 @@ describe('the live engine', () => {
     f.said('ai', 'Tama! Now, how would you say how are you?', 4000, 6000);
     await until(() => f.updates().length > 0);
     expect(f.noted).toEqual(['right']);
-    // The ready sound, then the right answer's chime.
-    expect(chimes.count).toBe(2);
+    // The right answer's chime.
+    expect(chimes.count).toBe(1);
     const update = f.updates()[0].content!;
     expect(update).toContain('"Salamat": right');
     expect(update).toContain('The question now: ask how to say "How are you?"');
@@ -507,7 +524,8 @@ describe('the live engine', () => {
     f.said('ai', 'Hmm.', 3000, 3200);
     await until(() => f.updates().length > 0);
     expect(f.noted).toEqual(['skip']);
-    expect(chimes.count).toBe(1);
+    // No chime for it.
+    expect(chimes.count).toBe(0);
     expect(f.updates()[0].content).toContain("couldn't check");
     f.run.stop();
   });

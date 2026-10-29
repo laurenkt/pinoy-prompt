@@ -4,7 +4,6 @@ import { getCard } from '../deck';
 import { CENTS_PER_MINUTE, forgetApiKey, getApiKey, getSpend, setApiKey } from '../openai';
 import { lastStartDelay, play, voiceQuality } from '../speech';
 import { applyAudioMode } from './quiet';
-import { callSounds, setCallSounds } from '../walk';
 import { backupFileName, exportBackup, importBackup, reset } from '../store';
 import { h, icon, pageHeader, settingsToggle } from '../ui';
 
@@ -158,16 +157,6 @@ export function settingsScreen(app: App): HTMLElement {
             },
           }),
           h('span', null, 'Tap sounds'),
-        ),
-        h(
-          'label',
-          { class: 'toggle' },
-          h('input', {
-            type: 'checkbox',
-            checked: callSounds(),
-            onchange: (e: Event) => setCallSounds((e.target as HTMLInputElement).checked),
-          }),
-          h('span', null, 'Chimes during walk and talk'),
         ),
         h('p', { class: 'muted small' }, voiceText),
         !settings.sound

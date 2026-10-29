@@ -256,17 +256,6 @@ export function waitingSound(): () => void {
   return () => clearInterval(timer);
 }
 
-/** Three notes rising (C5, E5, G5): it's ready, after waitingSound. */
-export function readySound(): Promise<void> {
-  return playMade('ready', (ctx) =>
-    bell(ctx, 0.5, [
-      { at: 0, freq: 523.25, level: 0.1, decay: 0.07 },
-      { at: 0.1, freq: 659.25, level: 0.1, decay: 0.07 },
-      { at: 0.2, freq: 783.99, level: 0.12, decay: 0.1 },
-    ]),
-  );
-}
-
 /** Sounds made in code once per context rate, by name. */
 const madeSounds = new Map<string, AudioBuffer>();
 
