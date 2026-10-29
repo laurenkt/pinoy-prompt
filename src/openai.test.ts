@@ -9,6 +9,7 @@ import {
   CENTS_PER_MINUTE,
   CHECK_MODEL,
   checkMeaning,
+  checkTurn,
   transcribe,
   transcriptionCost,
   TRANSCRIBE_PRICES,
@@ -420,6 +421,27 @@ describe('checking a typed meaning', () => {
   it("doesn't blame the connection for an answer that isn't JSON", async () => {
     const page = new Response('<html>Sign in to the Wi-Fi</html>', { status: 200 });
     await expect(checkMeaning(KEY, CARD, (async () => page) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'other' });
+  });
+});
+
+describe("checking a turn in walk and talk", () => {
+  const TURN = { tl: 'Tama.', en: "That's right.", language: 'tl' as const, asked: 'How do you say right?', said: 'right as in direction?', reply: 'I mean correct!' };
+  const turn = (answered: boolean) => json(200, { output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ answered }) }] }] });
+
+  it("sends the card, what the voice asked, what was said and the voice's reply, and reads back whether it was an answer", async () => {
+    const fetchFn = vi.fn(async () => turn(false));
+    expect(await checkTurn(KEY, TURN, fetchFn as unknown as typeof fetch)).toBe(false);
+    const body = JSON.parse(String((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body.model).toBe(CHECK_MODEL);
+    expect(body.store).toBe(false);
+    expect(body.input).toBe("Tagalog: Tama.\nMeaning: That's right.\nTutor asked: How do you say right?\nLearner said: right as in direction?\nTutor replied: I mean correct!");
+    expect(body.instructions).toMatch(/how to say it in Tagalog/);
+    expect(body.instructions).toMatch(/not whether it was right/);
+    expect(await checkTurn(KEY, TURN, (async () => turn(true)) as unknown as typeof fetch)).toBe(true);
+  });
+
+  it('fails without a verdict', async () => {
+    await expect(checkTurn(KEY, TURN, (async () => json(200, { output: [] })) as unknown as typeof fetch)).rejects.toMatchObject({ kind: 'other' });
   });
 });
 

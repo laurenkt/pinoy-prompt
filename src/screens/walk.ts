@@ -1,6 +1,6 @@
 import type { App } from '../app';
-import { askOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps } from '../openai';
-import type { MeaningJudge } from '../meaning';
+import { askOpenAi, askTurnOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps } from '../openai';
+import type { AnswerLanguage, MeaningJudge } from '../meaning';
 import { canDrill, DRILL_MIN_WORDS } from '../session';
 import { WALK_WAYS, walkRound, type WalkOutcome, type WalkQuestion } from '../walk';
 import { h, iconButton } from '../ui';
@@ -27,9 +27,11 @@ export interface WalkDeps {
   callSupported(): boolean;
   /** Judges a spoken answer the device can't match, with OpenAI (see judgeMeaning); null without a key. */
   askMeaning: MeaningJudge | null;
+  /** Whether what was said was an answer, as the voice took it (see checkTurn); null without a key. */
+  askTurn: ((turn: { tl: string; en: string; language: AnswerLanguage; asked: string; said: string; reply: string }) => Promise<boolean | null>) | null;
 }
 
-export const defaultWalkDeps: WalkDeps = { call: browserCallDeps, callSupported, askMeaning: askOpenAi };
+export const defaultWalkDeps: WalkDeps = { call: browserCallDeps, callSupported, askMeaning: askOpenAi, askTurn: askTurnOpenAi };
 
 const ABOUT = `An AI voice asks you words, in Tagalog or English, and you answer out loud. Say "skip" to move on, or "I don't know" to hear the answer, and ask it anything along the way. About ${CENTS_PER_MINUTE}¢ a minute on your OpenAI key.`;
 
