@@ -96,14 +96,30 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
       .join('')
       .trim();
 
-  /** Where a question's words last come in what the voice said, or -1: the English for recall, the Tagalog for listen. */
-  function lastMention(said: string, q: WalkQuestion): number {
-    const words = (text: string) => ` ${text.toLowerCase().normalize('NFD').replace(/[^a-z]+/g, ' ').trim()} `;
-    return words(said).lastIndexOf(words(q.way === 'recall' ? spokenMeaning(q.card) : q.card.tl));
+  /** Text as plain words, padded with spaces so a word is found only whole. */
+  const plainWords = (text: string) => ` ${text.toLowerCase().normalize('NFD').replace(/[^a-z]+/g, ' ').trim()} `;
+
+  /** A question's words as the voice would say them: the English for recall (without what's in brackets), the Tagalog for listen. */
+  const termOf = (q: WalkQuestion) => plainWords(q.way === 'recall' ? spokenMeaning(q.card).replace(/\([^)]*\)/g, ' ') : q.card.tl);
+
+  /** The voice's last question in what it said: from just after the question before it, up to its last question mark. */
+  function lastQuestion(said: string): string {
+    const end = said.lastIndexOf('?');
+    return end < 0 ? '' : said.slice(said.lastIndexOf('?', end - 1) + 1, end + 1);
   }
 
-  /** Whether what the voice last asked was the question after the current one, rather than the current one. */
-  const movedOn = (asked: string) => !!current && !!upcoming && lastMention(asked, upcoming) > lastMention(asked, current);
+  /**
+   * Whether the voice's last question was the question after the current one, rather than the current one: it names the
+   * next one's words and not the current one's. Short words ("oo", "no", "you") are too easily said in passing to go by,
+   * and nor are words that are part of the current one's ("night" in "good night"); then the round stays where it is.
+   */
+  function movedOn(said: string): boolean {
+    if (!current || !upcoming) return false;
+    const asked = plainWords(lastQuestion(said));
+    const now = termOf(current);
+    const next = termOf(upcoming);
+    return next.trim().length >= 4 && asked.includes(next) && !now.includes(next) && !(now.trim() && asked.includes(now));
+  }
 
   /** Waits for the voice's reply, unless the voice asks the app first. Whether it asked. */
   function replyHeard(): Promise<boolean> {
@@ -144,7 +160,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
           if (turn && !turn.answered) return null;
           // The voice heard them, where the transcript of Tagalog said by a beginner is often far off: its verdict, the
           // one the learner heard, is the one noted.
-          if (turn && turn.tutor !== 'none') return { q, said: answer, outcome: turn.tutor, unchecked: false };
+          if (turn && turn.tutor !== 'none') return { q, said: answer, outcome: turn.tutor === 'skipped' ? 'skip' : turn.tutor, unchecked: false };
         } catch {
           // Couldn't be asked, so it won't be asked again for the verdict: what's plainly an aside is taken as one, and
           // the rest isn't counted.
@@ -169,19 +185,23 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     const answer = heard.map((t) => t.text.trim()).join(' ').trim();
     if (!answer) return null;
     const since = turns.filter((t) => t.who === 'you' && t.end <= heard[0].start).at(-1)?.end ?? 0;
+    let resynced = false;
     if (movedOn(voiceSaid(since, heard[0].start))) {
       // The voice went on to the next question without the app (an answer the transcript missed): the app follows, so
       // this answer is judged against the question it answers. The one passed is noted nowhere, as a skip is.
-      round.note(current, 'skip');
+      view.answered(current, 'skip', round.note(current, 'skip'));
       current = upcoming;
       upcoming = current && round.next();
       if (!current) return null;
+      resynced = true;
     }
     const q = current;
     view.status('Checking…');
     const result = await judged(answer, q, heard, before);
     if (stopped || current !== q) return null;
     if (!result) {
+      // Followed to a new question, the voice is told what's after it.
+      if (resynced) call?.append('thinking', roundUpdate(brief(current), brief(upcoming)), null);
       view.status('Listening. Answer out loud.');
       return null;
     }

@@ -383,6 +383,40 @@ describe('the live engine', () => {
     f.run.stop();
   });
 
+  it("stays on the question when the voice's words for it differ, or the next one's come up in passing", async () => {
+    const f = await started([recall('opo'), recall('magandang-umaga'), recall('salamat')]);
+    // "Yes (polite)" said in other words, with "good morning" in passing.
+    f.said('ai', 'How do you say yes, politely, this good morning?', 0, 1500);
+    f.said('you', 'Opo', 2000, 2500);
+    f.said('ai', 'Tama!', 3000, 3500);
+    await until(() => f.noted.length > 0);
+    expect(f.noted).toEqual(['right']);
+    f.run.stop();
+  });
+
+  it("doesn't go by a short word in the voice's question", async () => {
+    const f = await started([recall('salamat'), recall('oo'), recall('kumusta')]);
+    f.said('ai', 'How do you say thanks, yes?', 0, 1500);
+    f.said('you', 'Salamat', 2000, 2500);
+    f.said('ai', 'Tama!', 3000, 3500);
+    await until(() => f.noted.length > 0);
+    expect(f.noted).toEqual(['right']);
+    f.run.stop();
+  });
+
+  it('notes a question the voice moved past at their asking as skipped', async () => {
+    const f = await started([recall('salamat'), recall('oo')], (deps) => {
+      deps.askTurn = async () => ({ answered: true, tutor: 'skipped' });
+      deps.askMeaning = async () => false;
+    });
+    f.said('ai', 'How do you say thank you?', 0, 1500);
+    f.said('you', 'can we move past this one', 2000, 2500);
+    f.said('ai', 'Sure! How do you say yes?', 3000, 4500);
+    await until(() => f.noted.length > 0, 5000);
+    expect(f.noted).toEqual(['skip']);
+    f.run.stop();
+  }, 10_000);
+
   it("doesn't take a question from the learner for an answer", async () => {
     const f = await started([recall('salamat'), recall('oo')]);
     f.said('you', 'What does that mean?', 2000, 2500);

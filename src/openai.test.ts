@@ -439,6 +439,7 @@ describe("checking a turn in walk and talk", () => {
     expect(body.instructions).toMatch(/how to say it in Tagalog/);
     expect(body.instructions).toMatch(/Don't judge the answer yourself/);
     expect(await checkTurn(KEY, TURN, (async () => turn(true, 'wrong')) as unknown as typeof fetch)).toEqual({ answered: true, tutor: 'wrong' });
+    expect(await checkTurn(KEY, TURN, (async () => turn(true, 'skipped')) as unknown as typeof fetch)).toEqual({ answered: true, tutor: 'skipped' });
   });
 
   it('fails without a verdict', async () => {
