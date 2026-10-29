@@ -286,7 +286,7 @@ describe('the live engine', () => {
   it('asks OpenAI, with the voice\'s reply, whether what was said was an answer, and moves on only if it was', async () => {
     const asks: { asked: string; said: string; reply: string }[] = [];
     const f = await started([recall('tama'), recall('oo'), recall('salamat')], (deps) => {
-      deps.askTurn = async (turn) => (asks.push(turn), turn.said.startsWith('do you mean') ? { answered: false, right: false } : { answered: true, right: true });
+      deps.askTurn = async (turn) => (asks.push(turn), !turn.said.startsWith('do you mean'));
     });
     f.said('ai', 'How do you say right?', 0, 1500);
     f.said('you', 'do you mean right as in direction or right as in correct', 2000, 4000);
@@ -303,13 +303,43 @@ describe('the live engine', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(f.noted).toEqual([]);
     expect(f.updates()).toEqual([]);
-    f.said('you', 'tamaa', 9000, 9500);
+    f.said('you', 'Tama', 9000, 9500);
     f.said('ai', 'Yes!', 10000, 10500);
     await until(() => f.noted.length > 0, 5000);
     expect(f.noted).toEqual(['right']);
     expect(f.updates()[0].content).toContain('The question now: ask how to say "Yes');
     f.run.stop();
   }, 10_000);
+
+  it("gives OpenAI the voice's whole reply, when the learner's words reach the transcript after it", async () => {
+    const asks: { asked: string; reply: string }[] = [];
+    const f = await started([recall('tama'), recall('oo')], (deps) => {
+      deps.askTurn = async (turn) => (asks.push(turn), true);
+    });
+    f.said('ai', 'How do you say right?', 0, 1500);
+    f.said('ai', ' Yes,', 2600, 2800);
+    f.said('ai', ' I mean correct.', 2900, 3200);
+    f.said('you', 'right as in correct', 1600, 2400);
+    await until(() => asks.length === 1, 5000);
+    expect(asks[0].asked).toBe('How do you say right?');
+    expect(asks[0].reply).toBe('Yes, I mean correct.');
+    f.run.stop();
+  }, 10_000);
+
+  it("takes what was said as an answer, without waiting on the reply, once the voice asks the app", async () => {
+    const asks: unknown[] = [];
+    const f = await started([recall('tama'), recall('oo')], (deps) => {
+      deps.askTurn = async (turn) => (asks.push(turn), false);
+    });
+    f.said('you', 'tamo', 2000, 2500);
+    f.said('ai', 'Hmm, let me check.', 3000, 3500);
+    await new Promise((r) => setTimeout(r, 700));
+    f.send({ type: 'session.delegation.created', delegation: { id: 'item_1' } });
+    await until(() => f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_1'), 2000);
+    expect(asks).toEqual([]);
+    expect(f.noted).toEqual(['wrong']);
+    f.run.stop();
+  });
 
   it("doesn't take a question from the learner for an answer", async () => {
     const f = await started([recall('salamat'), recall('oo')]);

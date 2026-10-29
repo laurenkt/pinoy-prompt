@@ -1,5 +1,5 @@
 import type { App } from '../app';
-import { askOpenAi, askTurnOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps, type TurnVerdict } from '../openai';
+import { askOpenAi, askTurnOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps } from '../openai';
 import type { AnswerLanguage, MeaningJudge } from '../meaning';
 import { canDrill, DRILL_MIN_WORDS } from '../session';
 import { WALK_WAYS, walkRound, type WalkOutcome, type WalkQuestion } from '../walk';
@@ -27,8 +27,8 @@ export interface WalkDeps {
   callSupported(): boolean;
   /** Judges a spoken answer the device can't match, with OpenAI (see judgeMeaning); null without a key. */
   askMeaning: MeaningJudge | null;
-  /** Whether what was said was an answer as the voice took it, and right (see checkTurn); null without a key. */
-  askTurn: ((turn: { tl: string; en: string; language: AnswerLanguage; asked: string; said: string; reply: string }) => Promise<TurnVerdict | null>) | null;
+  /** Whether what was said was an answer, as the voice took it (see checkTurn); null without a key. */
+  askTurn: ((turn: { tl: string; en: string; language: AnswerLanguage; asked: string; said: string; reply: string }) => Promise<boolean | null>) | null;
 }
 
 export const defaultWalkDeps: WalkDeps = { call: browserCallDeps, callSupported, askMeaning: askOpenAi, askTurn: askTurnOpenAi };
