@@ -1273,6 +1273,12 @@ p {
   color: var(--muted);
 }
 
+/* Walk and talk: while a round runs, the tally, then Stop taking the rest of the height, easy to hit without looking. */
+.panel > .walk-stop {
+  flex-grow: 1;
+  font-size: 1.6rem;
+}
+
 /* Drills */
 
 /* The kinds of question in a round, under the session header when opened. */

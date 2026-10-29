@@ -53,7 +53,6 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const AUDIO_DIR = join(ROOT, 'public/audio');
 const MANIFEST = join(ROOT, 'src/clips.json');
 const HEARD = join(ROOT, 'src/clip-sounds.json');
-const PROMPTS = join(ROOT, 'src/prompt-clips.json');
 const RECOGNISER = join(ROOT, 'node_modules/.cache/zipa/model.int8.onnx');
 
 // OpenAI's conversational voice model rather than its text-to-speech one, which sounds
@@ -377,12 +376,9 @@ async function write(prune) {
   const heard = Object.values(kept).flat().flatMap((name) => [name, `${name}-slow`]).filter((file) => clipSounds[file]);
   await writeFile(HEARD, `{\n${heard.map((file) => `${JSON.stringify(file)}: ${JSON.stringify(clipSounds[file])}`).join(',\n')}\n}\n`);
   if (!prune) return;
-  // Every other clip here is one this script made, so one no longer listed can go.
+  // Every clip here is one this script made, so one no longer listed can go.
   // Takes made for only some voices of a text are kept too, for the run that makes the rest.
   const files = texts.flatMap((t) => (Array.isArray(manifest[t]) ? manifest[t].filter(Boolean) : [])).flatMap((name) => [`${name}.mp3`, `${name}-slow.mp3`]);
-  // Walk and talk's English prompts are generate-prompts.mjs's, listed in their own file.
-  const prompts = JSON.parse(await readFile(PROMPTS, 'utf8').catch(() => '{}'));
-  files.push(...Object.values(prompts).map((name) => `${name}.mp3`));
   for (const file of await readdir(AUDIO_DIR)) {
     if (file.endsWith('.mp3') && !files.includes(file)) await rm(join(AUDIO_DIR, file));
   }

@@ -1,6 +1,5 @@
 import type { Step } from './session';
 import type { Progress } from './store';
-import type { WalkEngine } from './walk';
 
 export type Route =
   | { name: 'home' }
@@ -9,8 +8,8 @@ export type Route =
   | { name: 'practice' }
   /** `start` begins a call straight away, so Home's Chat button is one tap. */
   | { name: 'talk'; start?: boolean }
-  /** Walk and talk, run by `engine` (experimental, from Settings). */
-  | { name: 'walk'; engine: WalkEngine }
+  /** Walk and talk (experimental, from Settings). */
+  | { name: 'walk' }
   | { name: 'words' }
   | { name: 'settings' };
 

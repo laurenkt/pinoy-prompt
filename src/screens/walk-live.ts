@@ -7,32 +7,38 @@
 // judgeMeaning) to note it as Drills does, and tells the voice how it went. Only
 // when the voice can't tell does it say it's checking and ask the app (client
 // delegation, see startCall), which says the verdict aloud. A right answer gets
-// Drills' chime, as soon as the app's check finds it.
+// Drills' chime, as soon as the app's check finds it. While the call connects a
+// soft note sounds every so often, and a rising one once it's ready, for someone
+// not looking at the screen.
 
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call } from '../openai';
-import { chime, stop } from '../speech';
+import { chime, readySound, stop, waitingSound } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
-import { checkText, heardCommand, questionBrief, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import { checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
 
 /** Waited once the voice starts its reply, so the end of what the learner said reaches the transcript. */
 const TRANSCRIPT_SETTLE_MS = 600;
 /** A check this recent, with nothing said since, is the one the voice means when it asks the app. */
 const RECENT_CHECK_MS = 15_000;
-/** How long an answer stays on the screen before the next question shows. */
-const SHOW_ANSWER_MS = 3000;
 /** Time for the voice to say its last reaction and goodbye before the call ends. */
 const WRAP_UP_MS = 8000;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Something said that asks rather than answers ("what does it mean?", "say it again"), or only fills a pause: the question stays. Only taken
- * so once the answer hasn't passed as the card, as some cards are questions ("How are you?").
+ * An aside to the voice rather than an answer ("what does that mean?", "can you explain it?", "say it again"), or
+ * only a filler: the question stays, and the voice answers it and goes back to the question. Kept to what is clearly
+ * meant for the voice, as an answer taken for one leaves the app a question behind the voice. Only tried once the
+ * answer hasn't passed as the card and isn't a command, and never for a card whose meaning reads like one ("What
+ * does this mean?").
  */
-const ASKS =
-  /^(?:um+\s+|uh+\s+|sorry\s+|oh\s+)*(?:what does (?:it|that) mean|what was (?:it|that)|what did you say|say (?:it|that) again|(?:can|could) you (?:say|repeat)|repeat|one more time|again|wait|hold on|sorry)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|right)[\s.!]*$/i;
+const ASIDE =
+  /^(?:(?:um+|uh+|sorry|actually|okay|ok|hmm+)[,\s]+)*(?:what does (?:that|this|it)(?: word| one)? mean|what(?: does|'s| is) .{1,30} mean|(?:can|could|would) you (?:please )?(?:explain|repeat|say (?:it|that) again|go over)|say (?:it|that) again|tell me (?:about|more)|explain (?:it|that|this)|one more time|hold on)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|what)[\s.!?]*$/i;
+
+/** Hedges round an answer ("is it salamat?", "oh, salamat"), taken off before it's judged. */
+const HEDGE = /^(?:(?:um+|uh+|oh|so|wait|hmm+|okay|ok|is it|it's|it is|i think(?: it's)?|maybe)[,\s]+)+|[?.!\s]+$/gi;
 
 /** An answer checked by the app: how it went, and whether it could be told at all. */
 interface Check {
@@ -63,10 +69,12 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   let checking: Promise<Check | null> | null = null;
   /** The last answer checked, and when, for the voice to ask about just after. */
   let lastCheck: { result: Check; at: number } | null = null;
-  let showNext: ReturnType<typeof setTimeout> | undefined;
+  /** Stops the sound that says the call is still connecting. */
+  let stopWaiting = () => {};
   let wrapUp: ReturnType<typeof setTimeout> | undefined;
 
   const end = (problem?: string) => {
+    stopWaiting();
     if (!stopped) view.ended(problem);
   };
   const brief = (q: WalkQuestion | null) => (q ? questionBrief(q, round.help(q)) : null);
@@ -74,14 +82,15 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   /** What the learner has said that's still to check, before a moment of the call. */
   const untaken = (before: number) => turns.filter((t) => t.who === 'you' && t.end > takenTo && t.start < before);
 
-  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. Null for a question to the voice. */
+  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. Null for an aside to the voice. */
   async function judged(answer: string, q: WalkQuestion): Promise<Check | null> {
     const language = walkLanguage(q);
-    if ((await judgeMeaning(answer, q.card, null, language, false)).right) return { q, said: answer, outcome: 'right', unchecked: false };
-    if (ASKS.test(answer)) return null;
+    const plain = answer.replace(HEDGE, '') || answer;
+    if ((await judgeMeaning(plain, q.card, null, language, false)).right) return { q, said: answer, outcome: 'right', unchecked: false };
     const command = heardCommand(answer);
     if (command) return { q, said: answer, outcome: command, unchecked: false };
-    const { right, failure } = await judgeMeaning(answer, q.card, deps.askMeaning, language, false);
+    if (ASIDE.test(answer) && !ASIDE.test(spokenMeaning(q.card))) return null;
+    const { right, failure } = await judgeMeaning(plain, q.card, deps.askMeaning, language, false);
     // OpenAI couldn't be asked: it may well have been right, so it isn't counted.
     return { q, said: answer, outcome: right ? 'right' : 'wrong', unchecked: !right && failure !== undefined };
   }
@@ -107,19 +116,14 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     }
     // Drills' chime for a right answer, played by the app as it knows: asking the voice to would hold it up.
     if (result.outcome === 'right') void chime();
-    view.answered(q, result.outcome, round.note(q, result.unchecked ? 'skip' : result.outcome), answer);
+    // One OpenAI couldn't check is noted, and counted, as moved past.
+    const outcome = result.unchecked ? 'skip' : result.outcome;
+    view.answered(q, outcome, round.note(q, outcome));
     current = upcoming;
     upcoming = current && round.next();
     call?.append('thinking', roundUpdate(brief(current), brief(upcoming), checkText(q, answer, result.outcome, result.unchecked)), null);
-    clearTimeout(showNext);
-    const next = current;
-    if (!next) wrapUp = setTimeout(() => end('There was nothing more to ask.'), WRAP_UP_MS);
-    else
-      showNext = setTimeout(() => {
-        if (stopped || current !== next) return;
-        view.asked(next);
-        view.status('Listening. Answer out loud.');
-      }, SHOW_ANSWER_MS);
+    if (current) view.status('Listening. Answer out loud.');
+    else wrapUp = setTimeout(() => end('There was nothing more to ask.'), WRAP_UP_MS);
     return result;
   }
 
@@ -163,13 +167,19 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     // After the screen has drawn the round, so it shows why it stopped.
     queueMicrotask(() => end(current ? 'Chat needs an OpenAI key.' : 'There was nothing to ask.'));
   } else {
-    view.asked(current);
     view.status('Connecting…');
+    // Started inside the tap, so the audio may start.
+    stopWaiting = waitingSound();
     void startCall(
       key,
       { instructions: walkInstructions(), greeting: walkGreeting(brief(current)!, brief(upcoming)), signal: abort.signal, delegate: true },
       {
-        onStarted: () => !stopped && view.status('Listening. Answer out loud.'),
+        onStarted: () => {
+          stopWaiting();
+          if (stopped) return;
+          void readySound();
+          view.status('Listening. Answer out loud.');
+        },
         onTranscript: (who, text, start, endMs) => {
           if (stopped) return;
           addPiece(turns, who, text, start, endMs);
@@ -193,7 +203,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   return {
     stop() {
       stopped = true;
-      clearTimeout(showNext);
+      stopWaiting();
       clearTimeout(wrapUp);
       abort.abort();
       call?.hangUp();

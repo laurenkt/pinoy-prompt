@@ -166,14 +166,9 @@ export function settingsScreen(app: App): HTMLElement {
         h(
           'p',
           { class: 'muted small' },
-          'Walk and talk: drills you hear and answer out loud, with headphones in. Two versions to try: recorded voices checked on this phone, or a live AI voice on your OpenAI key.',
+          'Walk and talk: drills you hear and answer out loud, with headphones in, asked by a live AI voice on your OpenAI key.',
         ),
-        h(
-          'div',
-          { class: 'row' },
-          h('button', { class: 'btn secondary', onclick: () => app.navigate({ name: 'walk', engine: 'clips' }) }, 'Walk and talk'),
-          h('button', { class: 'btn secondary', onclick: () => app.navigate({ name: 'walk', engine: 'live' }) }, 'Walk and talk live'),
-        ),
+        h('button', { class: 'btn secondary', onclick: () => app.navigate({ name: 'walk' }) }, 'Walk and talk'),
       ),
       h(
         'section',

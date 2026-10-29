@@ -11,7 +11,6 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "audio": "node scripts/generate-audio.mjs",
-    "prompts": "node scripts/generate-prompts.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "about-shots": "node scripts/about-shots.mjs"
   },
