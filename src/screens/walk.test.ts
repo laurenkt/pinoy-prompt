@@ -98,7 +98,7 @@ function liveDeps() {
     createSpeaker: () => ({ srcObject: null, play: async () => {} }) as unknown as HTMLAudioElement,
   };
   const send = (event: object) => channel!.onmessage!({ data: JSON.stringify(event) });
-  const deps: WalkDeps = { call, callSupported: () => true, askMeaning: null };
+  const deps: WalkDeps = { call, callSupported: () => true, askMeaning: null, askTurn: null };
   return { deps, sent, send, fetch };
 }
 
@@ -282,6 +282,34 @@ describe('the live engine', () => {
     expect(f.noted).toEqual([outcome]);
     f.run.stop();
   });
+
+  it('asks OpenAI, with the voice\'s reply, whether what was said was an answer, and moves on only if it was', async () => {
+    const asks: { asked: string; said: string; reply: string }[] = [];
+    const f = await started([recall('tama'), recall('oo'), recall('salamat')], (deps) => {
+      deps.askTurn = async (turn) => (asks.push(turn), turn.said.startsWith('do you mean') ? { answered: false, right: false } : { answered: true, right: true });
+    });
+    f.said('ai', 'How do you say right?', 0, 1500);
+    f.said('you', 'do you mean right as in direction or right as in correct', 2000, 4000);
+    f.said('ai', 'Good question, I mean correct. So, how do you say right, as in correct?', 4500, 7000);
+    await until(() => asks.length === 1, 5000);
+    expect(asks[0]).toEqual({
+      tl: getCard('tama')!.tl,
+      en: getCard('tama')!.en,
+      language: 'tl',
+      asked: 'How do you say right?',
+      said: 'do you mean right as in direction or right as in correct',
+      reply: 'Good question, I mean correct. So, how do you say right, as in correct?',
+    });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(f.noted).toEqual([]);
+    expect(f.updates()).toEqual([]);
+    f.said('you', 'tamaa', 9000, 9500);
+    f.said('ai', 'Yes!', 10000, 10500);
+    await until(() => f.noted.length > 0, 5000);
+    expect(f.noted).toEqual(['right']);
+    expect(f.updates()[0].content).toContain('The question now: ask how to say "Yes');
+    f.run.stop();
+  }, 10_000);
 
   it("doesn't take a question from the learner for an answer", async () => {
     const f = await started([recall('salamat'), recall('oo')]);

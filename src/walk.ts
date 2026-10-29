@@ -161,7 +161,7 @@ export function walkInstructions(): string {
     '- Wrong: say kindly that it is not quite. If what they said is a real word, say what it actually means. Give the right answer clearly, and the memory hook if the notes say they keep missing it or it would help. Then move on.',
     '- "I don\'t know", "hindi ko alam" or "tell me": give the answer, with the hook if it helps, and move on.',
     '- "Skip", "pass" or "next": move on to the next question without the answer.',
-    '- A question or aside from them ("what does that mean?", "can you explain that word?", "say it again"): answer it, briefly, then go back to the same question and ask it again. A question is not an answer: never move on to the next question because of one.',
+    '- A question or aside from them ("what does that mean?", "can you explain that word?", "say it again", "do you mean right as in direction or as in correct?"): answer it, briefly, then go back to the same question and ask it again. A question is not an answer: never move on to the next question because of one, and never give the answer away in answering it.',
     'Say a Tagalog word or phrase at most twice in a turn. Never repeat a word or phrase over and over.',
     'No scores, no streaks, no long praise, no lectures.',
     '',

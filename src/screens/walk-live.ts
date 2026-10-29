@@ -20,6 +20,8 @@ import type { WalkDeps, WalkRun, WalkView } from './walk';
 
 /** Waited once the voice starts its reply, so the end of what the learner said reaches the transcript. */
 const TRANSCRIPT_SETTLE_MS = 600;
+/** How long the voice's reply is listened to before asking OpenAI whether it took what was said as an answer. */
+const REPLY_MS = 2500;
 /** A check this recent, with nothing said since, is the one the voice means when it asks the app. */
 const RECENT_CHECK_MS = 15_000;
 /** Time for the voice to say its last reaction and goodbye before the call ends. */
@@ -82,14 +84,37 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   /** What the learner has said that's still to check, before a moment of the call. */
   const untaken = (before: number) => turns.filter((t) => t.who === 'you' && t.end > takenTo && t.start < before);
 
-  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. Null for an aside to the voice. */
-  async function judged(answer: string, q: WalkQuestion): Promise<Check | null> {
+  /** What the voice said from one moment of the call to another. */
+  const voiceSaid = (from: number, to: number) =>
+    turns
+      .filter((t) => t.who === 'ai' && t.start >= from && t.start < to)
+      .map((t) => t.text.trim())
+      .join(' ');
+
+  /**
+   * How the answer went: the card judged first, on the device, so a card that is "Hindi ko alam" isn't taken for a
+   * command; then OpenAI, told the voice's reply too (replyAt on), so what the voice took for an aside isn't taken for
+   * an answer and the round moves on only when the voice does. Null for an aside to the voice. Asked by the voice
+   * (replyAt Infinity), it's an answer the voice can't judge.
+   */
+  async function judged(answer: string, q: WalkQuestion, heardAt: number, replyAt: number): Promise<Check | null> {
     const language = walkLanguage(q);
     const plain = answer.replace(HEDGE, '') || answer;
     if ((await judgeMeaning(plain, q.card, null, language, false)).right) return { q, said: answer, outcome: 'right', unchecked: false };
     const command = heardCommand(answer);
     if (command) return { q, said: answer, outcome: command, unchecked: false };
-    if (ASIDE.test(answer) && !ASIDE.test(spokenMeaning(q.card))) return null;
+    if (replyAt !== Infinity && deps.askTurn) {
+      await wait(REPLY_MS);
+      if (stopped) return null;
+      const asked = turns.filter((t) => t.who === 'ai' && t.start < heardAt).at(-1)?.text ?? '';
+      try {
+        const turn = await deps.askTurn({ tl: q.card.tl, en: q.card.en, language, asked, said: answer, reply: voiceSaid(replyAt, Infinity) });
+        if (turn) return turn.answered ? { q, said: answer, outcome: turn.right ? 'right' : 'wrong', unchecked: false } : null;
+      } catch {
+        // Couldn't be asked: what's plainly an aside is taken as one, and the rest judged as answers.
+      }
+    }
+    if (replyAt !== Infinity && ASIDE.test(answer) && !ASIDE.test(spokenMeaning(q.card))) return null;
     const { right, failure } = await judgeMeaning(plain, q.card, deps.askMeaning, language, false);
     // OpenAI couldn't be asked: it may well have been right, so it isn't counted.
     return { q, said: answer, outcome: right ? 'right' : 'wrong', unchecked: !right && failure !== undefined };
@@ -108,7 +133,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     const answer = heard.map((t) => t.text.trim()).join(' ').trim();
     if (!answer) return null;
     view.status('Checking…');
-    const result = await judged(answer, q);
+    const result = await judged(answer, q, heard[0].start, before);
     if (stopped || current !== q) return null;
     if (!result) {
       view.status('Listening. Answer out loud.');
