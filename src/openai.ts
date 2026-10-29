@@ -333,6 +333,73 @@ export const askOpenAi: MeaningJudge = async (answer, card, language, typed) => 
   return key ? checkMeaning(key, { tl: card.tl, en: card.en, answer, language, typed }) : null;
 };
 
+/** What walk and talk's turn check is told: the reply settles whether it was an answer, so the app moves on when the voice does. */
+const TURN_INSTRUCTIONS: Record<AnswerLanguage, string> = {
+  en: 'The learner heard the Tagalog and is asked what it means, answering in English.',
+  tl: 'The learner is given the English and asked how to say it in Tagalog.',
+};
+const TURN_RULES = `What was said is transcribed speech: Tagalog may come out spelled oddly or as English-looking words.
+Say only whether it was an answer, not whether it was right.
+answered: true if what the learner said was their answer to the question, even hedged ("is it salamat?"), unsure, partial or wrong. false if they asked the tutor something instead (what a word means, which sense of the word is meant, to say it again), or made an aside or a filler, rather than answering. The tutor's reply settles it: if the tutor gave a verdict, gave the answer, said it's checking or moved on, it was an answer; if the tutor answered their question or clarified and is still waiting for an answer, it was not.`;
+
+/**
+ * Ask OpenAI whether a learner's turn in walk and talk was their answer, as the voice took it, given what the voice
+ * asked, what the learner said and the voice's reply. Sends only the card and those three. Whether it was right is
+ * checkMeaning's to say.
+ */
+export async function checkTurn(
+  key: string,
+  { tl, en, language, asked, said, reply }: { tl: string; en: string; language: AnswerLanguage; asked: string; said: string; reply: string },
+  fetchFn: typeof fetch = (...args) => fetch(...args),
+): Promise<boolean> {
+  type Answer = { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
+  const body = await timed(CHECK_TIMEOUT_MS, async (signal) =>
+    readJson<Answer>(
+      await post(
+        key,
+        '/responses',
+        {
+          model: CHECK_MODEL,
+          reasoning: { effort: 'none' },
+          instructions: `A tutor is quizzing a beginner on a Tagalog word out loud. ${TURN_INSTRUCTIONS[language]}\n${TURN_RULES}`,
+          input: `Tagalog: ${tl}\nMeaning: ${en}\nTutor asked: ${asked.slice(-300)}\nLearner said: ${said.slice(0, 300)}\nTutor replied: ${reply.slice(0, 400)}`,
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'turn',
+              strict: true,
+              schema: {
+                type: 'object',
+                properties: { answered: { type: 'boolean' } },
+                required: ['answered'],
+                additionalProperties: false,
+              },
+            },
+          },
+          store: false,
+        },
+        fetchFn,
+        signal,
+      ),
+    ),
+  );
+  addSpend(tokenCost(CHECK_MODEL, body.usage));
+  const text = body.output?.find((o) => o.type === 'message')?.content?.find((c) => c.type === 'output_text')?.text;
+  try {
+    const verdict = JSON.parse(text ?? '') as { answered?: unknown };
+    if (typeof verdict.answered === 'boolean') return verdict.answered;
+  } catch {
+    // Fall through.
+  }
+  throw new AiError('other', 'OpenAI answered without a verdict.');
+}
+
+/** checkTurn with the learner's key, or null without one. */
+export const askTurnOpenAi = (turn: Parameters<typeof checkTurn>[1]): Promise<boolean | null> => {
+  const key = getApiKey();
+  return key ? checkTurn(key, turn) : Promise.resolve(null);
+};
+
 /** Turns a spoken answer in Drills into text. */
 export const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
 /** Longer than a check: a few seconds of audio go up first, over a phone's connection. */
