@@ -3794,7 +3794,9 @@ p {
   justify-self: center;
 }
 
-.about-variant-card {
+/* A card of the app's own colours with a striped foot: the phrase you learned, and a stretch of walk and talk. */
+.about-variant-card,
+.about-walk {
   position: relative;
   overflow: hidden;
   padding: 18px 20px 30px;
@@ -3805,13 +3807,14 @@ p {
   box-shadow: var(--shadow-big);
 }
 
-.about-variant-card::after {
+.about-variant-card::after,
+.about-walk::after {
   content: '';
   position: absolute;
   inset: auto 0 0;
   height: 14px;
   background:
-    repeating-linear-gradient(45deg, var(--teal) 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(45deg, var(--stripe, var(--teal)) 0 6px, transparent 6px 12px),
     repeating-linear-gradient(-45deg, var(--saffron) 0 6px, transparent 6px 12px);
   opacity: 0.6;
 }
@@ -3874,6 +3877,12 @@ p {
 
 .about-voices > li > .audio-btn {
   grid-row: 1 / 3;
+}
+
+/* The flipped words, under the words that say what they are. */
+.about-flips {
+  margin-top: 28px;
+  justify-self: start;
 }
 
 /* The coach: one intro, then the same word said by two voices, each with what the coach made of it. */
@@ -3986,31 +3995,14 @@ p {
   opacity: 0.85;
 }
 
-/* Walk and talk: a stretch of a round as it sounds, in Chat's bubbles, on a card of the app's own colours. */
+/* Walk and talk: a stretch of a round as it sounds, in Chat's bubbles. */
 .about-walk {
-  position: relative;
-  overflow: hidden;
+  --stripe: var(--magenta);
   width: 100%;
   max-width: 480px;
   justify-self: center;
   margin: 0;
   padding: 18px 18px 32px;
-  border: var(--outline);
-  border-radius: var(--radius);
-  background: var(--bg);
-  color: var(--text);
-  box-shadow: var(--shadow-big);
-}
-
-.about-walk::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0;
-  height: 14px;
-  background:
-    repeating-linear-gradient(45deg, var(--magenta) 0 6px, transparent 6px 12px),
-    repeating-linear-gradient(-45deg, var(--saffron) 0 6px, transparent 6px 12px);
-  opacity: 0.6;
 }
 
 .about-walk figcaption {
