@@ -85,7 +85,7 @@ export function walkRound(progress: Progress, now: () => number, ways: readonly 
       recent = [...recent.slice(-DRILL_GAP), card.id];
       const key = drillKey(card.id, pick.way);
       waiting.add(key);
-      return { card, way: pick.way, again: repeats.has(key) };
+      return { card, way: pick.way, again: repeats.get(key)?.rights === 0 };
     },
     note(q, outcome) {
       const key = drillKey(q.card.id, q.way);

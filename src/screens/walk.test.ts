@@ -7,8 +7,9 @@ import { setApiKey, forgetApiKey, type CallDeps } from '../openai';
 import { toPhones } from '../phonetics';
 import type { Take } from '../recorder';
 import { drillNote } from '../session';
-import { spokenMeaning } from '../walk';
-import { FakeAudioContext } from '../test/fake-audio';
+import prompts from '../prompt-clips.json';
+import { spokenMeaning, WALK_LINES } from '../walk';
+import { FakeAudioContext, chimes } from '../test/fake-audio';
 import { fakeRecognition } from '../test/fake-speech';
 import { button, fakeApp, flush } from '../test/screen';
 import type { SpeakDeps } from './speak';
@@ -70,6 +71,7 @@ function clipsDeps() {
 
 beforeEach(() => {
   document.body.replaceChildren();
+  chimes.count = 0;
   vi.stubGlobal('AudioContext', FakeAudioContext);
 });
 afterEach(() => {
@@ -140,6 +142,23 @@ describe('walk and talk with recorded clips', () => {
     expect(root.querySelector('.feedback strong')?.textContent).toBe('The answer:');
     expect(drillNote(app.progress.cards[card.id], 'recall').help).toBe(1);
   });
+
+  it('says "once more" before a word back after a miss', async () => {
+    const fetched: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => (fetched.push(String(url)), { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }));
+    const once = (prompts as Record<string, string>)[WALK_LINES.again];
+    const f = clipsDeps();
+    const root = walkScreen(fakeApp(KNOWN), 'clips', f.deps);
+    document.body.append(root);
+    button(root, 'Start').click();
+    await until(() => !!document.querySelector('.prompt-en'));
+    const card = asked();
+    const saidOnce = () => fetched.some((u) => u.includes(once));
+    expect(saidOnce()).toBe(false);
+    await f.say('wala');
+    await until(saidOnce, 12_000);
+    expect(asked().id).toBe(card.id);
+  }, 15_000);
 
   it('moves past a word said "skip", leaving it as it was', async () => {
     const f = clipsDeps();
@@ -237,6 +256,7 @@ describe('the live engine', () => {
     f.said('ai', 'Tama! Now, how would you say how are you?', 4000, 6000);
     await until(() => f.updates().length > 0);
     expect(f.noted).toEqual(['right']);
+    expect(chimes.count).toBe(1);
     const update = f.updates()[0].content!;
     expect(update).toContain('"Salamat": right');
     expect(update).toContain('The question now: ask how to say "How are you?"');
@@ -315,6 +335,7 @@ describe('the live engine', () => {
     f.said('ai', 'Hmm.', 3000, 3200);
     await until(() => f.updates().length > 0);
     expect(f.noted).toEqual(['skip']);
+    expect(chimes.count).toBe(0);
     expect(f.updates()[0].content).toContain("couldn't check");
     f.run.stop();
   });

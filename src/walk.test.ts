@@ -76,6 +76,13 @@ describe('walkRound', () => {
     const back = round.next()!;
     expect(back.card.id).toBe(q.card.id);
     expect(back.again).toBe(true);
+    // Got right, it still comes back later, but not as "once more".
+    round.note(back, 'right');
+    for (let i = 0; i < 6; i++) {
+      const later = round.next()!;
+      if (later.card.id === q.card.id) expect(later.again).toBe(false);
+      round.note(later, 'right');
+    }
   });
 
   it('with a question picked ahead (as the live voice is kept), never asks the same one twice in a row', () => {
