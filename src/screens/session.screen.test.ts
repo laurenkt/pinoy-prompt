@@ -30,6 +30,8 @@ describe('memory hooks in a session', () => {
     button(root, 'Show the meaning').click();
     button(root, 'Again').click();
     expect(hookText(root)).toContain(getCard('salamat')!.hook);
+    // Marked, so the panel makes room for the hook and keeps Continue in reach.
+    expect(root.querySelector('.panel.missed')).not.toBeNull();
     button(root, 'Continue').click();
     // The missed card comes straight back, asked the easy way, hook hidden again.
     expect(root.textContent).toContain('What does this mean?');
@@ -68,6 +70,7 @@ describe('open-ended study', () => {
       if (choices.length) {
         expect(wrong).toBeDefined();
         wrong!.click();
+        expect(root.querySelector('.panel.missed')).not.toBeNull();
         button(root, 'Continue').click();
       } else {
         button(root, 'Show').click();

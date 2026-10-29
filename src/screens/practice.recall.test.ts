@@ -71,6 +71,17 @@ describe('recalling words still being learned', () => {
     expect(box(root)).toBeNull();
   });
 
+  it('marks the panel missed on a wrong pick, so it makes room for the hook and Next, and not on a right one', () => {
+    for (const wrong of [true, false]) {
+      const root = (last = recall(learner(false)));
+      const asked = KNOWN.map((id) => getCard(id)!).find((c) => root.querySelector('.prompt')!.textContent!.includes(c.en))!;
+      const choices = [...root.querySelectorAll<HTMLButtonElement>('.choice')];
+      choices.find((b) => b.textContent!.endsWith(asked.tl) !== wrong)!.click();
+      expect(root.querySelector('.panel')!.classList.contains('missed')).toBe(wrong);
+      expect(root.querySelector('.hook') !== null).toBe(wrong);
+    }
+  });
+
   it('counts right answers in a row, and has it typed after three, Study or not', async () => {
     const app = learner(false);
     let root = (last = recall(app));

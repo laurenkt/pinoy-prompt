@@ -507,7 +507,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     const field = format === 'recall' ? 'tl' : 'en';
     return h(
       'div',
-      { class: 'panel' },
+      { class: `panel${answered && !right ? ' missed' : ''}` },
       quizPrompt(c, answered),
       choiceList(choices, { key: (o) => o.id, label: (o) => o[field], answer: c.id, picked, lang: field === 'tl' ? 'fil' : undefined, onPick: pick }),
       answered &&
@@ -590,7 +590,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   function missedView(c: Card): HTMLElement {
     return h(
       'div',
-      { class: 'panel' },
+      { class: 'panel missed' },
       h('div', { class: 'prompt' }, h('p', { class: 'eyebrow' }, 'Coming back shortly'), tagalog(c)),
       h('p', { class: 'meaning' }, c.en),
       c.hint && h('p', { class: 'hint' }, h('span', { class: 'muted' }, 'Say it: '), c.hint),

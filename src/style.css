@@ -797,6 +797,64 @@ p {
   margin-top: 0;
 }
 
+/*
+ * A miss (.panel.missed, set by the view) shows the answer and its memory hook, so what has already been read gives up
+ * height to keep Next under the thumb even on a short phone: the choices neither picked nor right go (the feedback names
+ * the answer), the two left shrink to their least, and the prompt and its word shrink on all but tall phones. Next
+ * takes a moment to come alive, so a second tap meant for a choice that has just gone doesn't land on it. After any
+ * answer, should a long hook, note or explanation still run past the screen, Next sticks to its bottom.
+ */
+.panel.missed > .choices .choice:disabled:not(.correct, .wrong) {
+  display: none;
+}
+
+/* The spare height goes above Next instead, which the hook's margin keeps apart from it. */
+.panel.missed > .choices,
+.panel.missed > .choices .choice {
+  flex-grow: 0;
+}
+
+.panel.missed > .choices .choice {
+  min-height: 48px;
+  padding-block: 10px;
+}
+
+.panel.missed > .feedback {
+  padding-block: 10px;
+}
+
+.panel.missed > .btn.continue {
+  margin-top: auto;
+  animation: arming 0.4s;
+}
+
+@keyframes arming {
+  from,
+  to {
+    pointer-events: none;
+  }
+}
+
+.panel.missed > .prompt {
+  min-height: clamp(0px, (var(--fill) - 800px) * 1.8, 300px);
+  padding: 14px 18px 24px;
+  margin-bottom: 12px;
+}
+
+.panel.missed > .prompt .tl {
+  font-size: clamp(1.7rem, 1.7rem + (var(--fill) - 700px) * 0.1, 2.4rem);
+}
+
+.panel.missed > .prompt .prompt-en {
+  font-size: clamp(1.4rem, 1.4rem + (var(--fill) - 700px) * 0.06, 1.9rem);
+}
+
+.panel:has(> .feedback, > .hook) > .btn.continue {
+  position: sticky;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 1;
+}
+
 /* A message with a way forward (a summary, a topic's introduction, "learn some words first") is a card, so it sits in the middle rather than stretching. */
 .panel.center {
   flex-grow: 0;
