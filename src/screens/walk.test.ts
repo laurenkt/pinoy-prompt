@@ -74,6 +74,11 @@ describe('opening walk and talk', () => {
     expect(walkScreen(fakeApp(KNOWN, { sound: false }), deps).textContent).toContain('needs the sound and the mic on');
     expect(walkScreen(fakeApp(KNOWN, { mic: false }), deps).textContent).toContain('needs the sound and the mic on');
     expect(walkScreen(fakeApp(['salamat']), deps).textContent).toContain('Learn at least');
+    // Before asking for a key.
+    forgetApiKey();
+    const unkeyed = walkScreen(fakeApp(['salamat']), deps).textContent;
+    expect(unkeyed).toContain('Learn at least');
+    expect(unkeyed).not.toContain('Connect OpenAI');
   });
 
   it('asks for a key first', () => {

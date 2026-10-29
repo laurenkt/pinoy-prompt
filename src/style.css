@@ -3089,7 +3089,7 @@ p {
   background: var(--cream);
 }
 
-/* Pages (Library, Drills, Settings): the back arrow, then the title row.
+/* Pages (Library, Settings, Drills before there are words to drill): the back arrow, then the title row.
    Settings also keeps Home's settings toggle at the right, where it was. */
 .back-bar {
   display: flex;

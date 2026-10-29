@@ -24,7 +24,7 @@ const closeButtons = (root: HTMLElement) => root.querySelectorAll('.session-head
 
 describe('page and session layouts', () => {
   it.each([
-    ['Library', wordsScreen, 'settings', 'Settings'],
+    ['Library', wordsScreen, 'settings', 'Back to Settings'],
     ['Settings', settingsScreen, 'home', 'Home'],
   ] as const)('%s is a page: a back arrow to where it was opened from above its title', (title, screen, to, label) => {
     const app = fakeApp(KNOWN);

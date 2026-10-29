@@ -33,6 +33,12 @@ const MODEL_FILE = 'node_modules/.cache/pinoy-prompt/model.int8.onnx';
 /** The speech model, read once. */
 let model;
 
+/** The Library, opened from Settings. */
+async function openLibrary(page) {
+  await page.click('[aria-label="Settings"]');
+  await page.click('button:has-text("Open the Library")');
+}
+
 /** Answer what's asked (a choice, from a typed question's Show choices, or a flashcard rated Good) and move on, until the way back shows, then take it. */
 async function lookBack(page) {
   for (let i = 0; i < 8 && !(await page.$('.prev-btn')); i++) {
@@ -286,26 +292,19 @@ const SCREENS = {
     await page.click('.hub-btn.big:not(.chat-btn)');
     await lookBack(page);
   },
-  // The Library, opened from Settings.
-  library: async (page) => {
-    await page.click('[aria-label="Settings"]');
-    await page.click('button:has-text("Open the Library")');
-  },
+  library: (page) => openLibrary(page),
   // A topic opened, so its heading shows in its open colours.
   'library-open': async (page) => {
-    await page.click('[aria-label="Settings"]');
-    await page.click('button:has-text("Open the Library")');
+    await openLibrary(page);
     await page.click('.unit-list summary');
   },
   // The filter chips, open on All, then open again with another filter chosen.
   'library-filters': async (page) => {
-    await page.click('[aria-label="Settings"]');
-    await page.click('button:has-text("Open the Library")');
+    await openLibrary(page);
     await page.click('.filter-toggle');
   },
   'library-filtered': async (page) => {
-    await page.click('[aria-label="Settings"]');
-    await page.click('button:has-text("Open the Library")');
+    await openLibrary(page);
     await page.click('.filter-toggle');
     await page.click('#library-filters .chip:nth-child(3)');
     await page.click('.filter-toggle');

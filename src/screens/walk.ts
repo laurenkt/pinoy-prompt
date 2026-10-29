@@ -154,7 +154,8 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
 
   function draw(): void {
     const why = blocked();
-    if (!getApiKey()) {
+    // A reason it can't start comes first, so nobody pastes a key only to learn they need more words.
+    if (!getApiKey() && !why) {
       root.replaceChildren(header(), h('section', { class: 'card' }, h('h2', null, 'Connect OpenAI'), keyForm(draw)));
       return;
     }

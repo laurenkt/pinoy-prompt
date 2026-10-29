@@ -143,7 +143,7 @@ export function wordsScreen(app: App): HTMLElement {
       current.label,
     );
     root.replaceChildren(
-      ...pageHeader('Library', back, toggle, undefined, 'Settings'),
+      ...pageHeader('Library', back, toggle, undefined, 'Back to Settings'),
       chips,
       h('p', { class: 'muted' }, 'Tap the speaker to hear any word.'),
       ...(showVocab ? UNITS.map((unit) => group(unit.title, unit.tlTitle, unit.cards, wordItem)) : []),

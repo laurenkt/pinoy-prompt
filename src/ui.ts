@@ -182,7 +182,7 @@ export function settingsToggle(app: App, open: boolean): HTMLButtonElement {
 }
 
 /**
- * The top of a page: the back arrow (to Home, or the page named by `backTo`), then the title and any one control
+ * The top of a page: the back arrow (to Home, or where `backTo` names), then the title and any one control
  * beside it. A page opened by one of Home's header toggles (Settings) shows that toggle, on, where it was on Home,
  * so tapping it again closes the page.
  */
