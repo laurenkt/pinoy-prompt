@@ -3986,6 +3986,44 @@ p {
   opacity: 0.85;
 }
 
+/* Walk and talk: a stretch of a round as it sounds, in Chat's bubbles, on a card of the app's own colours. */
+.about-walk {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 480px;
+  justify-self: center;
+  margin: 0;
+  padding: 18px 18px 32px;
+  border: var(--outline);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow-big);
+}
+
+.about-walk::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 14px;
+  background:
+    repeating-linear-gradient(45deg, var(--magenta) 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(-45deg, var(--saffron) 0 6px, transparent 6px 12px);
+  opacity: 0.6;
+}
+
+.about-walk figcaption {
+  margin-bottom: 12px;
+  color: var(--teal);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.about-walk .talk-log {
+  margin: 0;
+}
+
 /* Pictures and variations: the picture question beside the phrase and what it's asked as later. */
 .about-more {
   display: flex;
