@@ -94,6 +94,12 @@ function suspendWhenIdle(): void {
   }, IDLE_SUSPEND_MS);
 }
 
+/** Let the phone's audio go now rather than once idle, if nothing is playing (a call that plays no sounds of its own). */
+export function suspendAudio(): void {
+  clearTimeout(idleTimer);
+  if (sounding.size === 0 && context?.state === 'running') void context.suspend().catch(() => {});
+}
+
 /** Close the shared context; the next use makes a fresh one. Decoded clips aren't tied to it, so they're kept. */
 function closeContext(): void {
   if (!context) return;

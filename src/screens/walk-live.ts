@@ -11,13 +11,16 @@
 // soft note sounds every so often, and a rising one once it's ready, for someone
 // not looking at the screen. These play through the shared context, held running
 // for the whole call (holdAudio) so it doesn't stop and start beside the voice.
+// With Settings' "Chimes during walk and talk" off (callSounds), there's no ready
+// sound or chime, and the shared context is let go as the voice starts, to find
+// whether Web Audio beside the call is what makes it stutter on iPhone.
 
-import { holdAudio } from '../audio-engine';
+import { holdAudio, suspendAudio } from '../audio-engine';
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call, type CallQuality } from '../openai';
 import { chime, readySound, stop, waitingSound } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
-import { checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import { callSounds, checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
 
 /** Waited once the voice starts its reply, so the end of what the learner said reaches the transcript. */
@@ -84,6 +87,8 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   let quality: CallQuality | null = null;
   /** The call is connected, so the waiting sound mustn't start. */
   let connected = false;
+  /** Whether the app plays its own sounds beside the voice (callSounds), fixed for the round. */
+  const sounds = callSounds();
 
   const end = (problem?: string) => {
     stopWaiting();
@@ -215,7 +220,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
       return null;
     }
     // Drills' chime for a right answer, played by the app as it knows: asking the voice to would hold it up.
-    if (result.outcome === 'right') void chime();
+    if (result.outcome === 'right' && sounds) void chime();
     // One OpenAI couldn't check is noted, and counted, as moved past.
     const outcome = result.unchecked ? 'skip' : result.outcome;
     view.answered(q, outcome, round.note(q, outcome));
@@ -270,7 +275,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     queueMicrotask(() => end(current ? 'Chat needs an OpenAI key.' : 'There was nothing to ask.'));
   } else {
     view.status('Connecting…');
-    holdAudio(true);
+    if (sounds) holdAudio(true);
     void startCall(
       key,
       { instructions: walkInstructions(), greeting: walkGreeting(brief(current)!, brief(upcoming)), signal: abort.signal, delegate: true },
@@ -284,7 +289,9 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
           connected = true;
           stopWaiting();
           if (stopped) return;
-          void readySound();
+          // Without sounds of its own beside the voice, the shared context is let go as the voice starts.
+          if (sounds) void readySound();
+          else suspendAudio();
           view.status('Listening. Answer out loud.');
         },
         onTranscript: (who, text, start, endMs) => {

@@ -10,7 +10,7 @@ import { homeScreen } from './home';
 import { settingsScreen } from './settings';
 import { endWalk, walkScreen, type WalkDeps, type WalkView } from './walk';
 import { startLiveWalk } from './walk-live';
-import type { WalkOutcome, WalkQuestion, WalkRound } from '../walk';
+import { callSounds, setCallSounds, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 
 const KEY = 'sk-proj-abcdefghijklmnopqrstuvwxyz0123';
 const KNOWN = ['salamat', 'kumusta', 'oo', 'kape', 'paalam'];
@@ -32,6 +32,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   endWalk();
+  setCallSounds(true);
   forgetApiKey();
   vi.unstubAllGlobals();
 });
@@ -151,6 +152,28 @@ describe('walk and talk', () => {
     // The waiting sound has stopped.
     await new Promise((r) => setTimeout(r, 1300));
     expect(ticks.count).toBe(waiting);
+  });
+
+  it('plays no ready sound or chime with chimes during walk and talk off in Settings', async () => {
+    const settings = settingsScreen(fakeApp(KNOWN));
+    const toggle = [...settings.querySelectorAll('label.toggle')].find((l) => l.textContent === 'Chimes during walk and talk')!.querySelector('input')!;
+    expect(toggle.checked).toBe(true);
+    toggle.checked = false;
+    toggle.dispatchEvent(new Event('change'));
+    expect(callSounds()).toBe(false);
+    setApiKey(KEY);
+    const f = liveDeps();
+    const root = walkScreen(fakeApp(KNOWN), f.deps);
+    document.body.append(root);
+    button(root, 'Start').click();
+    await until(() => f.fetch.mock.calls.length > 0);
+    await flush();
+    f.send({ type: 'session.started', session: {} });
+    f.send({ type: 'session.input_transcript.delta', delta: 'salamat', start_ms: 2000, end_ms: 2400 });
+    f.send({ type: 'session.output_transcript.delta', delta: 'Tama!', start_ms: 3000, end_ms: 3500 });
+    await until(() => tally(root).asked === '1');
+    await new Promise((r) => setTimeout(r, 300));
+    expect(chimes.count).toBe(0);
   });
 
   it('waits for the microphone before sounding, so the sounds start in the call\'s audio', async () => {

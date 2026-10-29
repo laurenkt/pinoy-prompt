@@ -10,6 +10,29 @@ import { answerLanguageOf, type AnswerLanguage } from './meaning';
 import { DRILL_GAP, askAs, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, pickDrillCard, type DrillRepeat } from './session';
 import type { Progress } from './progress-schema';
 
+const CALL_SOUNDS_STORAGE = 'pinoy-prompt:walk-call-sounds';
+
+/**
+ * Whether the app plays its own sounds during a call (the ready sound and the chime): a switch in Settings for now, to
+ * find whether they make the call's voice stutter on iPhone. Kept, like the OpenAI key, outside progress.
+ */
+export function callSounds(): boolean {
+  try {
+    return localStorage.getItem(CALL_SOUNDS_STORAGE) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+export function setCallSounds(on: boolean): void {
+  try {
+    if (on) localStorage.removeItem(CALL_SOUNDS_STORAGE);
+    else localStorage.setItem(CALL_SOUNDS_STORAGE, 'off');
+  } catch {
+    // Storage is blocked: the switch just doesn't stick.
+  }
+}
+
 /** The ways a round asks: the ones that work without looking at the screen. */
 export const WALK_WAYS: readonly Way[] = ['recall', 'listen'];
 
