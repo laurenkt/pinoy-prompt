@@ -471,7 +471,8 @@ p {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  background: var(--surface-dim);
+  /* The panel's own colour, so it reads as words on the panel while still covering the stream. */
+  background: var(--surface);
   color: var(--text);
   border: none;
   border-radius: 10px;
@@ -527,11 +528,8 @@ p {
   position: relative;
   /* A little shorter where the phone's insets would otherwise push Home past one screen. */
   height: clamp(120px, var(--fill) - 632px, 160px);
-  border: var(--outline);
-  border-radius: 14px;
+  /* Straight on the panel, like the card back's pictures, so it doesn't look like a button. */
   overflow: hidden;
-  background: var(--surface-dim);
-  box-shadow: var(--shadow);
   /* Vertical swipes still scroll the page; sideways ones look through time. */
   touch-action: pan-y;
   cursor: crosshair;
