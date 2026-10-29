@@ -73,7 +73,32 @@ describe('walkRound', () => {
     const round = walkRound(progress, now, ['recall']);
     const q = round.next()!;
     round.note(q, 'wrong');
-    expect(round.next()!.card.id).toBe(q.card.id);
+    const back = round.next()!;
+    expect(back.card.id).toBe(q.card.id);
+    expect(back.again).toBe(true);
+    // Got right, it still comes back later, but not as "once more".
+    round.note(back, 'right');
+    for (let i = 0; i < 6; i++) {
+      const later = round.next()!;
+      if (later.card.id === q.card.id) expect(later.again).toBe(false);
+      round.note(later, 'right');
+    }
+  });
+
+  it('with a question picked ahead (as the live voice is kept), never asks the same one twice in a row', () => {
+    for (let run = 0; run < 30; run++) {
+      const { progress, now } = learner();
+      const round = walkRound(progress, now, ['recall', 'listen']);
+      let current = round.next()!;
+      let upcoming = round.next()!;
+      for (let i = 0; i < 20; i++) {
+        expect(`${upcoming.card.id} ${upcoming.way}`).not.toBe(`${current.card.id} ${current.way}`);
+        round.note(current, i % 3 ? 'right' : 'wrong');
+        const next = round.next()!;
+        current = upcoming;
+        upcoming = next;
+      }
+    }
   });
 });
 
@@ -98,6 +123,8 @@ describe('what the live voice is told', () => {
     expect(questionBrief(listen, 0)).toContain('say the Tagalog "kape"');
     expect(questionBrief(recall, 0)).not.toContain('needed help');
     expect(questionBrief(recall, 2)).toContain('needed help with it 2 times');
+    expect(questionBrief(recall, 0)).not.toContain('once more');
+    expect(questionBrief({ ...recall, again: true }, 0)).toContain('once more');
   });
 
   it('keeps the voice a question ahead, with how the last answer went', () => {
