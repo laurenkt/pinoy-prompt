@@ -339,19 +339,26 @@ const TURN_INSTRUCTIONS: Record<AnswerLanguage, string> = {
   tl: 'The learner is given the English and asked how to say it in Tagalog.',
 };
 const TURN_RULES = `What was said is transcribed speech: Tagalog may come out spelled oddly or as English-looking words.
-Say only whether it was an answer, not whether it was right.
-answered: true if what the learner said was their answer to the question, even hedged ("is it salamat?"), unsure, partial or wrong. false if they asked the tutor something instead (what a word means, which sense of the word is meant, to say it again), or made an aside or a filler, rather than answering. The tutor's reply settles it: if the tutor gave a verdict, gave the answer, said it's checking or moved on, it was an answer; if the tutor answered their question or clarified and is still waiting for an answer, it was not.`;
+Don't judge the answer yourself: say whether it was an answer, and what the tutor made of it.
+answered: true if what the learner said was their answer to the question, even hedged ("is it salamat?"), unsure, partial or wrong. false if they asked the tutor something instead (what a word means, which sense of the word is meant, to say it again), or made an aside or a filler, rather than answering. Asking to skip or pass counts as an answer. The tutor's reply settles it: if the tutor gave a verdict, gave the answer, said it's checking or moved on, it was an answer; if the tutor answered their question or clarified and is still waiting for an answer, it was not.
+tutor: what the tutor's reply said of the answer. "right" if it told them they got it (even with a small correction to how it's said), "wrong" if it told them it's not quite or gave the right answer in its place, "skipped" if they asked to skip or pass and it moved on, "none" if it gave no verdict (it's checking, or it wasn't an answer). The tutor heard them, where the transcript may not have, so go by what it said.`;
+
+/** How a learner's turn in walk and talk went, as the voice took it: whether it was their answer, and the voice's verdict on it. */
+export interface TurnVerdict {
+  answered: boolean;
+  tutor: 'right' | 'wrong' | 'skipped' | 'none';
+}
 
 /**
- * Ask OpenAI whether a learner's turn in walk and talk was their answer, as the voice took it, given what the voice
- * asked, what the learner said and the voice's reply. Sends only the card and those three. Whether it was right is
- * checkMeaning's to say.
+ * Ask OpenAI how the voice took a learner's turn in walk and talk: whether it was their answer, and whether the voice
+ * said it was right, given what the voice asked, what the learner said and the voice's reply. Sends only the card and
+ * those three. The voice hears the learner, so its verdict counts over the transcript's (see walk-live.ts).
  */
 export async function checkTurn(
   key: string,
   { tl, en, language, asked, said, reply }: { tl: string; en: string; language: AnswerLanguage; asked: string; said: string; reply: string },
   fetchFn: typeof fetch = (...args) => fetch(...args),
-): Promise<boolean> {
+): Promise<TurnVerdict> {
   type Answer = { output?: { type?: string; content?: { type?: string; text?: string }[] }[]; usage?: TokenUsage };
   const body = await timed(CHECK_TIMEOUT_MS, async (signal) =>
     readJson<Answer>(
@@ -370,8 +377,8 @@ export async function checkTurn(
               strict: true,
               schema: {
                 type: 'object',
-                properties: { answered: { type: 'boolean' } },
-                required: ['answered'],
+                properties: { answered: { type: 'boolean' }, tutor: { type: 'string', enum: ['right', 'wrong', 'skipped', 'none'] } },
+                required: ['answered', 'tutor'],
                 additionalProperties: false,
               },
             },
@@ -386,8 +393,9 @@ export async function checkTurn(
   addSpend(tokenCost(CHECK_MODEL, body.usage));
   const text = body.output?.find((o) => o.type === 'message')?.content?.find((c) => c.type === 'output_text')?.text;
   try {
-    const verdict = JSON.parse(text ?? '') as { answered?: unknown };
-    if (typeof verdict.answered === 'boolean') return verdict.answered;
+    const verdict = JSON.parse(text ?? '') as { answered?: unknown; tutor?: unknown };
+    if (typeof verdict.answered === 'boolean' && (['right', 'wrong', 'skipped', 'none'] as unknown[]).includes(verdict.tutor))
+      return { answered: verdict.answered, tutor: verdict.answered ? (verdict.tutor as TurnVerdict['tutor']) : 'none' };
   } catch {
     // Fall through.
   }
@@ -395,7 +403,7 @@ export async function checkTurn(
 }
 
 /** checkTurn with the learner's key, or null without one. */
-export const askTurnOpenAi = (turn: Parameters<typeof checkTurn>[1]): Promise<boolean | null> => {
+export const askTurnOpenAi = (turn: Parameters<typeof checkTurn>[1]): Promise<TurnVerdict | null> => {
   const key = getApiKey();
   return key ? checkTurn(key, turn) : Promise.resolve(null);
 };
