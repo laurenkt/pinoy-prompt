@@ -302,7 +302,7 @@ describe('the live engine', () => {
   it('asks OpenAI, with the voice\'s reply, whether what was said was an answer, and moves on only if it was', async () => {
     const asks: { asked: string; said: string; reply: string }[] = [];
     const f = await started([recall('tama'), recall('oo'), recall('salamat')], (deps) => {
-      deps.askTurn = async (turn) => (asks.push(turn), !turn.said.startsWith('do you mean'));
+      deps.askTurn = async (turn) => (asks.push(turn), { answered: !turn.said.startsWith('do you mean'), tutor: 'none' });
     });
     f.said('ai', 'How do you say right?', 0, 1500);
     f.said('you', 'do you mean right as in direction or right as in correct', 2000, 4000);
@@ -330,7 +330,7 @@ describe('the live engine', () => {
   it("gives OpenAI the voice's whole reply, when the learner's words reach the transcript after it", async () => {
     const asks: { asked: string; reply: string }[] = [];
     const f = await started([recall('tama'), recall('oo')], (deps) => {
-      deps.askTurn = async (turn) => (asks.push(turn), true);
+      deps.askTurn = async (turn) => (asks.push(turn), { answered: true, tutor: 'none' });
     });
     f.said('ai', 'How do you say right?', 0, 1500);
     f.said('ai', ' Yes,', 2600, 2800);
@@ -345,7 +345,7 @@ describe('the live engine', () => {
   it("takes what was said as an answer, without waiting on the reply, once the voice asks the app", async () => {
     const asks: unknown[] = [];
     const f = await started([recall('tama'), recall('oo')], (deps) => {
-      deps.askTurn = async (turn) => (asks.push(turn), false);
+      deps.askTurn = async (turn) => (asks.push(turn), { answered: false, tutor: 'none' });
     });
     f.said('you', 'tamo', 2000, 2500);
     f.said('ai', 'Hmm, let me check.', 3000, 3500);
@@ -354,6 +354,32 @@ describe('the live engine', () => {
     await until(() => f.sent.some((e) => e.type === 'session.commentary.append' && e.delegation_id === 'item_1'), 2000);
     expect(asks).toEqual([]);
     expect(f.noted).toEqual(['wrong']);
+    f.run.stop();
+  });
+
+  it("notes the voice's verdict, as it heard the answer where the transcript may be far off", async () => {
+    const f = await started([recall('salamat'), recall('oo')], (deps) => {
+      deps.askTurn = async () => ({ answered: true, tutor: 'right' });
+      deps.askMeaning = async () => false;
+    });
+    f.said('ai', 'How do you say thank you?', 0, 1500);
+    f.said('you', 'sa la mot', 2000, 2500);
+    f.said('ai', 'Tama! Now, how do you say yes?', 3000, 4500);
+    await until(() => f.noted.length > 0, 5000);
+    expect(f.noted).toEqual(['right']);
+    f.run.stop();
+  }, 10_000);
+
+  it('follows the voice when it has gone on to the next question without the app', async () => {
+    const f = await started([recall('salamat'), recall('kumusta'), recall('oo')]);
+    // The answer to "thank you" never reached the transcript; the voice reacted and asked the next question.
+    f.said('ai', 'How do you say thank you?', 0, 1500);
+    f.said('ai', 'Great! Now, how do you say how are you?', 5000, 7000);
+    f.said('you', 'Kumusta', 8000, 8500);
+    f.said('ai', 'Tama!', 9000, 9500);
+    await until(() => f.noted.length > 1);
+    expect(f.noted).toEqual(['skip', 'right']);
+    expect(f.updates()[0].content).toContain('"Kumusta": right');
     f.run.stop();
   });
 

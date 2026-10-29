@@ -96,6 +96,15 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
       .join('')
       .trim();
 
+  /** Where a question's words last come in what the voice said, or -1: the English for recall, the Tagalog for listen. */
+  function lastMention(said: string, q: WalkQuestion): number {
+    const words = (text: string) => ` ${text.toLowerCase().normalize('NFD').replace(/[^a-z]+/g, ' ').trim()} `;
+    return words(said).lastIndexOf(words(q.way === 'recall' ? spokenMeaning(q.card) : q.card.tl));
+  }
+
+  /** Whether what the voice last asked was the question after the current one, rather than the current one. */
+  const movedOn = (asked: string) => !!current && !!upcoming && lastMention(asked, upcoming) > lastMention(asked, current);
+
   /** Waits for the voice's reply, unless the voice asks the app first. Whether it asked. */
   function replyHeard(): Promise<boolean> {
     return new Promise((resolve) => {
@@ -110,10 +119,10 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
 
   /**
    * How the answer went: the card judged first, on the device, so a card that is "Hindi ko alam" isn't taken for a
-   * command; then, with the voice's reply, OpenAI says whether the voice took it as an answer at all (checkTurn), so
-   * the round moves on only when the voice does; then an answer is judged as Drills judges one (judgeMeaning), not by
-   * the voice's verdict, which it's there to put right. Null for an aside to the voice. Asked by the voice (replyAt
-   * Infinity), it's an answer the voice can't judge.
+   * command; then, with the voice's reply, OpenAI says how the voice took it (checkTurn): not as an answer, so the
+   * round moves on only when the voice does, or with its verdict, which counts as the voice heard what was said. Only
+   * an answer the voice gave no verdict on is judged as Drills judges one (judgeMeaning). Null for an aside to the
+   * voice. Asked by the voice (replyAt Infinity), it's an answer the voice can't judge.
    */
   async function judged(answer: string, q: WalkQuestion, heard: SpokenTurn[], replyAt: number): Promise<Check | null> {
     const language = walkLanguage(q);
@@ -131,8 +140,11 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
         const before = turns.filter((t) => t.who === 'you' && t.end <= from).at(-1)?.end ?? 0;
         const after = turns.find((t) => t.who === 'you' && t.start > to)?.start ?? Infinity;
         try {
-          const answered = await deps.askTurn({ tl: q.card.tl, en: q.card.en, language, asked: voiceSaid(before, from), said: answer, reply: voiceSaid(to, after) });
-          if (answered === false) return null;
+          const turn = await deps.askTurn({ tl: q.card.tl, en: q.card.en, language, asked: voiceSaid(before, from), said: answer, reply: voiceSaid(to, after) });
+          if (turn && !turn.answered) return null;
+          // The voice heard them, where the transcript of Tagalog said by a beginner is often far off: its verdict, the
+          // one the learner heard, is the one noted.
+          if (turn && turn.tutor !== 'none') return { q, said: answer, outcome: turn.tutor, unchecked: false };
         } catch {
           // Couldn't be asked, so it won't be asked again for the verdict: what's plainly an aside is taken as one, and
           // the rest isn't counted.
@@ -150,13 +162,22 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
    * question, telling the voice how it went and what's now next. Null when it wasn't an answer.
    */
   async function check(before: number): Promise<Check | null> {
-    const q = current;
     await wait(TRANSCRIPT_SETTLE_MS);
     const heard = untaken(before);
-    if (stopped || !q || !heard.length) return null;
+    if (stopped || !current || !heard.length) return null;
     takenTo = Math.max(takenTo, ...heard.map((t) => t.end));
     const answer = heard.map((t) => t.text.trim()).join(' ').trim();
     if (!answer) return null;
+    const since = turns.filter((t) => t.who === 'you' && t.end <= heard[0].start).at(-1)?.end ?? 0;
+    if (movedOn(voiceSaid(since, heard[0].start))) {
+      // The voice went on to the next question without the app (an answer the transcript missed): the app follows, so
+      // this answer is judged against the question it answers. The one passed is noted nowhere, as a skip is.
+      round.note(current, 'skip');
+      current = upcoming;
+      upcoming = current && round.next();
+      if (!current) return null;
+    }
+    const q = current;
     view.status('Checking…');
     const result = await judged(answer, q, heard, before);
     if (stopped || current !== q) return null;
