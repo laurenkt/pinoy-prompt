@@ -113,7 +113,14 @@ describe('filling the screen', () => {
     // A message with a way forward sits in the middle, the same on every screen.
     ['a finished study session', () => sessionScreen(fakeApp(KNOWN), []), '.panel.center'],
     ['Drills before there are words to drill', () => practiceScreen(fakeApp(['salamat'])), '.panel.center'],
-    ['walk and talk before it starts', () => walkScreen(fakeApp(KNOWN), 'clips'), '.panel.center'],
+    [
+      'walk and talk before it starts',
+      () => {
+        setApiKey('sk-proj-abcdefghijklmnopqrstuvwxyz0123');
+        return walkScreen(fakeApp(KNOWN));
+      },
+      '.panel.center',
+    ],
     [
       'Chat before there are words to chat with',
       () => {

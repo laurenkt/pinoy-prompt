@@ -343,13 +343,24 @@ const SCREENS = {
   chat: (page) => page.click('.chat-btn'),
   // Walk and talk, from Settings' Experimental section, before a round starts.
   walk: async (page) => {
+    await page.evaluate(async () => (await import('/src/openai.ts')).setApiKey('sk-screenshot-0000000000000000000000'));
     await page.click('[aria-label="Settings"]');
     await page.click('button:text-is("Walk and talk")');
   },
-  'walk-live': async (page) => {
-    await page.evaluate(async () => (await import('/src/openai.ts')).setApiKey('sk-screenshot-0000000000000000000000'));
+  // A round going: its tally and Stop, with a call that never finishes connecting.
+  'walk-running': async (page) => {
+    await page.evaluate(async () => {
+      (await import('/src/openai.ts')).setApiKey('sk-screenshot-0000000000000000000000');
+      const { defaultWalkDeps } = await import('/src/screens/walk.ts');
+      defaultWalkDeps.call = {
+        ...defaultWalkDeps.call,
+        getMicrophone: async () => new AudioContext().createMediaStreamDestination().stream,
+        fetch: () => new Promise(() => {}),
+      };
+    });
     await page.click('[aria-label="Settings"]');
-    await page.click('button:text-is("Walk and talk live")');
+    await page.click('button:text-is("Walk and talk")');
+    await page.click('button:text-is("Start")');
   },
   // A call going, with stand-ins for OpenAI and WebRTC: a hum for each voice, so the backdrop moves, and a few lines said.
   'chat-call': async (page) => {

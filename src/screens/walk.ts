@@ -2,53 +2,36 @@ import type { App } from '../app';
 import { askOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps } from '../openai';
 import type { MeaningJudge } from '../meaning';
 import { canDrill, DRILL_MIN_WORDS } from '../session';
-import { spokenMeaning, WALK_WAYS, walkRound, type WalkEngine, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import { WALK_WAYS, walkRound, type WalkOutcome, type WalkQuestion } from '../walk';
 import { h, iconButton } from '../ui';
-import { defaultDeps, type SpeakDeps } from './speak';
 import { keyForm } from './settings';
-import { startClipsWalk } from './walk-clips';
 import { startLiveWalk } from './walk-live';
 
-/** What a walk and talk engine tells the screen as it goes, so someone glancing at the phone can see where it is. */
+/** What the round tells the screen as it goes, so someone glancing at the phone can see how it's going. */
 export interface WalkView {
-  /** What's happening now: "Listening…", "Checking…". */
+  /** What's happening now: "Connecting…", "Listening…", "Checking…". */
   status(text: string): void;
-  /** A question is being asked. */
-  asked(q: WalkQuestion): void;
-  /** How the answer to it went, whether noting it changed progress (to be saved), and what was heard, if it's known. */
-  answered(q: WalkQuestion, outcome: WalkOutcome, changed: boolean, heard?: string): void;
+  /** How the answer to a question went, and whether noting it changed progress (to be saved). */
+  answered(q: WalkQuestion, outcome: WalkOutcome, changed: boolean): void;
   /** It stopped by itself; why, if it broke. */
   ended(problem?: string): void;
 }
 
-/** An engine running a round, until it's stopped or stops itself. */
+/** A round running, until it's stopped or stops itself. */
 export interface WalkRun {
   stop(): void;
 }
 
 export interface WalkDeps {
-  speak: SpeakDeps;
   call: CallDeps;
   callSupported(): boolean;
   /** Judges a spoken answer the device can't match, with OpenAI (see judgeMeaning); null without a key. */
   askMeaning: MeaningJudge | null;
 }
 
-export const defaultWalkDeps: WalkDeps = { speak: defaultDeps, call: browserCallDeps, callSupported, askMeaning: askOpenAi };
+export const defaultWalkDeps: WalkDeps = { call: browserCallDeps, callSupported, askMeaning: askOpenAi };
 
-const ENGINES: Record<WalkEngine, { title: string; about: string; start: (round: WalkRound, view: WalkView, deps: WalkDeps) => WalkRun }> = {
-  clips: {
-    title: 'Walk and talk',
-    about:
-      "You hear an English word or phrase and say it in Tagalog. Your answer is checked on this phone, then you hear it said by a recorded voice. Say \"skip\" to move on, or \"I don't know\" (or \"hindi ko alam\") to hear the answer.",
-    start: (round, view, deps) => startClipsWalk(round, view, deps.speak),
-  },
-  live: {
-    title: 'Walk and talk live',
-    about: `An AI voice asks you words, in Tagalog or English, and you answer out loud. The app checks each answer and tells the voice how it went. Say "skip" to move on, or "I don't know" to hear the answer. About ${CENTS_PER_MINUTE}¢ a minute on your OpenAI key.`,
-    start: startLiveWalk,
-  },
-};
+const ABOUT = `An AI voice asks you words, in Tagalog or English, and you answer out loud. Say "skip" to move on, or "I don't know" to hear the answer, and ask it anything along the way. About ${CENTS_PER_MINUTE}¢ a minute on your OpenAI key.`;
 
 let active: WalkRun | null = null;
 /** Keeps the screen on while a round runs: a phone that locks cuts off the microphone. */
@@ -86,24 +69,25 @@ export function endWalk(): void {
 
 type State = { name: 'ready' } | { name: 'running' } | { name: 'stopped'; problem?: string };
 
-/** One question and how it went, for a glance at the phone. */
-interface Shown {
-  q: WalkQuestion;
-  outcome?: WalkOutcome;
-  heard?: string;
+/** How the round has gone so far: what someone glancing at the phone sees, rather than the question. */
+interface Tally {
+  asked: number;
+  right: number;
+  /** Wrong, or not known. */
+  wrong: number;
+  skipped: number;
 }
 
 /**
- * Walk and talk: a drill round to do with headphones in and the phone in a pocket (see walk.ts). A session: its close
- * button ends the round and goes Home. Experimental, opened from Settings.
+ * Walk and talk: a drill round to do with headphones in and the phone in a pocket (see walk.ts), run by GPT-Live
+ * (walk-live.ts). A session: its close button ends the round and goes Home. While it runs, the screen shows only how
+ * the round is going and a big Stop. Experimental, opened from Settings.
  */
-export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaultWalkDeps): HTMLElement {
+export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElement {
   const root = h('div', { class: 'walk fill' });
-  const about = ENGINES[engine];
   let state: State = { name: 'ready' };
   let status = '';
-  let shown: Shown | null = null;
-  let round: WalkRound | null = null;
+  let tally: Tally = { asked: 0, right: 0, wrong: 0, skipped: 0 };
 
   const home = () => app.navigate({ name: 'home' });
 
@@ -112,8 +96,7 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
     const { settings } = app.progress;
     if (!canDrill(app.progress)) return `Learn at least ${DRILL_MIN_WORDS} words first, then come back to drill them out loud.`;
     if (!settings.sound || !settings.mic) return 'Walk and talk needs the sound and the mic on. Turn them on from Home.';
-    if (!deps.speak.recordingSupported()) return "This browser can't use the microphone.";
-    if (engine === 'live' && !deps.callSupported()) return "This browser can't use the microphone for calls. Try Safari or Chrome.";
+    if (!deps.callSupported()) return "This browser can't use the microphone for calls. Try Safari or Chrome.";
     return null;
   }
 
@@ -124,12 +107,13 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
       if (el) el.textContent = text;
       else draw();
     },
-    asked(q) {
-      shown = { q };
-      draw();
-    },
-    answered(q, outcome, changed, heard) {
-      shown = { q, outcome, heard };
+    answered(_q, outcome, changed) {
+      tally = {
+        asked: tally.asked + 1,
+        right: tally.right + (outcome === 'right' ? 1 : 0),
+        wrong: tally.wrong + (outcome === 'wrong' || outcome === 'dont-know' ? 1 : 0),
+        skipped: tally.skipped + (outcome === 'skip' ? 1 : 0),
+      };
       if (changed) app.commit();
       draw();
     },
@@ -143,13 +127,12 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
 
   function start(): void {
     endWalk();
-    round = walkRound(app.progress, app.now, WALK_WAYS[engine]);
-    shown = null;
+    tally = { asked: 0, right: 0, wrong: 0, skipped: 0 };
     status = 'Starting…';
     state = { name: 'running' };
     draw();
-    // Inside the tap: the engine starts its audio and microphone from here.
-    active = about.start(round, view, deps);
+    // Inside the tap: the round starts its audio and the call from here.
+    active = startLiveWalk(walkRound(app.progress, app.now, WALK_WAYS), view, deps);
     keepAwake();
   }
 
@@ -160,39 +143,18 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
   }
 
   function header(): HTMLElement {
-    return h(
-      'header',
-      { class: 'session-header' },
-      iconButton('close', 'End walk and talk', home),
-      h('span', { class: 'session-count' }, round ? `${round.done} done` : about.title),
-    );
+    return h('header', { class: 'session-header' }, iconButton('close', 'End walk and talk', home), h('span', { class: 'session-count' }, 'Walk and talk'));
   }
 
-  /** The question on show, and once answered, how it went, as a drill shows them. */
-  function question(s: Shown): (HTMLElement | false | undefined)[] {
-    const recall = s.q.way === 'recall';
-    const verdict = s.outcome && { right: 'Tama!', wrong: 'Mali.', 'dont-know': 'The answer:', skip: 'Skipped.' }[s.outcome];
-    return [
-      h(
-        'div',
-        { class: 'prompt' },
-        h('p', { class: 'eyebrow' }, recall ? 'How do you say…' : 'What does it mean?'),
-        recall ? h('p', { class: 'prompt-en' }, spokenMeaning(s.q.card)) : h('p', { class: 'tl', lang: 'fil' }, s.q.card.tl),
-      ),
-      s.outcome &&
-        h(
-          'div',
-          { class: `feedback ${s.outcome === 'right' ? 'good' : 'bad'}`, role: 'status' },
-          h('strong', null, verdict),
-          s.outcome !== 'skip' && ` ${s.q.card.tl} = ${s.q.card.en}`,
-          s.heard && h('p', { class: 'feedback-note' }, `Heard “${s.heard}”.`),
-        ),
-    ];
+  /** The round so far, in numbers. */
+  function stats(): HTMLElement {
+    const stat = (value: number, label: string) => h('div', { class: 'stat' }, h('span', { class: 'stat-value' }, String(value)), h('span', { class: 'stat-label' }, label));
+    return h('div', { class: 'stats' }, stat(tally.asked, 'asked'), stat(tally.right, 'right'), stat(tally.wrong, 'wrong'), stat(tally.skipped, 'skipped'));
   }
 
   function draw(): void {
     const why = blocked();
-    if (engine === 'live' && !getApiKey()) {
+    if (!getApiKey()) {
       root.replaceChildren(header(), h('section', { class: 'card' }, h('h2', null, 'Connect OpenAI'), keyForm(draw)));
       return;
     }
@@ -203,9 +165,9 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
       body = h(
         'section',
         { class: 'panel' },
-        ...(shown ? question(shown) : []),
+        stats(),
         h('p', { class: 'walk-status muted', role: 'status' }, status),
-        h('button', { class: 'btn secondary big', onclick: stop }, 'Stop'),
+        h('button', { class: 'btn primary big walk-stop', onclick: stop }, 'Stop'),
       );
     } else {
       const again = state.name === 'stopped';
@@ -213,8 +175,9 @@ export function walkScreen(app: App, engine: WalkEngine, deps: WalkDeps = defaul
         'section',
         { class: 'panel center' },
         h('p', { class: 'eyebrow' }, 'Experimental'),
-        h('h2', null, about.title),
-        h('p', null, about.about),
+        h('h2', null, 'Walk and talk'),
+        again && tally.asked > 0 && stats(),
+        h('p', null, ABOUT),
         h('p', { class: 'muted small' }, 'Put your headphones in. The screen stays on while it runs; locking the phone stops it.'),
         state.name === 'stopped' && state.problem && h('div', { class: 'feedback bad', role: 'alert' }, state.problem),
         h('button', { class: 'btn primary big', 'data-tap': 'before', onclick: start }, again ? 'Start again' : 'Start'),

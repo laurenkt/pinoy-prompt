@@ -1,23 +1,17 @@
 // Walk and talk: a drill round heard and answered out loud, with headphones in and
-// the phone in a pocket. It asks what Drills asks (pickDrillCard), only the ways
-// that work without looking: recall (the English said, the Tagalog answered) and,
-// with the live voice, listen (the Tagalog said, its meaning answered). It notes
-// answers as Drills does, so it never touches the schedule.
-//
-// Two ways of running it share this round and the screen in screens/walk.ts:
-// recorded clips with the answer judged on the phone (screens/walk-clips.ts), and
-// GPT-Live asking the questions with the app as its backend (screens/walk-live.ts).
+// the phone in a pocket, run by GPT-Live with the app as its backend
+// (screens/walk-live.ts). It asks what Drills asks (pickDrillCard), only the ways
+// that work without looking: recall (the English said, the Tagalog answered) and
+// listen (the Tagalog said, its meaning answered). It notes answers as Drills
+// does, so it never touches the schedule.
 
-import { ASKED_VOCAB, isVocab, variantsOf, type Card, type Way } from './deck';
+import { isVocab, type Card, type Way } from './deck';
 import { answerLanguageOf, type AnswerLanguage } from './meaning';
 import { DRILL_GAP, askAs, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, pickDrillCard, type DrillRepeat } from './session';
 import type { Progress } from './progress-schema';
 
-/** How a walk and talk round is run: recorded clips judged on the phone, or GPT-Live. */
-export type WalkEngine = 'clips' | 'live';
-
-/** The ways each engine can ask. Clips judge Tagalog on the phone; only the live voice can hear an English meaning. */
-export const WALK_WAYS: Record<WalkEngine, readonly Way[]> = { clips: ['recall'], live: ['recall', 'listen'] };
+/** The ways a round asks: the ones that work without looking at the screen. */
+export const WALK_WAYS: readonly Way[] = ['recall', 'listen'];
 
 export interface WalkQuestion {
   card: Card;
@@ -38,17 +32,6 @@ export const walkLanguage = (q: WalkQuestion): AnswerLanguage => answerLanguageO
 /** A card's first English meaning, as it's said: no slashes or alternatives for a voice to read out. */
 export function spokenMeaning(card: Card): string {
   return card.en.split('/')[0].trim();
-}
-
-/** The English lines the recorded version says, besides its questions. Each has a recorded clip (scripts/generate-prompts.mjs). */
-export const WALK_LINES = { start: "Okay, let's go!", miss: "Not quite. It's…", again: 'Once more.' } as const;
-
-/** The recorded version's question for a card, as its clip says it. */
-export const questionLine = (card: Card): string => `How do you say "${spokenMeaning(card).replace(/[.!?…]+$/, '')}"?`;
-
-/** Every English line the recorded version can say: what scripts/generate-prompts.mjs records, and what walk.test.ts checks has a clip. */
-export function walkLines(): string[] {
-  return [...new Set([...Object.values(WALK_LINES), ...ASKED_VOCAB.flatMap((c) => [c, ...variantsOf(c)]).map(questionLine)])];
 }
 
 export interface WalkRound {
@@ -121,15 +104,6 @@ export function heardCommand(said: string): 'skip' | 'dont-know' | null {
   return null;
 }
 
-/**
- * The same, as sounds for the phone's recogniser, which only writes down sounds: each spelled the Tagalog way, as the
- * recogniser hears English said by someone who speaks it.
- */
-export const COMMAND_SOUNDS: Record<'skip' | 'dont-know', string[]> = {
-  skip: ['iskip', 'skip', 'pas', 'nekst'],
-  'dont-know': ['ay dont now', 'ay downt now', 'dont now', 'hindi ko alam', 'di ko alam', 'ewan'],
-};
-
 /** What the live voice is told about a card: its Tagalog, its meaning, other right answers, how it's said and its memory hook. */
 function facts(card: Card): string {
   const also = [...(card.accept ?? [])];
@@ -187,7 +161,7 @@ export function walkInstructions(): string {
     '- Wrong: say kindly that it is not quite. If what they said is a real word, say what it actually means. Give the right answer clearly, and the memory hook if the notes say they keep missing it or it would help. Then move on.',
     '- "I don\'t know", "hindi ko alam" or "tell me": give the answer, with the hook if it helps, and move on.',
     '- "Skip", "pass" or "next": move on to the next question without the answer.',
-    '- A question from them ("what does that mean?", "say it again"): just answer it, then carry on.',
+    '- A question or aside from them ("what does that mean?", "can you explain that word?", "say it again"): answer it, briefly, then go back to the same question and ask it again. A question is not an answer: never move on to the next question because of one.',
     'Say a Tagalog word or phrase at most twice in a turn. Never repeat a word or phrase over and over.',
     'No scores, no streaks, no long praise, no lectures.',
     '',

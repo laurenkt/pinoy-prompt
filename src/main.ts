@@ -108,7 +108,7 @@ function render(route: Route): void {
       screen = settingsScreen(app);
       break;
     case 'walk':
-      screen = walkScreen(app, route.engine);
+      screen = walkScreen(app);
       break;
   }
   // Each screen draws its own top: a page its back arrow, a session its close button (docs/ARCHITECTURE.md).

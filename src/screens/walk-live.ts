@@ -7,11 +7,13 @@
 // judgeMeaning) to note it as Drills does, and tells the voice how it went. Only
 // when the voice can't tell does it say it's checking and ask the app (client
 // delegation, see startCall), which says the verdict aloud. A right answer gets
-// Drills' chime, as soon as the app's check finds it.
+// Drills' chime, as soon as the app's check finds it. While the call connects a
+// soft note sounds every so often, and a rising one once it's ready, for someone
+// not looking at the screen.
 
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call } from '../openai';
-import { chime, stop } from '../speech';
+import { chime, readySound, stop, waitingSound } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
 import { checkText, heardCommand, questionBrief, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
@@ -20,19 +22,18 @@ import type { WalkDeps, WalkRun, WalkView } from './walk';
 const TRANSCRIPT_SETTLE_MS = 600;
 /** A check this recent, with nothing said since, is the one the voice means when it asks the app. */
 const RECENT_CHECK_MS = 15_000;
-/** How long an answer stays on the screen before the next question shows. */
-const SHOW_ANSWER_MS = 3000;
 /** Time for the voice to say its last reaction and goodbye before the call ends. */
 const WRAP_UP_MS = 8000;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Something said that asks rather than answers ("what does it mean?", "say it again"), or only fills a pause: the question stays. Only taken
- * so once the answer hasn't passed as the card, as some cards are questions ("How are you?").
+ * Something said that asks rather than answers ("what does that mean?", "can you explain it?", "say it again"), or
+ * only fills a pause: the question stays, and the voice answers it and goes back to the question. Only taken so once
+ * the answer hasn't passed as the card, as some cards are questions ("How are you?").
  */
 const ASKS =
-  /^(?:um+\s+|uh+\s+|sorry\s+|oh\s+)*(?:what does (?:it|that) mean|what was (?:it|that)|what did you say|say (?:it|that) again|(?:can|could) you (?:say|repeat)|repeat|one more time|again|wait|hold on|sorry)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|right)[\s.!]*$/i;
+  /^(?:(?:um+|uh+|oh|okay|ok|so|wait|hmm+|actually|sorry|sorry but|but)[,\s]+)*(?:what does|what do|what's the|whats the|what is the|what was|what did|why|how do|how does|how would|how is|can you|could you|would you|will you|do you|is it|is that|is there|explain|tell me (?:about|what|more|why|how|again)|say (?:it|that) again|repeat|one more time|again|wait|hold on|sorry)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|right|what)[\s.!?]*$/i;
 
 /** An answer checked by the app: how it went, and whether it could be told at all. */
 interface Check {
@@ -63,10 +64,12 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   let checking: Promise<Check | null> | null = null;
   /** The last answer checked, and when, for the voice to ask about just after. */
   let lastCheck: { result: Check; at: number } | null = null;
-  let showNext: ReturnType<typeof setTimeout> | undefined;
+  /** Stops the sound that says the call is still connecting. */
+  let stopWaiting = () => {};
   let wrapUp: ReturnType<typeof setTimeout> | undefined;
 
   const end = (problem?: string) => {
+    stopWaiting();
     if (!stopped) view.ended(problem);
   };
   const brief = (q: WalkQuestion | null) => (q ? questionBrief(q, round.help(q)) : null);
@@ -107,19 +110,12 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     }
     // Drills' chime for a right answer, played by the app as it knows: asking the voice to would hold it up.
     if (result.outcome === 'right') void chime();
-    view.answered(q, result.outcome, round.note(q, result.unchecked ? 'skip' : result.outcome), answer);
+    view.answered(q, result.outcome, round.note(q, result.unchecked ? 'skip' : result.outcome));
     current = upcoming;
     upcoming = current && round.next();
     call?.append('thinking', roundUpdate(brief(current), brief(upcoming), checkText(q, answer, result.outcome, result.unchecked)), null);
-    clearTimeout(showNext);
-    const next = current;
-    if (!next) wrapUp = setTimeout(() => end('There was nothing more to ask.'), WRAP_UP_MS);
-    else
-      showNext = setTimeout(() => {
-        if (stopped || current !== next) return;
-        view.asked(next);
-        view.status('Listening. Answer out loud.');
-      }, SHOW_ANSWER_MS);
+    if (current) view.status('Listening. Answer out loud.');
+    else wrapUp = setTimeout(() => end('There was nothing more to ask.'), WRAP_UP_MS);
     return result;
   }
 
@@ -163,13 +159,19 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     // After the screen has drawn the round, so it shows why it stopped.
     queueMicrotask(() => end(current ? 'Chat needs an OpenAI key.' : 'There was nothing to ask.'));
   } else {
-    view.asked(current);
     view.status('Connecting…');
+    // Started inside the tap, so the audio may start.
+    stopWaiting = waitingSound();
     void startCall(
       key,
       { instructions: walkInstructions(), greeting: walkGreeting(brief(current)!, brief(upcoming)), signal: abort.signal, delegate: true },
       {
-        onStarted: () => !stopped && view.status('Listening. Answer out loud.'),
+        onStarted: () => {
+          stopWaiting();
+          if (stopped) return;
+          void readySound();
+          view.status('Listening. Answer out loud.');
+        },
         onTranscript: (who, text, start, endMs) => {
           if (stopped) return;
           addPiece(turns, who, text, start, endMs);
@@ -193,7 +195,7 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   return {
     stop() {
       stopped = true;
-      clearTimeout(showNext);
+      stopWaiting();
       clearTimeout(wrapUp);
       abort.abort();
       call?.hangUp();

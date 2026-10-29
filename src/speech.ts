@@ -10,7 +10,6 @@
 
 import { audioBusy, audioContext, audioRunning, clipsSupported, loadClip, msUntilHeard, playBuffer, runningContext, type Sound } from './audio-engine';
 import clips from './clips.json';
-import prompts from './prompt-clips.json';
 import thockFile from './sounds/tap-thock.mp3?inline';
 import { hapticTick } from './haptics';
 import { microphoneInUse } from './microphone';
@@ -70,8 +69,6 @@ export function voiceQuality(): VoiceQuality {
 
 /** Clip files by the text they say, one take per voice: `<name>.mp3`, and `<name>-slow.mp3` said slowly. */
 const CLIPS: Record<string, string[]> = clips;
-/** Recorded English lines by their text (walk and talk's, made by scripts/generate-prompts.mjs). */
-const PROMPTS: Record<string, string> = prompts;
 
 /** Which voice each text last played in, so its slow version is the same voice slowed down. */
 const lastVoice = new Map<string, number>();
@@ -92,8 +89,7 @@ function clipFile(name: string, slow: boolean): string {
 
 /** Every clip file, to keep offline. */
 export function allClipUrls(): string[] {
-  const words = Object.values(CLIPS).flatMap((names) => names.flatMap((name) => [clipFile(name, false), clipFile(name, true)]));
-  return [...words, ...Object.values(PROMPTS).map((name) => clipFile(name, false))];
+  return Object.values(CLIPS).flatMap((names) => names.flatMap((name) => [clipFile(name, false), clipFile(name, true)]));
 }
 
 /** Load a word's clips ahead, in every voice as either may play, so a tap only has to start one. Plays nothing. */
@@ -211,54 +207,6 @@ async function playNow(card: Pick<Card, 'tl' | 'say'>, slow: boolean, mine: numb
 }
 
 /**
- * Say an English line out loud: its recorded clip, through the shared context like every clip, or without one the
- * built-in voice, which an iPhone keeps silent while the microphone is open. The first sound must come inside a tap,
- * as iOS only lets a page play once a tap has started it. Muted with the words, and stopped by stop(). Resolves once
- * it has been said (or couldn't be).
- */
-export async function sayEnglish(text: string): Promise<void> {
-  const name = PROMPTS[text];
-  stop();
-  if (name && clipsSupported() && !muted) {
-    const mine = generation;
-    try {
-      if (await playClip(clipFile(name, false), mine, performance.now(), () => {})) return untilQuiet();
-    } finally {
-      if (loading === mine) loading = null;
-    }
-    // Stopped while it loaded; otherwise it couldn't play, so the built-in voice says it.
-    if (mine !== generation) return;
-  }
-  if (muted || !speechSupported()) return;
-  const utterance = new SpeechSynthesisUtterance(text);
-  const english = speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith('en'));
-  if (english) utterance.voice = english;
-  utterance.lang = english?.lang ?? 'en-US';
-  // Ended by stop() too: some browsers never report a cancelled one.
-  // iOS sometimes never says it has finished, so it's given up after about as long as it could take.
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const said = new Promise<void>((resolve) => {
-    endSaying = utterance.onend = utterance.onerror = () => resolve();
-    timer = setTimeout(resolve, 3000 + text.length * 120);
-  });
-  speechSynthesis.speak(utterance);
-  await said;
-  clearTimeout(timer);
-}
-
-/** Ends the wait for English being said, when stop() cancels it. */
-let endSaying: (() => void) | null = null;
-
-/**
- * Resolves once no word is being heard, for a screen that plays one sound after another, or after `limitMs` anyway:
- * the built-in voice can report it's speaking long after it has stopped, or without making a sound.
- */
-export async function untilQuiet(limitMs = 15_000): Promise<void> {
-  const until = Date.now() + limitMs;
-  while (speaking() && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 100));
-}
-
-/**
  * A soft two-note chime for a right answer. It's short and quiet, as praise
  * should stay small, and goes quiet with the words while the sound is off. A word
  * played with it (the answer, said back) starts once it's done, not over it.
@@ -292,6 +240,44 @@ function chimeSound(ctx: AudioContext): AudioBuffer {
     { at: 0, freq: 659.25, level: 0.12, decay: 0.07 },
     { at: 0.09, freq: 987.77, level: 0.12, decay: 0.07 },
   ]);
+}
+
+/** How often the waiting sound comes while something is on its way. */
+const WAITING_EVERY_MS = 1200;
+
+/**
+ * A soft low note now and every so often, until the returned function stops it: something is on its way (a call
+ * connecting), for someone not looking at the screen. Quiet while the sound is off, like the chime.
+ */
+export function waitingSound(): () => void {
+  const pulse = () => void playMade('waiting', (ctx) => bell(ctx, 0.18, [{ at: 0, freq: 523.25, level: 0.07, decay: 0.05 }]));
+  pulse();
+  const timer = setInterval(pulse, WAITING_EVERY_MS);
+  return () => clearInterval(timer);
+}
+
+/** Three notes rising (C5, E5, G5): it's ready, after waitingSound. */
+export function readySound(): Promise<void> {
+  return playMade('ready', (ctx) =>
+    bell(ctx, 0.5, [
+      { at: 0, freq: 523.25, level: 0.1, decay: 0.07 },
+      { at: 0.1, freq: 659.25, level: 0.1, decay: 0.07 },
+      { at: 0.2, freq: 783.99, level: 0.12, decay: 0.1 },
+    ]),
+  );
+}
+
+/** Sounds made in code once per context rate, by name. */
+const madeSounds = new Map<string, AudioBuffer>();
+
+/** Play a sound made in code, if the shared context will start (outside a tap iOS may not let it: then nothing). */
+async function playMade(name: string, make: (ctx: AudioContext) => AudioBuffer): Promise<void> {
+  if (muted || !clipsSupported()) return;
+  const ctx = audioContext();
+  if (!(await audioRunning(ctx)) || muted) return;
+  let buffer = madeSounds.get(name);
+  if (buffer?.sampleRate !== ctx.sampleRate) madeSounds.set(name, (buffer = make(ctx)));
+  playBuffer(buffer);
 }
 
 /** Soft bell-like notes, made in code: each starts at `at` seconds and fades out over about `decay`. */
@@ -570,8 +556,6 @@ if (typeof document !== 'undefined') {
 /** Stop any word playing. */
 export function stop(): void {
   generation++;
-  endSaying?.();
-  endSaying = null;
   reportStart(null);
   currentClip?.stop();
   currentClip = null;
