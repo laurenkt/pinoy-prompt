@@ -94,15 +94,6 @@ function suspendWhenIdle(): void {
   }, IDLE_SUSPEND_MS);
 }
 
-/**
- * Let the shared context go now, so the next sound makes a fresh one. For a call: closed before its microphone opens,
- * the context made for its sounds afterwards is made once, under the call's audio session, rather than kept from
- * before and replaced on its first sound while the call connects (see `audioContext`).
- */
-export function closeAudio(): void {
-  closeContext();
-}
-
 /** Close the shared context; the next use makes a fresh one. Decoded clips aren't tied to it, so they're kept. */
 function closeContext(): void {
   if (!context) return;

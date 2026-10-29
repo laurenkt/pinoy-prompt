@@ -139,8 +139,7 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
     status = 'Starting…';
     state = { name: 'running' };
     draw();
-    // Inside the tap: the round starts the call from here. No tap sound: the round lets the shared context go as it starts
-    // (closeAudio), which would cut it off.
+    // Inside the tap: the round starts its audio and the call from here.
     active = startLiveWalk(walkRound(app.progress, app.now, WALK_WAYS), view, deps);
     keepAwake();
   }
@@ -192,7 +191,7 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
         h('p', { class: 'muted small' }, 'Put your headphones in. The screen stays on while it runs; locking the phone stops it.'),
         state.name === 'stopped' && state.problem && h('div', { class: 'feedback bad', role: 'alert' }, state.problem),
         rough && h('p', { class: 'muted small walk-connection' }, rough),
-        h('button', { class: 'btn primary big', 'data-no-tap': true, onclick: start }, again ? 'Start again' : 'Start'),
+        h('button', { class: 'btn primary big', 'data-tap': 'before', onclick: start }, again ? 'Start again' : 'Start'),
       );
     }
     root.replaceChildren(h('div', { class: 'session' }, header(), body));

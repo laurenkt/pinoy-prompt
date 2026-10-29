@@ -8,14 +8,12 @@
 // when the voice can't tell does it say it's checking and ask the app (client
 // delegation, see startCall), which says the verdict aloud. A right answer gets
 // Drills' chime, as soon as the app's check finds it. While the call connects a
-// soft note sounds every so often, for someone not looking at the screen; the
-// voice's greeting says it's ready. These play through the shared context, closed
-// as the round starts and made afresh once the microphone is open, so the phone's
-// switch into a call and the context's making are both over before the voice
-// starts, and held running for the whole call (holdAudio) so it doesn't stop and
-// start beside the voice.
+// soft note sounds every so often, for someone not looking at the screen, and
+// stops as the voice starts its greeting, with nothing of the app's over it. These
+// play through the shared context, held running for the whole call (holdAudio) so
+// it doesn't stop and start beside the voice.
 
-import { closeAudio, holdAudio } from '../audio-engine';
+import { holdAudio } from '../audio-engine';
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call, type CallQuality } from '../openai';
 import { chime, stop, waitingSound } from '../speech';
@@ -273,15 +271,13 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     queueMicrotask(() => end(current ? 'Chat needs an OpenAI key.' : 'There was nothing to ask.'));
   } else {
     view.status('Connecting…');
-    // Made before the microphone opens (the taps that got here), the context would be replaced on the first connecting
-    // note, just as the call connects. Let go now, it's made once the microphone is open.
-    closeAudio();
     holdAudio(true);
     void startCall(
       key,
       { instructions: walkInstructions(), greeting: walkGreeting(brief(current)!, brief(upcoming)), signal: abort.signal, delegate: true },
       {
-        // Not from the tap: once the microphone is open the context may start by itself, made under the call's audio.
+        // Not from the tap: the microphone opening changes the phone's audio, which would replace a context made before
+        // it, mid-call. Once it's open the context may start by itself.
         onMicrophone: () => {
           if (!stopped && !connected) stopWaiting = waitingSound();
         },

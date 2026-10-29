@@ -3,7 +3,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCard } from '../deck';
-import { audioContext, closeAudio } from '../audio-engine';
 import { setApiKey, forgetApiKey, type CallDeps } from '../openai';
 import { FakeAudioContext, chimes, ticks } from '../test/fake-audio';
 import { button, fakeApp, flush } from '../test/screen';
@@ -152,45 +151,6 @@ describe('walk and talk', () => {
     await new Promise((r) => setTimeout(r, 1300));
     expect(ticks.count).toBe(waiting);
     expect(chimes.count).toBe(0);
-  });
-
-  it('lets go of the audio made before Start, and makes it afresh once the microphone is open', async () => {
-    const made: { closed: boolean }[] = [];
-    vi.stubGlobal(
-      'AudioContext',
-      class extends FakeAudioContext {
-        closed = false;
-        constructor() {
-          super();
-          made.push(this);
-          this.close = async () => void (this.closed = true);
-        }
-      },
-    );
-    // The taps that got here made one.
-    closeAudio();
-    audioContext();
-    expect(made).toHaveLength(1);
-    setApiKey(KEY);
-    const f = liveDeps();
-    let open = (_: MediaStream) => {};
-    const mic = f.deps.call.getMicrophone;
-    f.deps.call.getMicrophone = () => mic().then((m) => new Promise<MediaStream>((r) => (open = () => r(m))));
-    const root = walkScreen(fakeApp(KNOWN), f.deps);
-    document.body.append(root);
-    expect(button(root, 'Start').hasAttribute('data-no-tap')).toBe(true);
-    button(root, 'Start').click();
-    await flush();
-    expect(made[0].closed).toBe(true);
-    expect(made).toHaveLength(1);
-    open(null as unknown as MediaStream);
-    await until(() => ticks.count > 0);
-    await until(() => f.fetch.mock.calls.length > 0);
-    f.send({ type: 'session.started', session: {} });
-    await new Promise((r) => setTimeout(r, 1300));
-    // One made under the call, and kept.
-    expect(made).toHaveLength(2);
-    expect(made[1].closed).toBe(false);
   });
 
   it('waits for the microphone before sounding, so the sounds start in the call\'s audio', async () => {
