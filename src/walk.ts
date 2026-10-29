@@ -8,7 +8,7 @@
 // recorded clips with the answer judged on the phone (screens/walk-clips.ts), and
 // GPT-Live asking the questions with the app as its backend (screens/walk-live.ts).
 
-import { ASKED_VOCAB, isVocab, type Card, type Way } from './deck';
+import { ASKED_VOCAB, isVocab, variantsOf, type Card, type Way } from './deck';
 import { answerLanguageOf, type AnswerLanguage } from './meaning';
 import { DRILL_GAP, askAs, drillHelp, drillKey, noteDrillAnswer, noteDrillRepeat, pickDrillCard, type DrillRepeat } from './session';
 import type { Progress } from './progress-schema';
@@ -22,6 +22,8 @@ export const WALK_WAYS: Record<WalkEngine, readonly Way[]> = { clips: ['recall']
 export interface WalkQuestion {
   card: Card;
   way: Way;
+  /** Missed earlier this round and coming back for it, so it's asked as "once more". */
+  again?: boolean;
 }
 
 /**
@@ -46,7 +48,7 @@ export const questionLine = (card: Card): string => `How do you say "${spokenMea
 
 /** Every English line the recorded version can say: what scripts/generate-prompts.mjs records, and what walk.test.ts checks has a clip. */
 export function walkLines(): string[] {
-  return [...new Set([...Object.values(WALK_LINES), ...ASKED_VOCAB.map(questionLine)])];
+  return [...new Set([...Object.values(WALK_LINES), ...ASKED_VOCAB.flatMap((c) => [c, ...variantsOf(c)]).map(questionLine)])];
 }
 
 export interface WalkRound {
@@ -60,29 +62,37 @@ export interface WalkRound {
   help(q: WalkQuestion): number;
 }
 
-/** A round asking `ways`, picked and noted as a drill round's are. */
+/**
+ * A round asking `ways`, picked and noted as a drill round's are. A question may be picked before the last is answered
+ * (the live voice is kept one ahead): until it's noted, it isn't picked again, and the next pick counts it as asked.
+ */
 export function walkRound(progress: Progress, now: () => number, ways: readonly Way[]): WalkRound {
   let recent: string[] = [];
   const repeats = new Map<string, DrillRepeat>();
   let done = 0;
-  const askable = (c: Card) => (isVocab(c) ? ways : []);
+  /** Questions picked and not yet noted, by drillKey. */
+  const waiting = new Set<string>();
+  const askable = (c: Card) => (isVocab(c) ? ways.filter((w) => !waiting.has(drillKey(c.id, w))) : []);
   return {
     get done() {
       return done;
     },
     help: (q) => drillHelp(progress.cards[q.card.id], q.way),
     next() {
-      const pick = pickDrillCard(progress, now(), recent, repeats, done, askable);
+      const pick = pickDrillCard(progress, now(), recent, repeats, done + waiting.size, askable);
       if (!pick) return null;
       const card = askAs(progress, pick.card, pick.way);
       recent = [...recent.slice(-DRILL_GAP), card.id];
-      return { card, way: pick.way };
+      const key = drillKey(card.id, pick.way);
+      waiting.add(key);
+      return { card, way: pick.way, again: repeats.has(key) };
     },
     note(q, outcome) {
+      const key = drillKey(q.card.id, q.way);
+      waiting.delete(key);
       done++;
       // Skipped, it's left exactly as it was.
       if (outcome === 'skip') return false;
-      const key = drillKey(q.card.id, q.way);
       const right = outcome === 'right';
       noteDrillRepeat(repeats, key, right, done - 1);
       // Got right while it's still coming back after a miss, it takes nothing off, as in Drills.
@@ -139,8 +149,9 @@ export function questionBrief(q: WalkQuestion, help: number): string {
     q.way === 'recall'
       ? `ask how to say "${spokenMeaning(q.card)}" in Tagalog (don't give the Tagalog away)`
       : `say the Tagalog "${q.card.tl}" clearly and ask what it means (don't give the meaning away)`;
+  const again = q.again ? ' They missed it a moment ago and this is it again: say so lightly as you ask it ("okay, that one once more").' : '';
   const missed = help > 0 ? ` They've needed help with it ${help === 1 ? 'once' : `${help} times`} lately, so on a miss give the memory hook.` : '';
-  return `${ask}. ${facts(q.card)}.${missed}`;
+  return `${ask}. ${facts(q.card)}.${again}${missed}`;
 }
 
 /** How an answer went, as the app's check tells the live voice. */

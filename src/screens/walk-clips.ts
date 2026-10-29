@@ -72,7 +72,8 @@ export function startClipsWalk(round: WalkRound, view: WalkView, deps: SpeakDeps
       // Nothing said, it's asked once more; still nothing, the answer is said.
       for (let tries = 0; outcome === null && !stopped; tries++) {
         view.status('Asking…');
-        if (tries > 0) await sayEnglish(WALK_LINES.again);
+        // Asked again after a silence, or back after a miss earlier on.
+        if (tries > 0 || q.again) await sayEnglish(WALK_LINES.again);
         await sayEnglish(questionLine(q.card));
         if (stopped) return;
         view.status('Getting the mic ready…');

@@ -6,11 +6,12 @@
 // checks what the learner said (from the call's transcript, with Drills'
 // judgeMeaning) to note it as Drills does, and tells the voice how it went. Only
 // when the voice can't tell does it say it's checking and ask the app (client
-// delegation, see startCall), which says the verdict aloud.
+// delegation, see startCall), which says the verdict aloud. A right answer gets
+// Drills' chime, as soon as the app's check finds it.
 
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call } from '../openai';
-import { stop } from '../speech';
+import { chime, stop } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
 import { checkText, heardCommand, questionBrief, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
@@ -104,6 +105,8 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
       view.status('Listening. Answer out loud.');
       return null;
     }
+    // Drills' chime for a right answer, played by the app as it knows: asking the voice to would hold it up.
+    if (result.outcome === 'right') void chime();
     view.answered(q, result.outcome, round.note(q, result.unchecked ? 'skip' : result.outcome), answer);
     current = upcoming;
     upcoming = current && round.next();
