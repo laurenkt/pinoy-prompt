@@ -19,9 +19,14 @@ const FILTERS: { id: Filter; label: string }[] = [
 /** Kept across visits, so the Library opens where the learner left it. */
 let filter: Filter = 'all';
 
-/** Everything there is to learn: words and phrases by topic, then the guides by kind. Tap any card to hear it, learned or not. */
+/**
+ * Everything there is to learn: words and phrases by topic, then the guides by kind. Tap any card to hear it, learned or not.
+ * Opened from Settings, so its back arrow and the system back go there.
+ */
 export function wordsScreen(app: App): HTMLElement {
   const root = h('div', { class: 'words' });
+  const back = () => app.navigate({ name: 'settings' });
+  app.onBack(back);
   // The filters stay tucked away until asked for, so the list starts near the top.
   let filtersOpen = false;
 
@@ -138,7 +143,7 @@ export function wordsScreen(app: App): HTMLElement {
       current.label,
     );
     root.replaceChildren(
-      ...pageHeader('Library', () => app.navigate({ name: 'home' }), toggle),
+      ...pageHeader('Library', back, toggle, undefined, 'Settings'),
       chips,
       h('p', { class: 'muted' }, 'Tap the speaker to hear any word.'),
       ...(showVocab ? UNITS.map((unit) => group(unit.title, unit.tlTitle, unit.cards, wordItem)) : []),

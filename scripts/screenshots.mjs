@@ -286,19 +286,26 @@ const SCREENS = {
     await page.click('.hub-btn.big:not(.chat-btn)');
     await lookBack(page);
   },
-  library: (page) => page.click('.library-btn'),
+  // The Library, opened from Settings.
+  library: async (page) => {
+    await page.click('[aria-label="Settings"]');
+    await page.click('button:has-text("Open the Library")');
+  },
   // A topic opened, so its heading shows in its open colours.
   'library-open': async (page) => {
-    await page.click('.library-btn');
+    await page.click('[aria-label="Settings"]');
+    await page.click('button:has-text("Open the Library")');
     await page.click('.unit-list summary');
   },
   // The filter chips, open on All, then open again with another filter chosen.
   'library-filters': async (page) => {
-    await page.click('.library-btn');
+    await page.click('[aria-label="Settings"]');
+    await page.click('button:has-text("Open the Library")');
     await page.click('.filter-toggle');
   },
   'library-filtered': async (page) => {
-    await page.click('.library-btn');
+    await page.click('[aria-label="Settings"]');
+    await page.click('button:has-text("Open the Library")');
     await page.click('.filter-toggle');
     await page.click('#library-filters .chip:nth-child(3)');
     await page.click('.filter-toggle');
@@ -341,11 +348,10 @@ const SCREENS = {
     await page.click('[aria-label="Settings"]');
   },
   chat: (page) => page.click('.chat-btn'),
-  // Walk and talk, from Settings' Experimental section, before a round starts.
+  // Walk and talk, from Home, before a round starts.
   walk: async (page) => {
     await page.evaluate(async () => (await import('/src/openai.ts')).setApiKey('sk-screenshot-0000000000000000000000'));
-    await page.click('[aria-label="Settings"]');
-    await page.click('button:text-is("Walk and talk")');
+    await page.click('.walk-btn');
   },
   // A round going: its tally and Stop, with a call that never finishes connecting.
   'walk-running': async (page) => {
@@ -358,8 +364,7 @@ const SCREENS = {
         fetch: () => new Promise(() => {}),
       };
     });
-    await page.click('[aria-label="Settings"]');
-    await page.click('button:text-is("Walk and talk")');
+    await page.click('.walk-btn');
     await page.click('button:text-is("Start")');
   },
   // A call going, with stand-ins for OpenAI and WebRTC: a hum for each voice, so the backdrop moves, and a few lines said.
