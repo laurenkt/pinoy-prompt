@@ -798,6 +798,50 @@ p {
   margin-top: 0;
 }
 
+/*
+ * Once an answer brings the memory hook (a miss, mostly), what has already been read gives up height so Next stays
+ * under the thumb, as it would be after a right answer, even on a short phone: the choices that were neither picked nor
+ * right go (the feedback names the answer), and the prompt's word shrinks on all but tall phones. Should a long hook,
+ * note or explanation still run past the screen after any answer, Next sticks to its bottom.
+ */
+.panel:has(> .feedback ~ .hook) > .choices .choice:disabled:not(.correct, .wrong) {
+  display: none;
+}
+
+/* The two left keep their size; the spare height goes above Next, which the hook's margin keeps apart from it. */
+.panel:has(> .feedback ~ .hook) > .choices {
+  flex-grow: 0;
+}
+
+.panel:has(> .feedback ~ .hook) > .choices .choice {
+  flex-grow: 0;
+  min-height: 48px;
+  padding-block: 8px;
+}
+
+.panel:has(> .feedback ~ .hook) > .feedback {
+  padding-block: 8px;
+}
+
+.panel:has(> .feedback ~ .hook) > .btn.continue {
+  margin-top: auto;
+}
+
+.panel:has(> .feedback ~ .hook) > .prompt {
+  padding: 14px 18px 24px;
+  margin-bottom: 12px;
+}
+
+.panel:has(> .feedback ~ .hook) > .prompt .tl {
+  font-size: clamp(1.7rem, 1.7rem + (var(--fill) - 700px) * 0.1, 2.4rem);
+}
+
+.panel:has(> .feedback, > .hook) > .btn.continue {
+  position: sticky;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 1;
+}
+
 /* A message with a way forward (a summary, a topic's introduction, "learn some words first") is a card, so it sits in the middle rather than stretching. */
 .panel.center {
   flex-grow: 0;

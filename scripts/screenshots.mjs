@@ -48,6 +48,32 @@ async function lookBack(page) {
   await page.click('.prev-btn');
 }
 
+/**
+ * Move on (past introductions, flashcards rated Good, typed questions answered from their choices) until a question
+ * shows its Tagalog and asks for its meaning from choices, then pick one that's wrong.
+ */
+async function answerWrong(page) {
+  for (let i = 0; i < 20; i++) {
+    if (await page.$('.meaning-input')) await page.click('text=Show choices');
+    const wrong = await page.evaluate(async () => {
+      const { ASKED_VOCAB } = await import('/src/deck.ts');
+      const tl = document.querySelector('.prompt .tl')?.textContent;
+      const card = ASKED_VOCAB.find((c) => c.tl === tl);
+      const choices = [...document.querySelectorAll('.choice:not(:disabled)')];
+      return card ? choices.findIndex((b) => !b.textContent.endsWith(card.en)) : -1;
+    });
+    if (wrong >= 0) return page.locator('.choice').nth(wrong).click();
+    const next =
+      (await page.$('.choice:not(:disabled)')) ??
+      (await page.$('.rate-good')) ??
+      (await page.$('.panel .btn.big')) ??
+      (await page.$('button:has-text("Next")'));
+    if (!next) break;
+    await next.click();
+  }
+  throw new Error('No question with choices to get wrong');
+}
+
 /** Turn the mic and the sound off from Home's split button. */
 async function quiet(page) {
   await page.click('.split-toggle [aria-label="Mic off"]');
@@ -172,6 +198,12 @@ const SCREENS = {
     await page.click('.drills-btn');
     await page.click('.choice');
   },
+  // A choice picked wrong: the answer and its memory hook show, and Next has to stay in reach.
+  'drills-wrong': async (page) => {
+    await page.click('.drills-btn');
+    await onlyAsk(page, 'read');
+    await answerWrong(page);
+  },
   // How well the card is known, on the back of the card, turned over with a tap.
   'drills-memory': async (page) => {
     await page.click('.drills-btn');
@@ -224,6 +256,12 @@ const SCREENS = {
   'study-next': async (page) => {
     await page.click('.hub-btn.big:not(.chat-btn)');
     await page.click('.panel .btn.big');
+  },
+  // A card in Study rated Again: the answer and its memory hook, with Next still in reach.
+  'study-wrong': async (page) => {
+    await page.click('.hub-btn.big:not(.chat-btn)');
+    await page.click('.panel .btn.big');
+    await page.click('.rate-again');
   },
   // A spoken attempt's results, from a drill round asking only to speak, with stand-ins for the microphone and
   // the speech model that hear the word with a vowel and a consonant off.
@@ -430,6 +468,11 @@ const SCREENS = {
   'coach-right': (page) => coachTake(page, 'Walang anuman', 'public/audio/walang-anuman-24546d53.mp3'),
   // A new learner's first Study: the topic's introduction, then the first word's.
   'first-study': (page) => page.click('.hub-btn.big:not(.chat-btn)'),
+  // A new word's quiz answered wrong: the answer and its memory hook, with Next still in reach.
+  'first-study-wrong': async (page) => {
+    await page.click('.hub-btn.big:not(.chat-btn)');
+    await answerWrong(page);
+  },
   'first-study-next': async (page) => {
     await page.click('.hub-btn.big:not(.chat-btn)');
     await page.click('.panel .btn.big');
