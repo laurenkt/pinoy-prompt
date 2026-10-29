@@ -72,9 +72,23 @@ export const IDLE_SUSPEND_MS = 30_000;
 let idleTimer: ReturnType<typeof setTimeout> | undefined;
 /** What's playing now, by the function that finishes it. */
 const sounding = new Set<() => void>();
+/** A call is holding the context running (holdAudio). */
+let held = false;
+
+/**
+ * Keep the shared context running for a call that plays sounds beside its voice (walk and talk), or let it go. On an
+ * iPhone each suspend and resume restarts the phone's audio output under the call, which can make the call's voice
+ * stutter, so a held context isn't suspended when idle. The call's microphone stays open throughout, so the context
+ * isn't replaced either, as long as its first sound comes once the microphone is open.
+ */
+export function holdAudio(hold: boolean): void {
+  held = hold;
+  suspendWhenIdle();
+}
 
 function suspendWhenIdle(): void {
   clearTimeout(idleTimer);
+  if (held) return;
   idleTimer = setTimeout(() => {
     if (sounding.size === 0 && context?.state === 'running') void context.suspend().catch(() => {});
   }, IDLE_SUSPEND_MS);

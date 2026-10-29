@@ -1,5 +1,5 @@
 import type { App } from '../app';
-import { askOpenAi, askTurnOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps, type TurnVerdict } from '../openai';
+import { askOpenAi, askTurnOpenAi, browserCallDeps, callSupported, getApiKey, CENTS_PER_MINUTE, type CallDeps, type CallQuality, type TurnVerdict } from '../openai';
 import type { AnswerLanguage, MeaningJudge } from '../meaning';
 import { canDrill, DRILL_MIN_WORDS } from '../session';
 import { WALK_WAYS, walkRound, type WalkOutcome, type WalkQuestion } from '../walk';
@@ -20,6 +20,8 @@ export interface WalkView {
 /** A round running, until it's stopped or stops itself. */
 export interface WalkRun {
   stop(): void;
+  /** How the call's voice has come through so far, once it's known. */
+  quality(): CallQuality | null;
 }
 
 export interface WalkDeps {
@@ -69,7 +71,10 @@ export function endWalk(): void {
   wakeLock = null;
 }
 
-type State = { name: 'ready' } | { name: 'running' } | { name: 'stopped'; problem?: string };
+type State = { name: 'ready' } | { name: 'running' } | { name: 'stopped'; problem?: string; quality?: CallQuality | null };
+
+/** More than this share of the voice patched over, and the connection is named as a cause of stutter. */
+const ROUGH_CONNECTION = 0.01;
 
 /** How the round has gone so far: what someone glancing at the phone sees, rather than the question. */
 interface Tally {
@@ -121,8 +126,9 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
     },
     ended(problem) {
       if (state.name !== 'running') return;
+      const quality = active?.quality();
       endWalk();
-      state = { name: 'stopped', problem };
+      state = { name: 'stopped', problem, quality };
       draw();
     },
   };
@@ -139,8 +145,9 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
   }
 
   function stop(): void {
+    const quality = active?.quality();
     endWalk();
-    state = { name: 'stopped' };
+    state = { name: 'stopped', quality };
     draw();
   }
 
@@ -174,6 +181,7 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
       );
     } else {
       const again = state.name === 'stopped';
+      const rough = state.name === 'stopped' && roughConnection(state.quality);
       body = h(
         'section',
         { class: 'panel center' },
@@ -182,6 +190,7 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
         h('p', null, ABOUT),
         h('p', { class: 'muted small' }, 'Put your headphones in. The screen stays on while it runs; locking the phone stops it.'),
         state.name === 'stopped' && state.problem && h('div', { class: 'feedback bad', role: 'alert' }, state.problem),
+        rough && h('p', { class: 'muted small walk-connection' }, rough),
         h('button', { class: 'btn primary big', 'data-tap': 'before', onclick: start }, again ? 'Start again' : 'Start'),
       );
     }
@@ -190,4 +199,10 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
 
   draw();
   return root;
+}
+
+/** What to say about a call whose connection lost enough of the voice to be heard, if it did. */
+function roughConnection(quality: CallQuality | null | undefined): string | null {
+  if (!quality || quality.concealed < ROUGH_CONNECTION) return null;
+  return `The connection dropped some of the voice: ${Math.round(quality.concealed * 100)}% of it was patched over, which sounds like stutter.`;
 }

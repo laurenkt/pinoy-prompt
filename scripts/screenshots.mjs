@@ -407,6 +407,35 @@ const SCREENS = {
     await page.click('.walk-btn');
     await page.click('button:text-is("Start")');
   },
+  // A round stopped after a call whose connection patched over some of the voice, saying so.
+  'walk-rough': async (page) => {
+    await page.evaluate(async () => {
+      (await import('/src/openai.ts')).setApiKey('sk-screenshot-0000000000000000000000');
+      const { defaultWalkDeps } = await import('/src/screens/walk.ts');
+      let channel;
+      const peer = {
+        connectionState: 'connected',
+        addTrack() {},
+        getStats: async () => new Map([['in', { type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 100000, concealedSamples: 4000, packetsReceived: 97, packetsLost: 3 }]]),
+        createDataChannel: () => (channel = { readyState: 'open', send() {}, onmessage: null }),
+        createOffer: async () => ({ type: 'offer', sdp: 'offer' }),
+        setLocalDescription: async () => {},
+        setRemoteDescription: async () => setTimeout(() => channel.onmessage({ data: JSON.stringify({ type: 'session.started' }) }), 50),
+        close() {},
+      };
+      defaultWalkDeps.call = {
+        ...defaultWalkDeps.call,
+        getMicrophone: async () => new AudioContext().createMediaStreamDestination().stream,
+        createPeer: () => peer,
+        fetch: async () => new Response(JSON.stringify({ transport: { sdp: 'answer' } }), { status: 201 }),
+      };
+    });
+    await page.click('.walk-btn');
+    await page.click('button:text-is("Start")');
+    await page.waitForTimeout(3000);
+    await page.click('.walk-stop');
+    await page.waitForSelector('.walk-connection');
+  },
   // A call going, with stand-ins for OpenAI and WebRTC: a hum for each voice, so the backdrop moves, and a few lines said.
   'chat-call': async (page) => {
     await page.evaluate(async () => {

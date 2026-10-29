@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Decoded clips are kept between tests, so each test that counts fetches has its own word.
 vi.mock('./clips.json', () => ({ default: { Salamat: ['salamat-1a2b'], Opo: ['opo-a1-marin', 'opo-b2-cedar'], Sige: ['sige-c3-marin', 'sige-d4-cedar'], Oo: ['oo-3c4d'], Paalam: ['paalam-5e6f'], 'Kumusta?': ['kumusta-7a8b'] } }));
 
-const { audioBusy, IDLE_SUSPEND_MS, KEEP_DECODED, loadClip, playLive, WAKE_SECONDS } = await import('./audio-engine');
+const { audioBusy, holdAudio, IDLE_SUSPEND_MS, KEEP_DECODED, loadClip, playLive, WAKE_SECONDS } = await import('./audio-engine');
 const { canPlay, chime, clickSamples, tick, clipUrl, lastStartDelay, play, preload, setMuted, speaking, stop, voiceQuality } = await import('./speech');
 
 interface FakeSource {
@@ -325,6 +325,20 @@ describe('clips', () => {
     await play({ tl: 'Salamat' });
     expect(contexts.at(-1)).toBe(ctx);
     expect(sources.at(-1)!.started).not.toBeNull();
+  });
+
+  it('stays running while a call holds it, and lets go once idle after', async () => {
+    vi.useFakeTimers();
+    await play({ tl: 'Salamat' });
+    const ctx = contexts.at(-1)!;
+    sources.at(-1)!.onended!();
+    await Promise.resolve();
+    holdAudio(true);
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS * 3);
+    expect(ctx.state).toBe('running');
+    holdAudio(false);
+    vi.advanceTimersByTime(IDLE_SUSPEND_MS);
+    expect(ctx.state).toBe('suspended');
   });
 
   it('still lets go once idle after a context closed mid-word', async () => {

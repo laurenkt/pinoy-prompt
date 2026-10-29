@@ -471,6 +471,42 @@ export interface CallEvents {
    * for what it's given back with `append` under this id. Nothing says what it wants: that's in the transcript.
    */
   onDelegation?(id: string): void;
+  /** The microphone is open, so the page's audio is in the call's audio session: a sound started now isn't moved by it. */
+  onMicrophone?(): void;
+  /** How the AI's voice is coming through so far, every few seconds once connected. */
+  onQuality?(quality: CallQuality): void;
+}
+
+/**
+ * How the AI's voice has come through so far, from the call's receiving stats: the share of it the browser had to
+ * make up for audio lost or late on the network (heard as a stutter or warble), and the share of packets lost.
+ */
+export interface CallQuality {
+  concealed: number;
+  lost: number;
+}
+
+/** How often a call's receiving stats are read (onQuality). */
+const QUALITY_EVERY_MS = 2000;
+
+/** The voice's quality from a peer's stats, or null before any of it has arrived. */
+export function callQuality(report: RTCStatsReport): CallQuality | null {
+  let samples = 0;
+  let concealed = 0;
+  let received = 0;
+  let lost = 0;
+  // Summed over every incoming audio stream, in case the voice's changes partway.
+  report.forEach((s: Record<string, unknown>) => {
+    if (s.type !== 'inbound-rtp' || s.kind !== 'audio') return;
+    const n = (key: string) => (typeof s[key] === 'number' ? (s[key] as number) : 0);
+    samples += n('totalSamplesReceived');
+    // Silence made up while the voice sent none (between its turns) can't be heard, so isn't counted.
+    concealed += Math.max(0, n('concealedSamples') - n('silentConcealedSamples'));
+    received += n('packetsReceived');
+    lost += n('packetsLost');
+  });
+  if (!samples) return null;
+  return { concealed: concealed / samples, lost: received + lost ? lost / (received + lost) : 0 };
 }
 
 /** How the app adds to what the AI knows mid-call: something to say aloud, to know without saying, or an instruction. */
@@ -544,6 +580,11 @@ export async function startCall(
   } catch {
     throw new AiError('other', 'Chat needs the microphone. Allow it for this site and try again.');
   }
+  try {
+    if (!signal?.aborted) events.onMicrophone?.();
+  } catch {
+    // A sound that couldn't start mustn't keep the microphone from the call, or leave it open without one.
+  }
   let peer: RTCPeerConnection | null = null;
   let channel: RTCDataChannel | null = null;
   let ended = false;
@@ -562,6 +603,7 @@ export async function startCall(
   };
   let limit: ReturnType<typeof setTimeout> | undefined;
   let dropping: ReturnType<typeof setTimeout> | undefined;
+  let qualityTimer: ReturnType<typeof setInterval> | undefined;
 
   /** Why the call finished, if it did while still connecting. */
   let failure: AiError | undefined;
@@ -572,6 +614,7 @@ export async function startCall(
     released = true;
     clearTimeout(limit);
     clearTimeout(dropping);
+    clearInterval(qualityTimer);
     if (deps.releaseMicrophone) deps.releaseMicrophone(mic);
     else mic.getTracks().forEach((t) => t.stop());
     peer?.close();
@@ -649,6 +692,19 @@ export async function startCall(
     await pc.setRemoteDescription({ type: 'answer', sdp: body.transport.sdp });
     still();
     events.onAudio?.('you', mic);
+    if (events.onQuality) {
+      const onQuality = events.onQuality;
+      qualityTimer = setInterval(() => {
+        if (ended || typeof pc.getStats !== 'function') return;
+        pc.getStats().then(
+          (report) => {
+            const quality = callQuality(report);
+            if (quality && !ended) onQuality(quality);
+          },
+          () => {},
+        );
+      }, QUALITY_EVERY_MS);
+    }
   } catch (e) {
     ended = true;
     release();

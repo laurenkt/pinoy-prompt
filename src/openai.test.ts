@@ -6,6 +6,7 @@ import {
   addSpend,
   AiError,
   callCost,
+  callQuality,
   CENTS_PER_MINUTE,
   CHECK_MODEL,
   checkMeaning,
@@ -75,6 +76,10 @@ class FakeChannel {
 
 class FakePeer {
   channel = new FakeChannel();
+  stats: Record<string, unknown>[] = [];
+  async getStats() {
+    return new Map(this.stats.map((s, i) => [String(i), s])) as unknown as RTCStatsReport;
+  }
   tracks: unknown[] = [];
   remote: RTCSessionDescriptionInit | null = null;
   closed = false;
@@ -197,6 +202,38 @@ describe('startCall', () => {
     call.hangUp();
     call.append('commentary', 'Too late.', null);
     expect(f.peer.channel.sent.at(-1)).toEqual({ type: 'session.close' });
+  });
+
+  it('says when the microphone is open, before the call connects', async () => {
+    const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+    const onMicrophone = vi.fn(() => expect(f.fetchFn).not.toHaveBeenCalled());
+    await startCall(KEY, PROMPT, { ...f.events, onMicrophone }, f.deps);
+    expect(onMicrophone).toHaveBeenCalledOnce();
+  });
+
+  it('reports how the voice is coming through every couple of seconds, until the call ends', async () => {
+    vi.useFakeTimers();
+    try {
+      const f = fakeCall(json(201, { session: { id: 'live_1' }, transport: { type: 'webrtc', sdp: 'answer' } }));
+      const onQuality = vi.fn();
+      const call = await startCall(KEY, PROMPT, { ...f.events, onQuality }, f.deps);
+      f.peer.stats = [
+        { type: 'outbound-rtp', kind: 'audio', packetsSent: 500 },
+        { type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 480_000, concealedSamples: 48_000, silentConcealedSamples: 24_000, packetsReceived: 490, packetsLost: 10 },
+      ];
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(onQuality).toHaveBeenCalledWith({ concealed: 0.05, lost: 0.02 });
+      call.hangUp();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(onQuality).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('has no quality to report before any voice arrives', () => {
+    const report = new Map([['a', { type: 'inbound-rtp', kind: 'audio', totalSamplesReceived: 0 }]]) as unknown as RTCStatsReport;
+    expect(callQuality(report)).toBeNull();
   });
 
   it('starts an ordinary call without a backend', async () => {
