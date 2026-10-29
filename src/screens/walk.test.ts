@@ -252,7 +252,7 @@ describe('the live engine', () => {
     f.run.stop();
   });
 
-  it.each(['Can you explain to me what this word means?', 'Wait, what does kumusta mean again', 'Why is it said like that?'])(
+  it.each(['Can you explain to me what this word means?', 'what does kumusta mean again', 'Could you say that again?', 'Hmm'])(
     'answers an aside ("%s") without moving on',
     async (aside) => {
       const f = await started([recall('salamat'), recall('oo')]);
@@ -267,6 +267,21 @@ describe('the live engine', () => {
       f.run.stop();
     },
   );
+
+  it.each([
+    ['is it salamat?', 'salamat', 'recall', 'right'],
+    ['oh wait, salamat', 'salamat', 'recall', 'right'],
+    ['sorry, I don\'t know', 'salamat', 'recall', 'dont-know'],
+    ['wait a second', 'teka', 'listen', 'wrong'],
+    ['do you have rice', 'salamat', 'listen', 'wrong'],
+  ] as const)('takes "%s" for an answer', async (said, id, way, outcome) => {
+    const f = await started([{ card: getCard(id)!, way }, recall('oo')]);
+    f.said('you', said, 2000, 2500);
+    f.said('ai', 'Okay!', 3000, 3500);
+    await until(() => f.noted.length > 0);
+    expect(f.noted).toEqual([outcome]);
+    f.run.stop();
+  });
 
   it("doesn't take a question from the learner for an answer", async () => {
     const f = await started([recall('salamat'), recall('oo')]);

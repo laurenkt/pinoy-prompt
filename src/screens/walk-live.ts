@@ -15,7 +15,7 @@ import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call } from '../openai';
 import { chime, readySound, stop, waitingSound } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
-import { checkText, heardCommand, questionBrief, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
+import { checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
 
 /** Waited once the voice starts its reply, so the end of what the learner said reaches the transcript. */
@@ -28,12 +28,17 @@ const WRAP_UP_MS = 8000;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Something said that asks rather than answers ("what does that mean?", "can you explain it?", "say it again"), or
- * only fills a pause: the question stays, and the voice answers it and goes back to the question. Only taken so once
- * the answer hasn't passed as the card, as some cards are questions ("How are you?").
+ * An aside to the voice rather than an answer ("what does that mean?", "can you explain it?", "say it again"), or
+ * only a filler: the question stays, and the voice answers it and goes back to the question. Kept to what is clearly
+ * meant for the voice, as an answer taken for one leaves the app a question behind the voice. Only tried once the
+ * answer hasn't passed as the card and isn't a command, and never for a card whose meaning reads like one ("What
+ * does this mean?").
  */
-const ASKS =
-  /^(?:(?:um+|uh+|oh|okay|ok|so|wait|hmm+|actually|sorry|sorry but|but)[,\s]+)*(?:what does|what do|what's the|whats the|what is the|what was|what did|why|how do|how does|how would|how is|can you|could you|would you|will you|do you|is it|is that|is there|explain|tell me (?:about|what|more|why|how|again)|say (?:it|that) again|repeat|one more time|again|wait|hold on|sorry)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|right|what)[\s.!?]*$/i;
+const ASIDE =
+  /^(?:(?:um+|uh+|sorry|actually|okay|ok|hmm+)[,\s]+)*(?:what does (?:that|this|it)(?: word| one)? mean|what(?: does|'s| is) .{1,30} mean|(?:can|could|would) you (?:please )?(?:explain|repeat|say (?:it|that) again|go over)|say (?:it|that) again|tell me (?:about|more)|explain (?:it|that|this)|one more time|hold on)\b|^(?:ok(?:ay)?|yeah|uh huh|mm+|hmm+|um+|uh+|what)[\s.!?]*$/i;
+
+/** Hedges round an answer ("is it salamat?", "oh, salamat"), taken off before it's judged. */
+const HEDGE = /^(?:(?:um+|uh+|oh|so|wait|hmm+|okay|ok|is it|it's|it is|i think(?: it's)?|maybe)[,\s]+)+|[?.!\s]+$/gi;
 
 /** An answer checked by the app: how it went, and whether it could be told at all. */
 interface Check {
@@ -77,14 +82,15 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
   /** What the learner has said that's still to check, before a moment of the call. */
   const untaken = (before: number) => turns.filter((t) => t.who === 'you' && t.end > takenTo && t.start < before);
 
-  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. Null for a question to the voice. */
+  /** How the answer went: the card judged first (on the device, then OpenAI), so a card that is "Hindi ko alam" isn't taken for a command. Null for an aside to the voice. */
   async function judged(answer: string, q: WalkQuestion): Promise<Check | null> {
     const language = walkLanguage(q);
-    if ((await judgeMeaning(answer, q.card, null, language, false)).right) return { q, said: answer, outcome: 'right', unchecked: false };
-    if (ASKS.test(answer)) return null;
+    const plain = answer.replace(HEDGE, '') || answer;
+    if ((await judgeMeaning(plain, q.card, null, language, false)).right) return { q, said: answer, outcome: 'right', unchecked: false };
     const command = heardCommand(answer);
     if (command) return { q, said: answer, outcome: command, unchecked: false };
-    const { right, failure } = await judgeMeaning(answer, q.card, deps.askMeaning, language, false);
+    if (ASIDE.test(answer) && !ASIDE.test(spokenMeaning(q.card))) return null;
+    const { right, failure } = await judgeMeaning(plain, q.card, deps.askMeaning, language, false);
     // OpenAI couldn't be asked: it may well have been right, so it isn't counted.
     return { q, said: answer, outcome: right ? 'right' : 'wrong', unchecked: !right && failure !== undefined };
   }
@@ -110,7 +116,9 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
     }
     // Drills' chime for a right answer, played by the app as it knows: asking the voice to would hold it up.
     if (result.outcome === 'right') void chime();
-    view.answered(q, result.outcome, round.note(q, result.unchecked ? 'skip' : result.outcome));
+    // One OpenAI couldn't check is noted, and counted, as moved past.
+    const outcome = result.unchecked ? 'skip' : result.outcome;
+    view.answered(q, outcome, round.note(q, outcome));
     current = upcoming;
     upcoming = current && round.next();
     call?.append('thinking', roundUpdate(brief(current), brief(upcoming), checkText(q, answer, result.outcome, result.unchecked)), null);
