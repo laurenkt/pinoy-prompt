@@ -260,7 +260,10 @@ const SCREENS = {
   // A card in Study rated Again: the answer and its memory hook, with Next still in reach.
   'study-wrong': async (page) => {
     await page.click('.hub-btn.big:not(.chat-btn)');
-    await page.click('.panel .btn.big');
+    // Past any new card's introduction and quiz, to a review's back.
+    for (let i = 0; i < 12 && !(await page.$('.rate-again')); i++) {
+      await ((await page.$('.choice:not(:disabled)')) ?? (await page.$('.panel .btn.big')) ?? (await page.$('.btn.continue')))?.click();
+    }
     await page.click('.rate-again');
   },
   // A spoken attempt's results, from a drill round asking only to speak, with stand-ins for the microphone and

@@ -880,7 +880,8 @@ export function practiceScreen(
       back,
       h(
         'div',
-        { class: 'panel' },
+        // A miss shows the hook: the panel makes room for it so Next stays in reach (style.css).
+        { class: `panel${q.mode !== 'speak' && answered && !right ? ' missed' : ''}` },
         prompt,
         q.mode === 'speak' ? speak?.el : null,
         q.typed && typedAnswer(q, picked),

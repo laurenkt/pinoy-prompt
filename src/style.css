@@ -799,41 +799,55 @@ p {
 }
 
 /*
- * Once an answer brings the memory hook (a miss, mostly), what has already been read gives up height so Next stays
- * under the thumb, as it would be after a right answer, even on a short phone: the choices that were neither picked nor
- * right go (the feedback names the answer), and the prompt's word shrinks on all but tall phones. Should a long hook,
- * note or explanation still run past the screen after any answer, Next sticks to its bottom.
+ * A miss (.panel.missed, set by the view) shows the answer and its memory hook, so what has already been read gives up
+ * height to keep Next under the thumb even on a short phone: the choices neither picked nor right go (the feedback names
+ * the answer), the two left shrink to their least, and the prompt and its word shrink on all but tall phones. Next
+ * takes a moment to come alive, so a second tap meant for a choice that has just gone doesn't land on it. After any
+ * answer, should a long hook, note or explanation still run past the screen, Next sticks to its bottom.
  */
-.panel:has(> .feedback ~ .hook) > .choices .choice:disabled:not(.correct, .wrong) {
+.panel.missed > .choices .choice:disabled:not(.correct, .wrong) {
   display: none;
 }
 
-/* The two left keep their size; the spare height goes above Next, which the hook's margin keeps apart from it. */
-.panel:has(> .feedback ~ .hook) > .choices {
+/* The spare height goes above Next instead, which the hook's margin keeps apart from it. */
+.panel.missed > .choices,
+.panel.missed > .choices .choice {
   flex-grow: 0;
 }
 
-.panel:has(> .feedback ~ .hook) > .choices .choice {
-  flex-grow: 0;
+.panel.missed > .choices .choice {
   min-height: 48px;
-  padding-block: 8px;
+  padding-block: 10px;
 }
 
-.panel:has(> .feedback ~ .hook) > .feedback {
-  padding-block: 8px;
+.panel.missed > .feedback {
+  padding-block: 10px;
 }
 
-.panel:has(> .feedback ~ .hook) > .btn.continue {
+.panel.missed > .btn.continue {
   margin-top: auto;
+  animation: arming 0.4s;
 }
 
-.panel:has(> .feedback ~ .hook) > .prompt {
+@keyframes arming {
+  from,
+  to {
+    pointer-events: none;
+  }
+}
+
+.panel.missed > .prompt {
+  min-height: clamp(0px, (var(--fill) - 800px) * 1.8, 300px);
   padding: 14px 18px 24px;
   margin-bottom: 12px;
 }
 
-.panel:has(> .feedback ~ .hook) > .prompt .tl {
+.panel.missed > .prompt .tl {
   font-size: clamp(1.7rem, 1.7rem + (var(--fill) - 700px) * 0.1, 2.4rem);
+}
+
+.panel.missed > .prompt .prompt-en {
+  font-size: clamp(1.4rem, 1.4rem + (var(--fill) - 700px) * 0.06, 1.9rem);
 }
 
 .panel:has(> .feedback, > .hook) > .btn.continue {
