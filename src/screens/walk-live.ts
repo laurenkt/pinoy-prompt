@@ -8,14 +8,15 @@
 // when the voice can't tell does it say it's checking and ask the app (client
 // delegation, see startCall), which says the verdict aloud. A right answer gets
 // Drills' chime, as soon as the app's check finds it. While the call connects a
-// soft note sounds every so often, and a rising one once it's ready, for someone
-// not looking at the screen. These play through the shared context, held running
-// for the whole call (holdAudio) so it doesn't stop and start beside the voice.
+// soft note sounds every so often, for someone not looking at the screen, and
+// stops as the voice starts its greeting, with nothing of the app's over it. These
+// play through the shared context, held running for the whole call (holdAudio) so
+// it doesn't stop and start beside the voice.
 
 import { holdAudio } from '../audio-engine';
 import { judgeMeaning } from '../meaning';
 import { errorText, getApiKey, startCall, type Call, type CallQuality } from '../openai';
-import { chime, readySound, stop, waitingSound } from '../speech';
+import { chime, stop, waitingSound } from '../speech';
 import { addPiece, type SpokenTurn } from '../talk';
 import { checkText, heardCommand, questionBrief, spokenMeaning, roundUpdate, walkGreeting, walkInstructions, walkLanguage, type WalkOutcome, type WalkQuestion, type WalkRound } from '../walk';
 import type { WalkDeps, WalkRun, WalkView } from './walk';
@@ -284,7 +285,8 @@ export function startLiveWalk(round: WalkRound, view: WalkView, deps: WalkDeps):
           connected = true;
           stopWaiting();
           if (stopped) return;
-          void readySound();
+          // No sound here: the voice starts its greeting now, and a sound of the app's over its first moments is what
+          // a call on an iPhone can stutter under.
           view.status('Listening. Answer out loud.');
         },
         onTranscript: (who, text, start, endMs) => {

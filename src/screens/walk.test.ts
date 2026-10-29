@@ -135,7 +135,7 @@ describe('walk and talk', () => {
     expect(greeting).toContain('The question after it');
   });
 
-  it('sounds while it connects, and again once it is ready', async () => {
+  it('sounds while it connects, and stops without a sound of its own once the voice starts', async () => {
     setApiKey(KEY);
     const f = liveDeps();
     const root = walkScreen(fakeApp(KNOWN), f.deps);
@@ -147,10 +147,10 @@ describe('walk and talk', () => {
     expect(waiting).toBeGreaterThan(0);
     expect(chimes.count).toBe(0);
     f.send({ type: 'session.started', session: {} });
-    await until(() => chimes.count === 1);
-    // The waiting sound has stopped.
+    // The waiting sound has stopped, and nothing plays over the voice's greeting.
     await new Promise((r) => setTimeout(r, 1300));
     expect(ticks.count).toBe(waiting);
+    expect(chimes.count).toBe(0);
   });
 
   it('waits for the microphone before sounding, so the sounds start in the call\'s audio', async () => {
@@ -255,8 +255,8 @@ describe('the live engine', () => {
     f.said('ai', 'Tama! Now, how would you say how are you?', 4000, 6000);
     await until(() => f.updates().length > 0);
     expect(f.noted).toEqual(['right']);
-    // The ready sound, then the right answer's chime.
-    expect(chimes.count).toBe(2);
+    // The right answer's chime.
+    expect(chimes.count).toBe(1);
     const update = f.updates()[0].content!;
     expect(update).toContain('"Salamat": right');
     expect(update).toContain('The question now: ask how to say "How are you?"');
@@ -484,7 +484,8 @@ describe('the live engine', () => {
     f.said('ai', 'Hmm.', 3000, 3200);
     await until(() => f.updates().length > 0);
     expect(f.noted).toEqual(['skip']);
-    expect(chimes.count).toBe(1);
+    // No chime for it.
+    expect(chimes.count).toBe(0);
     expect(f.updates()[0].content).toContain("couldn't check");
     f.run.stop();
   });
