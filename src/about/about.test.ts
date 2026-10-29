@@ -4,6 +4,7 @@
 import { expect, it } from 'vitest';
 import page from '../../about.html?raw';
 import clips from '../clips.json';
+import { CENTS_PER_MINUTE } from '../openai';
 
 it('has a recorded clip for every phrase it plays', () => {
   const phrases = [...page.matchAll(/data-say="([^"]+)"/g)].map((m) => m[1]);
@@ -25,4 +26,11 @@ it("shows the coach judging the same take of the app's voice that it plays", asy
   expect(harness).toContain(`coachTake(page, 'Walang anuman', 'src/about/walang-anuman-english.mp3')`);
   const script = (await import('./about.ts?raw')).default;
   expect(script).toContain(`clipUrl({ tl: 'Walang anuman' }, false, 0)`);
+});
+
+it('states the price a call costs as the app does', () => {
+  // Chat and walk and talk, each priced by hand on the page.
+  const prices = [...page.matchAll(/(\d+)¢ a minute/g)].map((m) => Number(m[1]));
+  expect(prices.length).toBeGreaterThan(1);
+  expect(prices.filter((cents) => cents !== CENTS_PER_MINUTE)).toEqual([]);
 });
