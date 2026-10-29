@@ -83,7 +83,7 @@ interface Tally {
 /**
  * Walk and talk: a drill round to do with headphones in and the phone in a pocket (see walk.ts), run by GPT-Live
  * (walk-live.ts). A session: its close button ends the round and goes Home. While it runs, the screen shows only how
- * the round is going and a big Stop. Experimental, opened from Settings.
+ * the round is going and a big Stop. Opened from Home.
  */
 export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElement {
   const root = h('div', { class: 'walk fill' });
@@ -156,7 +156,8 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
 
   function draw(): void {
     const why = blocked();
-    if (!getApiKey()) {
+    // A reason it can't start comes first, so nobody pastes a key only to learn they need more words.
+    if (!getApiKey() && !why) {
       root.replaceChildren(header(), h('section', { class: 'card' }, h('h2', null, 'Connect OpenAI'), keyForm(draw)));
       return;
     }
@@ -176,7 +177,6 @@ export function walkScreen(app: App, deps: WalkDeps = defaultWalkDeps): HTMLElem
       body = h(
         'section',
         { class: 'panel center' },
-        h('p', { class: 'eyebrow' }, 'Experimental'),
         h('h2', null, 'Walk and talk'),
         again && tally.asked > 0 && stats(),
         h('p', null, ABOUT),

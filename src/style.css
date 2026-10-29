@@ -3003,12 +3003,12 @@ p {
   font-size: 0.85rem;
 }
 
-/* Home: four ways in. Study and Chat are the big ones; Drills and Library sit under them. */
+/* Home: four ways in. Study and Chat are the big ones; Drills and Walk and talk sit under them. */
 
 .hub {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  /* Home's spare height (see Layout), two parts to Study and Chat, one to Drills and Library. */
+  /* Home's spare height (see Layout), two parts to Study and Chat, one to Drills and Walk and talk. */
   flex: 1 0 auto;
   grid-template-rows: 2fr 1fr;
   gap: 14px;
@@ -3084,11 +3084,11 @@ p {
   background: var(--pink);
 }
 
-.library-btn {
+.walk-btn {
   background: var(--cream);
 }
 
-/* Pages opened from Home (Library, Drills, Settings): the back arrow, then the title row.
+/* Pages (Library, Settings, Drills before there are words to drill): the back arrow, then the title row.
    Settings also keeps Home's settings toggle at the right, where it was. */
 .back-bar {
   display: flex;

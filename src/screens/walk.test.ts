@@ -6,6 +6,7 @@ import { getCard } from '../deck';
 import { setApiKey, forgetApiKey, type CallDeps } from '../openai';
 import { FakeAudioContext, chimes, ticks } from '../test/fake-audio';
 import { button, fakeApp, flush } from '../test/screen';
+import { homeScreen } from './home';
 import { settingsScreen } from './settings';
 import { endWalk, walkScreen, type WalkDeps, type WalkView } from './walk';
 import { startLiveWalk } from './walk-live';
@@ -41,10 +42,20 @@ function tally(root: HTMLElement): Record<string, string> {
 }
 
 describe('opening walk and talk', () => {
-  it('is opened from Settings', () => {
+  it('is opened from Home, in the place Library had', () => {
     const app = fakeApp(KNOWN);
-    button(settingsScreen(app), 'Walk and talk').click();
+    const home = homeScreen(app);
+    const hub = [...home.querySelectorAll('.hub .hub-title')].map((t) => t.textContent);
+    // After Study (whatever it says) and Chat, beside Drills.
+    expect(hub.slice(1)).toEqual(['Chat', 'Drills', 'Walk & talk']);
+    home.querySelector<HTMLButtonElement>('.walk-btn')!.click();
     expect(app.navigate).toHaveBeenLastCalledWith({ name: 'walk' });
+  });
+
+  it('has left Settings, and Settings has no Experimental section', () => {
+    const settings = settingsScreen(fakeApp(KNOWN));
+    expect([...settings.querySelectorAll('button')].some((b) => b.textContent === 'Walk and talk')).toBe(false);
+    expect([...settings.querySelectorAll('h2')].map((t) => t.textContent)).not.toContain('Experimental');
   });
 
   it('is a session that closes to Home', () => {
@@ -63,6 +74,11 @@ describe('opening walk and talk', () => {
     expect(walkScreen(fakeApp(KNOWN, { sound: false }), deps).textContent).toContain('needs the sound and the mic on');
     expect(walkScreen(fakeApp(KNOWN, { mic: false }), deps).textContent).toContain('needs the sound and the mic on');
     expect(walkScreen(fakeApp(['salamat']), deps).textContent).toContain('Learn at least');
+    // Before asking for a key.
+    forgetApiKey();
+    const unkeyed = walkScreen(fakeApp(['salamat']), deps).textContent;
+    expect(unkeyed).toContain('Learn at least');
+    expect(unkeyed).not.toContain('Connect OpenAI');
   });
 
   it('asks for a key first', () => {

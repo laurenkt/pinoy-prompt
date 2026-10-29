@@ -97,6 +97,13 @@ export function settingsScreen(app: App): HTMLElement {
       h(
         'section',
         { class: 'card' },
+        h('h2', null, 'Library'),
+        h('p', { class: 'muted small' }, 'Every word, phrase and guide in the app, with how well you know each one.'),
+        h('button', { class: 'btn secondary', onclick: () => app.navigate({ name: 'words' }) }, icon('cards'), ' Open the Library'),
+      ),
+      h(
+        'section',
+        { class: 'card' },
         h('h2', null, 'New cards per day'),
         h('p', { class: 'muted small' }, 'Fewer means lighter reviews later. 8 is a good start.'),
         h(
@@ -159,17 +166,6 @@ export function settingsScreen(app: App): HTMLElement {
       ),
       ...(badgeSupported() ? [iconBadgeCard(app, draw)] : []),
       h('section', { class: 'card' }, h('h2', null, 'Chat'), keyForm(draw)),
-      h(
-        'section',
-        { class: 'card' },
-        h('h2', null, 'Experimental'),
-        h(
-          'p',
-          { class: 'muted small' },
-          'Walk and talk: drills you hear and answer out loud, with headphones in, asked by a live AI voice on your OpenAI key.',
-        ),
-        h('button', { class: 'btn secondary', onclick: () => app.navigate({ name: 'walk' }) }, 'Walk and talk'),
-      ),
       h(
         'section',
         { class: 'card' },

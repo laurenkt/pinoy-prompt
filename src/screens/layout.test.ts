@@ -24,16 +24,29 @@ const closeButtons = (root: HTMLElement) => root.querySelectorAll('.session-head
 
 describe('page and session layouts', () => {
   it.each([
-    ['Library', wordsScreen],
-    ['Settings', settingsScreen],
-  ])('%s is a page: a back arrow to Home above its title', (title, screen) => {
+    ['Library', wordsScreen, 'settings', 'Back to Settings'],
+    ['Settings', settingsScreen, 'home', 'Home'],
+  ] as const)('%s is a page: a back arrow to where it was opened from above its title', (title, screen, to, label) => {
     const app = fakeApp(KNOWN);
     const root = screen(app);
     expect(backArrows(root)).toBe(1);
     expect(closeButtons(root)).toBe(0);
     expect(root.querySelector('.page-header h1')?.textContent).toBe(title);
-    root.querySelector<HTMLButtonElement>('.back-bar button')!.click();
-    expect(app.navigate).toHaveBeenCalledWith({ name: 'home' });
+    const back = root.querySelector<HTMLButtonElement>('.back-bar button')!;
+    expect(back.getAttribute('aria-label')).toBe(label);
+    back.click();
+    expect(app.navigate).toHaveBeenCalledWith({ name: to });
+  });
+
+  it('opens the Library from Settings, and the back gesture goes back there', () => {
+    const app = fakeApp(KNOWN);
+    [...settingsScreen(app).querySelectorAll('button')].find((b) => b.textContent?.includes('Open the Library'))!.click();
+    expect(app.navigate).toHaveBeenLastCalledWith({ name: 'words' });
+    let back: (() => void) | null = null;
+    app.onBack = (handler) => (back = handler);
+    wordsScreen(app);
+    back!();
+    expect(app.navigate).toHaveBeenLastCalledWith({ name: 'settings' });
   });
 
   it("keeps Home's settings button on Settings, pressed, so a second tap closes it", () => {

@@ -8,7 +8,7 @@ export type Route =
   | { name: 'practice' }
   /** `start` begins a call straight away, so Home's Chat button is one tap. */
   | { name: 'talk'; start?: boolean }
-  /** Walk and talk (experimental, from Settings). */
+  /** Walk and talk, from Home. */
   | { name: 'walk' }
   | { name: 'words' }
   | { name: 'settings' };

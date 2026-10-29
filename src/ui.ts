@@ -182,13 +182,13 @@ export function settingsToggle(app: App, open: boolean): HTMLButtonElement {
 }
 
 /**
- * The top of a page opened from Home: the back arrow, then the title and any one control beside it.
- * A page opened by one of Home's header toggles (Settings) shows that toggle, on, where it was on Home,
+ * The top of a page: the back arrow (to Home, or where `backTo` names), then the title and any one control
+ * beside it. A page opened by one of Home's header toggles (Settings) shows that toggle, on, where it was on Home,
  * so tapping it again closes the page.
  */
-export function pageHeader(title: string, onBack: () => void, action?: Node | false | null, opener?: Node): HTMLElement[] {
+export function pageHeader(title: string, onBack: () => void, action?: Node | false | null, opener?: Node, backTo = 'Home'): HTMLElement[] {
   return [
-    h('nav', { class: 'back-bar' }, iconButton('back', 'Home', onBack, { title: 'Home' }), opener),
+    h('nav', { class: 'back-bar' }, iconButton('back', backTo, onBack, { title: backTo }), opener),
     h('header', { class: 'page-header' }, h('h1', null, title), action),
   ];
 }
