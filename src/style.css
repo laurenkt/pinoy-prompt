@@ -737,7 +737,8 @@ p {
 }
 
 /* Study's burn-down (screens/burn-down.ts), on a big backlog only: the cards left after each answer, beside how many
-   are done. Drawn straight on the screen like Home's chart, under the header's count of what's left. */
+   are done, on a true scale from nothing, with the way down from here hatched like Home's forecast. Drawn straight
+   on the screen like Home's chart, under the header's count of what's left. */
 .burn-down {
   display: flex;
   align-items: flex-end;
@@ -764,9 +765,29 @@ p {
 }
 
 .burn-frame {
+  position: relative;
   flex: 1;
   min-width: 0;
   height: 64px;
+}
+
+/* The scale at the right, where the way down leaves room: the most cards left, and nothing. */
+.burn-scale {
+  position: absolute;
+  right: 0;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.burn-scale.top {
+  top: 0;
+}
+
+.burn-scale.bottom {
+  bottom: 8px;
 }
 
 .burn-svg {
@@ -780,10 +801,21 @@ p {
   fill: var(--saffron);
 }
 
-.burn-svg .burn-start {
-  fill: none;
-  stroke: var(--muted);
+.burn-svg .burn-ahead {
+  fill: url(#burn-hatch);
+}
+
+.burn-svg .hatch {
+  fill: var(--line);
+}
+
+.burn-svg .burn-base {
+  stroke: var(--line);
   stroke-width: 3px;
+}
+
+.burn-svg .burn-edge.burn-ahead-edge {
+  stroke: var(--muted);
   stroke-dasharray: 8 6;
 }
 
