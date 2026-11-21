@@ -1,5 +1,5 @@
 // An experiment: when Study opens on a big backlog (after a few days away), a small burn-down under its header
-// shows the cards left after every answer, which can rise as missed cards come back, and how many are done.
+// shows how far down the pile the session has come, on a true scale, and how many answers are done.
 // Self-contained so it can be taken out again: Study's screen only starts it and feeds it its own count.
 
 import { svg, h } from '../ui';
@@ -31,33 +31,28 @@ export function settleLeft(burn: BurnDown, left: number): void {
   burn.left[burn.left.length - 1] = left;
 }
 
-/** The fewest answers the chart spans, so the first few don't each stretch across the whole width. */
-const MIN_SPAN = 20;
-/** The fewest cards the chart's height spans, so one card more or less is a small step, not a cliff. */
-const MIN_RANGE = 20;
-
 /**
- * The chart: cards left after each answer, a step per answer, so each one shows whether the pile went down or a
- * missed card came back. Its height spans the counts this session has seen rather than starting from nothing, so the
- * steps can be told apart on a pile of a hundred or more; the dashed line is where the session started. It spans
- * the answers so far (at least MIN_SPAN), filling out as the session goes on.
+ * The chart, on a true scale: up the side, nothing to the most cards left this session (labelled); along the
+ * bottom, the answers so far and as many again as there are cards left, re-fitted after every answer. Behind the
+ * latest answer, the cards left after each one, in saffron; ahead of it, hatched like Home's forecast, the way down
+ * to nothing if every answer from here cleared a card. So three answers into a pile of 439 is a sliver at the left.
+ * On a pile that size a single card is a fraction of a pixel: the chart shows how far down the pile has come, not
+ * each answer, which the header's count does.
  */
 export function burnDownChart(burn: BurnDown): HTMLElement {
   const { left } = burn;
   const done = left.length - 1;
   const now = left[done];
-  const span = Math.max(done, MIN_SPAN);
-  const low = Math.min(...left);
-  const high = Math.max(...left, low + MIN_RANGE);
-  // A little room above and below, so the outline at either end isn't clipped.
-  const pad = (high - low) * 0.1;
-  const yOf = (n: number) => f(H - ((n - low + pad) / (high - low + 2 * pad)) * H);
+  const top = Math.max(...left, 1);
+  // The answers so far, and at least as many again as there are cards left.
+  const span = Math.max(done + now, 1);
+  const yOf = (n: number) => f(H - (n / top) * H);
   const xOf = (i: number) => f((i / span) * W);
   // Level for each answer, then a step to the next count.
   let line = `M0,${yOf(left[0])}`;
   for (let i = 1; i <= done; i++) line += ` H${xOf(i)} V${yOf(left[i])}`;
-  const end = xOf(Math.max(done, 0.5));
-  if (!done) line += ` H${end}`;
+  const here = `${xOf(done)},${yOf(now)}`;
+  const ahead = `M${here} L${xOf(span)},${H}`;
   const plot = svg(
     'svg',
     {
@@ -65,17 +60,35 @@ export function burnDownChart(burn: BurnDown): HTMLElement {
       preserveAspectRatio: 'none',
       class: 'burn-svg',
       role: 'img',
-      'aria-label': `Cards left after each answer: ${left[0]} at the start, ${now} now.`,
+      'aria-label': `Cards left after each answer: ${left[0]} at the start, ${now} now, after ${done} ${done === 1 ? 'answer' : 'answers'}.`,
     },
-    svg('path', { d: `${line} V${H} H0 Z`, class: 'burn-area' }),
-    svg('path', { d: `M0,${yOf(left[0])} H${W}`, class: 'burn-start', 'vector-effect': 'non-scaling-stroke' }),
-    svg('path', { d: line, class: 'burn-edge', 'vector-effect': 'non-scaling-stroke' }),
+    svg(
+      'defs',
+      {},
+      svg(
+        'pattern',
+        { id: 'burn-hatch', patternUnits: 'userSpaceOnUse', width: 8, height: 8, patternTransform: 'rotate(45)' },
+        svg('rect', { width: 4, height: 8, class: 'hatch' }),
+      ),
+    ),
+    svg('path', { d: `${ahead} L${xOf(done)},${H} Z`, class: 'burn-ahead' }),
+    done ? svg('path', { d: `${line} V${H} H0 Z`, class: 'burn-area' }) : '',
+    svg('path', { d: `M0,${H} H${W}`, class: 'burn-base', 'vector-effect': 'non-scaling-stroke' }),
+    svg('path', { d: ahead, class: 'burn-edge burn-ahead-edge', 'vector-effect': 'non-scaling-stroke' }),
+    done ? svg('path', { d: line, class: 'burn-edge', 'vector-effect': 'non-scaling-stroke' }) : '',
   );
   return h(
     'div',
     { class: 'burn-down' },
-    h('p', { class: 'burn-done' }, h('strong', null, String(done)), ' done', h('span', { class: 'small' }, `from ${left[0]}`)),
-    h('div', { class: 'burn-frame' }, plot),
+    h('p', { class: 'burn-done' }, h('strong', null, String(done)), ' done'),
+    h(
+      'div',
+      { class: 'burn-frame' },
+      plot,
+      // The scale, so a sliver reads as a sliver of the whole pile.
+      h('span', { class: 'burn-scale top small', 'aria-hidden': 'true' }, String(top)),
+      h('span', { class: 'burn-scale bottom small', 'aria-hidden': 'true' }, '0'),
+    ),
   );
 }
 

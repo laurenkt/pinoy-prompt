@@ -62,7 +62,7 @@ describe('burn-down record', () => {
     expect(burn.left).toEqual([60, 59, 61, 0]);
     const chart = burnDownChart(burn);
     expect(chart.querySelector('.burn-done strong')!.textContent).toBe('3');
-    expect(chart.querySelector('.burn-edge')!.getAttribute('d')).toMatch(/^M0,.* H.* V.* H.* V.* H.* V/);
+    expect(chart.querySelector('.burn-edge:not(.burn-ahead-edge)')!.getAttribute('d')).toMatch(/^M0,.* H.* V.* H.* V.* H.* V/);
   });
 
   it('follows the header when its count changes between answers, so the next step is only that answer', () => {
@@ -76,6 +76,20 @@ describe('burn-down record', () => {
     expect(left(root)).toBeLessThan(before);
     expect(done(root)).toBe('1');
     expect(root.querySelector('.burn-svg')!.getAttribute('aria-label')).toContain(`${left(root)} now`);
+  });
+
+  it('draws a pile on a true scale: three answers into 439 is a sliver at the top left, not most of the chart', () => {
+    const burn = startBurnDown(439)!;
+    for (const n of [438, 437, 436]) noteLeft(burn, n);
+    const chart = burnDownChart(burn);
+    // Nothing to the most cards left, up the side.
+    expect(chart.querySelector('.burn-scale.top')!.textContent).toBe('439');
+    expect(chart.querySelector('.burn-scale.bottom')!.textContent).toBe('0');
+    // Every point of the line so far near the top (436 of 439) and the left (3 answers of the 439 the session spans).
+    const nums = chart.querySelector('.burn-edge:not(.burn-ahead-edge)')!.getAttribute('d')!.match(/[\d.]+/g)!.map(Number);
+    expect(Math.max(...nums)).toBeLessThan(3);
+    // The way down from here reaches nothing at the right edge.
+    expect(chart.querySelector('.burn-ahead-edge')!.getAttribute('d')).toMatch(/L320\.0,100$/);
   });
 
   it('starts only at the threshold', () => {
