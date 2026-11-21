@@ -758,12 +758,6 @@ p {
   font-variant-numeric: tabular-nums;
 }
 
-/* Where the session started, under the count of what's done. */
-.burn-done .small {
-  display: block;
-  font-variant-numeric: tabular-nums;
-}
-
 .burn-frame {
   position: relative;
   flex: 1;
@@ -787,7 +781,8 @@ p {
 }
 
 .burn-scale.bottom {
-  bottom: 8px;
+  /* Just clear of the zero line. */
+  bottom: 5px;
 }
 
 .burn-svg {

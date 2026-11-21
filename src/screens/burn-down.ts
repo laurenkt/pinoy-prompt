@@ -1,5 +1,5 @@
 // An experiment: when Study opens on a big backlog (after a few days away), a small burn-down under its header
-// shows the cards left after every answer, which can rise as missed cards come back, and how many are done.
+// shows how far down the pile the session has come, on a true scale, and how many answers are done.
 // Self-contained so it can be taken out again: Study's screen only starts it and feeds it its own count.
 
 import { svg, h } from '../ui';
@@ -32,10 +32,12 @@ export function settleLeft(burn: BurnDown, left: number): void {
 }
 
 /**
- * The chart, on a true scale: up the side, nothing to the most cards left this session; along the bottom, one step
- * per answer. Behind the latest answer, a step line of the cards left after each one, flat where a missed card stayed
- * due, up where cards came in. Ahead of it, hatched like Home's forecast, the way down to nothing if every answer from
- * here cleared a card, so the width is the whole session: three answers into a pile of 439 is a sliver at the left.
+ * The chart, on a true scale: up the side, nothing to the most cards left this session (labelled); along the
+ * bottom, the answers so far and as many again as there are cards left, re-fitted after every answer. Behind the
+ * latest answer, the cards left after each one, in saffron; ahead of it, hatched like Home's forecast, the way down
+ * to nothing if every answer from here cleared a card. So three answers into a pile of 439 is a sliver at the left.
+ * On a pile that size a single card is a fraction of a pixel: the chart shows how far down the pile has come, not
+ * each answer, which the header's count does.
  */
 export function burnDownChart(burn: BurnDown): HTMLElement {
   const { left } = burn;
@@ -78,7 +80,7 @@ export function burnDownChart(burn: BurnDown): HTMLElement {
   return h(
     'div',
     { class: 'burn-down' },
-    h('p', { class: 'burn-done' }, h('strong', null, String(done)), ' done', h('span', { class: 'small' }, `from ${left[0]}`)),
+    h('p', { class: 'burn-done' }, h('strong', null, String(done)), ' done'),
     h(
       'div',
       { class: 'burn-frame' },
