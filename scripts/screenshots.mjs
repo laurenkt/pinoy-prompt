@@ -226,6 +226,31 @@ const SCREENS = {
   'drills-picture-answered': (page) => pictureRecall(page, true),
   'drills-build': (page) => drillGuide(page, 'recall'),
   study: (page) => page.click('.hub-btn.big:not(.chat-btn)'),
+  // Back after days away, with 60 words due: Study's burn-down after 16 answers, a few of them forgotten.
+  'study-backlog': async (page) => {
+    await page.evaluate(async () => {
+      const { load, recordAnswer, save } = await import('/src/store.ts');
+      const { LEARN_ORDER } = await import('/src/deck.ts');
+      const progress = load(Date.now());
+      for (const id of LEARN_ORDER.slice(0, 60)) recordAnswer(progress, id, 'good', Date.now() - 9 * 86_400_000);
+      for (const state of Object.values(progress.cards)) state.due = Date.now() - 86_400_000;
+      progress.today.newCount = progress.settings.dailyNew;
+      save(progress, { replace: true });
+    });
+    await page.reload();
+    await page.click('.hub-btn.big:not(.chat-btn)');
+    for (let i = 0; i < 40 && Number(await page.textContent('.burn-done strong')) < 16; i++) {
+      // Now and then forgotten, so the count goes back up as well as down.
+      const next =
+        (i % 5 === 3 ? await page.$('.rate-again') : null) ??
+        (await page.$('.choice:not(:disabled)')) ??
+        (await page.$('.meaning-form .btn.secondary')) ??
+        (await page.$('.rate-good')) ??
+        (await page.$('.panel .btn.big'));
+      if (!next) throw new Error('Nothing to answer in Study');
+      await next.click();
+    }
+  },
   // A word due to be recalled in Study, asked from its picture and turned over to rate.
   'study-picture': async (page) => {
     await page.evaluate(async () => {

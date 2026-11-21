@@ -28,6 +28,7 @@ import { recordAnswer, rollDay } from '../store';
 import { audioPair, choiceList, h, hookView, iconButton, progressBar, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { drillPrompt, gapLine, guideAnswer, guideBody, guideFeedback, guideQuestion, guideQuestionView, sentenceClip, type GuideQuestion } from './guide-question';
+import { burnDownChart, caughtUp, noteLeft, startBurnDown } from './burn-down';
 import { quietToggle } from './quiet';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'caught-up' | 'done';
@@ -94,6 +95,15 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     ({ step, card, phase, format, choices, picked, hookShown, pictured, drill, guide, praise } = s);
   }
 
+  /** Counting down to caught up, as Study will see it: a new day brings new cards. */
+  function leftToStudy(): number {
+    const now = app.now();
+    const { reviews, fresh } = studyLeft(rollDay(app.progress, now), now, abilities(app.progress, canPlay()));
+    return reviews + fresh;
+  }
+  /** Open-ended study that starts on a big backlog charts the count after every answer (see burn-down.ts). */
+  const burn = open ? startBurnDown(leftToStudy()) : null;
+
   holdOnTap(root, hold);
 
   /** Listening needs a voice, and the sound on. */
@@ -144,6 +154,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     if (!step || !card) {
       // Open-ended study runs until it's caught up, then points on to Drills.
       phase = open ? 'caught-up' : 'done';
+      if (burn) caughtUp(burn);
     } else if (step.kind === 'new' && !isIntroduced(app.progress, card.id)) {
       const unit = unitOf(card.id);
       const unitIsFresh = unit && !unit.cards.some((c) => isIntroduced(app.progress, c.id));
@@ -199,6 +210,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     // Another way of asking a word already met isn't a new word (see Way).
     if (wasNew && (step.way ?? 'read') === 'read') stats.learned++;
     else stats.reviewed++;
+    if (burn) noteLeft(burn, leftToStudy());
     if (open) return;
     // Open-ended study brings a missed card back by itself: it's still being learned.
     if (rating === 'again') queue = requeue(queue, step);
@@ -341,12 +353,9 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
 
   function header(): HTMLElement {
     if (open) {
-      // Counting down to caught up, as Study will see it: a new day brings new cards. Once it says it's caught up,
-      // nothing is left, even a way of the card just shown that it won't ask straight after it, and looking back
-      // from there doesn't change that.
-      const now = app.now();
-      const { reviews, fresh } = studyLeft(rollDay(app.progress, now), now, abilities(app.progress, canPlay()));
-      const left = (reviewing?.phase ?? phase) === 'caught-up' ? 0 : reviews + fresh;
+      // Once it says it's caught up, nothing is left, even a way of the card just shown that it won't ask straight
+      // after it, and looking back from there doesn't change that.
+      const left = (reviewing?.phase ?? phase) === 'caught-up' ? 0 : leftToStudy();
       return h(
         'header',
         { class: 'session-header' },
@@ -372,6 +381,7 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   function draw(): void {
     root.replaceChildren(
       header(),
+      ...(burn ? [burnDownChart(burn)] : []),
       h('div', { class: 'session-body' }, previous && !reviewing && UNANSWERED.includes(phase) && previousButton(lookBack), body()),
     );
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
