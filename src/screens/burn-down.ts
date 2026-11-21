@@ -23,9 +23,12 @@ export function noteLeft(burn: BurnDown, left: number): void {
   burn.left.push(left);
 }
 
-/** Caught up means nothing is left, as the header says, even if the last count still held a way it won't ask yet. */
-export function caughtUp(burn: BurnDown): void {
-  if (burn.left.length > 1) burn.left[burn.left.length - 1] = 0;
+/**
+ * Keep the latest count on the header's: it can change between answers (the sound turned off, a new day, caught up),
+ * and the next answer's step should only show what that answer did.
+ */
+export function settleLeft(burn: BurnDown, left: number): void {
+  burn.left[burn.left.length - 1] = left;
 }
 
 /** The fewest answers the chart spans, so the first few don't each stretch across the whole width. */

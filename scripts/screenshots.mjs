@@ -239,6 +239,7 @@ const SCREENS = {
     });
     await page.reload();
     await page.click('.hub-btn.big:not(.chat-btn)');
+    if (!(await page.$('.burn-down'))) throw new Error('Study opened without its burn-down: fewer cards due than it needs');
     for (let i = 0; i < 40 && Number(await page.textContent('.burn-done strong')) < 16; i++) {
       // Now and then forgotten, so the count goes back up as well as down.
       const next =

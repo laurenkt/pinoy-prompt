@@ -742,7 +742,7 @@ p {
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  margin: -8px 0 14px;
+  margin: 0 0 14px;
 }
 
 .burn-done {
@@ -753,7 +753,6 @@ p {
 }
 
 .burn-done strong {
-  font-size: 1.5rem;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
@@ -784,8 +783,8 @@ p {
 .burn-svg .burn-start {
   fill: none;
   stroke: var(--muted);
-  stroke-width: 2px;
-  stroke-dasharray: 6 5;
+  stroke-width: 3px;
+  stroke-dasharray: 8 6;
 }
 
 .burn-svg .burn-edge {

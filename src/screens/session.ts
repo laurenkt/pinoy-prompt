@@ -28,7 +28,7 @@ import { recordAnswer, rollDay } from '../store';
 import { audioPair, choiceList, h, hookView, iconButton, progressBar, recallCue } from '../ui';
 import { continueButton, countdown, holdOnTap, previousButton, type Countdown } from './auto-advance';
 import { drillPrompt, gapLine, guideAnswer, guideBody, guideFeedback, guideQuestion, guideQuestionView, sentenceClip, type GuideQuestion } from './guide-question';
-import { burnDownChart, caughtUp, noteLeft, startBurnDown } from './burn-down';
+import { burnDownChart, noteLeft, settleLeft, startBurnDown } from './burn-down';
 import { quietToggle } from './quiet';
 
 type Phase = 'topic-intro' | 'intro' | 'quiz' | 'feedback' | 'front' | 'back' | 'missed' | 'caught-up' | 'done';
@@ -154,7 +154,6 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
     if (!step || !card) {
       // Open-ended study runs until it's caught up, then points on to Drills.
       phase = open ? 'caught-up' : 'done';
-      if (burn) caughtUp(burn);
     } else if (step.kind === 'new' && !isIntroduced(app.progress, card.id)) {
       const unit = unitOf(card.id);
       const unitIsFresh = unit && !unit.cards.some((c) => isIntroduced(app.progress, c.id));
@@ -356,6 +355,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
       // Once it says it's caught up, nothing is left, even a way of the card just shown that it won't ask straight
       // after it, and looking back from there doesn't change that.
       const left = (reviewing?.phase ?? phase) === 'caught-up' ? 0 : leftToStudy();
+      // The chart drawn under the header ends on this same count.
+      if (burn) settleLeft(burn, left);
       return h(
         'header',
         { class: 'session-header' },
@@ -381,7 +382,8 @@ export function sessionScreen(app: App, steps: Step[] | null, title?: string): H
   function draw(): void {
     root.replaceChildren(
       header(),
-      ...(burn ? [burnDownChart(burn)] : []),
+      // Not over the summary, which has its own numbers.
+      ...(burn && phase !== 'done' ? [burnDownChart(burn)] : []),
       h('div', { class: 'session-body' }, previous && !reviewing && UNANSWERED.includes(phase) && previousButton(lookBack), body()),
     );
     if (!autoMoved) root.querySelector<HTMLElement>('[data-autofocus]')?.focus({ preventScroll: true });
